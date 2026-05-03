@@ -34,6 +34,9 @@ function SuwayomiPlugin:createDownloadQueue()
         downloader = require("suwayomi_downloader"),
         ui_manager = UIManager,
         ffi_util = require("ffi/util"),
+        max_active_chapters = SuwayomiSettings.loadMaxParallelChapterDownloads
+            and SuwayomiSettings:loadMaxParallelChapterDownloads()
+            or nil,
         getCredentials = function()
             return SuwayomiSettings:load()
         end,

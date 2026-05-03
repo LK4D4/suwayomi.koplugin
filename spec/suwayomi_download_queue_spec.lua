@@ -427,6 +427,12 @@ describe("suwayomi_download_queue", function()
         assert.are.equal("queued", context.queue:getStatus(manga, chapters[3]).state)
     end)
 
+    it("clamps the active chapter limit to the supported range", function()
+        assert.are.equal(1, build_queue({ max_active_chapters = 0 }).queue.max_active_chapters)
+        assert.are.equal(4, build_queue({ max_active_chapters = 99 }).queue.max_active_chapters)
+        assert.are.equal(3, build_queue({ max_active_chapters = "3" }).queue.max_active_chapters)
+    end)
+
     it("backfills a completed active slot while another chapter keeps downloading", function()
         local context = build_queue({
             max_active_chapters = 2,

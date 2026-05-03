@@ -134,6 +134,35 @@ describe("suwayomi_settings", function()
         assert.are.same(jobs, stored_data.download_queue)
     end)
 
+    it("loads two parallel chapter downloads by default", function()
+        local settings = require("suwayomi_settings")
+
+        assert.are.equal(2, settings:loadMaxParallelChapterDownloads())
+    end)
+
+    it("clamps persisted parallel chapter downloads to the supported range", function()
+        local settings = require("suwayomi_settings")
+
+        stored_data.max_parallel_chapter_downloads = 0
+        assert.are.equal(1, settings:loadMaxParallelChapterDownloads())
+
+        stored_data.max_parallel_chapter_downloads = 9
+        assert.are.equal(4, settings:loadMaxParallelChapterDownloads())
+
+        stored_data.max_parallel_chapter_downloads = "3"
+        assert.are.equal(3, settings:loadMaxParallelChapterDownloads())
+    end)
+
+    it("saves clamped parallel chapter download settings", function()
+        local settings = require("suwayomi_settings")
+
+        local saved = settings:saveMaxParallelChapterDownloads(9)
+
+        assert.is_true(flushed)
+        assert.are.equal(4, saved)
+        assert.are.equal(4, stored_data.max_parallel_chapter_downloads)
+    end)
+
     it("loads an empty chapter ledger by default", function()
         local settings = require("suwayomi_settings")
 

@@ -345,6 +345,27 @@ describe("suwayomi plugin", function()
         assert.are.equal(4, #menu_items.suwayomi_dl.sub_item_table)
     end)
 
+    it("configures the download queue with the saved parallel chapter limit", function()
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example" }
+                end,
+                loadMaxParallelChapterDownloads = function()
+                    return 3
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local queue = plugin:createDownloadQueue()
+
+        assert.are.equal(3, queue.max_active_chapters)
+    end)
+
     it("opens the login dialog with persisted credentials", function()
         local plugin_class = require("main")
         local menu_items = {}

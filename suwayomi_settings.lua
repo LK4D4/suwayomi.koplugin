@@ -15,6 +15,9 @@ local DEFAULT_CREDENTIALS = {
 
 local DEFAULT_SOURCE_LANGUAGES = { "en" }
 local DEFAULT_DOWNLOAD_DIRECTORY = ""
+local DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS = 2
+local MIN_PARALLEL_CHAPTER_DOWNLOADS = 1
+local MAX_PARALLEL_CHAPTER_DOWNLOADS = 4
 
 local function copyTable(source)
     local target = {}
@@ -22,6 +25,18 @@ local function copyTable(source)
         target[key] = value
     end
     return target
+end
+
+function SuwayomiSettings:normalizeMaxParallelChapterDownloads(value)
+    local normalized = tonumber(value) or DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS
+    normalized = math.floor(normalized)
+    if normalized < MIN_PARALLEL_CHAPTER_DOWNLOADS then
+        return MIN_PARALLEL_CHAPTER_DOWNLOADS
+    end
+    if normalized > MAX_PARALLEL_CHAPTER_DOWNLOADS then
+        return MAX_PARALLEL_CHAPTER_DOWNLOADS
+    end
+    return normalized
 end
 
 function SuwayomiSettings:open()
@@ -102,6 +117,18 @@ function SuwayomiSettings:saveDownloadQueue(jobs)
     end
 
     self:open():saveSetting("download_queue", normalized):flush()
+    return normalized
+end
+
+function SuwayomiSettings:loadMaxParallelChapterDownloads()
+    return self:normalizeMaxParallelChapterDownloads(
+        self:open():readSetting("max_parallel_chapter_downloads", DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS)
+    )
+end
+
+function SuwayomiSettings:saveMaxParallelChapterDownloads(value)
+    local normalized = self:normalizeMaxParallelChapterDownloads(value)
+    self:open():saveSetting("max_parallel_chapter_downloads", normalized):flush()
     return normalized
 end
 

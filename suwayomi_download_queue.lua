@@ -8,6 +8,20 @@ DownloadQueue.POLL_INTERVAL_SECONDS = 0.5
 DownloadQueue.WATCHDOG_TIMEOUT_SECONDS = 30 * 60
 DownloadQueue.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS = 58
 DownloadQueue.MAX_ACTIVE_CHAPTERS = 2
+DownloadQueue.MIN_ACTIVE_CHAPTERS = 1
+DownloadQueue.MAX_SUPPORTED_ACTIVE_CHAPTERS = 4
+
+function DownloadQueue:normalizeActiveChapterLimit(value)
+    local limit = tonumber(value) or self.MAX_ACTIVE_CHAPTERS
+    limit = math.floor(limit)
+    if limit < self.MIN_ACTIVE_CHAPTERS then
+        return self.MIN_ACTIVE_CHAPTERS
+    end
+    if limit > self.MAX_SUPPORTED_ACTIVE_CHAPTERS then
+        return self.MAX_SUPPORTED_ACTIVE_CHAPTERS
+    end
+    return limit
+end
 
 function DownloadQueue:new(options)
     options = options or {}
@@ -24,7 +38,7 @@ function DownloadQueue:new(options)
         statuses = {},
         active_jobs = {},
         poll_scheduled = false,
-        max_active_chapters = options.max_active_chapters or self.MAX_ACTIVE_CHAPTERS,
+        max_active_chapters = self:normalizeActiveChapterLimit(options.max_active_chapters),
     }
     return setmetatable(queue, self)
 end
@@ -38,7 +52,13 @@ function DownloadQueue:getActiveCount()
 end
 
 function DownloadQueue:getActiveJob(key)
-    return self.active_jobs and self.active_jobs[key]
+    if self.active_jobs and self.active_jobs[key] then
+        return self.active_jobs[key]
+    end
+    if self.active and (self.active.key or self:getKey(self.active.manga, self.active.chapter)) == key then
+        return self.active
+    end
+    return nil
 end
 
 function DownloadQueue:setActiveJob(job)
