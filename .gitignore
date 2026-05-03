@@ -1,1 +1,9 @@
 .worktrees/
+.codex-tmp/
+docs/superpowers/plans/
+.tmp-*/
+luasocket-*/
+testdll.c
+testdll.dll
+testlua.c
+testlua.dll
