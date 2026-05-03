@@ -194,6 +194,30 @@ function SuwayomiUI.showLanguageMenu(options)
     return menu
 end
 
+function SuwayomiUI.showParallelDownloadsMenu(options)
+    options = options or {}
+    local menu_table = {}
+    local current = tonumber(options.current) or 2
+    for _, value in ipairs(options.choices or { 1, 2, 3, 4 }) do
+        table.insert(menu_table, {
+            text = string.format("%s %d", value == current and "[x]" or "[ ]", value),
+            callback = function()
+                if options.onSelect then
+                    options.onSelect(value)
+                end
+            end,
+        })
+    end
+
+    local UIManager = require("ui/uimanager")
+    local menu = Menu:new{
+        title = _("Parallel chapter downloads"),
+        item_table = menu_table,
+    }
+    UIManager:show(menu)
+    return menu
+end
+
 function SuwayomiUI.updateLanguageMenu(menu, options, onToggleCallback)
     if not menu then
         return

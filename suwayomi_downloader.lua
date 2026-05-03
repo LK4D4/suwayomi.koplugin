@@ -61,7 +61,8 @@ function Downloader:writeProgress(progress_path, state, current, total, path, er
         return
     end
 
-    local handle = io.open(progress_path, "w")
+    local tmp_path = tostring(progress_path) .. ".tmp"
+    local handle = io.open(tmp_path, "w")
     if not handle then
         return
     end
@@ -74,6 +75,9 @@ function Downloader:writeProgress(progress_path, state, current, total, path, er
         handle:write("error=", tostring(error_message), "\n")
     end
     handle:close()
+    if not os.rename(tmp_path, progress_path) then
+        os.remove(tmp_path)
+    end
 end
 
 function Downloader:startChapterDownload(credentials, download_directory, manga, chapter)

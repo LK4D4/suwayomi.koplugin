@@ -258,6 +258,29 @@ describe("suwayomi_ui", function()
         assert.are.equal("/storage/emulated/0/Books/Manga", chosen_path)
     end)
 
+    it("shows a parallel chapter downloads menu", function()
+        local ui = require("suwayomi_ui")
+        local selected
+
+        ui.showParallelDownloadsMenu({
+            current = 2,
+            choices = { 1, 2, 3, 4 },
+            onSelect = function(value)
+                selected = value
+            end,
+        })
+
+        assert.are.equal("Parallel chapter downloads", shown_dialog.title)
+        assert.are.equal("[ ] 1", shown_dialog.item_table[1].text)
+        assert.are.equal("[x] 2", shown_dialog.item_table[2].text)
+        assert.are.equal("[ ] 3", shown_dialog.item_table[3].text)
+        assert.are.equal("[ ] 4", shown_dialog.item_table[4].text)
+
+        shown_dialog.item_table[3].callback()
+
+        assert.are.equal(3, selected)
+    end)
+
     it("updates an existing language menu instead of requiring a new menu", function()
         local ui = require("suwayomi_ui")
         local update_count = 0

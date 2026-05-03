@@ -1806,6 +1806,20 @@ function SuwayomiPlugin:addToMainMenu(menu_items)
                         self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
                     end)
                 end
+            },
+            {
+                text = _("Setup parallel downloads"),
+                callback = function()
+                    SuwayomiUI.showParallelDownloadsMenu({
+                        current = SuwayomiSettings:loadMaxParallelChapterDownloads(),
+                        choices = { 1, 2, 3, 4 },
+                        onSelect = function(value)
+                            local saved_value = SuwayomiSettings:saveMaxParallelChapterDownloads(value)
+                            self.download_queue = nil
+                            self:showMessage(T(_("Suwayomi parallel chapter downloads saved: %1"), saved_value))
+                        end,
+                    })
+                end
             }
         }
     }

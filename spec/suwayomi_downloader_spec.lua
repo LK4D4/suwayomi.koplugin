@@ -244,7 +244,16 @@ describe("suwayomi_downloader", function()
     it("writes progress updates while downloading a chapter", function()
         local progress_path = os.tmpname()
         local original_rename = os.rename
-        os.rename = function()
+        os.rename = function(from, to)
+            if from == progress_path .. ".tmp" then
+                local source = assert(io.open(from, "r"))
+                local content = source:read("*a")
+                source:close()
+                local target = assert(io.open(to, "w"))
+                target:write(content)
+                target:close()
+                os.remove(from)
+            end
             return true
         end
 

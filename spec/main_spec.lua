@@ -5,6 +5,7 @@ describe("suwayomi plugin", function()
     local registered_menu_plugin
     local login_dialog_options
     local language_menu_options
+    local parallel_downloads_menu_options
     local shown_messages
     local shown_sources
     local directory_chooser_callback
@@ -13,6 +14,7 @@ describe("suwayomi plugin", function()
     local trapper_subprocess_calls
     local scheduled_callbacks
     local original_io_open
+    local original_os_rename
     local progress_files
 
     local function reset_plugin_environment()
@@ -20,6 +22,7 @@ describe("suwayomi plugin", function()
         registered_menu_plugin = nil
         login_dialog_options = nil
         language_menu_options = nil
+        parallel_downloads_menu_options = nil
         shown_messages = {}
         shown_sources = nil
         directory_chooser_callback = nil
@@ -29,6 +32,7 @@ describe("suwayomi plugin", function()
         scheduled_callbacks = {}
         progress_files = {}
         original_io_open = original_io_open or io.open
+        original_os_rename = original_os_rename or os.rename
         io.open = function(path, mode)
             if tostring(path):match("%.suwayomi_dl_progress_") then
                 if mode == "w" then
@@ -67,6 +71,14 @@ describe("suwayomi plugin", function()
                 }
             end
             return original_io_open(path, mode)
+        end
+        os.rename = function(from, to)
+            if tostring(from):match("%.suwayomi_dl_progress_") or tostring(to):match("%.suwayomi_dl_progress_") then
+                progress_files[to] = progress_files[from]
+                progress_files[from] = nil
+                return true
+            end
+            return original_os_rename(from, to)
         end
 
         package.loaded.main = nil
@@ -235,6 +247,9 @@ describe("suwayomi plugin", function()
                 showLanguageMenu = function(options)
                     language_menu_options = options
                 end,
+                showParallelDownloadsMenu = function(options)
+                    parallel_downloads_menu_options = options
+                end,
                 showSourcesMenu = function(sources)
                     shown_sources = sources
                 end,
@@ -271,6 +286,12 @@ describe("suwayomi plugin", function()
                 end,
                 loadDownloadQueue = function()
                     return {}
+                end,
+                loadMaxParallelChapterDownloads = function()
+                    return 2
+                end,
+                saveMaxParallelChapterDownloads = function(_, value)
+                    return value
                 end,
                 saveDownloadQueue = function(_, jobs)
                     return jobs
@@ -311,6 +332,9 @@ describe("suwayomi plugin", function()
         if original_io_open then
             io.open = original_io_open
         end
+        if original_os_rename then
+            os.rename = original_os_rename
+        end
     end)
 
     it("registers a dispatcher action and main-menu entry on init", function()
@@ -342,7 +366,7 @@ describe("suwayomi plugin", function()
         assert.is_table(menu_items.suwayomi_dl)
         assert.are.equal("Suwayomi", menu_items.suwayomi_dl.text)
         assert.are.equal("search", menu_items.suwayomi_dl.sorting_hint)
-        assert.are.equal(4, #menu_items.suwayomi_dl.sub_item_table)
+        assert.are.equal(5, #menu_items.suwayomi_dl.sub_item_table)
     end)
 
     it("configures the download queue with the saved parallel chapter limit", function()
@@ -364,6 +388,36 @@ describe("suwayomi plugin", function()
         local queue = plugin:createDownloadQueue()
 
         assert.are.equal(3, queue.max_active_chapters)
+    end)
+
+    it("opens and saves the parallel downloads setting from the main menu", function()
+        local saved_parallel_downloads
+        package.preload.suwayomi_settings = function()
+            return {
+                loadMaxParallelChapterDownloads = function()
+                    return 2
+                end,
+                saveMaxParallelChapterDownloads = function(_, value)
+                    saved_parallel_downloads = value
+                    return value
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+        parallel_downloads_menu_options.onSelect(3)
+
+        assert.are.equal(2, parallel_downloads_menu_options.current)
+        assert.are.same({ 1, 2, 3, 4 }, parallel_downloads_menu_options.choices)
+        assert.are.equal(3, saved_parallel_downloads)
+        assert.are.equal("Suwayomi parallel chapter downloads saved: 3", shown_messages[#shown_messages])
     end)
 
     it("opens the login dialog with persisted credentials", function()
@@ -2037,13 +2091,13 @@ describe("suwayomi plugin", function()
 
         plugin:getDownloadQueue():enqueue(manga, queued, "/books")
         plugin:getDownloadQueue():enqueue(manga, active, "/books")
-        plugin:getDownloadQueue().active = {
+        plugin:getDownloadQueue():setActiveJob({
             key = "m1:399",
             manga = manga,
             chapter = active,
             download_directory = "/books",
             progress_path = "/books/.suwayomi_dl_progress_m1_399.txt",
-        }
+        })
         plugin:getDownloadQueue():setStatus(manga, active, { state = "downloading" })
 
         plugin:performBulkChapterAction("delete_selected")
@@ -2122,13 +2176,13 @@ describe("suwayomi plugin", function()
         plugin.selection_mode = true
 
         plugin:getDownloadQueue():enqueue(manga, active, "/books")
-        plugin:getDownloadQueue().active = {
+        plugin:getDownloadQueue():setActiveJob({
             key = "m1:400",
             manga = manga,
             chapter = active,
             download_directory = "/books",
             progress_path = "/books/.suwayomi_dl_progress_m1_400.txt",
-        }
+        })
         plugin:getDownloadQueue():setStatus(manga, active, { state = "downloading" })
 
         plugin:performBulkChapterAction("delete_selected")

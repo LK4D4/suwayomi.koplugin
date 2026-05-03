@@ -3,13 +3,17 @@ package.path = "?.lua;" .. package.path
 describe("suwayomi_download_queue", function()
     local original_io_open
     local original_os_remove
+    local original_os_rename
     local removed_paths
+    local renamed_paths
     local progress_files
 
     local function install_progress_file_mock()
         original_io_open = io.open
         original_os_remove = os.remove
+        original_os_rename = os.rename
         removed_paths = {}
+        renamed_paths = {}
         progress_files = {}
 
         io.open = function(path, mode)
@@ -55,6 +59,13 @@ describe("suwayomi_download_queue", function()
         os.remove = function(path)
             table.insert(removed_paths, path)
             progress_files[path] = nil
+            return true
+        end
+
+        os.rename = function(from, to)
+            table.insert(renamed_paths, { from = from, to = to })
+            progress_files[to] = progress_files[from]
+            progress_files[from] = nil
             return true
         end
     end
@@ -163,6 +174,7 @@ describe("suwayomi_download_queue", function()
             status_changes = function() return status_changes end,
             download_calls = function() return download_calls end,
             progress_files = progress_files,
+            renamed_paths = renamed_paths,
             advance = function(seconds)
                 now = now + seconds
             end,
@@ -231,6 +243,7 @@ describe("suwayomi_download_queue", function()
     after_each(function()
         io.open = original_io_open
         os.remove = original_os_remove
+        os.rename = original_os_rename
         package.loaded.suwayomi_download_queue = nil
         package.loaded.gettext = nil
         package.loaded["ffi/util"] = nil
@@ -466,6 +479,22 @@ describe("suwayomi_download_queue", function()
         assert.are.equal("downloading", context.queue:getStatus(manga, chapters[3]).state)
     end)
 
+    it("uses atomic progress writes so polling sees complete updates", function()
+        local context = build_queue()
+        local progress_path = context.queue:buildProgressPath(
+            { id = "m1", title = "Sousou no Frieren" },
+            { id = "398", name = "Official_Vol. 1 Ch. 1" },
+            "/books"
+        )
+
+        context.queue:writeProgressFallback(progress_path, "failed", 0, 1, "", "network timeout")
+
+        assert.are.equal(progress_path .. ".tmp", context.renamed_paths[#context.renamed_paths].from)
+        assert.are.equal(progress_path, context.renamed_paths[#context.renamed_paths].to)
+        assert.are.equal("state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n", context.progress_files[progress_path])
+        assert.is_nil(context.progress_files[progress_path .. ".tmp"])
+    end)
+
     it("persists failed state when the downloader reports failure", function()
         local context = build_queue({
             downloader = {
@@ -559,5 +588,30 @@ describe("suwayomi_download_queue", function()
 
         assert.are.equal("failed", context.saved_queue()[1].state)
         assert.are.equal("Chapter download timed out.", context.messages[#context.messages])
+    end)
+
+    it("does not time out an active job that is still reporting progress", function()
+        local context = build_queue({
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        table.remove(context.scheduled, 1).callback()
+
+        context.advance((30 * 60) - 1)
+        context.write_progress(manga, chapter, "downloading", 1, 2, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        table.remove(context.scheduled, 1).callback()
+
+        context.advance(2)
+        context.write_progress(manga, chapter, "downloading", 2, 3, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        table.remove(context.scheduled, 1).callback()
+
+        assert.are.equal("downloading", context.queue:getStatus(manga, chapter).state)
+        assert.are.equal(2, context.queue:getStatus(manga, chapter).current)
+        assert.are.equal("downloading", context.saved_queue()[1].state)
+        assert.are.same({}, context.messages)
     end)
 end)

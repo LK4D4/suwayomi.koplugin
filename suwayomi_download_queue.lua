@@ -52,13 +52,7 @@ function DownloadQueue:getActiveCount()
 end
 
 function DownloadQueue:getActiveJob(key)
-    if self.active_jobs and self.active_jobs[key] then
-        return self.active_jobs[key]
-    end
-    if self.active and (self.active.key or self:getKey(self.active.manga, self.active.chapter)) == key then
-        return self.active
-    end
-    return nil
+    return self.active_jobs and self.active_jobs[key] or nil
 end
 
 function DownloadQueue:setActiveJob(job)
@@ -463,7 +457,8 @@ function DownloadQueue:getCredentialsForJob()
 end
 
 function DownloadQueue:writeProgressFallback(progress_path, state, current, total, path, error_message)
-    local handle = io.open(progress_path, "w")
+    local tmp_path = tostring(progress_path or "") .. ".tmp"
+    local handle = io.open(tmp_path, "w")
     if not handle then
         return
     end
@@ -475,6 +470,9 @@ function DownloadQueue:writeProgressFallback(progress_path, state, current, tota
         handle:write("error=", tostring(error_message), "\n")
     end
     handle:close()
+    if not os.rename(tmp_path, progress_path) then
+        os.remove(tmp_path)
+    end
 end
 
 function DownloadQueue:runDownloaderJob(queued)
@@ -517,6 +515,9 @@ function DownloadQueue:process()
         end
 
         queued.started_at = self.now()
+        queued.last_progress_at = queued.started_at
+        queued.last_progress_current = nil
+        queued.last_progress_state = nil
         queued.progress_path = self:buildProgressPath(queued.manga, queued.chapter, queued.download_directory)
         os.remove(queued.progress_path)
         queued.credentials = queued.credentials or self:getCredentialsForJob()
@@ -567,6 +568,11 @@ function DownloadQueue:poll()
         local active = active_jobs[index]
         local progress = self:readProgress(active.progress_path)
         if progress and progress.state then
+            if progress.current ~= active.last_progress_current or progress.state ~= active.last_progress_state then
+                active.last_progress_at = self.now()
+                active.last_progress_current = progress.current
+                active.last_progress_state = progress.state
+            end
             self:setStatus(active.manga, active.chapter, {
                 state = progress.state,
                 current = progress.current,
@@ -574,7 +580,7 @@ function DownloadQueue:poll()
             })
         end
 
-        if self.now() - (active.started_at or self.now()) > self.WATCHDOG_TIMEOUT_SECONDS then
+        if self.now() - (active.last_progress_at or active.started_at or self.now()) > self.WATCHDOG_TIMEOUT_SECONDS then
             self:finishActiveWithFailure(active, _("Chapter download timed out."))
         else
             local done = self.ffi_util.isSubProcessDone(active.pid)
