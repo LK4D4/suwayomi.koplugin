@@ -59,8 +59,8 @@ Goal: define what the plugin should download next, not just how to download one 
 - [x] Add `Download next N unread chapters`
 - [x] Add `Keep next N unread chapters downloaded`
 - [x] Add `Delete read chapters from device`
-- [ ] Define queue ordering clearly for chapter batches
-- [ ] Show lightweight queue/progress state in the chapter list for batch operations
+- [x] Define queue ordering clearly for chapter batches
+- [x] Show lightweight queue/progress state in the chapter list for batch operations
 - [ ] Prevent obviously excessive queue sizes or duplicate batch requests
 
 Exit criteria:
