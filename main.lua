@@ -36,6 +36,10 @@ function SuwayomiPlugin:createDownloadQueue()
             return SuwayomiSettings:load()
         end,
         onStatusChanged = function()
+            if self.chapter_menu_refresh_suppressed and self.chapter_menu_refresh_suppressed > 0 then
+                self.pending_chapter_menu_refresh = true
+                return
+            end
             self:refreshChapterMenu()
         end,
         onMessage = function(message)
@@ -49,6 +53,19 @@ function SuwayomiPlugin:getDownloadQueue()
         self.download_queue = self:createDownloadQueue()
     end
     return self.download_queue
+end
+
+function SuwayomiPlugin:withChapterMenuRefreshSuppressed(callback)
+    self.chapter_menu_refresh_suppressed = (self.chapter_menu_refresh_suppressed or 0) + 1
+    local ok, result = pcall(callback)
+    self.chapter_menu_refresh_suppressed = (self.chapter_menu_refresh_suppressed or 1) - 1
+    if self.chapter_menu_refresh_suppressed <= 0 then
+        self.chapter_menu_refresh_suppressed = nil
+    end
+    if not ok then
+        error(result)
+    end
+    return result
 end
 
 function SuwayomiPlugin:onDispatcherRegisterActions()
@@ -1050,19 +1067,21 @@ function SuwayomiPlugin:enqueueSelectedChapterDownloads(manga, chapters, downloa
     local queued = 0
     local skipped = 0
     local capped = 0
-    for _, chapter in ipairs(chapters or {}) do
-        local status = self:getDownloadQueue():getStatus(manga, chapter)
-        local downloaded = self:isChapterDownloaded(manga, chapter)
-        if downloaded or (status and (status.state == "queued" or status.state == "downloading" or status.state == "downloaded" or status.state == "skipped")) then
-            skipped = skipped + 1
-        elseif queued >= self.max_batch_queue_chapters then
-            capped = capped + 1
-        elseif self:getDownloadQueue():enqueue(manga, chapter, download_directory, { quiet_duplicate = true }) then
-            queued = queued + 1
-        else
-            skipped = skipped + 1
+    self:withChapterMenuRefreshSuppressed(function()
+        for _, chapter in ipairs(chapters or {}) do
+            local status = self:getDownloadQueue():getStatus(manga, chapter)
+            local downloaded = self:isChapterDownloaded(manga, chapter)
+            if downloaded or (status and (status.state == "queued" or status.state == "downloading" or status.state == "downloaded" or status.state == "skipped")) then
+                skipped = skipped + 1
+            elseif queued >= self.max_batch_queue_chapters then
+                capped = capped + 1
+            elseif self:getDownloadQueue():enqueue(manga, chapter, download_directory, { quiet_duplicate = true }) then
+                queued = queued + 1
+            else
+                skipped = skipped + 1
+            end
         end
-    end
+    end)
 
     self:clearChapterSelection(true)
     self:refreshChapterMenu()
@@ -1271,25 +1290,27 @@ function SuwayomiPlugin:deleteSelectedChapters()
     local canceled = 0
     local missing = 0
     local active = 0
-    for _, chapter in ipairs(chapters) do
-        local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
-            quiet_active = true,
-            quiet_missing = true,
-            skip_refresh = true,
-        })
-        if ok then
-            deleted = deleted + 1
-            if state == "queued" then
+    self:withChapterMenuRefreshSuppressed(function()
+        for _, chapter in ipairs(chapters) do
+            local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
+                quiet_active = true,
+                quiet_missing = true,
+                skip_refresh = true,
+            })
+            if ok then
+                deleted = deleted + 1
+                if state == "queued" then
+                    canceled = canceled + 1
+                end
+            elseif state == "downloading" then
+                active = active + 1
+            elseif state == "queued" then
                 canceled = canceled + 1
+            elseif state == "missing" then
+                missing = missing + 1
             end
-        elseif state == "downloading" then
-            active = active + 1
-        elseif state == "queued" then
-            canceled = canceled + 1
-        elseif state == "missing" then
-            missing = missing + 1
         end
-    end
+    end)
 
     self:clearChapterSelection(true)
     self:refreshChapterMenu()
@@ -1321,20 +1342,22 @@ function SuwayomiPlugin:deleteReadChaptersFromDevice()
     local deleted = 0
     local missing = 0
     local active = 0
-    for _, chapter in ipairs(read_chapters) do
-        local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
-            quiet_active = true,
-            quiet_missing = true,
-            skip_refresh = true,
-        })
-        if ok then
-            deleted = deleted + 1
-        elseif state == "downloading" then
-            active = active + 1
-        elseif state == "missing" then
-            missing = missing + 1
+    self:withChapterMenuRefreshSuppressed(function()
+        for _, chapter in ipairs(read_chapters) do
+            local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
+                quiet_active = true,
+                quiet_missing = true,
+                skip_refresh = true,
+            })
+            if ok then
+                deleted = deleted + 1
+            elseif state == "downloading" then
+                active = active + 1
+            elseif state == "missing" then
+                missing = missing + 1
+            end
         end
-    end
+    end)
 
     self:refreshChapterMenu()
 
@@ -1603,6 +1626,7 @@ function SuwayomiPlugin:refreshChapterMenu()
     if not self.current_chapter_context then
         return
     end
+    self.pending_chapter_menu_refresh = false
 
     local options = self:buildChapterMenuOptions(
         self.current_chapter_context.manga,
@@ -1638,7 +1662,9 @@ function SuwayomiPlugin:enqueueChapterDownload(manga, chapter)
         return
     end
 
-    self:getDownloadQueue():enqueue(manga, chapter, download_directory)
+    self:withChapterMenuRefreshSuppressed(function()
+        self:getDownloadQueue():enqueue(manga, chapter, download_directory)
+    end)
     self:refreshChapterMenu()
 end
 
