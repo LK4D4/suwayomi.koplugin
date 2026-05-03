@@ -20,6 +20,7 @@ local SOURCE_LANGUAGE_OPTIONS = {
 local SuwayomiPlugin = WidgetContainer:extend{
     name = "suwayomi_dl",
     is_doc_only = false,
+    selection_mode = false,
 }
 
 function SuwayomiPlugin:createDownloadQueue()
@@ -58,6 +59,8 @@ end
 
 function SuwayomiPlugin:init()
     self:onDispatcherRegisterActions()
+    self.selected_chapters = self.selected_chapters or {}
+    self.selection_mode = self.selection_mode == true
     self:getDownloadQueue():recover()
     self.ui.menu:registerToMainMenu(self)
 end
@@ -715,10 +718,6 @@ function SuwayomiPlugin:buildChapterMenuOptions(manga, chapters)
         chapters = self:buildChapterMenuItems(manga, chapters),
         title_bar_left_icon = "appbar.menu",
         on_title_bar_left_tap = function()
-            if self:getSelectedChapterCount() == 0 then
-                self:showMessage(_("Long-press chapters to select them."), { timeout = 2 })
-                return true
-            end
             self:showBulkChapterActions(manga)
             return true
         end,
@@ -924,13 +923,20 @@ function SuwayomiPlugin:performChapterAction(manga, chapter, action_id)
 end
 
 function SuwayomiPlugin:getBulkChapterActions()
-    return {
-        { id = "download_selected", text = _("Download selected") },
-        { id = "delete_selected", text = _("Delete selected from device") },
-        { id = "mark_read_selected", text = _("Mark selected as read") },
-        { id = "mark_unread_selected", text = _("Mark selected as unread") },
-        { id = "clear_selection", text = _("Clear selection") },
-    }
+    local actions = {}
+
+    if self:getSelectedChapterCount() > 0 then
+        table.insert(actions, { id = "download_selected", text = _("Download selected") })
+        table.insert(actions, { id = "delete_selected", text = _("Delete selected from device") })
+        table.insert(actions, { id = "mark_read_selected", text = _("Mark selected as read") })
+        table.insert(actions, { id = "mark_unread_selected", text = _("Mark selected as unread") })
+        table.insert(actions, { id = "clear_selection", text = _("Clear selection") })
+    end
+
+    table.insert(actions, { id = "download_next_5_unread", text = _("Download next 5 unread") })
+    table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
+
+    return actions
 end
 
 function SuwayomiPlugin:pluralize(count, singular, plural)
@@ -982,6 +988,63 @@ function SuwayomiPlugin:enqueueSelectedChapterDownloads(manga, chapters, downloa
         self:showMessage(self:formatBulkDownloadMessage(queued, skipped))
     end
     return queued
+end
+
+function SuwayomiPlugin:canQueueChapterDownload(manga, chapter)
+    if chapter.is_read == true then
+        return false
+    end
+
+    local status = self:getDownloadQueue():getStatus(manga, chapter)
+    if status and (
+        status.state == "queued"
+            or status.state == "downloading"
+            or status.state == "downloaded"
+            or status.state == "skipped"
+    ) then
+        return false
+    end
+
+    local downloaded = self:isChapterDownloaded(manga, chapter)
+    return downloaded ~= true
+end
+
+function SuwayomiPlugin:getNextUnreadChaptersForDownload(manga, limit)
+    local chapters = {}
+    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+        if self:canQueueChapterDownload(manga, chapter) then
+            table.insert(chapters, chapter)
+            if #chapters >= limit then
+                break
+            end
+        end
+    end
+    return chapters
+end
+
+function SuwayomiPlugin:enqueueNextUnreadChapterDownloads(limit)
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        SuwayomiUI.showDirectoryChooser(function(path)
+            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
+            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+            self:enqueueNextUnreadChapterDownloads(limit)
+        end)
+        return 0
+    end
+
+    local chapters = self:getNextUnreadChaptersForDownload(manga, limit)
+    if #chapters == 0 then
+        self:showMessage(_("No unread chapters available to download."))
+        return 0
+    end
+
+    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
 end
 
 function SuwayomiPlugin:downloadSelectedChapters()
@@ -1141,6 +1204,11 @@ function SuwayomiPlugin:markSelectedChaptersUnread()
 end
 
 function SuwayomiPlugin:performBulkChapterAction(action_id)
+    local next_unread_count = tostring(action_id or ""):match("^download_next_(%d+)_unread$")
+    if next_unread_count then
+        self:enqueueNextUnreadChapterDownloads(tonumber(next_unread_count))
+        return true
+    end
     if action_id == "download_selected" then
         self:downloadSelectedChapters()
         return true
@@ -1172,7 +1240,7 @@ function SuwayomiPlugin:showBulkChapterActions(manga)
 
     local count = self:getSelectedChapterCount()
     local options = {
-        title = T(_("%1 selected chapters"), count),
+        title = count > 0 and T(_("%1 selected chapters"), count) or _("Chapter downloads"),
         actions = self:getBulkChapterActions(),
     }
 
