@@ -303,6 +303,21 @@ describe("suwayomi_download_queue", function()
         assert.are.equal(0, #context.queue.items)
     end)
 
+    it("clears a terminal chapter status without forcing a refresh", function()
+        local context = build_queue()
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:setStatus(manga, chapter, { state = "downloaded" })
+        assert.are.equal(1, context.status_changes())
+
+        context.queue:clearStatus(manga, chapter, { quiet = true })
+
+        assert.is_nil(context.queue:getStatus(manga, chapter))
+        assert.are.equal(1, context.status_changes())
+        assert.are.same({}, context.saved_queue())
+    end)
+
     it("does not cancel an active download", function()
         local context = build_queue({ subprocess_done = false, skip_subprocess_callback = true })
         local manga = { id = "m1", title = "Sousou no Frieren" }

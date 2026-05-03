@@ -867,6 +867,7 @@ function SuwayomiPlugin:deleteChapterFromDeviceWithOptions(manga, chapter, optio
         end
         self:saveChapterLedger(ledger)
     end
+    self:getDownloadQueue():clearStatus(manga, chapter, { quiet = true })
 
     if not options.skip_refresh then
         self:refreshChapterMenu()

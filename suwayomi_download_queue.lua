@@ -102,6 +102,16 @@ function DownloadQueue:setStatus(manga, chapter, status)
     self.onStatusChanged()
 end
 
+function DownloadQueue:clearStatus(manga, chapter, options)
+    options = options or {}
+    local key = self:getKey(manga, chapter)
+    self.statuses[key] = nil
+    self:removePersistentJob(key)
+    if not options.quiet then
+        self.onStatusChanged()
+    end
+end
+
 function DownloadQueue:cancelPending(manga, chapter)
     local key = self:getKey(manga, chapter)
     if self.active and (self.active.key or self:getKey(self.active.manga, self.active.chapter)) == key then

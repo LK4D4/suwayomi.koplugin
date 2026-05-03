@@ -1396,6 +1396,7 @@ describe("suwayomi plugin", function()
 
     it("deletes read chapters from device without selecting them", function()
         local removed_paths = {}
+        local refreshed_chapter_menu
         local saved_ledger = {
             ["m1:398"] = {
                 manga_id = "m1",
@@ -1439,6 +1440,17 @@ describe("suwayomi plugin", function()
             }
         end
 
+        package.preload.suwayomi_ui = function()
+            return {
+                updateChapterMenu = function(_, options)
+                    refreshed_chapter_menu = options
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+
         package.preload.suwayomi_settings = function()
             return {
                 load = function()
@@ -1457,10 +1469,12 @@ describe("suwayomi plugin", function()
 
         package.loaded.main = nil
         package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_ui = nil
         package.loaded.suwayomi_settings = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
+        plugin.current_chapter_menu = {}
         plugin.current_chapter_context = {
             manga = { id = "m1", title = "Sousou no Frieren" },
             chapters = {
@@ -1468,12 +1482,18 @@ describe("suwayomi plugin", function()
                 { id = "399", name = "Official_Vol. 1 Ch. 2", is_read = false },
             },
         }
+        plugin:setChapterDownloadStatus(
+            plugin.current_chapter_context.manga,
+            plugin.current_chapter_context.chapters[1],
+            { state = "downloaded" }
+        )
 
         local deleted = plugin:performBulkChapterAction("delete_read_downloaded")
         os.remove = original_remove
 
         assert.is_true(deleted)
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", removed_paths[1])
+        assert.are.equal("Official_Vol. 1 Ch. 1  ✓", refreshed_chapter_menu.chapters[1].menu_text)
         assert.is_nil(saved_ledger["m1:398"].path)
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 2.cbz", saved_ledger["m1:399"].path)
         assert.are.same({}, shown_messages)
