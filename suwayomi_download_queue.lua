@@ -6,6 +6,7 @@ DownloadQueue.__index = DownloadQueue
 
 DownloadQueue.POLL_INTERVAL_SECONDS = 0.5
 DownloadQueue.WATCHDOG_TIMEOUT_SECONDS = 30 * 60
+DownloadQueue.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS = 58
 
 function DownloadQueue:new(options)
     options = options or {}
@@ -82,6 +83,26 @@ function DownloadQueue:upsertPersistentJob(job)
     self:savePersistentJobs(jobs)
 end
 
+function DownloadQueue:upsertPersistentJobs(new_jobs)
+    local jobs = self:loadPersistentJobs()
+    local indexes_by_key = {}
+    for index, existing in ipairs(jobs) do
+        indexes_by_key[existing.key] = index
+    end
+
+    for _, job in ipairs(new_jobs or {}) do
+        local existing_index = indexes_by_key[job.key]
+        if existing_index then
+            jobs[existing_index] = job
+        else
+            table.insert(jobs, job)
+            indexes_by_key[job.key] = #jobs
+        end
+    end
+
+    self:savePersistentJobs(jobs)
+end
+
 function DownloadQueue:removePersistentJob(key)
     local remaining = {}
     for _, job in ipairs(self:loadPersistentJobs()) do
@@ -101,48 +122,128 @@ function DownloadQueue:setStatus(manga, chapter, status)
     self.onStatusChanged()
 end
 
+function DownloadQueue:clearStatus(manga, chapter, options)
+    options = options or {}
+    local key = self:getKey(manga, chapter)
+    self.statuses[key] = nil
+    self:removePersistentJob(key)
+    if not options.quiet then
+        self.onStatusChanged()
+    end
+end
+
+function DownloadQueue:cancelPending(manga, chapter)
+    local key = self:getKey(manga, chapter)
+    if self.active and (self.active.key or self:getKey(self.active.manga, self.active.chapter)) == key then
+        return false, "downloading"
+    end
+
+    local removed = false
+    local remaining = {}
+    for _, item in ipairs(self.items or {}) do
+        if (item.key or self:getKey(item.manga, item.chapter)) == key then
+            removed = true
+        else
+            table.insert(remaining, item)
+        end
+    end
+    self.items = remaining
+
+    if removed then
+        self:removePersistentJob(key)
+        self.statuses[key] = nil
+        self.onStatusChanged()
+        return true, "queued"
+    end
+
+    return false, nil
+end
+
+function DownloadQueue:splitUtf8Chars(text)
+    local chars = {}
+    text = tostring(text or "")
+    local index = 1
+    while index <= #text do
+        local byte = text:byte(index)
+        local length = 1
+        if byte and byte >= 0xF0 then
+            length = 4
+        elseif byte and byte >= 0xE0 then
+            length = 3
+        elseif byte and byte >= 0xC0 then
+            length = 2
+        end
+        table.insert(chars, text:sub(index, index + length - 1))
+        index = index + length
+    end
+    return chars
+end
+
+function DownloadQueue:shortenChapterTitle(title, reserved_chars)
+    local max_chars = self.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS - (reserved_chars or 0)
+    if max_chars < 12 then
+        max_chars = 12
+    end
+
+    local chars = self:splitUtf8Chars(title)
+    if #chars <= max_chars then
+        return title
+    end
+
+    local shortened = {}
+    for index = 1, max_chars - 1 do
+        table.insert(shortened, chars[index])
+    end
+    table.insert(shortened, "…")
+    return table.concat(shortened)
+end
+
+function DownloadQueue:formatChapterStatusSymbols(chapter, symbols)
+    symbols = symbols or {}
+    if #symbols == 0 then
+        return chapter.name
+    end
+    local suffix = table.concat(symbols, " ")
+    local title = self:shortenChapterTitle(chapter.name, #self:splitUtf8Chars(suffix) + 2)
+    return title .. "  " .. suffix
+end
+
 function DownloadQueue:formatChapterMenuText(chapter, status)
-    local badges = {}
+    local symbols = {}
     if chapter and chapter.is_read == true then
-        table.insert(badges, _("read"))
+        table.insert(symbols, "✓")
     end
 
     if not status then
-        if #badges == 0 then
-            return chapter.name
-        end
-        return chapter.name .. " [" .. table.concat(badges, "] [") .. "]"
+        return self:formatChapterStatusSymbols(chapter, symbols)
     end
     if status.state == "queued" then
-        table.insert(badges, _("queued"))
-        return chapter.name .. " [" .. table.concat(badges, "] [") .. "]"
+        table.insert(symbols, "⏳")
+        return self:formatChapterStatusSymbols(chapter, symbols)
     end
     if status.state == "downloading" then
         if status.total and status.total > 0 and status.current then
-            table.insert(badges, T(_("downloading %1/%2"), status.current, status.total))
-            return chapter.name .. " [" .. table.concat(badges, "] [") .. "]"
+            table.insert(symbols, T(_("↓ %1/%2"), status.current, status.total))
+            return self:formatChapterStatusSymbols(chapter, symbols)
         end
-        table.insert(badges, _("downloading"))
-        return chapter.name .. " [" .. table.concat(badges, "] [") .. "]"
+        table.insert(symbols, "⏳")
+        return self:formatChapterStatusSymbols(chapter, symbols)
     end
     if status.state == "downloaded" or status.state == "skipped" then
-        table.insert(badges, _("downloaded"))
-        return chapter.name .. " [" .. table.concat(badges, "] [") .. "]"
+        table.insert(symbols, "↓")
+        return self:formatChapterStatusSymbols(chapter, symbols)
     end
     if status.state == "read" then
-        if #badges == 0 then
-            table.insert(badges, _("read"))
+        if #symbols == 0 then
+            table.insert(symbols, "✓")
         end
-        return chapter.name .. " [" .. table.concat(badges, "] [") .. "]"
+        return self:formatChapterStatusSymbols(chapter, symbols)
     end
     if status.state == "failed" then
-        table.insert(badges, _("failed"))
-        return chapter.name .. " [" .. table.concat(badges, "] [") .. "]"
+        table.insert(symbols, "⚠")
+        return self:formatChapterStatusSymbols(chapter, symbols)
     end
-    if #badges == 0 then
-        return chapter.name
-    end
-    return chapter.name .. " [" .. table.concat(badges, "] [") .. "]"
+    return self:formatChapterStatusSymbols(chapter, symbols)
 end
 
 function DownloadQueue:readProgress(progress_path)
@@ -216,10 +317,13 @@ function DownloadQueue:recover()
     end
 end
 
-function DownloadQueue:enqueue(manga, chapter, download_directory)
+function DownloadQueue:enqueue(manga, chapter, download_directory, options)
+    options = options or {}
     local status = self:getStatus(manga, chapter)
     if status and (status.state == "queued" or status.state == "downloading") then
-        self.onMessage(_("Chapter download is already in progress."))
+        if not options.quiet_duplicate then
+            self.onMessage(_("Chapter download is already in progress."))
+        end
         return false
     end
     if status and status.state == "failed" then
@@ -245,6 +349,52 @@ function DownloadQueue:enqueue(manga, chapter, download_directory)
         self:process()
     end)
     return true
+end
+
+function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options)
+    options = options or {}
+    local persistent_jobs = {}
+    local queued_count = 0
+
+    for _, chapter in ipairs(chapters or {}) do
+        local status = self:getStatus(manga, chapter)
+        if status and (status.state == "queued" or status.state == "downloading") then
+            if not options.quiet_duplicate then
+                self.onMessage(_("Chapter download is already in progress."))
+            end
+        else
+            if status and status.state == "failed" then
+                self:cleanupInterruptedDownload({
+                    download_directory = download_directory,
+                    manga = manga,
+                    chapter = chapter,
+                })
+            end
+
+            local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued")
+            table.insert(persistent_jobs, persistent_job)
+            self.statuses[persistent_job.key] = { state = "queued" }
+            table.insert(self.items, {
+                key = persistent_job.key,
+                download_directory = download_directory,
+                manga = manga,
+                chapter = chapter,
+                downloader = self.downloader,
+            })
+            queued_count = queued_count + 1
+        end
+    end
+
+    if queued_count == 0 then
+        return 0
+    end
+
+    self:upsertPersistentJobs(persistent_jobs)
+    self.onStatusChanged()
+    self.ui_manager:scheduleIn(0, function()
+        self:process()
+    end)
+    return queued_count
 end
 
 function DownloadQueue:getCredentialsForJob()

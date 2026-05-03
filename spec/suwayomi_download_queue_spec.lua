@@ -65,6 +65,7 @@ describe("suwayomi_download_queue", function()
         local DownloadQueue = require("suwayomi_download_queue")
         local scheduled = {}
         local saved_queue = options.saved_queue or {}
+        local save_count = 0
         local now = options.now or 100
         local messages = {}
         local status_changes = 0
@@ -107,6 +108,7 @@ describe("suwayomi_download_queue", function()
                     return saved_queue
                 end,
                 saveDownloadQueue = function(_, jobs)
+                    save_count = save_count + 1
                     saved_queue = jobs
                     return jobs
                 end,
@@ -144,6 +146,7 @@ describe("suwayomi_download_queue", function()
             queue = queue,
             scheduled = scheduled,
             saved_queue = function() return saved_queue end,
+            save_count = function() return save_count end,
             messages = messages,
             status_changes = function() return status_changes end,
             download_calls = function() return download_calls end,
@@ -217,9 +220,47 @@ describe("suwayomi_download_queue", function()
         local context = build_queue()
 
         assert.are.equal(
-            "Official_Vol. 1 Ch. 1 [read] [downloaded]",
+            "Official_Vol. 1 Ch. 1  ✓ ↓",
             context.queue:formatChapterMenuText(
                 { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = true },
+                { state = "downloaded" }
+            )
+        )
+    end)
+
+    it("puts compact status symbols after shortened chapter names", function()
+        local context = build_queue()
+
+        assert.are.equal(
+            "Official_Vol. 25 Ch. 126 A Very Long Chapter Ti…  ✓ ↓ 3/12",
+            context.queue:formatChapterMenuText(
+                { id = "398", name = "Official_Vol. 25 Ch. 126 A Very Long Chapter Title", is_read = true },
+                { state = "downloading", current = 3, total = 12 }
+            )
+        )
+        assert.are.equal(
+            "Official_Vol. 25 Ch. 126 A Very Long Chapter Title  ⏳",
+            context.queue:formatChapterMenuText(
+                { id = "398", name = "Official_Vol. 25 Ch. 126 A Very Long Chapter Title" },
+                { state = "downloading", current = 0, total = 0 }
+            )
+        )
+        assert.are.equal(
+            "Official_Vol. 25 Ch. 127 Another Long Chapter Title  ⚠",
+            context.queue:formatChapterMenuText(
+                { id = "399", name = "Official_Vol. 25 Ch. 127 Another Long Chapter Title" },
+                { state = "failed" }
+            )
+        )
+    end)
+
+    it("shortens unicode chapter names without splitting characters", function()
+        local context = build_queue()
+
+        assert.are.equal(
+            "Очень длинное название главы с кириллицей для провер…  ✓ ↓",
+            context.queue:formatChapterMenuText(
+                { id = "401", name = "Очень длинное название главы с кириллицей для проверки", is_read = true },
                 { state = "downloaded" }
             )
         )
@@ -235,6 +276,87 @@ describe("suwayomi_download_queue", function()
 
         assert.are.equal(1, #context.saved_queue())
         assert.are.equal("Chapter download is already in progress.", context.messages[#context.messages])
+    end)
+
+    it("can suppress the duplicate download message for bulk enqueue", function()
+        local context = build_queue({ subprocess_done = false })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
+        assert.is_false(context.queue:enqueue(manga, chapter, "/books", { quiet_duplicate = true }))
+
+        assert.are.equal(1, #context.saved_queue())
+        assert.are.same({}, context.messages)
+    end)
+
+    it("cancels a queued download before it starts", function()
+        local context = build_queue({ subprocess_done = false })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
+
+        local cancelled, state = context.queue:cancelPending(manga, chapter)
+
+        assert.is_true(cancelled)
+        assert.are.equal("queued", state)
+        assert.are.same({}, context.saved_queue())
+        assert.is_nil(context.queue:getStatus(manga, chapter))
+        assert.are.equal(0, #context.queue.items)
+    end)
+
+    it("batch enqueues multiple chapters with one persistence write and process schedule", function()
+        local context = build_queue({ subprocess_done = false })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapters = {
+            { id = "398", name = "Official_Vol. 1 Ch. 1" },
+            { id = "399", name = "Official_Vol. 1 Ch. 2" },
+            { id = "400", name = "Official_Vol. 1 Ch. 3" },
+        }
+
+        local queued = context.queue:enqueueBatch(manga, chapters, "/books")
+
+        assert.are.equal(3, queued)
+        assert.are.equal(1, context.save_count())
+        assert.are.equal(1, #context.scheduled)
+        assert.are.equal(1, context.status_changes())
+        assert.are.equal(3, #context.saved_queue())
+        assert.are.equal("queued", context.queue:getStatus(manga, chapters[1]).state)
+        assert.are.equal("queued", context.queue:getStatus(manga, chapters[2]).state)
+        assert.are.equal("queued", context.queue:getStatus(manga, chapters[3]).state)
+    end)
+
+    it("clears a terminal chapter status without forcing a refresh", function()
+        local context = build_queue()
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:setStatus(manga, chapter, { state = "downloaded" })
+        assert.are.equal(1, context.status_changes())
+
+        context.queue:clearStatus(manga, chapter, { quiet = true })
+
+        assert.is_nil(context.queue:getStatus(manga, chapter))
+        assert.are.equal(1, context.status_changes())
+        assert.are.same({}, context.saved_queue())
+    end)
+
+    it("does not cancel an active download", function()
+        local context = build_queue({ subprocess_done = false, skip_subprocess_callback = true })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
+        context.scheduled[1].callback()
+
+        local cancelled, state = context.queue:cancelPending(manga, chapter)
+
+        assert.is_false(cancelled)
+        assert.are.equal("downloading", state)
+        assert.are.equal("downloading", context.queue:getStatus(manga, chapter).state)
+        assert.are.equal(1, #context.saved_queue())
+        assert.are.equal("downloading", context.saved_queue()[1].state)
     end)
 
     it("persists failed state when the downloader reports failure", function()

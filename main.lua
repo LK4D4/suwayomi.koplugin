@@ -20,6 +20,12 @@ local SOURCE_LANGUAGE_OPTIONS = {
 local SuwayomiPlugin = WidgetContainer:extend{
     name = "suwayomi_dl",
     is_doc_only = false,
+    selection_mode = false,
+    max_batch_queue_chapters = 50,
+    read_sync_batch_size = 2,
+    read_sync_delay_seconds = 0.5,
+    read_sync_failure_delay_seconds = 5,
+    read_sync_max_failure_delay_seconds = 300,
 }
 
 function SuwayomiPlugin:createDownloadQueue()
@@ -32,7 +38,11 @@ function SuwayomiPlugin:createDownloadQueue()
             return SuwayomiSettings:load()
         end,
         onStatusChanged = function()
-            self:refreshChapterMenu()
+            if self.chapter_menu_refresh_suppressed and self.chapter_menu_refresh_suppressed > 0 then
+                self.pending_chapter_menu_refresh = true
+                return
+            end
+            self:refreshChapterMenu({ quick = true })
         end,
         onMessage = function(message)
             self:showMessage(message)
@@ -47,6 +57,19 @@ function SuwayomiPlugin:getDownloadQueue()
     return self.download_queue
 end
 
+function SuwayomiPlugin:withChapterMenuRefreshSuppressed(callback)
+    self.chapter_menu_refresh_suppressed = (self.chapter_menu_refresh_suppressed or 0) + 1
+    local ok, result = pcall(callback)
+    self.chapter_menu_refresh_suppressed = (self.chapter_menu_refresh_suppressed or 1) - 1
+    if self.chapter_menu_refresh_suppressed <= 0 then
+        self.chapter_menu_refresh_suppressed = nil
+    end
+    if not ok then
+        error(result)
+    end
+    return result
+end
+
 function SuwayomiPlugin:onDispatcherRegisterActions()
     Dispatcher:registerAction("suwayomi_action", {
         category = "none",
@@ -58,6 +81,8 @@ end
 
 function SuwayomiPlugin:init()
     self:onDispatcherRegisterActions()
+    self.selected_chapters = self.selected_chapters or {}
+    self.selection_mode = self.selection_mode == true
     self:getDownloadQueue():recover()
     self.ui.menu:registerToMainMenu(self)
 end
@@ -66,9 +91,11 @@ function SuwayomiPlugin:showNotImplemented(message)
     self:showMessage(message)
 end
 
-function SuwayomiPlugin:showMessage(message)
+function SuwayomiPlugin:showMessage(message, options)
+    options = options or {}
     UIManager:show(InfoMessage:new{
         text = message,
+        timeout = options.timeout,
     })
 end
 
@@ -176,7 +203,7 @@ function SuwayomiPlugin:browseSuwayomi()
         return
     end
 
-    self:syncPendingReadMarks(credentials)
+    self:schedulePendingReadSync(credentials)
 
     local result = SuwayomiAPI.fetchSources(credentials)
     if not result.ok then
@@ -227,15 +254,17 @@ function SuwayomiPlugin:showChaptersForManga(manga)
     end
 
     local chapters = self:mergeChaptersWithReadLedger(manga, result.chapters)
+    if self.current_chapter_context
+        and self:getChapterSelectionKey(self.current_chapter_context.manga, {}) ~= self:getChapterSelectionKey(manga, {})
+    then
+        self:clearChapterSelection(true)
+    end
     self.current_chapter_context = {
         manga = manga,
         chapters = chapters,
     }
 
-    self.current_chapter_options = {
-        title = manga.title,
-        chapters = self:buildChapterMenuItems(manga, chapters),
-    }
+    self.current_chapter_options = self:buildChapterMenuOptions(manga, chapters)
     self.current_chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, function(chapter)
         self:handleChapterTap(manga, chapter)
     end, function(chapter)
@@ -282,6 +311,24 @@ function SuwayomiPlugin:getSelectedChapterCount()
         end
     end
     return count
+end
+
+function SuwayomiPlugin:getSelectedChapters(manga, chapters)
+    local selected = {}
+    for _, chapter in ipairs(chapters or {}) do
+        if self:isChapterSelected(manga, chapter) then
+            table.insert(selected, chapter)
+        end
+    end
+    return selected
+end
+
+function SuwayomiPlugin:clearChapterSelection(skip_refresh)
+    self.selected_chapters = {}
+    self.selection_mode = false
+    if not skip_refresh then
+        self:refreshChapterMenu()
+    end
 end
 
 function SuwayomiPlugin:toggleChapterSelection(manga, chapter)
@@ -332,6 +379,7 @@ function SuwayomiPlugin:upsertChapterLedgerEntry(manga, chapter, updates)
         read = existing.read == true,
         path = existing.path,
         pending_read_sync = existing.pending_read_sync == true or nil,
+        pending_read_state = existing.pending_read_state,
     }
 
     for update_key, value in pairs(updates or {}) do
@@ -361,20 +409,31 @@ function SuwayomiPlugin:mergeChaptersWithReadLedger(manga, chapters)
         local key = self:getChapterLedgerKey(manga, item)
         local entry = ledger[key]
         local suwayomi_is_read = item.is_read == true
-        local ledger_read_is_pending = entry and entry.read == true and entry.pending_read_sync == true
-        local is_read = suwayomi_is_read or ledger_read_is_pending
+        local pending_read_state
+        if entry and entry.pending_read_sync == true then
+            if entry.pending_read_state ~= nil then
+                pending_read_state = entry.pending_read_state == true
+            else
+                pending_read_state = entry.read == true
+            end
+        end
+        local is_read = pending_read_state
+        if is_read == nil then
+            is_read = suwayomi_is_read
+        end
         item._suwayomi_is_read = suwayomi_is_read
         item.is_read = is_read
 
-        if is_read then
+        if is_read or pending_read_state ~= nil then
             ledger[key] = {
                 manga_id = tostring(manga.id or ""),
                 manga_title = manga.title,
                 chapter_id = tostring(item.id or ""),
                 chapter_name = item.name,
-                read = true,
+                read = is_read == true,
                 path = entry and entry.path or nil,
-                pending_read_sync = suwayomi_is_read and nil or (entry and entry.pending_read_sync == true or nil),
+                pending_read_sync = pending_read_state ~= nil and true or nil,
+                pending_read_state = pending_read_state,
             }
             changed = true
         elseif entry and entry.read == true then
@@ -674,6 +733,91 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters)
     return items
 end
 
+function SuwayomiPlugin:buildChapterMenuOptions(manga, chapters)
+    local selected_count = self:getSelectedChapterCount()
+    local title = manga.title
+    if self.selection_mode then
+        title = T(_("%1 selected"), selected_count)
+    end
+
+    return {
+        title = title,
+        chapters = self:buildChapterMenuItems(manga, chapters),
+        title_bar_left_icon = "appbar.menu",
+        on_title_bar_left_tap = function()
+            self:showBulkChapterActions(manga)
+            return true
+        end,
+    }
+end
+
+function SuwayomiPlugin:buildCachedChapterMenuMap()
+    local items_by_key = {}
+    for _, item in ipairs((self.current_chapter_options and self.current_chapter_options.chapters) or {}) do
+        items_by_key[self:getChapterDownloadKey(
+            self.current_chapter_context.manga,
+            item
+        )] = item
+    end
+    return items_by_key
+end
+
+function SuwayomiPlugin:buildQuickChapterMenuItems(manga, chapters)
+    local cached_items = self:buildCachedChapterMenuMap()
+    local items = {}
+    for _, chapter in ipairs(chapters or {}) do
+        local item = {}
+        for key, value in pairs(chapter) do
+            item[key] = value
+        end
+
+        local cached = cached_items[self:getChapterDownloadKey(manga, item)]
+        local status = self:getChapterDownloadStatus(manga, item)
+        if status then
+            item.menu_text = self:formatChapterMenuText(item, status)
+        elseif cached and cached.menu_text then
+            item.menu_text = self:stripChapterSelectionMarker(cached.menu_text)
+        elseif item.is_read then
+            item.menu_text = self:formatChapterMenuText(item, { state = "read" })
+        else
+            item.menu_text = item.name
+        end
+
+        if self.selection_mode then
+            if self:isChapterSelected(manga, item) then
+                item.menu_text = "[x] " .. item.menu_text
+            else
+                item.menu_text = "[ ] " .. item.menu_text
+            end
+        end
+
+        table.insert(items, item)
+    end
+    return items
+end
+
+function SuwayomiPlugin:stripChapterSelectionMarker(menu_text)
+    return tostring(menu_text or ""):gsub("^%[[x ]%]%s+", "", 1)
+end
+
+function SuwayomiPlugin:buildQuickChapterMenuOptions(manga, chapters)
+    local selected_count = self:getSelectedChapterCount()
+    local title = manga.title
+    if self.selection_mode then
+        title = T(_("%1 selected"), selected_count)
+    end
+
+    return {
+        title = title,
+        chapters = self:buildQuickChapterMenuItems(manga, chapters),
+        title_bar_left_icon = "appbar.menu",
+        on_title_bar_left_tap = function()
+            self:showBulkChapterActions(manga)
+            return true
+        end,
+    }
+end
+
 function SuwayomiPlugin:getChapterPath(manga, chapter)
     local download_directory = SuwayomiSettings:loadDownloadDirectory()
     if not download_directory or download_directory == "" then
@@ -710,6 +854,8 @@ function SuwayomiPlugin:getChapterActions(manga, chapter)
         table.insert(actions, { id = "mark_unread", text = _("Mark as unread") })
     else
         table.insert(actions, { id = "mark_read", text = _("Mark as read") })
+        table.insert(actions, { id = "mark_previous_read", text = _("Mark previous as read") })
+        table.insert(actions, { id = "mark_through_read", text = _("Mark this and previous as read") })
     end
     return actions
 end
@@ -740,10 +886,25 @@ function SuwayomiPlugin:openChapter(manga, chapter)
 end
 
 function SuwayomiPlugin:deleteChapterFromDevice(manga, chapter)
+    return self:deleteChapterFromDeviceWithOptions(manga, chapter)
+end
+
+function SuwayomiPlugin:deleteChapterFromDeviceWithOptions(manga, chapter, options)
+    options = options or {}
+    local cancelled, queue_state = self:getDownloadQueue():cancelPending(manga, chapter)
+    if queue_state == "downloading" then
+        if not options.quiet_active then
+            self:showMessage(_("This chapter is downloading. Wait for it to finish before deleting it."))
+        end
+        return false, "downloading"
+    end
+
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
     if not downloaded or not chapter_path then
-        self:showMessage(_("This chapter is not downloaded."))
-        return false
+        if not options.quiet_missing then
+            self:showMessage(_("This chapter is not downloaded."))
+        end
+        return false, cancelled and "queued" or "missing"
     end
 
     local metadata_path = self:getKoreaderMetadataPathForDocument(chapter_path)
@@ -760,6 +921,17 @@ function SuwayomiPlugin:deleteChapterFromDevice(manga, chapter)
     local ledger = self:loadChapterLedger()
     local key = self:getChapterLedgerKey(manga, chapter)
     local entry = ledger[key]
+    if not entry then
+        for existing_key, existing in pairs(ledger) do
+            if tostring(existing.manga_id or "") == tostring(manga.id or "")
+                and tostring(existing.chapter_id or "") == tostring(chapter.id or "")
+            then
+                key = existing_key
+                entry = existing
+                break
+            end
+        end
+    end
     if entry then
         entry.path = nil
         if entry.read ~= true and entry.pending_read_sync ~= true then
@@ -769,12 +941,16 @@ function SuwayomiPlugin:deleteChapterFromDevice(manga, chapter)
         end
         self:saveChapterLedger(ledger)
     end
+    self:getDownloadQueue():clearStatus(manga, chapter, { quiet = true })
 
-    self:refreshChapterMenu()
-    return true
+    if not options.skip_refresh then
+        self:refreshChapterMenu()
+    end
+    return true, cancelled and "queued" or "deleted"
 end
 
-function SuwayomiPlugin:markChapterRead(manga, chapter)
+function SuwayomiPlugin:markChapterRead(manga, chapter, options)
+    options = options or {}
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
     if downloaded and chapter_path then
         self:setKoreaderChapterReadState(chapter_path, true)
@@ -783,6 +959,7 @@ function SuwayomiPlugin:markChapterRead(manga, chapter)
         path = chapter_path,
         read = true,
         pending_read_sync = true,
+        pending_read_state = true,
     })
 
     if self.current_chapter_context and self.current_chapter_context.chapters then
@@ -793,31 +970,27 @@ function SuwayomiPlugin:markChapterRead(manga, chapter)
             end
         end
     end
-    self:refreshChapterMenu()
-    self:schedulePendingReadSync()
+    if not options.skip_refresh then
+        self:refreshChapterMenu()
+    end
+    if not options.skip_schedule then
+        self:schedulePendingReadSync()
+    end
     return true
 end
 
-function SuwayomiPlugin:markChapterUnread(manga, chapter)
+function SuwayomiPlugin:markChapterUnread(manga, chapter, options)
+    options = options or {}
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
     if downloaded and chapter_path then
         self:setKoreaderChapterReadState(chapter_path, false)
     end
-    local ledger = self:loadChapterLedger()
-    local key = self:getChapterLedgerKey(manga, chapter)
-    local entry = ledger[key]
-
-    if entry then
-        entry.read = nil
-        entry.pending_read_sync = nil
-        entry.path = entry.path or chapter_path
-        if not entry.path then
-            ledger[key] = nil
-        else
-            ledger[key] = entry
-        end
-        self:saveChapterLedger(ledger)
-    end
+    self:upsertChapterLedgerEntry(manga, chapter, {
+        path = chapter_path,
+        read = false,
+        pending_read_sync = true,
+        pending_read_state = false,
+    })
 
     if self.current_chapter_context and self.current_chapter_context.chapters then
         for _, current in ipairs(self.current_chapter_context.chapters) do
@@ -828,8 +1001,66 @@ function SuwayomiPlugin:markChapterUnread(manga, chapter)
         end
     end
 
-    self:refreshChapterMenu()
+    if not options.skip_refresh then
+        self:refreshChapterMenu()
+    end
+    if not options.skip_schedule then
+        self:schedulePendingReadSync()
+    end
     return true
+end
+
+function SuwayomiPlugin:getChaptersThrough(chapter)
+    local chapters = {}
+    if not self.current_chapter_context or not self.current_chapter_context.chapters then
+        return chapters
+    end
+
+    local found = false
+    for _, current in ipairs(self.current_chapter_context.chapters) do
+        table.insert(chapters, current)
+        if tostring(current.id or "") == tostring(chapter.id or "") then
+            found = true
+            break
+        end
+    end
+    if not found then
+        return {}
+    end
+    return chapters
+end
+
+function SuwayomiPlugin:getChaptersBefore(chapter)
+    local chapters = self:getChaptersThrough(chapter)
+    if #chapters > 0 then
+        table.remove(chapters)
+    end
+    return chapters
+end
+
+function SuwayomiPlugin:markChapterListRead(manga, chapters)
+    if #chapters == 0 then
+        return 0
+    end
+
+    for _, current in ipairs(chapters) do
+        self:markChapterRead(manga, current, {
+            skip_refresh = true,
+            skip_schedule = true,
+        })
+    end
+
+    self:refreshChapterMenu()
+    self:schedulePendingReadSync()
+    return #chapters
+end
+
+function SuwayomiPlugin:markChaptersBeforeRead(manga, chapter)
+    return self:markChapterListRead(manga, self:getChaptersBefore(chapter))
+end
+
+function SuwayomiPlugin:markChaptersReadThrough(manga, chapter)
+    return self:markChapterListRead(manga, self:getChaptersThrough(chapter))
 end
 
 function SuwayomiPlugin:performChapterAction(manga, chapter, action_id)
@@ -846,10 +1077,476 @@ function SuwayomiPlugin:performChapterAction(manga, chapter, action_id)
     if action_id == "mark_read" then
         return self:markChapterRead(manga, chapter)
     end
+    if action_id == "mark_previous_read" then
+        return self:markChaptersBeforeRead(manga, chapter)
+    end
+    if action_id == "mark_through_read" then
+        return self:markChaptersReadThrough(manga, chapter)
+    end
     if action_id == "mark_unread" then
         return self:markChapterUnread(manga, chapter)
     end
     return false
+end
+
+function SuwayomiPlugin:getBulkChapterActions()
+    local actions = {}
+
+    if self:getSelectedChapterCount() > 0 then
+        table.insert(actions, { id = "download_selected", text = _("Download selected") })
+        table.insert(actions, { id = "delete_selected", text = _("Delete selected from device") })
+        table.insert(actions, { id = "mark_read_selected", text = _("Mark selected as read") })
+        table.insert(actions, { id = "mark_unread_selected", text = _("Mark selected as unread") })
+        table.insert(actions, { id = "clear_selection", text = _("Clear selection") })
+    end
+
+    table.insert(actions, { id = "download_next_5_unread", text = _("Download next 5 unread") })
+    table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
+    table.insert(actions, { id = "download_next_50_unread", text = _("Download next 50 unread") })
+    table.insert(actions, { id = "keep_next_5_unread", text = _("Keep next 5 unread downloaded") })
+    table.insert(actions, { id = "keep_next_10_unread", text = _("Keep next 10 unread downloaded") })
+    table.insert(actions, { id = "keep_next_50_unread", text = _("Keep next 50 unread downloaded") })
+    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read chapters from device") })
+
+    return actions
+end
+
+function SuwayomiPlugin:pluralize(count, singular, plural)
+    if count == 1 then
+        return singular
+    end
+    return plural
+end
+
+function SuwayomiPlugin:formatBulkDownloadMessage(queued, skipped)
+    local parts = {}
+    if queued > 0 then
+        table.insert(parts, T(
+            self:pluralize(queued, _("Queued %1 selected chapter download."), _("Queued %1 selected chapter downloads.")),
+            queued
+        ))
+    else
+        table.insert(parts, _("No new downloads queued."))
+    end
+
+    if skipped > 0 then
+        table.insert(parts, T(
+            self:pluralize(skipped, _("Skipped %1 already downloaded or queued."), _("Skipped %1 already downloaded or queued.")),
+            skipped
+        ))
+    end
+    return table.concat(parts, " ")
+end
+
+function SuwayomiPlugin:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+    local queued = 0
+    local skipped = 0
+    local capped = 0
+    local queueable = {}
+    for _, chapter in ipairs(chapters or {}) do
+        local status = self:getDownloadQueue():getStatus(manga, chapter)
+        local downloaded = self:isChapterDownloaded(manga, chapter)
+        if downloaded or (status and (status.state == "queued" or status.state == "downloading" or status.state == "downloaded" or status.state == "skipped")) then
+            skipped = skipped + 1
+        elseif #queueable >= self.max_batch_queue_chapters then
+            capped = capped + 1
+        else
+            table.insert(queueable, chapter)
+        end
+    end
+
+    self:withChapterMenuRefreshSuppressed(function()
+        queued = self:getDownloadQueue():enqueueBatch(manga, queueable, download_directory, { quiet_duplicate = true })
+    end)
+    skipped = skipped + (#queueable - queued)
+
+    self:clearChapterSelection(true)
+    self:refreshChapterMenu({ quick = true })
+
+    if capped > 0 then
+        self:showMessage(T(
+            _("Queued first %1 downloads. Refine the chapter selection to queue more."),
+            self.max_batch_queue_chapters
+        ))
+    elseif queued == 0 and skipped > 0 then
+        self:showMessage(self:formatBulkDownloadMessage(queued, skipped))
+    end
+    return queued
+end
+
+function SuwayomiPlugin:canQueueChapterDownload(manga, chapter)
+    if chapter.is_read == true then
+        return false
+    end
+
+    local status = self:getDownloadQueue():getStatus(manga, chapter)
+    if status and (
+        status.state == "queued"
+            or status.state == "downloading"
+            or status.state == "downloaded"
+            or status.state == "skipped"
+    ) then
+        return false
+    end
+
+    local downloaded = self:isChapterDownloaded(manga, chapter)
+    return downloaded ~= true
+end
+
+function SuwayomiPlugin:isChapterDownloadAvailable(manga, chapter)
+    local status = self:getDownloadQueue():getStatus(manga, chapter)
+    if status and (
+        status.state == "queued"
+            or status.state == "downloading"
+            or status.state == "downloaded"
+            or status.state == "skipped"
+    ) then
+        return true
+    end
+
+    local downloaded = self:isChapterDownloaded(manga, chapter)
+    return downloaded == true
+end
+
+function SuwayomiPlugin:getNextUnreadChaptersForDownload(manga, limit)
+    local chapters = {}
+    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+        if self:canQueueChapterDownload(manga, chapter) then
+            table.insert(chapters, chapter)
+            if #chapters >= limit then
+                break
+            end
+        end
+    end
+    return chapters
+end
+
+function SuwayomiPlugin:getUnreadDownloadBufferCandidates(manga, limit)
+    local missing = {}
+    local unread_count = 0
+
+    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+        if chapter.is_read ~= true then
+            unread_count = unread_count + 1
+            if not self:isChapterDownloadAvailable(manga, chapter) then
+                table.insert(missing, chapter)
+            end
+            if unread_count >= limit then
+                break
+            end
+        end
+    end
+
+    return missing, unread_count
+end
+
+function SuwayomiPlugin:enqueueNextUnreadChapterDownloads(limit)
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        SuwayomiUI.showDirectoryChooser(function(path)
+            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
+            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+            self:enqueueNextUnreadChapterDownloads(limit)
+        end)
+        return 0
+    end
+
+    local chapters = self:getNextUnreadChaptersForDownload(manga, limit)
+    if #chapters == 0 then
+        self:showMessage(_("No unread chapters available to download."))
+        return 0
+    end
+
+    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+end
+
+function SuwayomiPlugin:keepNextUnreadChaptersDownloaded(limit)
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        SuwayomiUI.showDirectoryChooser(function(path)
+            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
+            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+            self:keepNextUnreadChaptersDownloaded(limit)
+        end)
+        return 0
+    end
+
+    local chapters = self:getUnreadDownloadBufferCandidates(manga, limit)
+    if #chapters == 0 then
+        self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
+        return 0
+    end
+
+    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+end
+
+function SuwayomiPlugin:downloadSelectedChapters()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
+    if #chapters == 0 then
+        self:showMessage(_("No chapters selected."))
+        return 0
+    end
+
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        SuwayomiUI.showDirectoryChooser(function(path)
+            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
+            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+            self:enqueueSelectedChapterDownloads(manga, chapters, saved_path)
+        end)
+        return 0
+    end
+
+    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+end
+
+function SuwayomiPlugin:formatActiveDownloadCount(count)
+    if count == 1 then
+        return _("1 download is still in progress.")
+    end
+    return T(_("%1 downloads are still in progress."), count)
+end
+
+function SuwayomiPlugin:formatBulkDeleteMessage(deleted, canceled, missing, active)
+    local parts = {}
+    if deleted > 0 then
+        table.insert(parts, T(
+            self:pluralize(deleted, _("Deleted %1 selected chapter from device."), _("Deleted %1 selected chapters from device.")),
+            deleted
+        ))
+    end
+    if canceled > 0 then
+        table.insert(parts, T(
+            self:pluralize(canceled, _("Canceled %1 queued download."), _("Canceled %1 queued downloads.")),
+            canceled
+        ))
+    end
+    if missing > 0 then
+        table.insert(parts, T(
+            self:pluralize(missing, _("Skipped %1 not downloaded."), _("Skipped %1 not downloaded.")),
+            missing
+        ))
+    end
+    if active > 0 then
+        table.insert(parts, self:formatActiveDownloadCount(active))
+    end
+    if #parts == 0 then
+        return _("No selected chapters were deleted.")
+    end
+    return table.concat(parts, " ")
+end
+
+function SuwayomiPlugin:deleteSelectedChapters()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
+    if #chapters == 0 then
+        self:showMessage(_("No chapters selected."))
+        return 0
+    end
+
+    local deleted = 0
+    local canceled = 0
+    local missing = 0
+    local active = 0
+    self:withChapterMenuRefreshSuppressed(function()
+        for _, chapter in ipairs(chapters) do
+            local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
+                quiet_active = true,
+                quiet_missing = true,
+                skip_refresh = true,
+            })
+            if ok then
+                deleted = deleted + 1
+                if state == "queued" then
+                    canceled = canceled + 1
+                end
+            elseif state == "downloading" then
+                active = active + 1
+            elseif state == "queued" then
+                canceled = canceled + 1
+            elseif state == "missing" then
+                missing = missing + 1
+            end
+        end
+    end)
+
+    self:clearChapterSelection(true)
+    self:refreshChapterMenu()
+
+    if missing > 0 or active > 0 then
+        self:showMessage(self:formatBulkDeleteMessage(deleted, 0, missing, active))
+    end
+    return deleted
+end
+
+function SuwayomiPlugin:deleteReadChaptersFromDevice()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local read_chapters = {}
+    for _, chapter in ipairs(self.current_chapter_context.chapters or {}) do
+        if chapter.is_read == true then
+            table.insert(read_chapters, chapter)
+        end
+    end
+
+    if #read_chapters == 0 then
+        self:showMessage(_("No read chapters to delete."))
+        return 0
+    end
+
+    local deleted = 0
+    local missing = 0
+    local active = 0
+    self:withChapterMenuRefreshSuppressed(function()
+        for _, chapter in ipairs(read_chapters) do
+            local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
+                quiet_active = true,
+                quiet_missing = true,
+                skip_refresh = true,
+            })
+            if ok then
+                deleted = deleted + 1
+            elseif state == "downloading" then
+                active = active + 1
+            elseif state == "missing" then
+                missing = missing + 1
+            end
+        end
+    end)
+
+    self:refreshChapterMenu()
+
+    if deleted == 0 or active > 0 then
+        self:showMessage(self:formatBulkDeleteMessage(deleted, 0, missing, active))
+    end
+    return deleted
+end
+
+function SuwayomiPlugin:markSelectedChaptersRead()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
+    if #chapters == 0 then
+        self:showMessage(_("No chapters selected."))
+        return 0
+    end
+
+    for _, chapter in ipairs(chapters) do
+        self:markChapterRead(manga, chapter, {
+            skip_refresh = true,
+            skip_schedule = true,
+        })
+    end
+
+    self:clearChapterSelection(true)
+    self:refreshChapterMenu()
+    self:schedulePendingReadSync()
+    return #chapters
+end
+
+function SuwayomiPlugin:markSelectedChaptersUnread()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
+    if #chapters == 0 then
+        self:showMessage(_("No chapters selected."))
+        return 0
+    end
+
+    for _, chapter in ipairs(chapters) do
+        self:markChapterUnread(manga, chapter, {
+            skip_refresh = true,
+            skip_schedule = true,
+        })
+    end
+
+    self:clearChapterSelection(true)
+    self:refreshChapterMenu()
+    self:schedulePendingReadSync()
+    return #chapters
+end
+
+function SuwayomiPlugin:performBulkChapterAction(action_id)
+    local next_unread_count = tostring(action_id or ""):match("^download_next_(%d+)_unread$")
+    if next_unread_count then
+        self:enqueueNextUnreadChapterDownloads(tonumber(next_unread_count))
+        return true
+    end
+    local keep_unread_count = tostring(action_id or ""):match("^keep_next_(%d+)_unread$")
+    if keep_unread_count then
+        self:keepNextUnreadChaptersDownloaded(tonumber(keep_unread_count))
+        return true
+    end
+    if action_id == "delete_read_downloaded" then
+        self:deleteReadChaptersFromDevice()
+        return true
+    end
+    if action_id == "download_selected" then
+        self:downloadSelectedChapters()
+        return true
+    end
+    if action_id == "delete_selected" then
+        self:deleteSelectedChapters()
+        return true
+    end
+    if action_id == "mark_read_selected" then
+        self:markSelectedChaptersRead()
+        return true
+    end
+    if action_id == "mark_unread_selected" then
+        self:markSelectedChaptersUnread()
+        return true
+    end
+    if action_id == "clear_selection" then
+        self:clearChapterSelection()
+        return true
+    end
+    return false
+end
+
+function SuwayomiPlugin:showBulkChapterActions(manga)
+    if not SuwayomiUI.showChapterActionsMenu then
+        self:downloadSelectedChapters()
+        return
+    end
+
+    local count = self:getSelectedChapterCount()
+    local options = {
+        title = count > 0 and T(_("%1 selected chapters"), count) or _("Chapter downloads"),
+        actions = self:getBulkChapterActions(),
+    }
+
+    SuwayomiUI.showChapterActionsMenu(options, function(action)
+        self:performBulkChapterAction(action.id)
+    end)
 end
 
 function SuwayomiPlugin:showChapterActions(manga, chapter)
@@ -903,14 +1600,24 @@ function SuwayomiPlugin:markLedgerEntryRead(entry)
 
     ledger[key].read = true
     ledger[key].pending_read_sync = true
+    ledger[key].pending_read_state = true
     self:saveChapterLedger(ledger)
 
     self:schedulePendingReadSync()
     return true
 end
 
-function SuwayomiPlugin:syncPendingReadMarks(credentials)
-    if not SuwayomiAPI.markChapterRead then
+function SuwayomiPlugin:hasPendingReadSync(ledger)
+    for _, entry in pairs(ledger or {}) do
+        if entry.pending_read_sync == true and entry.chapter_id then
+            return true
+        end
+    end
+    return false
+end
+
+function SuwayomiPlugin:syncPendingReadMarks(credentials, max_count)
+    if not SuwayomiAPI.markChapterRead and not SuwayomiAPI.markChapterUnread then
         return 0
     end
 
@@ -921,15 +1628,37 @@ function SuwayomiPlugin:syncPendingReadMarks(credentials)
 
     local ledger = self:loadChapterLedger()
     local synced = 0
+    local attempted = 0
     local changed = false
 
     for key, entry in pairs(ledger) do
-        if entry.read == true and entry.pending_read_sync == true and entry.chapter_id then
-            local result = SuwayomiAPI.markChapterRead(credentials, entry.chapter_id)
+        if max_count and attempted >= max_count then
+            break
+        end
+        if entry.pending_read_sync == true and entry.chapter_id then
+            attempted = attempted + 1
+            local desired_read_state = entry.pending_read_state
+            if desired_read_state == nil then
+                desired_read_state = entry.read == true
+            end
+
+            local result
+            if desired_read_state == true and SuwayomiAPI.markChapterRead then
+                result = SuwayomiAPI.markChapterRead(credentials, entry.chapter_id)
+            elseif SuwayomiAPI.markChapterUnread then
+                result = SuwayomiAPI.markChapterUnread(credentials, entry.chapter_id)
+            else
+                result = { ok = false }
+            end
+
             if result.ok then
                 ledger[key].pending_read_sync = nil
+                ledger[key].pending_read_state = nil
                 synced = synced + 1
                 changed = true
+                if desired_read_state ~= true and not ledger[key].path then
+                    ledger[key] = nil
+                end
             end
         end
     end
@@ -938,18 +1667,34 @@ function SuwayomiPlugin:syncPendingReadMarks(credentials)
         self:saveChapterLedger(ledger)
     end
 
-    return synced
+    return synced, attempted
 end
 
-function SuwayomiPlugin:schedulePendingReadSync()
+function SuwayomiPlugin:schedulePendingReadSync(credentials, delay_seconds)
     if self.pending_read_sync_scheduled then
         return
     end
 
     self.pending_read_sync_scheduled = true
-    UIManager:scheduleIn(0, function()
+    UIManager:scheduleIn(delay_seconds or self.read_sync_delay_seconds, function()
         self.pending_read_sync_scheduled = false
-        self:syncPendingReadMarks()
+        local sync_credentials = credentials or SuwayomiSettings:load()
+        local synced, attempted = self:syncPendingReadMarks(sync_credentials, self.read_sync_batch_size)
+        if self:hasPendingReadSync(self:loadChapterLedger()) then
+            local next_delay = self.read_sync_delay_seconds
+            if attempted > 0 and synced == 0 then
+                next_delay = self.pending_read_sync_failure_delay or self.read_sync_failure_delay_seconds
+                self.pending_read_sync_failure_delay = math.min(
+                    next_delay * 2,
+                    self.read_sync_max_failure_delay_seconds
+                )
+            else
+                self.pending_read_sync_failure_delay = nil
+            end
+            self:schedulePendingReadSync(sync_credentials, next_delay)
+        else
+            self.pending_read_sync_failure_delay = nil
+        end
     end)
 end
 
@@ -968,21 +1713,29 @@ function SuwayomiPlugin:onCloseDocument()
     end
 end
 
-function SuwayomiPlugin:refreshChapterMenu()
+function SuwayomiPlugin:refreshChapterMenu(options)
+    options = options or {}
     if not self.current_chapter_context then
         return
     end
+    self.pending_chapter_menu_refresh = false
 
-    local options = {
-        title = self.current_chapter_context.manga.title,
-        chapters = self:buildChapterMenuItems(self.current_chapter_context.manga, self.current_chapter_context.chapters),
-    }
+    local menu_options_builder = options.quick
+        and self.buildQuickChapterMenuOptions
+        or self.buildChapterMenuOptions
+    local menu_options = menu_options_builder(
+        self,
+        self.current_chapter_context.manga,
+        self.current_chapter_context.chapters
+    )
     self.current_chapter_options = self.current_chapter_options or {}
-    self.current_chapter_options.title = options.title
-    self.current_chapter_options.chapters = options.chapters
+    self.current_chapter_options.title = menu_options.title
+    self.current_chapter_options.chapters = menu_options.chapters
+    self.current_chapter_options.title_bar_left_icon = menu_options.title_bar_left_icon
+    self.current_chapter_options.on_title_bar_left_tap = menu_options.on_title_bar_left_tap
 
     if SuwayomiUI.updateChapterMenu then
-        SuwayomiUI.updateChapterMenu(self.current_chapter_menu, options, function(chapter)
+        SuwayomiUI.updateChapterMenu(self.current_chapter_menu, menu_options, function(chapter)
             self:handleChapterTap(self.current_chapter_context.manga, chapter)
         end, function(chapter)
             self:toggleChapterSelection(self.current_chapter_context.manga, chapter)
@@ -1005,8 +1758,10 @@ function SuwayomiPlugin:enqueueChapterDownload(manga, chapter)
         return
     end
 
-    self:getDownloadQueue():enqueue(manga, chapter, download_directory)
-    self:refreshChapterMenu()
+    self:withChapterMenuRefreshSuppressed(function()
+        self:getDownloadQueue():enqueue(manga, chapter, download_directory)
+    end)
+    self:refreshChapterMenu({ quick = true })
 end
 
 function SuwayomiPlugin:processChapterDownloadQueue()

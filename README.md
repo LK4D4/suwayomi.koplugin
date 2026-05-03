@@ -19,8 +19,13 @@ This plugin is experimental and still under active development.
 - Select a custom download directory
 - Download individual chapters as `.cbz`
 - Chapter actions menu with `Open`, `Download`, `Delete from device`, and `Mark as read` / `Mark as unread`
+- Bulk chapter menu actions for selected chapters, `Download next 5/10/50 unread`, `Keep next 5/10/50 unread downloaded`, and deleting read chapters
+- Chapter action to mark the selected chapter and all previous chapters as read, useful for setting up a clean device from an existing reading position
+- Batch downloads queue chapters in the visible chapter-list order
+- Bulk queueing is capped at 50 new downloads per action to avoid accidental huge queues
+- Chapter rows show lightweight read/download status symbols, including queued and in-progress downloads
 - Read-state tracking from Suwayomi, the local plugin ledger, and KOReader sidecar metadata
-- Background retry of pending read syncs when Suwayomi is temporarily unavailable
+- Background retry of pending read/unread syncs when Suwayomi is temporarily unavailable
 
 Current limitation:
 - The practical, tested flow currently targets the Suwayomi **Local Source**. Other Suwayomi sources may browse correctly, but downloading and reading workflows outside Local Source are not yet considered supported.
@@ -54,6 +59,7 @@ Manual installation:
 6. Tap **Browse Suwayomi** to explore the server.
 7. Tap a chapter to open the chapter actions dialog.
 8. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
+9. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to download or keep the next unread chapters.
 
 ## Testing Locally
 

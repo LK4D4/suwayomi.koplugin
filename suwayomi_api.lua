@@ -214,18 +214,26 @@ function SuwayomiAPI._buildStoredChapterQuery(manga_id)
     })
 end
 
-function SuwayomiAPI._buildMarkChapterReadMutation(chapter_id)
+function SuwayomiAPI._buildUpdateChapterReadMutation(chapter_id, is_read)
     return json.encode({
         query = "mutation UPDATE_CHAPTER_READ($input: UpdateChapterInput!) { updateChapter(input: $input) { chapter { id isRead } } }",
         variables = {
             input = {
                 id = tonumber(chapter_id) or chapter_id,
                 patch = {
-                    isRead = true,
+                    isRead = is_read == true,
                 },
             },
         },
     })
+end
+
+function SuwayomiAPI._buildMarkChapterReadMutation(chapter_id)
+    return SuwayomiAPI._buildUpdateChapterReadMutation(chapter_id, true)
+end
+
+function SuwayomiAPI._buildMarkChapterUnreadMutation(chapter_id)
+    return SuwayomiAPI._buildUpdateChapterReadMutation(chapter_id, false)
 end
 
 function SuwayomiAPI.parseChapterResponse(response_body)
@@ -572,6 +580,31 @@ function SuwayomiAPI.markChapterRead(credentials, chapter_id)
     local chapter, parse_error = SuwayomiAPI.parseMarkChapterReadResponse(result.response_body)
     if not chapter then
         logDebugEvent({ operation = "markChapterRead", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        chapter = chapter,
+    }
+end
+
+function SuwayomiAPI.markChapterUnread(credentials, chapter_id)
+    local result = performGraphQLRequest(
+        credentials,
+        SuwayomiAPI._buildMarkChapterUnreadMutation(chapter_id),
+        "markChapterUnread"
+    )
+    if not result.ok then
+        return result
+    end
+
+    local chapter, parse_error = SuwayomiAPI.parseMarkChapterReadResponse(result.response_body)
+    if not chapter then
+        logDebugEvent({ operation = "markChapterUnread", event = "parse_error", error = parse_error })
         return {
             ok = false,
             error = parse_error,

@@ -77,8 +77,12 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
 
     local menu = Menu:new{
         title = options.title or _("Suwayomi Chapters"),
+        title_bar_left_icon = options.title_bar_left_icon,
         item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback),
     }
+    if options.on_title_bar_left_tap then
+        menu.onLeftButtonTap = options.on_title_bar_left_tap
+    end
     if onHoldCallback then
         menu.onMenuHold = function(_, entry)
             if entry and entry.chapter then
@@ -131,6 +135,16 @@ function SuwayomiUI.updateChapterMenu(menu, options, onSelectCallback, onHoldCal
     end
 
     menu.item_table = SuwayomiUI.buildChapterMenuTable(options.chapters or {}, onSelectCallback)
+    menu.title = options.title or menu.title
+    if menu.title_bar and options.title then
+        menu.title_bar:setTitle(options.title, true)
+    end
+    if options.title_bar_left_icon and menu.setTitleBarLeftIcon then
+        menu:setTitleBarLeftIcon(options.title_bar_left_icon)
+    end
+    if options.on_title_bar_left_tap then
+        menu.onLeftButtonTap = options.on_title_bar_left_tap
+    end
     if onHoldCallback then
         menu.onMenuHold = function(_, entry)
             if entry and entry.chapter then

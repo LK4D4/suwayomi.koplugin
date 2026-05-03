@@ -23,18 +23,16 @@ Implemented already:
 - [x] Chapter actions: `Download`
 - [x] Chapter actions: `Delete from device`
 - [x] Chapter actions: `Mark as read`
-- [x] Chapter actions: `Mark as unread` (local/plugin state)
+- [x] Chapter actions: `Mark as unread`
 - [x] Chapter selection mode
 - [x] Read-state merge from Suwayomi, local ledger, and KOReader sidecar metadata
-- [x] Background retry for pending read syncs
+- [x] Background retry for pending read/unread syncs
 - [x] Backgrounded `Mark as read` sync to avoid blocking the UI
 - [x] App Store installation path
 
 Known limitations:
 - [x] Only Local Source is considered supported right now
-- [x] Bulk selection is not implemented yet
-- [x] Bulk download workflow is not implemented yet
-- [x] `Mark as unread` does not sync unread state back to Suwayomi yet
+- [x] Bulk actions currently start with selected chapter downloads only
 - [x] Non-Local Source reading/downloading is not considered production-ready yet
 
 ## Phase 1: Finish the Local Source MVP
@@ -42,14 +40,14 @@ Known limitations:
 Goal: make the current Local Source reading loop feel complete and predictable.
 
 - [x] Add chapter selection mode
-- [ ] Add bulk chapter actions entry point
-- [ ] Add bulk `Download`
-- [ ] Add bulk `Delete from device`
-- [ ] Add bulk `Mark as read`
-- [ ] Polish chapter status labels so `read`, `downloaded`, `queued`, and `failed` remain easy to scan
-- [ ] Decide and implement final `Mark as unread` behavior:
-  Local only, or local plus Suwayomi sync
-- [ ] Improve small UX feedback after chapter actions where useful
+- [x] Add bulk chapter actions entry point
+- [x] Add bulk `Download`
+- [x] Add bulk `Delete from device`
+- [x] Add bulk `Mark as read`
+- [x] Polish chapter status labels so `read`, `downloaded`, `queued`, and `failed` remain easy to scan
+- [x] Decide and implement final `Mark as unread` behavior:
+  Local plus Suwayomi sync
+- [x] Improve small UX feedback after chapter actions where useful
 
 Exit criteria:
 - The plugin is comfortable for normal reading and library management inside KOReader without manual file cleanup.
@@ -58,12 +56,12 @@ Exit criteria:
 
 Goal: define what the plugin should download next, not just how to download one chapter.
 
-- [ ] Add `Download next N unread chapters`
-- [ ] Add `Keep next N unread chapters downloaded`
-- [ ] Add `Delete read chapters from device`
-- [ ] Define queue ordering clearly for chapter batches
-- [ ] Show lightweight queue/progress state in the chapter list for batch operations
-- [ ] Prevent obviously excessive queue sizes or duplicate batch requests
+- [x] Add `Download next N unread chapters`
+- [x] Add `Keep next N unread chapters downloaded`
+- [x] Add `Delete read chapters from device`
+- [x] Define queue ordering clearly for chapter batches
+- [x] Show lightweight queue/progress state in the chapter list for batch operations
+- [x] Prevent obviously excessive queue sizes or duplicate batch requests
 
 Exit criteria:
 - Large manga can be managed from KOReader without one-by-one downloading.
@@ -74,8 +72,8 @@ Goal: make read state trustworthy across KOReader and Suwayomi.
 
 - [ ] Add manual `Sync read state now`
 - [ ] Add a ledger reconciliation sweep for downloaded chapters
-- [ ] Decide whether `Mark as unread` should sync back to Suwayomi
-- [ ] If yes, implement unread sync mutation flow
+- [x] Decide whether `Mark as unread` should sync back to Suwayomi
+- [x] If yes, implement unread sync mutation flow
 - [ ] Improve diagnostics for read-state conflicts and sync failures
 
 Exit criteria:

@@ -273,6 +273,14 @@ describe("suwayomi_api", function()
         assert.truthy(query:match('"isRead":true'))
     end)
 
+    it("builds the mark chapter unread mutation", function()
+        local query = api._buildMarkChapterUnreadMutation("398")
+
+        assert.truthy(query:match("mutation UPDATE_CHAPTER_READ"))
+        assert.truthy(query:match('"id":398'))
+        assert.truthy(query:match('"isRead":false'))
+    end)
+
     it("parses chapters from a manga response body", function()
         local response = [[
             {
@@ -807,6 +815,49 @@ describe("suwayomi_api", function()
         assert.is_true(result.ok)
         assert.truthy(requested_body:match("UPDATE_CHAPTER_READ"))
         assert.truthy(requested_body:match('"isRead":true'))
+    end)
+
+    it("marks a chapter unread through Suwayomi", function()
+        local requested_body
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    requested_body = options.source
+                    options.sink("ignored")
+                    return 1, 200
+                end,
+            }
+        end
+
+        package.preload.ltn12 = function()
+            return {
+                source = {
+                    string = function(value)
+                        return value
+                    end,
+                },
+                sink = {
+                    table = function(target)
+                        return function(_chunk)
+                            table.insert(target, [[{"data":{"updateChapter":{"chapter":{"id":398,"isRead":false}}}}]])
+                        end
+                    end,
+                },
+            }
+        end
+
+        local result = api.markChapterUnread({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }, "398")
+
+        assert.is_true(result.ok)
+        assert.is_false(result.chapter.is_read)
+        assert.truthy(requested_body:match("UPDATE_CHAPTER_READ"))
+        assert.truthy(requested_body:match('"isRead":false'))
     end)
 
     it("fetches chapters for a manga and parses the response", function()
