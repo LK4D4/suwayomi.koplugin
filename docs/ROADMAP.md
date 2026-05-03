@@ -61,7 +61,7 @@ Goal: define what the plugin should download next, not just how to download one 
 - [x] Add `Delete read chapters from device`
 - [x] Define queue ordering clearly for chapter batches
 - [x] Show lightweight queue/progress state in the chapter list for batch operations
-- [ ] Prevent obviously excessive queue sizes or duplicate batch requests
+- [x] Prevent obviously excessive queue sizes or duplicate batch requests
 
 Exit criteria:
 - Large manga can be managed from KOReader without one-by-one downloading.

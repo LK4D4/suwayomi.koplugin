@@ -21,6 +21,7 @@ This plugin is experimental and still under active development.
 - Chapter actions menu with `Open`, `Download`, `Delete from device`, and `Mark as read` / `Mark as unread`
 - Bulk chapter menu actions for selected chapters, `Download next 5/10 unread`, `Keep next 5/10 unread downloaded`, and deleting read chapters
 - Batch downloads queue chapters in the visible chapter-list order
+- Bulk queueing is capped at 50 new downloads per action to avoid accidental huge queues
 - Chapter rows show lightweight read/download status symbols, including queued and in-progress downloads
 - Read-state tracking from Suwayomi, the local plugin ledger, and KOReader sidecar metadata
 - Background retry of pending read/unread syncs when Suwayomi is temporarily unavailable

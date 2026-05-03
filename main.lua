@@ -21,6 +21,7 @@ local SuwayomiPlugin = WidgetContainer:extend{
     name = "suwayomi_dl",
     is_doc_only = false,
     selection_mode = false,
+    max_batch_queue_chapters = 50,
 }
 
 function SuwayomiPlugin:createDownloadQueue()
@@ -983,11 +984,14 @@ end
 function SuwayomiPlugin:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
     local queued = 0
     local skipped = 0
+    local capped = 0
     for _, chapter in ipairs(chapters or {}) do
         local status = self:getDownloadQueue():getStatus(manga, chapter)
         local downloaded = self:isChapterDownloaded(manga, chapter)
         if downloaded or (status and (status.state == "queued" or status.state == "downloading" or status.state == "downloaded" or status.state == "skipped")) then
             skipped = skipped + 1
+        elseif queued >= self.max_batch_queue_chapters then
+            capped = capped + 1
         elseif self:getDownloadQueue():enqueue(manga, chapter, download_directory, { quiet_duplicate = true }) then
             queued = queued + 1
         else
@@ -998,7 +1002,12 @@ function SuwayomiPlugin:enqueueSelectedChapterDownloads(manga, chapters, downloa
     self:clearChapterSelection(true)
     self:refreshChapterMenu()
 
-    if queued == 0 and skipped > 0 then
+    if capped > 0 then
+        self:showMessage(T(
+            _("Queued first %1 downloads. Refine the chapter selection to queue more."),
+            self.max_batch_queue_chapters
+        ))
+    elseif queued == 0 and skipped > 0 then
         self:showMessage(self:formatBulkDownloadMessage(queued, skipped))
     end
     return queued

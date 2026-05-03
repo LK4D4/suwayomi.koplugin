@@ -1533,6 +1533,70 @@ describe("suwayomi plugin", function()
         assert.are.equal("No new downloads queued. Skipped 1 already downloaded or queued.", shown_messages[#shown_messages])
     end)
 
+    it("limits excessive selected bulk download requests", function()
+        local saved_queue = {}
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path)
+                    return chapter_path .. ".part"
+                end,
+                chapterExists = function()
+                    return false
+                end,
+                downloadChapterWithProgress = function() end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapters = {}
+        local selected = {}
+        for index = 1, 55 do
+            local chapter = { id = tostring(400 + index), name = "Chapter " .. tostring(index), is_read = false }
+            table.insert(chapters, chapter)
+            selected["m1:" .. tostring(400 + index)] = true
+        end
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = chapters,
+        }
+        plugin.selected_chapters = selected
+        plugin.selection_mode = true
+
+        plugin:performBulkChapterAction("download_selected")
+
+        assert.are.equal(50, #saved_queue)
+        assert.are.equal("401", saved_queue[1].chapter.id)
+        assert.are.equal("450", saved_queue[50].chapter.id)
+        assert.are.equal("Queued first 50 downloads. Refine the chapter selection to queue more.", shown_messages[#shown_messages])
+    end)
+
     it("deletes selected downloaded chapters from bulk actions", function()
         local saved_ledger = {
             ["m1:398"] = {
