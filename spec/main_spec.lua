@@ -3306,6 +3306,86 @@ return {
         assert.is_nil(saved_ledger["m1:398"].pending_read_sync)
     end)
 
+    it("syncs pending read marks in small scheduled batches", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "398",
+                chapter_name = "Official_Vol. 1 Ch. 1",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+            ["m1:399"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "399",
+                chapter_name = "Official_Vol. 1 Ch. 2",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+            ["m1:400"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "400",
+                chapter_name = "Official_Vol. 1 Ch. 3",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+        }
+        local marked_ids = {}
+
+        package.preload.suwayomi_api = function()
+            return {
+                markChapterRead = function(_, chapter_id)
+                    table.insert(marked_ids, chapter_id)
+                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
+                end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.read_sync_batch_size = 2
+
+        plugin:schedulePendingReadSync()
+        local first_callback = table.remove(scheduled_callbacks, 1)
+        first_callback()
+
+        assert.are.equal(2, #marked_ids)
+        assert.are.equal(1, #scheduled_callbacks)
+        assert.is_true(plugin:hasPendingReadSync(saved_ledger))
+
+        local second_callback = table.remove(scheduled_callbacks, 1)
+        second_callback()
+
+        assert.are.equal(3, #marked_ids)
+        assert.are.equal(0, #scheduled_callbacks)
+        assert.is_false(plugin:hasPendingReadSync(saved_ledger))
+    end)
+
     it("keeps pending read sync while a retry still fails during browsing", function()
         local shown_chapter_menu
         local saved_ledger = {

@@ -22,6 +22,8 @@ local SuwayomiPlugin = WidgetContainer:extend{
     is_doc_only = false,
     selection_mode = false,
     max_batch_queue_chapters = 50,
+    read_sync_batch_size = 2,
+    read_sync_delay_seconds = 0.5,
 }
 
 function SuwayomiPlugin:createDownloadQueue()
@@ -182,7 +184,7 @@ function SuwayomiPlugin:browseSuwayomi()
         return
     end
 
-    self:syncPendingReadMarks(credentials)
+    self:schedulePendingReadSync(credentials)
 
     local result = SuwayomiAPI.fetchSources(credentials)
     if not result.ok then
@@ -1505,7 +1507,16 @@ function SuwayomiPlugin:markLedgerEntryRead(entry)
     return true
 end
 
-function SuwayomiPlugin:syncPendingReadMarks(credentials)
+function SuwayomiPlugin:hasPendingReadSync(ledger)
+    for _, entry in pairs(ledger or {}) do
+        if entry.pending_read_sync == true and entry.chapter_id then
+            return true
+        end
+    end
+    return false
+end
+
+function SuwayomiPlugin:syncPendingReadMarks(credentials, max_count)
     if not SuwayomiAPI.markChapterRead and not SuwayomiAPI.markChapterUnread then
         return 0
     end
@@ -1520,6 +1531,9 @@ function SuwayomiPlugin:syncPendingReadMarks(credentials)
     local changed = false
 
     for key, entry in pairs(ledger) do
+        if max_count and synced >= max_count then
+            break
+        end
         if entry.pending_read_sync == true and entry.chapter_id then
             local desired_read_state = entry.pending_read_state
             if desired_read_state == nil then
@@ -1554,15 +1568,19 @@ function SuwayomiPlugin:syncPendingReadMarks(credentials)
     return synced
 end
 
-function SuwayomiPlugin:schedulePendingReadSync()
+function SuwayomiPlugin:schedulePendingReadSync(credentials)
     if self.pending_read_sync_scheduled then
         return
     end
 
     self.pending_read_sync_scheduled = true
-    UIManager:scheduleIn(0, function()
+    UIManager:scheduleIn(self.read_sync_delay_seconds, function()
         self.pending_read_sync_scheduled = false
-        self:syncPendingReadMarks()
+        local sync_credentials = credentials or SuwayomiSettings:load()
+        self:syncPendingReadMarks(sync_credentials, self.read_sync_batch_size)
+        if self:hasPendingReadSync(self:loadChapterLedger()) then
+            self:schedulePendingReadSync(sync_credentials)
+        end
     end)
 end
 
