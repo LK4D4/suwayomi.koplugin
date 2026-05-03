@@ -70,6 +70,8 @@ describe("suwayomi_download_queue", function()
         local messages = {}
         local status_changes = 0
         local download_calls = 0
+        local next_pid = 1233
+        local subprocess_done = options.subprocess_done
 
         local downloader = options.downloader or {
             getTargetPath = function(_, download_directory, manga, chapter)
@@ -122,15 +124,24 @@ describe("suwayomi_download_queue", function()
             ffi_util = {
                 runInSubProcess = function(callback)
                     if options.skip_subprocess_callback then
-                        return 1234
+                        next_pid = next_pid + 1
+                        return next_pid
                     end
                     callback()
-                    return 1234
+                    next_pid = next_pid + 1
+                    return next_pid
                 end,
-                isSubProcessDone = function()
-                    return options.subprocess_done ~= false
+                isSubProcessDone = function(pid)
+                    if type(subprocess_done) == "table" then
+                        return subprocess_done[pid] == true
+                    end
+                    if type(subprocess_done) == "function" then
+                        return subprocess_done(pid)
+                    end
+                    return subprocess_done ~= false
                 end,
             },
+            max_active_chapters = options.max_active_chapters,
             now = function()
                 return now
             end,
@@ -142,7 +153,8 @@ describe("suwayomi_download_queue", function()
             end,
         }
 
-        return {
+        local context
+        context = {
             queue = queue,
             scheduled = scheduled,
             saved_queue = function() return saved_queue end,
@@ -150,8 +162,37 @@ describe("suwayomi_download_queue", function()
             messages = messages,
             status_changes = function() return status_changes end,
             download_calls = function() return download_calls end,
+            progress_files = progress_files,
             advance = function(seconds)
                 now = now + seconds
+            end,
+            set_subprocess_done = function(pid, done)
+                if type(subprocess_done) ~= "table" then
+                    subprocess_done = {}
+                end
+                subprocess_done[pid] = done
+            end,
+            active_count = function()
+                local count = 0
+                for _ in pairs(context.queue.active_jobs or {}) do
+                    count = count + 1
+                end
+                return count
+            end,
+            active_job = function(manga, chapter)
+                return context.queue.active_jobs[context.queue:getKey(manga, chapter)]
+            end,
+            write_progress = function(manga, chapter, state, current, total, path, error_message)
+                local progress_path = context.queue:buildProgressPath(manga, chapter, "/books")
+                local handle = assert(io.open(progress_path, "w"))
+                handle:write("state=", tostring(state or ""), "\n")
+                handle:write("current=", tostring(current or 0), "\n")
+                handle:write("total=", tostring(total or 0), "\n")
+                handle:write("path=", tostring(path or ""), "\n")
+                if error_message then
+                    handle:write("error=", tostring(error_message), "\n")
+                end
+                handle:close()
             end,
             run_scheduled = function()
                 while #scheduled > 0 do
@@ -160,6 +201,8 @@ describe("suwayomi_download_queue", function()
                 end
             end,
         }
+
+        return context
     end
 
     before_each(function()
@@ -357,6 +400,64 @@ describe("suwayomi_download_queue", function()
         assert.are.equal("downloading", context.queue:getStatus(manga, chapter).state)
         assert.are.equal(1, #context.saved_queue())
         assert.are.equal("downloading", context.saved_queue()[1].state)
+    end)
+
+    it("starts downloads up to the active chapter limit", function()
+        local context = build_queue({
+            max_active_chapters = 2,
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapters = {
+            { id = "398", name = "Official_Vol. 1 Ch. 1" },
+            { id = "399", name = "Official_Vol. 1 Ch. 2" },
+            { id = "400", name = "Official_Vol. 1 Ch. 3" },
+        }
+
+        context.queue:enqueueBatch(manga, chapters, "/books")
+        table.remove(context.scheduled, 1).callback()
+
+        assert.are.equal(2, context.active_count())
+        assert.is_not_nil(context.active_job(manga, chapters[1]))
+        assert.is_not_nil(context.active_job(manga, chapters[2]))
+        assert.is_nil(context.active_job(manga, chapters[3]))
+        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[1]).state)
+        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[2]).state)
+        assert.are.equal("queued", context.queue:getStatus(manga, chapters[3]).state)
+    end)
+
+    it("backfills a completed active slot while another chapter keeps downloading", function()
+        local context = build_queue({
+            max_active_chapters = 2,
+            subprocess_done = {},
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapters = {
+            { id = "398", name = "Official_Vol. 1 Ch. 1" },
+            { id = "399", name = "Official_Vol. 1 Ch. 2" },
+            { id = "400", name = "Official_Vol. 1 Ch. 3" },
+        }
+
+        context.queue:enqueueBatch(manga, chapters, "/books")
+        table.remove(context.scheduled, 1).callback()
+        local first = context.active_job(manga, chapters[1])
+        local second = context.active_job(manga, chapters[2])
+        context.write_progress(manga, chapters[1], "downloaded", 1, 1, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        context.write_progress(manga, chapters[2], "downloading", 1, 2, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 2.cbz")
+        context.set_subprocess_done(first.pid, true)
+        context.set_subprocess_done(second.pid, false)
+
+        table.remove(context.scheduled, 1).callback()
+
+        assert.are.equal(2, context.active_count())
+        assert.is_nil(context.active_job(manga, chapters[1]))
+        assert.is_not_nil(context.active_job(manga, chapters[2]))
+        assert.is_not_nil(context.active_job(manga, chapters[3]))
+        assert.are.equal("downloaded", context.queue:getStatus(manga, chapters[1]).state)
+        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[2]).state)
+        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[3]).state)
     end)
 
     it("persists failed state when the downloader reports failure", function()

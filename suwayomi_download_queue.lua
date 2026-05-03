@@ -7,6 +7,7 @@ DownloadQueue.__index = DownloadQueue
 DownloadQueue.POLL_INTERVAL_SECONDS = 0.5
 DownloadQueue.WATCHDOG_TIMEOUT_SECONDS = 30 * 60
 DownloadQueue.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS = 58
+DownloadQueue.MAX_ACTIVE_CHAPTERS = 2
 
 function DownloadQueue:new(options)
     options = options or {}
@@ -21,9 +22,46 @@ function DownloadQueue:new(options)
         getCredentials = options.getCredentials,
         items = {},
         statuses = {},
-        active = false,
+        active_jobs = {},
+        poll_scheduled = false,
+        max_active_chapters = options.max_active_chapters or self.MAX_ACTIVE_CHAPTERS,
     }
     return setmetatable(queue, self)
+end
+
+function DownloadQueue:getActiveCount()
+    local count = 0
+    for _ in pairs(self.active_jobs or {}) do
+        count = count + 1
+    end
+    return count
+end
+
+function DownloadQueue:getActiveJob(key)
+    return self.active_jobs and self.active_jobs[key]
+end
+
+function DownloadQueue:setActiveJob(job)
+    self.active_jobs = self.active_jobs or {}
+    self.active_jobs[job.key or self:getKey(job.manga, job.chapter)] = job
+end
+
+function DownloadQueue:removeActiveJob(job)
+    if not self.active_jobs then
+        return
+    end
+    self.active_jobs[job.key or self:getKey(job.manga, job.chapter)] = nil
+end
+
+function DownloadQueue:schedulePoll()
+    if self.poll_scheduled or self:getActiveCount() == 0 then
+        return
+    end
+
+    self.poll_scheduled = true
+    self.ui_manager:scheduleIn(self.POLL_INTERVAL_SECONDS, function()
+        self:poll()
+    end)
 end
 
 function DownloadQueue:getKey(manga, chapter)
@@ -134,7 +172,7 @@ end
 
 function DownloadQueue:cancelPending(manga, chapter)
     local key = self:getKey(manga, chapter)
-    if self.active and (self.active.key or self:getKey(self.active.manga, self.active.chapter)) == key then
+    if self:getActiveJob(key) then
         return false, "downloading"
     end
 
@@ -452,103 +490,93 @@ function DownloadQueue:runDownloaderJob(queued)
 end
 
 function DownloadQueue:process()
-    if self.active then
-        return
-    end
+    while self:getActiveCount() < self.max_active_chapters do
+        local queued = table.remove(self.items, 1)
+        if not queued then
+            break
+        end
 
-    local queued = table.remove(self.items, 1)
-    if not queued then
-        return
-    end
+        queued.started_at = self.now()
+        queued.progress_path = self:buildProgressPath(queued.manga, queued.chapter, queued.download_directory)
+        os.remove(queued.progress_path)
+        queued.credentials = queued.credentials or self:getCredentialsForJob()
+        self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading"))
 
-    self.active = queued
-    queued.started_at = self.now()
-    queued.progress_path = self:buildProgressPath(queued.manga, queued.chapter, queued.download_directory)
-    os.remove(queued.progress_path)
-    queued.credentials = queued.credentials or self:getCredentialsForJob()
-    self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading"))
-
-    local pid, err = self.ffi_util.runInSubProcess(function()
-        self:runDownloaderJob(queued)
-    end)
-
-    if not pid then
-        self.active = false
-        self:setStatus(queued.manga, queued.chapter, { state = "failed" })
-        self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "failed"))
-        self.onMessage(T(_("Could not start chapter download: %1"), err or _("unknown error")))
-        self.ui_manager:scheduleIn(0, function()
-            self:process()
+        local pid, err = self.ffi_util.runInSubProcess(function()
+            self:runDownloaderJob(queued)
         end)
-        return
+
+        if not pid then
+            self:setStatus(queued.manga, queued.chapter, { state = "failed" })
+            self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "failed"))
+            self.onMessage(T(_("Could not start chapter download: %1"), err or _("unknown error")))
+        else
+            queued.pid = pid
+            self:setActiveJob(queued)
+            self:setStatus(queued.manga, queued.chapter, {
+                state = "downloading",
+                current = 0,
+                total = 0,
+            })
+        end
     end
 
-    queued.pid = pid
-    self:setStatus(queued.manga, queued.chapter, {
-        state = "downloading",
-        current = 0,
-        total = 0,
-    })
-    self.ui_manager:scheduleIn(self.POLL_INTERVAL_SECONDS, function()
-        self:poll()
-    end)
+    self:schedulePoll()
 end
 
 function DownloadQueue:finishActiveWithFailure(active, message)
-    self.active = false
+    self:removeActiveJob(active)
     os.remove(active.progress_path)
     self:setStatus(active.manga, active.chapter, { state = "failed" })
     self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed"))
     self.onMessage(message or _("Chapter download failed."))
-    self.ui_manager:scheduleIn(0, function()
-        self:process()
-    end)
 end
 
 function DownloadQueue:poll()
-    local active = self.active
-    if not active then
+    self.poll_scheduled = false
+    if self:getActiveCount() == 0 then
         return
     end
 
-    local progress = self:readProgress(active.progress_path)
-    if progress and progress.state then
-        self:setStatus(active.manga, active.chapter, {
-            state = progress.state,
-            current = progress.current,
-            total = progress.total,
-        })
+    local active_jobs = {}
+    for _, active in pairs(self.active_jobs or {}) do
+        table.insert(active_jobs, active)
     end
 
-    if self.now() - (active.started_at or self.now()) > self.WATCHDOG_TIMEOUT_SECONDS then
-        self:finishActiveWithFailure(active, _("Chapter download timed out."))
-        return
-    end
-
-    local done = self.ffi_util.isSubProcessDone(active.pid)
-    local terminal = progress and (progress.state == "downloaded" or progress.state == "skipped" or progress.state == "failed")
-    if terminal or done then
-        self.active = false
-        os.remove(active.progress_path)
-        if progress and (progress.state == "downloaded" or progress.state == "skipped") then
-            self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
-        elseif progress and progress.state == "failed" then
-            self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed"))
-            self.onMessage(_(progress.error or _("Chapter download failed.")))
-        else
-            self:setStatus(active.manga, active.chapter, { state = "failed" })
-            self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed"))
-            self.onMessage(_("Chapter download failed."))
+    for index = 1, #active_jobs do
+        local active = active_jobs[index]
+        local progress = self:readProgress(active.progress_path)
+        if progress and progress.state then
+            self:setStatus(active.manga, active.chapter, {
+                state = progress.state,
+                current = progress.current,
+                total = progress.total,
+            })
         end
-        self.ui_manager:scheduleIn(0, function()
-            self:process()
-        end)
-        return
+
+        if self.now() - (active.started_at or self.now()) > self.WATCHDOG_TIMEOUT_SECONDS then
+            self:finishActiveWithFailure(active, _("Chapter download timed out."))
+        else
+            local done = self.ffi_util.isSubProcessDone(active.pid)
+            local terminal = progress and (progress.state == "downloaded" or progress.state == "skipped" or progress.state == "failed")
+            if terminal or done then
+                self:removeActiveJob(active)
+                os.remove(active.progress_path)
+                if progress and (progress.state == "downloaded" or progress.state == "skipped") then
+                    self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
+                elseif progress and progress.state == "failed" then
+                    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed"))
+                    self.onMessage(_(progress.error or _("Chapter download failed.")))
+                else
+                    self:setStatus(active.manga, active.chapter, { state = "failed" })
+                    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed"))
+                    self.onMessage(_("Chapter download failed."))
+                end
+            end
+        end
     end
 
-    self.ui_manager:scheduleIn(self.POLL_INTERVAL_SECONDS, function()
-        self:poll()
-    end)
+    self:process()
 end
 
 return DownloadQueue
