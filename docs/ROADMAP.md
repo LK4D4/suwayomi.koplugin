@@ -57,7 +57,7 @@ Exit criteria:
 Goal: define what the plugin should download next, not just how to download one chapter.
 
 - [x] Add `Download next N unread chapters`
-- [ ] Add `Keep next N unread chapters downloaded`
+- [x] Add `Keep next N unread chapters downloaded`
 - [ ] Add `Delete read chapters from device`
 - [ ] Define queue ordering clearly for chapter batches
 - [ ] Show lightweight queue/progress state in the chapter list for batch operations

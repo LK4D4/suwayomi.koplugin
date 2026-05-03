@@ -935,6 +935,8 @@ function SuwayomiPlugin:getBulkChapterActions()
 
     table.insert(actions, { id = "download_next_5_unread", text = _("Download next 5 unread") })
     table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
+    table.insert(actions, { id = "keep_next_5_unread", text = _("Keep next 5 unread downloaded") })
+    table.insert(actions, { id = "keep_next_10_unread", text = _("Keep next 10 unread downloaded") })
 
     return actions
 end
@@ -1009,6 +1011,21 @@ function SuwayomiPlugin:canQueueChapterDownload(manga, chapter)
     return downloaded ~= true
 end
 
+function SuwayomiPlugin:isChapterDownloadAvailable(manga, chapter)
+    local status = self:getDownloadQueue():getStatus(manga, chapter)
+    if status and (
+        status.state == "queued"
+            or status.state == "downloading"
+            or status.state == "downloaded"
+            or status.state == "skipped"
+    ) then
+        return true
+    end
+
+    local downloaded = self:isChapterDownloaded(manga, chapter)
+    return downloaded == true
+end
+
 function SuwayomiPlugin:getNextUnreadChaptersForDownload(manga, limit)
     local chapters = {}
     for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
@@ -1020,6 +1037,25 @@ function SuwayomiPlugin:getNextUnreadChaptersForDownload(manga, limit)
         end
     end
     return chapters
+end
+
+function SuwayomiPlugin:getUnreadDownloadBufferCandidates(manga, limit)
+    local missing = {}
+    local unread_count = 0
+
+    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+        if chapter.is_read ~= true then
+            unread_count = unread_count + 1
+            if not self:isChapterDownloadAvailable(manga, chapter) then
+                table.insert(missing, chapter)
+            end
+            if unread_count >= limit then
+                break
+            end
+        end
+    end
+
+    return missing, unread_count
 end
 
 function SuwayomiPlugin:enqueueNextUnreadChapterDownloads(limit)
@@ -1041,6 +1077,31 @@ function SuwayomiPlugin:enqueueNextUnreadChapterDownloads(limit)
     local chapters = self:getNextUnreadChaptersForDownload(manga, limit)
     if #chapters == 0 then
         self:showMessage(_("No unread chapters available to download."))
+        return 0
+    end
+
+    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+end
+
+function SuwayomiPlugin:keepNextUnreadChaptersDownloaded(limit)
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        SuwayomiUI.showDirectoryChooser(function(path)
+            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
+            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+            self:keepNextUnreadChaptersDownloaded(limit)
+        end)
+        return 0
+    end
+
+    local chapters = self:getUnreadDownloadBufferCandidates(manga, limit)
+    if #chapters == 0 then
+        self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
         return 0
     end
 
@@ -1207,6 +1268,11 @@ function SuwayomiPlugin:performBulkChapterAction(action_id)
     local next_unread_count = tostring(action_id or ""):match("^download_next_(%d+)_unread$")
     if next_unread_count then
         self:enqueueNextUnreadChapterDownloads(tonumber(next_unread_count))
+        return true
+    end
+    local keep_unread_count = tostring(action_id or ""):match("^keep_next_(%d+)_unread$")
+    if keep_unread_count then
+        self:keepNextUnreadChaptersDownloaded(tonumber(keep_unread_count))
         return true
     end
     if action_id == "download_selected" then
