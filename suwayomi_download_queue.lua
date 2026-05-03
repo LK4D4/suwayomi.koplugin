@@ -83,6 +83,26 @@ function DownloadQueue:upsertPersistentJob(job)
     self:savePersistentJobs(jobs)
 end
 
+function DownloadQueue:upsertPersistentJobs(new_jobs)
+    local jobs = self:loadPersistentJobs()
+    local indexes_by_key = {}
+    for index, existing in ipairs(jobs) do
+        indexes_by_key[existing.key] = index
+    end
+
+    for _, job in ipairs(new_jobs or {}) do
+        local existing_index = indexes_by_key[job.key]
+        if existing_index then
+            jobs[existing_index] = job
+        else
+            table.insert(jobs, job)
+            indexes_by_key[job.key] = #jobs
+        end
+    end
+
+    self:savePersistentJobs(jobs)
+end
+
 function DownloadQueue:removePersistentJob(key)
     local remaining = {}
     for _, job in ipairs(self:loadPersistentJobs()) do
@@ -329,6 +349,52 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
         self:process()
     end)
     return true
+end
+
+function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options)
+    options = options or {}
+    local persistent_jobs = {}
+    local queued_count = 0
+
+    for _, chapter in ipairs(chapters or {}) do
+        local status = self:getStatus(manga, chapter)
+        if status and (status.state == "queued" or status.state == "downloading") then
+            if not options.quiet_duplicate then
+                self.onMessage(_("Chapter download is already in progress."))
+            end
+        else
+            if status and status.state == "failed" then
+                self:cleanupInterruptedDownload({
+                    download_directory = download_directory,
+                    manga = manga,
+                    chapter = chapter,
+                })
+            end
+
+            local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued")
+            table.insert(persistent_jobs, persistent_job)
+            self.statuses[persistent_job.key] = { state = "queued" }
+            table.insert(self.items, {
+                key = persistent_job.key,
+                download_directory = download_directory,
+                manga = manga,
+                chapter = chapter,
+                downloader = self.downloader,
+            })
+            queued_count = queued_count + 1
+        end
+    end
+
+    if queued_count == 0 then
+        return 0
+    end
+
+    self:upsertPersistentJobs(persistent_jobs)
+    self.onStatusChanged()
+    self.ui_manager:scheduleIn(0, function()
+        self:process()
+    end)
+    return queued_count
 end
 
 function DownloadQueue:getCredentialsForJob()

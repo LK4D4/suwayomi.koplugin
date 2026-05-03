@@ -900,6 +900,74 @@ describe("suwayomi plugin", function()
         assert.are.equal("Official_Vol. 1 Ch. 1", shown_actions_menu.title)
     end)
 
+    it("does not duplicate selection markers during quick refreshes", function()
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapters = {
+            { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = false },
+            { id = "399", name = "Official_Vol. 1 Ch. 2", is_read = false },
+        }
+
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = chapters,
+        }
+        plugin.selected_chapters = { ["m1:398"] = true }
+        plugin.selection_mode = true
+        plugin.current_chapter_options = plugin:buildChapterMenuOptions(manga, chapters)
+
+        local quick_items = plugin:buildQuickChapterMenuItems(manga, chapters)
+
+        assert.are.equal("[x] Official_Vol. 1 Ch. 1", quick_items[1].menu_text)
+        assert.are.equal("[ ] Official_Vol. 1 Ch. 2", quick_items[2].menu_text)
+    end)
+
+    it("clears stale selection when opening chapters for another manga", function()
+        package.preload.suwayomi_api = function()
+            return {
+                fetchChaptersForManga = function(_, manga_id)
+                    return {
+                        ok = true,
+                        chapters = {
+                            { id = manga_id .. "-398", name = "Official_Vol. 1 Ch. 1", is_read = false },
+                        },
+                    }
+                end,
+            }
+        end
+
+        local last_menu
+        package.preload.suwayomi_ui = function()
+            return {
+                showChapterMenu = function(options)
+                    last_menu = options
+                    return {}
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_ui = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.selected_chapters = { ["m1:398"] = true }
+        plugin.selection_mode = true
+        plugin.current_chapter_context = {
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapters = { { id = "398", name = "Official_Vol. 1 Ch. 1" } },
+        }
+
+        plugin:showChaptersForManga({ id = "m2", title = "Yotsuba&!" })
+
+        assert.is_false(plugin.selection_mode)
+        assert.are.same({}, plugin.selected_chapters)
+        assert.are.equal("Yotsuba&!", last_menu.title)
+        assert.are.equal("Official_Vol. 1 Ch. 1", last_menu.chapters[1].menu_text)
+    end)
+
     it("shows bulk actions for selected chapters and queues selected downloads", function()
         local shown_chapter_menu
         local tap_chapter
@@ -3537,7 +3605,6 @@ return {
                 end,
             }
         end
-
         package.loaded.main = nil
         package.loaded.suwayomi_api = nil
         package.loaded.suwayomi_settings = nil
@@ -3560,6 +3627,90 @@ return {
         assert.are.equal(3, #marked_ids)
         assert.are.equal(0, #scheduled_callbacks)
         assert.is_false(plugin:hasPendingReadSync(saved_ledger))
+    end)
+
+    it("backs off failed pending read sync retries instead of immediately retrying", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                chapter_id = "398",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+            ["m1:399"] = {
+                manga_id = "m1",
+                chapter_id = "399",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+            ["m1:400"] = {
+                manga_id = "m1",
+                chapter_id = "400",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+        }
+        local attempts = 0
+
+        package.preload.suwayomi_api = function()
+            return {
+                markChapterRead = function()
+                    attempts = attempts + 1
+                    return { ok = false, error = "offline" }
+                end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+        package.preload["ui/uimanager"] = function()
+            return {
+                show = function(_, widget)
+                    table.insert(shown_messages, widget.text)
+                end,
+                nextTick = function(_, callback)
+                    callback()
+                end,
+                scheduleIn = function(_, delay, callback)
+                    table.insert(scheduled_callbacks, { delay = delay, callback = callback })
+                end,
+                setDirty = function() end,
+                forceRePaint = function() end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+        package.loaded["ui/uimanager"] = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.read_sync_batch_size = 2
+        plugin.read_sync_delay_seconds = 0.5
+
+        plugin:schedulePendingReadSync()
+        local first_callback = table.remove(scheduled_callbacks, 1)
+        first_callback.callback()
+
+        assert.are.equal(2, attempts)
+        assert.are.equal(1, #scheduled_callbacks)
+        assert.are.equal(5, scheduled_callbacks[1].delay)
     end)
 
     it("keeps pending read sync while a retry still fails during browsing", function()

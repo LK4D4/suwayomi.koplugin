@@ -24,6 +24,8 @@ local SuwayomiPlugin = WidgetContainer:extend{
     max_batch_queue_chapters = 50,
     read_sync_batch_size = 2,
     read_sync_delay_seconds = 0.5,
+    read_sync_failure_delay_seconds = 5,
+    read_sync_max_failure_delay_seconds = 300,
 }
 
 function SuwayomiPlugin:createDownloadQueue()
@@ -252,6 +254,11 @@ function SuwayomiPlugin:showChaptersForManga(manga)
     end
 
     local chapters = self:mergeChaptersWithReadLedger(manga, result.chapters)
+    if self.current_chapter_context
+        and self:getChapterSelectionKey(self.current_chapter_context.manga, {}) ~= self:getChapterSelectionKey(manga, {})
+    then
+        self:clearChapterSelection(true)
+    end
     self.current_chapter_context = {
         manga = manga,
         chapters = chapters,
@@ -769,7 +776,7 @@ function SuwayomiPlugin:buildQuickChapterMenuItems(manga, chapters)
         if status then
             item.menu_text = self:formatChapterMenuText(item, status)
         elseif cached and cached.menu_text then
-            item.menu_text = cached.menu_text
+            item.menu_text = self:stripChapterSelectionMarker(cached.menu_text)
         elseif item.is_read then
             item.menu_text = self:formatChapterMenuText(item, { state = "read" })
         else
@@ -787,6 +794,10 @@ function SuwayomiPlugin:buildQuickChapterMenuItems(manga, chapters)
         table.insert(items, item)
     end
     return items
+end
+
+function SuwayomiPlugin:stripChapterSelectionMarker(menu_text)
+    return tostring(menu_text or ""):gsub("^%[[x ]%]%s+", "", 1)
 end
 
 function SuwayomiPlugin:buildQuickChapterMenuOptions(manga, chapters)
@@ -1131,21 +1142,23 @@ function SuwayomiPlugin:enqueueSelectedChapterDownloads(manga, chapters, downloa
     local queued = 0
     local skipped = 0
     local capped = 0
-    self:withChapterMenuRefreshSuppressed(function()
-        for _, chapter in ipairs(chapters or {}) do
-            local status = self:getDownloadQueue():getStatus(manga, chapter)
-            local downloaded = self:isChapterDownloaded(manga, chapter)
-            if downloaded or (status and (status.state == "queued" or status.state == "downloading" or status.state == "downloaded" or status.state == "skipped")) then
-                skipped = skipped + 1
-            elseif queued >= self.max_batch_queue_chapters then
-                capped = capped + 1
-            elseif self:getDownloadQueue():enqueue(manga, chapter, download_directory, { quiet_duplicate = true }) then
-                queued = queued + 1
-            else
-                skipped = skipped + 1
-            end
+    local queueable = {}
+    for _, chapter in ipairs(chapters or {}) do
+        local status = self:getDownloadQueue():getStatus(manga, chapter)
+        local downloaded = self:isChapterDownloaded(manga, chapter)
+        if downloaded or (status and (status.state == "queued" or status.state == "downloading" or status.state == "downloaded" or status.state == "skipped")) then
+            skipped = skipped + 1
+        elseif #queueable >= self.max_batch_queue_chapters then
+            capped = capped + 1
+        else
+            table.insert(queueable, chapter)
         end
+    end
+
+    self:withChapterMenuRefreshSuppressed(function()
+        queued = self:getDownloadQueue():enqueueBatch(manga, queueable, download_directory, { quiet_duplicate = true })
     end)
+    skipped = skipped + (#queueable - queued)
 
     self:clearChapterSelection(true)
     self:refreshChapterMenu({ quick = true })
@@ -1615,13 +1628,15 @@ function SuwayomiPlugin:syncPendingReadMarks(credentials, max_count)
 
     local ledger = self:loadChapterLedger()
     local synced = 0
+    local attempted = 0
     local changed = false
 
     for key, entry in pairs(ledger) do
-        if max_count and synced >= max_count then
+        if max_count and attempted >= max_count then
             break
         end
         if entry.pending_read_sync == true and entry.chapter_id then
+            attempted = attempted + 1
             local desired_read_state = entry.pending_read_state
             if desired_read_state == nil then
                 desired_read_state = entry.read == true
@@ -1652,21 +1667,33 @@ function SuwayomiPlugin:syncPendingReadMarks(credentials, max_count)
         self:saveChapterLedger(ledger)
     end
 
-    return synced
+    return synced, attempted
 end
 
-function SuwayomiPlugin:schedulePendingReadSync(credentials)
+function SuwayomiPlugin:schedulePendingReadSync(credentials, delay_seconds)
     if self.pending_read_sync_scheduled then
         return
     end
 
     self.pending_read_sync_scheduled = true
-    UIManager:scheduleIn(self.read_sync_delay_seconds, function()
+    UIManager:scheduleIn(delay_seconds or self.read_sync_delay_seconds, function()
         self.pending_read_sync_scheduled = false
         local sync_credentials = credentials or SuwayomiSettings:load()
-        self:syncPendingReadMarks(sync_credentials, self.read_sync_batch_size)
+        local synced, attempted = self:syncPendingReadMarks(sync_credentials, self.read_sync_batch_size)
         if self:hasPendingReadSync(self:loadChapterLedger()) then
-            self:schedulePendingReadSync(sync_credentials)
+            local next_delay = self.read_sync_delay_seconds
+            if attempted > 0 and synced == 0 then
+                next_delay = self.pending_read_sync_failure_delay or self.read_sync_failure_delay_seconds
+                self.pending_read_sync_failure_delay = math.min(
+                    next_delay * 2,
+                    self.read_sync_max_failure_delay_seconds
+                )
+            else
+                self.pending_read_sync_failure_delay = nil
+            end
+            self:schedulePendingReadSync(sync_credentials, next_delay)
+        else
+            self.pending_read_sync_failure_delay = nil
         end
     end)
 end
