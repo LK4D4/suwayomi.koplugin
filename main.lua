@@ -761,6 +761,8 @@ function SuwayomiPlugin:getChapterActions(manga, chapter)
         table.insert(actions, { id = "mark_unread", text = _("Mark as unread") })
     else
         table.insert(actions, { id = "mark_read", text = _("Mark as read") })
+        table.insert(actions, { id = "mark_previous_read", text = _("Mark previous as read") })
+        table.insert(actions, { id = "mark_through_read", text = _("Mark this and previous as read") })
     end
     return actions
 end
@@ -914,6 +916,59 @@ function SuwayomiPlugin:markChapterUnread(manga, chapter, options)
     return true
 end
 
+function SuwayomiPlugin:getChaptersThrough(chapter)
+    local chapters = {}
+    if not self.current_chapter_context or not self.current_chapter_context.chapters then
+        return chapters
+    end
+
+    local found = false
+    for _, current in ipairs(self.current_chapter_context.chapters) do
+        table.insert(chapters, current)
+        if tostring(current.id or "") == tostring(chapter.id or "") then
+            found = true
+            break
+        end
+    end
+    if not found then
+        return {}
+    end
+    return chapters
+end
+
+function SuwayomiPlugin:getChaptersBefore(chapter)
+    local chapters = self:getChaptersThrough(chapter)
+    if #chapters > 0 then
+        table.remove(chapters)
+    end
+    return chapters
+end
+
+function SuwayomiPlugin:markChapterListRead(manga, chapters)
+    if #chapters == 0 then
+        return 0
+    end
+
+    for _, current in ipairs(chapters) do
+        self:markChapterRead(manga, current, {
+            skip_refresh = true,
+            skip_schedule = true,
+        })
+    end
+
+    self:refreshChapterMenu()
+    self:schedulePendingReadSync()
+    return #chapters
+end
+
+function SuwayomiPlugin:markChaptersBeforeRead(manga, chapter)
+    return self:markChapterListRead(manga, self:getChaptersBefore(chapter))
+end
+
+function SuwayomiPlugin:markChaptersReadThrough(manga, chapter)
+    return self:markChapterListRead(manga, self:getChaptersThrough(chapter))
+end
+
 function SuwayomiPlugin:performChapterAction(manga, chapter, action_id)
     if action_id == "open" then
         return self:openChapter(manga, chapter)
@@ -927,6 +982,12 @@ function SuwayomiPlugin:performChapterAction(manga, chapter, action_id)
     end
     if action_id == "mark_read" then
         return self:markChapterRead(manga, chapter)
+    end
+    if action_id == "mark_previous_read" then
+        return self:markChaptersBeforeRead(manga, chapter)
+    end
+    if action_id == "mark_through_read" then
+        return self:markChaptersReadThrough(manga, chapter)
     end
     if action_id == "mark_unread" then
         return self:markChapterUnread(manga, chapter)
@@ -947,8 +1008,10 @@ function SuwayomiPlugin:getBulkChapterActions()
 
     table.insert(actions, { id = "download_next_5_unread", text = _("Download next 5 unread") })
     table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
+    table.insert(actions, { id = "download_next_50_unread", text = _("Download next 50 unread") })
     table.insert(actions, { id = "keep_next_5_unread", text = _("Keep next 5 unread downloaded") })
     table.insert(actions, { id = "keep_next_10_unread", text = _("Keep next 10 unread downloaded") })
+    table.insert(actions, { id = "keep_next_50_unread", text = _("Keep next 50 unread downloaded") })
     table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read chapters from device") })
 
     return actions
