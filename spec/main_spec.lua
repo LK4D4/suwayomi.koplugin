@@ -1281,6 +1281,89 @@ describe("suwayomi plugin", function()
         assert.are.equal(1, menu_updates)
     end)
 
+    it("does not scan every chapter on the UI thread when queueing next unread downloads", function()
+        local saved_queue = {}
+        local exists_checks = 0
+        local refreshed_chapter_menu
+        local chapters = {}
+        for index = 1, 100 do
+            table.insert(chapters, {
+                id = tostring(index),
+                name = "Ch. " .. tostring(index),
+                is_read = false,
+            })
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path)
+                    return chapter_path .. ".part"
+                end,
+                chapterExists = function()
+                    exists_checks = exists_checks + 1
+                    return false
+                end,
+                downloadChapterWithProgress = function() end,
+            }
+        end
+
+        package.preload.suwayomi_ui = function()
+            return {
+                updateChapterMenu = function(_, options)
+                    refreshed_chapter_menu = options
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_ui = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.current_chapter_menu = {}
+        plugin.current_chapter_context = {
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapters = chapters,
+        }
+        plugin.current_chapter_options = {
+            title = "Sousou no Frieren",
+            chapters = chapters,
+        }
+
+        local queued = plugin:performBulkChapterAction("download_next_5_unread")
+
+        assert.is_true(queued)
+        assert.are.equal(5, #saved_queue)
+        assert.are.equal(10, exists_checks)
+        assert.are.equal("Ch. 1  ⏳", refreshed_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Ch. 6", refreshed_chapter_menu.chapters[6].menu_text)
+    end)
+
     it("keeps the next unread chapter buffer downloaded or queued", function()
         local saved_queue = {}
 

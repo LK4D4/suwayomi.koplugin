@@ -40,7 +40,7 @@ function SuwayomiPlugin:createDownloadQueue()
                 self.pending_chapter_menu_refresh = true
                 return
             end
-            self:refreshChapterMenu()
+            self:refreshChapterMenu({ quick = true })
         end,
         onMessage = function(message)
             self:showMessage(message)
@@ -744,6 +744,69 @@ function SuwayomiPlugin:buildChapterMenuOptions(manga, chapters)
     }
 end
 
+function SuwayomiPlugin:buildCachedChapterMenuMap()
+    local items_by_key = {}
+    for _, item in ipairs((self.current_chapter_options and self.current_chapter_options.chapters) or {}) do
+        items_by_key[self:getChapterDownloadKey(
+            self.current_chapter_context.manga,
+            item
+        )] = item
+    end
+    return items_by_key
+end
+
+function SuwayomiPlugin:buildQuickChapterMenuItems(manga, chapters)
+    local cached_items = self:buildCachedChapterMenuMap()
+    local items = {}
+    for _, chapter in ipairs(chapters or {}) do
+        local item = {}
+        for key, value in pairs(chapter) do
+            item[key] = value
+        end
+
+        local cached = cached_items[self:getChapterDownloadKey(manga, item)]
+        local status = self:getChapterDownloadStatus(manga, item)
+        if status then
+            item.menu_text = self:formatChapterMenuText(item, status)
+        elseif cached and cached.menu_text then
+            item.menu_text = cached.menu_text
+        elseif item.is_read then
+            item.menu_text = self:formatChapterMenuText(item, { state = "read" })
+        else
+            item.menu_text = item.name
+        end
+
+        if self.selection_mode then
+            if self:isChapterSelected(manga, item) then
+                item.menu_text = "[x] " .. item.menu_text
+            else
+                item.menu_text = "[ ] " .. item.menu_text
+            end
+        end
+
+        table.insert(items, item)
+    end
+    return items
+end
+
+function SuwayomiPlugin:buildQuickChapterMenuOptions(manga, chapters)
+    local selected_count = self:getSelectedChapterCount()
+    local title = manga.title
+    if self.selection_mode then
+        title = T(_("%1 selected"), selected_count)
+    end
+
+    return {
+        title = title,
+        chapters = self:buildQuickChapterMenuItems(manga, chapters),
+        title_bar_left_icon = "appbar.menu",
+        on_title_bar_left_tap = function()
+            self:showBulkChapterActions(manga)
+            return true
+        end,
+    }
+end
+
 function SuwayomiPlugin:getChapterPath(manga, chapter)
     local download_directory = SuwayomiSettings:loadDownloadDirectory()
     if not download_directory or download_directory == "" then
@@ -1085,7 +1148,7 @@ function SuwayomiPlugin:enqueueSelectedChapterDownloads(manga, chapters, downloa
     end)
 
     self:clearChapterSelection(true)
-    self:refreshChapterMenu()
+    self:refreshChapterMenu({ quick = true })
 
     if capped > 0 then
         self:showMessage(T(
@@ -1623,24 +1686,29 @@ function SuwayomiPlugin:onCloseDocument()
     end
 end
 
-function SuwayomiPlugin:refreshChapterMenu()
+function SuwayomiPlugin:refreshChapterMenu(options)
+    options = options or {}
     if not self.current_chapter_context then
         return
     end
     self.pending_chapter_menu_refresh = false
 
-    local options = self:buildChapterMenuOptions(
+    local menu_options_builder = options.quick
+        and self.buildQuickChapterMenuOptions
+        or self.buildChapterMenuOptions
+    local menu_options = menu_options_builder(
+        self,
         self.current_chapter_context.manga,
         self.current_chapter_context.chapters
     )
     self.current_chapter_options = self.current_chapter_options or {}
-    self.current_chapter_options.title = options.title
-    self.current_chapter_options.chapters = options.chapters
-    self.current_chapter_options.title_bar_left_icon = options.title_bar_left_icon
-    self.current_chapter_options.on_title_bar_left_tap = options.on_title_bar_left_tap
+    self.current_chapter_options.title = menu_options.title
+    self.current_chapter_options.chapters = menu_options.chapters
+    self.current_chapter_options.title_bar_left_icon = menu_options.title_bar_left_icon
+    self.current_chapter_options.on_title_bar_left_tap = menu_options.on_title_bar_left_tap
 
     if SuwayomiUI.updateChapterMenu then
-        SuwayomiUI.updateChapterMenu(self.current_chapter_menu, options, function(chapter)
+        SuwayomiUI.updateChapterMenu(self.current_chapter_menu, menu_options, function(chapter)
             self:handleChapterTap(self.current_chapter_context.manga, chapter)
         end, function(chapter)
             self:toggleChapterSelection(self.current_chapter_context.manga, chapter)
@@ -1666,7 +1734,7 @@ function SuwayomiPlugin:enqueueChapterDownload(manga, chapter)
     self:withChapterMenuRefreshSuppressed(function()
         self:getDownloadQueue():enqueue(manga, chapter, download_directory)
     end)
-    self:refreshChapterMenu()
+    self:refreshChapterMenu({ quick = true })
 end
 
 function SuwayomiPlugin:processChapterDownloadQueue()
