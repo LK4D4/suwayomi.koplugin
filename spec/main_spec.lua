@@ -1128,6 +1128,7 @@ describe("suwayomi plugin", function()
         assert.are.equal("Download next 10 unread", shown_actions_menu.actions[2].text)
         assert.are.equal("Keep next 5 unread downloaded", shown_actions_menu.actions[3].text)
         assert.are.equal("Keep next 10 unread downloaded", shown_actions_menu.actions[4].text)
+        assert.are.equal("Delete read chapters from device", shown_actions_menu.actions[5].text)
         assert.is_false(plugin.selection_mode)
         assert.are.equal("Sousou no Frieren", shown_chapter_menu.title)
     end)
@@ -1314,6 +1315,116 @@ describe("suwayomi plugin", function()
         plugin:performBulkChapterAction("keep_next_5_unread")
 
         assert.are.equal("Next unread chapter buffer is already downloaded or queued.", shown_messages[#shown_messages])
+    end)
+
+    it("deletes read chapters from device without selecting them", function()
+        local removed_paths = {}
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "398",
+                chapter_name = "Official_Vol. 1 Ch. 1",
+                read = true,
+                path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+            },
+            ["m1:399"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "399",
+                chapter_name = "Official_Vol. 1 Ch. 2",
+                read = false,
+                path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 2.cbz",
+            },
+        }
+        local original_remove = os.remove
+
+        os.remove = function(path)
+            table.insert(removed_paths, path)
+            return true
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function(_, chapter_path)
+                    for _, removed_path in ipairs(removed_paths) do
+                        if removed_path == chapter_path then
+                            return false
+                        end
+                    end
+                    return chapter_path == "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
+                        or chapter_path == "/books/Sousou no Frieren/Official_Vol. 1 Ch. 2.cbz"
+                end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.current_chapter_context = {
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapters = {
+                { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = true },
+                { id = "399", name = "Official_Vol. 1 Ch. 2", is_read = false },
+            },
+        }
+
+        local deleted = plugin:performBulkChapterAction("delete_read_downloaded")
+        os.remove = original_remove
+
+        assert.is_true(deleted)
+        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", removed_paths[1])
+        assert.is_nil(saved_ledger["m1:398"].path)
+        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 2.cbz", saved_ledger["m1:399"].path)
+        assert.are.same({}, shown_messages)
+    end)
+
+    it("reports when there are no read chapters to delete", function()
+        package.preload.suwayomi_settings = function()
+            return {
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.current_chapter_context = {
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapters = {
+                { id = "399", name = "Official_Vol. 1 Ch. 2", is_read = false },
+            },
+        }
+
+        plugin:performBulkChapterAction("delete_read_downloaded")
+
+        assert.are.equal("No read chapters to delete.", shown_messages[#shown_messages])
     end)
 
     it("reports queued and skipped counts for selected downloads", function()

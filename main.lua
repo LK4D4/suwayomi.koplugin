@@ -825,6 +825,17 @@ function SuwayomiPlugin:deleteChapterFromDeviceWithOptions(manga, chapter, optio
     local ledger = self:loadChapterLedger()
     local key = self:getChapterLedgerKey(manga, chapter)
     local entry = ledger[key]
+    if not entry then
+        for existing_key, existing in pairs(ledger) do
+            if tostring(existing.manga_id or "") == tostring(manga.id or "")
+                and tostring(existing.chapter_id or "") == tostring(chapter.id or "")
+            then
+                key = existing_key
+                entry = existing
+                break
+            end
+        end
+    end
     if entry then
         entry.path = nil
         if entry.read ~= true and entry.pending_read_sync ~= true then
@@ -937,6 +948,7 @@ function SuwayomiPlugin:getBulkChapterActions()
     table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
     table.insert(actions, { id = "keep_next_5_unread", text = _("Keep next 5 unread downloaded") })
     table.insert(actions, { id = "keep_next_10_unread", text = _("Keep next 10 unread downloaded") })
+    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read chapters from device") })
 
     return actions
 end
@@ -1214,6 +1226,50 @@ function SuwayomiPlugin:deleteSelectedChapters()
     return deleted
 end
 
+function SuwayomiPlugin:deleteReadChaptersFromDevice()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local read_chapters = {}
+    for _, chapter in ipairs(self.current_chapter_context.chapters or {}) do
+        if chapter.is_read == true then
+            table.insert(read_chapters, chapter)
+        end
+    end
+
+    if #read_chapters == 0 then
+        self:showMessage(_("No read chapters to delete."))
+        return 0
+    end
+
+    local deleted = 0
+    local missing = 0
+    local active = 0
+    for _, chapter in ipairs(read_chapters) do
+        local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
+            quiet_active = true,
+            quiet_missing = true,
+            skip_refresh = true,
+        })
+        if ok then
+            deleted = deleted + 1
+        elseif state == "downloading" then
+            active = active + 1
+        elseif state == "missing" then
+            missing = missing + 1
+        end
+    end
+
+    self:refreshChapterMenu()
+
+    if deleted == 0 or active > 0 then
+        self:showMessage(self:formatBulkDeleteMessage(deleted, 0, missing, active))
+    end
+    return deleted
+end
+
 function SuwayomiPlugin:markSelectedChaptersRead()
     if not self.current_chapter_context then
         return 0
@@ -1273,6 +1329,10 @@ function SuwayomiPlugin:performBulkChapterAction(action_id)
     local keep_unread_count = tostring(action_id or ""):match("^keep_next_(%d+)_unread$")
     if keep_unread_count then
         self:keepNextUnreadChaptersDownloaded(tonumber(keep_unread_count))
+        return true
+    end
+    if action_id == "delete_read_downloaded" then
+        self:deleteReadChaptersFromDevice()
         return true
     end
     if action_id == "download_selected" then

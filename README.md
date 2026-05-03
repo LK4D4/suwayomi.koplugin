@@ -19,7 +19,7 @@ This plugin is experimental and still under active development.
 - Select a custom download directory
 - Download individual chapters as `.cbz`
 - Chapter actions menu with `Open`, `Download`, `Delete from device`, and `Mark as read` / `Mark as unread`
-- Bulk chapter menu actions for selected chapters, `Download next 5/10 unread`, and `Keep next 5/10 unread downloaded`
+- Bulk chapter menu actions for selected chapters, `Download next 5/10 unread`, `Keep next 5/10 unread downloaded`, and deleting read chapters
 - Read-state tracking from Suwayomi, the local plugin ledger, and KOReader sidecar metadata
 - Background retry of pending read/unread syncs when Suwayomi is temporarily unavailable
 
