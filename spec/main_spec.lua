@@ -499,6 +499,81 @@ describe("suwayomi plugin", function()
         assert.are.equal(0, #scheduled_callbacks)
     end)
 
+    it("reconciles downloaded KOReader sidecar state before manual read sync", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "398",
+                chapter_name = "Official_Vol. 1 Ch. 1",
+                path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+                read = false,
+            },
+        }
+        local marked_ids = {}
+        local original_open = io.open
+
+        io.open = function(path, mode)
+            if path == "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.sdr/metadata.cbz.lua" then
+                return {
+                    read = function()
+                        return [[
+return {
+    ["doc_path"] = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+    ["percent_finished"] = 1,
+    ["summary"] = {
+        ["status"] = "complete",
+    },
+}
+]]
+                    end,
+                    close = function() end,
+                }
+            end
+            return original_open(path, mode)
+        end
+
+        package.preload.suwayomi_api = function()
+            return {
+                markChaptersReadState = successful_batch_read_sync(marked_ids),
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+        plugin:addToMainMenu(menu_items)
+
+        menu_items.suwayomi_dl.sub_item_table[2].callback()
+
+        assert.are.equal("Read state sync started.", shown_messages[#shown_messages])
+        assert.is_true(saved_ledger["m1:398"].read)
+        assert.is_true(saved_ledger["m1:398"].pending_read_sync)
+
+        run_scheduled_callbacks()
+        io.open = original_open
+
+        assert.are.same({ "398" }, marked_ids)
+        assert.is_nil(saved_ledger["m1:398"].pending_read_sync)
+    end)
+
     it("opens and saves the parallel downloads setting from the main menu", function()
         local saved_parallel_downloads
         package.preload.suwayomi_settings = function()

@@ -71,7 +71,7 @@ Exit criteria:
 Goal: make read state trustworthy across KOReader and Suwayomi.
 
 - [x] Add manual `Sync read state now`
-- [ ] Add a ledger reconciliation sweep for downloaded chapters
+- [x] Add a ledger reconciliation sweep for downloaded chapters
 - [x] Decide whether `Mark as unread` should sync back to Suwayomi
 - [x] If yes, implement unread sync mutation flow
 - [ ] Improve diagnostics for read-state conflicts and sync failures

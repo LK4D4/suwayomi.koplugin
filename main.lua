@@ -734,6 +734,33 @@ function SuwayomiPlugin:loadKoreaderHistoryPaths()
     return paths
 end
 
+function SuwayomiPlugin:reconcileDownloadedChapterLedger(ledger)
+    ledger = ledger or self:loadChapterLedger()
+    local history_paths = self:loadKoreaderHistoryPaths()
+    local changed = false
+    local read_count = 0
+
+    for _, entry in pairs(ledger or {}) do
+        if type(entry) == "table" and type(entry.path) == "string" and entry.path ~= "" then
+            local metadata_finished = self:isChapterPathFinishedInKoreader(entry.path)
+            local history_read = history_paths[entry.path] == true
+            if (metadata_finished or history_read) and entry.read ~= true then
+                entry.read = true
+                entry.pending_read_sync = true
+                entry.pending_read_state = true
+                changed = true
+                read_count = read_count + 1
+            end
+        end
+    end
+
+    if changed then
+        self:saveChapterLedger(ledger)
+    end
+
+    return read_count
+end
+
 function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
     local started_at = SuwayomiDebug.now()
     local SuwayomiDownloader = require("suwayomi_downloader")
@@ -2058,6 +2085,8 @@ function SuwayomiPlugin:syncReadStateNow()
         self:showMessage(_("Read state sync is already running."))
         return false
     end
+
+    self:reconcileDownloadedChapterLedger()
 
     if not self:hasPendingReadSync(self:loadChapterLedger()) then
         self:showMessage(_("Read state is already synced."))
