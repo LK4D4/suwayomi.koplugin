@@ -33,6 +33,7 @@ function DownloadQueue:new(options)
         now = options.now or os.time,
         onStatusChanged = options.onStatusChanged or function() end,
         onMessage = options.onMessage or function() end,
+        debug_logger = options.debug_logger or function() end,
         getCredentials = options.getCredentials,
         items = {},
         statuses = {},
@@ -41,6 +42,12 @@ function DownloadQueue:new(options)
         max_active_chapters = self:normalizeActiveChapterLimit(options.max_active_chapters),
     }
     return setmetatable(queue, self)
+end
+
+function DownloadQueue:logDebug(event)
+    if self.debug_logger then
+        pcall(self.debug_logger, event)
+    end
 end
 
 function DownloadQueue:getActiveCount()
@@ -404,6 +411,11 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
 end
 
 function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options)
+    local started_at = os.time()
+    local ok_socket, socket = pcall(require, "socket")
+    if ok_socket and socket and socket.gettime then
+        started_at = socket.gettime()
+    end
     options = options or {}
     local persistent_jobs = {}
     local queued_count = 0
@@ -446,6 +458,18 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
     self.ui_manager:scheduleIn(0, function()
         self:process()
     end)
+    local finished_at = os.time()
+    if ok_socket and socket and socket.gettime then
+        finished_at = socket.gettime()
+    end
+    self:logDebug({
+        operation = "downloadQueue.enqueueBatch",
+        event = "end",
+        manga_id = manga and manga.id,
+        requested_count = #(chapters or {}),
+        queued_count = queued_count,
+        elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
+    })
     return queued_count
 end
 
@@ -508,6 +532,12 @@ function DownloadQueue:runDownloaderJob(queued)
 end
 
 function DownloadQueue:process()
+    local started_at = os.time()
+    local ok_socket, socket = pcall(require, "socket")
+    if ok_socket and socket and socket.gettime then
+        started_at = socket.gettime()
+    end
+    local started_count = 0
     while self:getActiveCount() < self.max_active_chapters do
         local queued = table.remove(self.items, 1)
         if not queued then
@@ -539,10 +569,23 @@ function DownloadQueue:process()
                 current = 0,
                 total = 0,
             })
+            started_count = started_count + 1
         end
     end
 
     self:schedulePoll()
+    local finished_at = os.time()
+    if ok_socket and socket and socket.gettime then
+        finished_at = socket.gettime()
+    end
+    self:logDebug({
+        operation = "downloadQueue.process",
+        event = "end",
+        started_count = started_count,
+        active_count = self:getActiveCount(),
+        queued_count = #(self.items or {}),
+        elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
+    })
 end
 
 function DownloadQueue:finishActiveWithFailure(active, message)
@@ -554,6 +597,11 @@ function DownloadQueue:finishActiveWithFailure(active, message)
 end
 
 function DownloadQueue:poll()
+    local started_at = os.time()
+    local ok_socket, socket = pcall(require, "socket")
+    if ok_socket and socket and socket.gettime then
+        started_at = socket.gettime()
+    end
     self.poll_scheduled = false
     if self:getActiveCount() == 0 then
         return
@@ -603,6 +651,18 @@ function DownloadQueue:poll()
     end
 
     self:process()
+    local finished_at = os.time()
+    if ok_socket and socket and socket.gettime then
+        finished_at = socket.gettime()
+    end
+    self:logDebug({
+        operation = "downloadQueue.poll",
+        event = "end",
+        polled_count = #active_jobs,
+        active_count = self:getActiveCount(),
+        queued_count = #(self.items or {}),
+        elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
+    })
 end
 
 return DownloadQueue

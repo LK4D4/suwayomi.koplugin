@@ -359,6 +359,11 @@ function SuwayomiAPI.downloadBinary(credentials, page_url)
         headers = SuwayomiAPI.buildRequestHeaders(credentials)
     end
 
+    local started_at = os.time()
+    local ok_socket, socket = pcall(require, "socket")
+    if ok_socket and socket and socket.gettime then
+        started_at = socket.gettime()
+    end
     local ok, code, headers = client.request{
         url = request_url,
         method = "GET",
@@ -368,10 +373,25 @@ function SuwayomiAPI.downloadBinary(credentials, page_url)
     }
 
     headers = headers or {}
+    local body = table.concat(response_chunks)
+    local finished_at = os.time()
+    if ok_socket and socket and socket.gettime then
+        finished_at = socket.gettime()
+    end
+    logDebugEvent({
+        operation = "downloadBinary",
+        event = "response",
+        ok = ok,
+        code = code,
+        code_type = type(code),
+        elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
+        response_bytes = #body,
+        same_origin = (not page_url:match("^https?://") or isSameOrigin(server_url, request_url)) == true,
+    })
     if code == 200 then
         return {
             ok = true,
-            body = table.concat(response_chunks),
+            body = body,
             content_type = headers["content-type"] or headers["Content-Type"],
         }
     end
@@ -505,6 +525,11 @@ performGraphQLRequest = function(credentials, request_body, operation_name)
     local headers = SuwayomiAPI.buildRequestHeaders(credentials)
     headers["Content-Length"] = tostring(#request_body)
 
+    local started_at = os.time()
+    local ok_socket, socket = pcall(require, "socket")
+    if ok_socket and socket and socket.gettime then
+        started_at = socket.gettime()
+    end
     local ok, code = client.request{
         url = SuwayomiAPI.buildGraphQLEndpoint(server_url),
         method = "POST",
@@ -514,9 +539,21 @@ performGraphQLRequest = function(credentials, request_body, operation_name)
         timeout = REQUEST_TIMEOUT_SECONDS,
     }
 
-    logDebugEvent({ operation = operation_name, event = "response", ok = ok, code = code, code_type = type(code) })
-
     local response_body = table.concat(response_chunks)
+    local finished_at = os.time()
+    if ok_socket and socket and socket.gettime then
+        finished_at = socket.gettime()
+    end
+    logDebugEvent({
+        operation = operation_name,
+        event = "response",
+        ok = ok,
+        code = code,
+        code_type = type(code),
+        elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
+        request_bytes = #request_body,
+        response_bytes = #response_body,
+    })
     if code == 200 then
         return {
             ok = true,

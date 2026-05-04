@@ -7,6 +7,7 @@ local SuwayomiDownloadQueue = require("suwayomi_download_queue")
 local SuwayomiReadSyncWorker = require("suwayomi_read_sync_worker")
 local SuwayomiSettings = require("suwayomi_settings")
 local SuwayomiUI = require("suwayomi_ui")
+local SuwayomiDebug = require("suwayomi_debug")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
 local T = FFIUtil.template
@@ -41,6 +42,7 @@ function SuwayomiPlugin:createDownloadQueue()
         max_active_chapters = SuwayomiSettings.loadMaxParallelChapterDownloads
             and SuwayomiSettings:loadMaxParallelChapterDownloads()
             or nil,
+        debug_logger = SuwayomiDebug.log,
         getCredentials = function()
             return SuwayomiSettings:load()
         end,
@@ -87,11 +89,16 @@ function SuwayomiPlugin:onDispatcherRegisterActions()
 end
 
 function SuwayomiPlugin:init()
+    if SuwayomiAPI.setDebugLogger then
+        SuwayomiAPI.setDebugLogger(SuwayomiDebug.log)
+    end
+    SuwayomiDebug.log({ operation = "plugin_init", event = "start" })
     self:onDispatcherRegisterActions()
     self.selected_chapters = self.selected_chapters or {}
     self.selection_mode = self.selection_mode == true
     self:getDownloadQueue():recover()
     self.ui.menu:registerToMainMenu(self)
+    SuwayomiDebug.log({ operation = "plugin_init", event = "end" })
 end
 
 function SuwayomiPlugin:showNotImplemented(message)
@@ -204,78 +211,106 @@ function SuwayomiPlugin:showSourceLanguageDialog()
 end
 
 function SuwayomiPlugin:browseSuwayomi()
-    local credentials = SuwayomiSettings:load()
-    if credentials.server_url == "" then
-        self:showMessage(_("Set up your Suwayomi server login first."))
-        return
-    end
+    return SuwayomiDebug.time("browseSuwayomi", function()
+        local credentials = SuwayomiSettings:load()
+        if credentials.server_url == "" then
+            self:showMessage(_("Set up your Suwayomi server login first."))
+            return
+        end
 
-    self:schedulePendingReadSync(credentials)
+        self:schedulePendingReadSync(credentials)
 
-    local result = SuwayomiAPI.fetchSources(credentials)
-    if not result.ok then
-        self:showMessage(_(result.error))
-        return
-    end
+        local result = SuwayomiAPI.fetchSources(credentials)
+        if not result.ok then
+            self:showMessage(_(result.error))
+            return
+        end
 
-    local filtered_sources = self:filterSourcesByLanguage(result.sources)
-    if #filtered_sources == 0 then
-        self:showMessage(_("No Suwayomi sources match the selected languages."))
-        return
-    end
+        local filtered_sources = self:filterSourcesByLanguage(result.sources)
+        SuwayomiDebug.log({
+            operation = "browseSuwayomi",
+            event = "sources_loaded",
+            source_count = #(result.sources or {}),
+            filtered_source_count = #filtered_sources,
+        })
+        if #filtered_sources == 0 then
+            self:showMessage(_("No Suwayomi sources match the selected languages."))
+            return
+        end
 
-    SuwayomiUI.showSourcesMenu(filtered_sources, function(source)
-        self:showMangaForSource(source)
+        SuwayomiUI.showSourcesMenu(filtered_sources, function(source)
+            self:showMangaForSource(source)
+        end)
     end)
 end
 
 function SuwayomiPlugin:showMangaForSource(source)
-    local credentials = SuwayomiSettings:load()
-    local result = SuwayomiAPI.fetchMangaForSource(credentials, source.id)
-    if not result.ok then
-        self:showMessage(_(result.error))
-        return
-    end
+    return SuwayomiDebug.time("showMangaForSource", {
+        source_id = source and source.id,
+    }, function()
+        local credentials = SuwayomiSettings:load()
+        local result = SuwayomiAPI.fetchMangaForSource(credentials, source.id)
+        if not result.ok then
+            self:showMessage(_(result.error))
+            return
+        end
 
-    if not result.manga or #result.manga == 0 then
-        self:showMessage(_("This source has no manga."))
-        return
-    end
+        SuwayomiDebug.log({
+            operation = "showMangaForSource",
+            event = "manga_loaded",
+            source_id = source and source.id,
+            manga_count = #(result.manga or {}),
+        })
+        if not result.manga or #result.manga == 0 then
+            self:showMessage(_("This source has no manga."))
+            return
+        end
 
-    SuwayomiUI.showMangaMenu(result.manga, function(manga)
-        self:showChaptersForManga(manga)
+        SuwayomiUI.showMangaMenu(result.manga, function(manga)
+            self:showChaptersForManga(manga)
+        end)
     end)
 end
 
 function SuwayomiPlugin:showChaptersForManga(manga)
-    local credentials = SuwayomiSettings:load()
-    local result = SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
-    if not result.ok then
-        self:showMessage(_(result.error))
-        return
-    end
+    return SuwayomiDebug.time("showChaptersForManga", {
+        manga_id = manga and manga.id,
+    }, function()
+        local credentials = SuwayomiSettings:load()
+        local result = SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
+        if not result.ok then
+            self:showMessage(_(result.error))
+            return
+        end
 
-    if not result.chapters or #result.chapters == 0 then
-        self:showMessage(_("This manga has no chapters."))
-        return
-    end
+        SuwayomiDebug.log({
+            operation = "showChaptersForManga",
+            event = "chapters_loaded",
+            manga_id = manga and manga.id,
+            chapter_count = #(result.chapters or {}),
+        })
+        if not result.chapters or #result.chapters == 0 then
+            self:showMessage(_("This manga has no chapters."))
+            return
+        end
 
-    local chapters = self:mergeChaptersWithReadLedger(manga, result.chapters)
-    if self.current_chapter_context
-        and self:getChapterSelectionKey(self.current_chapter_context.manga, {}) ~= self:getChapterSelectionKey(manga, {})
-    then
-        self:clearChapterSelection(true)
-    end
-    self.current_chapter_context = {
-        manga = manga,
-        chapters = chapters,
-    }
+        local chapters = self:mergeChaptersWithReadLedger(manga, result.chapters)
+        if self.current_chapter_context
+            and self:getChapterSelectionKey(self.current_chapter_context.manga, {}) ~= self:getChapterSelectionKey(manga, {})
+        then
+            self:clearChapterSelection(true)
+        end
+        self.current_chapter_context = {
+            manga = manga,
+            chapters = chapters,
+        }
 
-    self.current_chapter_options = self:buildChapterMenuOptions(manga, chapters)
-    self.current_chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, function(chapter)
-        self:handleChapterTap(manga, chapter)
-    end, function(chapter)
-        self:toggleChapterSelection(manga, chapter)
+        self.current_chapter_options = self:buildChapterMenuOptions(manga, chapters)
+        self.current_chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, function(chapter)
+            self:handleChapterTap(manga, chapter)
+        end, function(chapter)
+            self:toggleChapterSelection(manga, chapter)
+        end)
     end)
 end
 
@@ -700,10 +735,16 @@ function SuwayomiPlugin:loadKoreaderHistoryPaths()
 end
 
 function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
+    local started_at = SuwayomiDebug.now()
     local SuwayomiDownloader = require("suwayomi_downloader")
     local download_directory = SuwayomiSettings:loadDownloadDirectory()
     local history_paths = self:loadKoreaderHistoryPaths()
     local items = {}
+    local downloaded_count = 0
+    local metadata_finished_count = 0
+    local history_read_count = 0
+    local metadata_write_count = 0
+    local ledger_upsert_count = 0
 
     for _, chapter in ipairs(chapters or {}) do
         local item = {}
@@ -718,6 +759,15 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
             chapter_exists = SuwayomiDownloader:chapterExists(chapter_path)
             local metadata_finished = chapter_exists and self:isChapterPathFinishedInKoreader(chapter_path)
             local history_read = chapter_exists and history_paths[chapter_path] == true
+            if chapter_exists then
+                downloaded_count = downloaded_count + 1
+            end
+            if metadata_finished then
+                metadata_finished_count = metadata_finished_count + 1
+            end
+            if history_read then
+                history_read_count = history_read_count + 1
+            end
             if metadata_finished or history_read then
                 item.is_read = true
                 if item._suwayomi_is_read ~= true then
@@ -726,6 +776,7 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
             end
             if chapter_exists and item.is_read == true and not metadata_finished then
                 self:setKoreaderChapterReadState(chapter_path, true)
+                metadata_write_count = metadata_write_count + 1
             end
         end
 
@@ -757,11 +808,24 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
             else
                 self:upsertChapterLedgerEntry(manga, item, updates)
             end
+            ledger_upsert_count = ledger_upsert_count + 1
         end
 
         table.insert(items, item)
     end
 
+    SuwayomiDebug.log({
+        operation = "buildChapterMenuItems",
+        event = "end",
+        manga_id = manga and manga.id,
+        chapter_count = #(chapters or {}),
+        downloaded_count = downloaded_count,
+        metadata_finished_count = metadata_finished_count,
+        history_read_count = history_read_count,
+        metadata_write_count = metadata_write_count,
+        ledger_upsert_count = ledger_upsert_count,
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+    })
     return items
 end
 
@@ -982,10 +1046,12 @@ function SuwayomiPlugin:deleteChapterFromDeviceWithOptions(manga, chapter, optio
 end
 
 function SuwayomiPlugin:markChapterRead(manga, chapter, options)
+    local started_at = SuwayomiDebug.now()
     options = options or {}
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
+    local metadata_updated = false
     if downloaded and chapter_path then
-        self:setKoreaderChapterReadState(chapter_path, true)
+        metadata_updated = self:setKoreaderChapterReadState(chapter_path, true)
     end
     local updates = {
         path = chapter_path,
@@ -1013,14 +1079,29 @@ function SuwayomiPlugin:markChapterRead(manga, chapter, options)
     if not options.skip_schedule then
         self:schedulePendingReadSync()
     end
+    if not options.skip_refresh or not options.skip_schedule then
+        SuwayomiDebug.log({
+            operation = "markChapterRead",
+            event = "end",
+            manga_id = manga and manga.id,
+            chapter_id = chapter and chapter.id,
+            downloaded = downloaded == true,
+            metadata_updated = metadata_updated == true,
+            skip_refresh = options.skip_refresh == true,
+            skip_schedule = options.skip_schedule == true,
+            elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+        })
+    end
     return true
 end
 
 function SuwayomiPlugin:markChapterUnread(manga, chapter, options)
+    local started_at = SuwayomiDebug.now()
     options = options or {}
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
+    local metadata_updated = false
     if downloaded and chapter_path then
-        self:setKoreaderChapterReadState(chapter_path, false)
+        metadata_updated = self:setKoreaderChapterReadState(chapter_path, false)
     end
     local updates = {
         path = chapter_path,
@@ -1048,6 +1129,19 @@ function SuwayomiPlugin:markChapterUnread(manga, chapter, options)
     end
     if not options.skip_schedule then
         self:schedulePendingReadSync()
+    end
+    if not options.skip_refresh or not options.skip_schedule then
+        SuwayomiDebug.log({
+            operation = "markChapterUnread",
+            event = "end",
+            manga_id = manga and manga.id,
+            chapter_id = chapter and chapter.id,
+            downloaded = downloaded == true,
+            metadata_updated = metadata_updated == true,
+            skip_refresh = options.skip_refresh == true,
+            skip_schedule = options.skip_schedule == true,
+            elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+        })
     end
     return true
 end
@@ -1081,6 +1175,7 @@ function SuwayomiPlugin:getChaptersBefore(chapter)
 end
 
 function SuwayomiPlugin:markChapterListRead(manga, chapters)
+    local started_at = SuwayomiDebug.now()
     if #chapters == 0 then
         return 0
     end
@@ -1097,6 +1192,13 @@ function SuwayomiPlugin:markChapterListRead(manga, chapters)
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
+    SuwayomiDebug.log({
+        operation = "markChapterListRead",
+        event = "end",
+        manga_id = manga and manga.id,
+        chapter_count = #chapters,
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+    })
     return #chapters
 end
 
@@ -1188,6 +1290,7 @@ function SuwayomiPlugin:formatBulkDownloadMessage(queued, skipped)
 end
 
 function SuwayomiPlugin:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+    local started_at = SuwayomiDebug.now()
     local queued = 0
     local skipped = 0
     local capped = 0
@@ -1220,6 +1323,17 @@ function SuwayomiPlugin:enqueueSelectedChapterDownloads(manga, chapters, downloa
     elseif queued == 0 and skipped > 0 then
         self:showMessage(self:formatBulkDownloadMessage(queued, skipped))
     end
+    SuwayomiDebug.log({
+        operation = "enqueueSelectedChapterDownloads",
+        event = "end",
+        manga_id = manga and manga.id,
+        requested_count = #(chapters or {}),
+        queueable_count = #queueable,
+        queued_count = queued,
+        skipped_count = skipped,
+        capped_count = capped,
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+    })
     return queued
 end
 
@@ -1401,6 +1515,7 @@ function SuwayomiPlugin:formatBulkDeleteMessage(deleted, canceled, missing, acti
 end
 
 function SuwayomiPlugin:deleteSelectedChapters()
+    local started_at = SuwayomiDebug.now()
     if not self.current_chapter_context then
         return 0
     end
@@ -1444,10 +1559,21 @@ function SuwayomiPlugin:deleteSelectedChapters()
     if missing > 0 or active > 0 then
         self:showMessage(self:formatBulkDeleteMessage(deleted, 0, missing, active))
     end
+    SuwayomiDebug.log({
+        operation = "deleteSelectedChapters",
+        event = "end",
+        requested_count = #chapters,
+        deleted_count = deleted,
+        missing_count = missing,
+        active_count = active,
+        canceled_count = canceled,
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+    })
     return deleted
 end
 
 function SuwayomiPlugin:deleteReadChaptersFromDevice()
+    local started_at = SuwayomiDebug.now()
     if not self.current_chapter_context then
         return 0
     end
@@ -1490,10 +1616,20 @@ function SuwayomiPlugin:deleteReadChaptersFromDevice()
     if deleted == 0 or active > 0 then
         self:showMessage(self:formatBulkDeleteMessage(deleted, 0, missing, active))
     end
+    SuwayomiDebug.log({
+        operation = "deleteReadChaptersFromDevice",
+        event = "end",
+        requested_count = #read_chapters,
+        deleted_count = deleted,
+        missing_count = missing,
+        active_count = active,
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+    })
     return deleted
 end
 
 function SuwayomiPlugin:markSelectedChaptersRead()
+    local started_at = SuwayomiDebug.now()
     if not self.current_chapter_context then
         return 0
     end
@@ -1518,10 +1654,18 @@ function SuwayomiPlugin:markSelectedChaptersRead()
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
+    SuwayomiDebug.log({
+        operation = "markSelectedChaptersRead",
+        event = "end",
+        manga_id = manga and manga.id,
+        chapter_count = #chapters,
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+    })
     return #chapters
 end
 
 function SuwayomiPlugin:markSelectedChaptersUnread()
+    local started_at = SuwayomiDebug.now()
     if not self.current_chapter_context then
         return 0
     end
@@ -1546,6 +1690,13 @@ function SuwayomiPlugin:markSelectedChaptersUnread()
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
+    SuwayomiDebug.log({
+        operation = "markSelectedChaptersUnread",
+        event = "end",
+        manga_id = manga and manga.id,
+        chapter_count = #chapters,
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+    })
     return #chapters
 end
 
@@ -1870,6 +2021,11 @@ function SuwayomiPlugin:schedulePendingReadSync(credentials, delay_seconds)
     end
 
     self.pending_read_sync_scheduled = true
+    SuwayomiDebug.log({
+        operation = "schedulePendingReadSync",
+        event = "scheduled",
+        delay_seconds = delay_seconds or self.read_sync_delay_seconds,
+    })
     UIManager:scheduleIn(delay_seconds or self.read_sync_delay_seconds, function()
         self.pending_read_sync_scheduled = false
         if self.pending_read_sync_active then
@@ -1938,6 +2094,7 @@ function SuwayomiPlugin:onCloseDocument()
 end
 
 function SuwayomiPlugin:refreshChapterMenu(options)
+    local started_at = SuwayomiDebug.now()
     options = options or {}
     if not self.current_chapter_context then
         return
@@ -1968,6 +2125,14 @@ function SuwayomiPlugin:refreshChapterMenu(options)
     elseif self.current_chapter_menu and self.current_chapter_menu.updateItems then
         self.current_chapter_menu:updateItems(nil, true)
     end
+    SuwayomiDebug.log({
+        operation = "refreshChapterMenu",
+        event = "end",
+        quick = options.quick == true,
+        chapter_count = #(self.current_chapter_context.chapters or {}),
+        selected_count = self:getSelectedChapterCount(),
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+    })
 end
 
 function SuwayomiPlugin:enqueueChapterDownload(manga, chapter)
