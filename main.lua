@@ -1897,6 +1897,31 @@ function SuwayomiPlugin:schedulePendingReadSync(credentials, delay_seconds)
     end)
 end
 
+function SuwayomiPlugin:syncReadStateNow()
+    if self.pending_read_sync_active then
+        self:showMessage(_("Read state sync is already running."))
+        return false
+    end
+
+    if not self:hasPendingReadSync(self:loadChapterLedger()) then
+        self:showMessage(_("Read state is already synced."))
+        return false
+    end
+
+    local credentials = SuwayomiSettings:load()
+    if not credentials or credentials.server_url == "" then
+        self:showMessage(_("Set up your Suwayomi server login first."))
+        return false
+    end
+
+    local started = self:startPendingReadSyncWorker(credentials, self.read_sync_batch_size)
+    if started then
+        self:showMessage(_("Read state sync started."))
+        return true
+    end
+    return false
+end
+
 function SuwayomiPlugin:onCloseDocument()
     local document_path = self:getCurrentDocumentPath()
     if not document_path or not self:isCurrentDocumentFinished() then
@@ -1981,6 +2006,12 @@ function SuwayomiPlugin:addToMainMenu(menu_items)
                 text = _("Browse Suwayomi"),
                 callback = function()
                     self:browseSuwayomi()
+                end
+            },
+            {
+                text = _("Sync read state now"),
+                callback = function()
+                    self:syncReadStateNow()
                 end
             },
             {

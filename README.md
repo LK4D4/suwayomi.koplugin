@@ -27,6 +27,7 @@ This plugin is experimental and still under active development.
 - Chapter rows show lightweight read/download status symbols, including queued and in-progress downloads
 - Read-state tracking from Suwayomi, the local plugin ledger, and KOReader sidecar metadata
 - Background retry of pending read/unread syncs when Suwayomi is temporarily unavailable
+- Manual `Sync read state now` action for flushing pending read/unread changes immediately
 
 Current limitation:
 - The practical, tested flow currently targets the Suwayomi **Local Source**. Other Suwayomi sources may browse correctly, but downloading and reading workflows outside Local Source are not yet considered supported.
@@ -55,12 +56,13 @@ Manual installation:
 1. Open the **Search** tab in KOReader's top menu.
 2. Tap **Suwayomi**.
 3. First time use: Tap **Setup login information** to enter your Suwayomi server URL, username, and password.
-4. Optionally tap **Setup source languages** to filter the source list.
-5. Tap **Setup download directory** to choose where manga will be downloaded.
-6. Tap **Browse Suwayomi** to explore the server.
-7. Tap a chapter to open the chapter actions dialog.
-8. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
-9. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to download or keep the next unread chapters.
+4. Optionally tap **Sync read state now** to flush any pending local read/unread changes.
+5. Optionally tap **Setup source languages** to filter the source list.
+6. Tap **Setup download directory** to choose where manga will be downloaded.
+7. Tap **Browse Suwayomi** to explore the server.
+8. Tap a chapter to open the chapter actions dialog.
+9. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
+10. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to download or keep the next unread chapters.
 
 ## Testing Locally
 

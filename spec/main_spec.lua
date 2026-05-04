@@ -403,7 +403,8 @@ describe("suwayomi plugin", function()
         assert.is_table(menu_items.suwayomi_dl)
         assert.are.equal("Suwayomi", menu_items.suwayomi_dl.text)
         assert.are.equal("search", menu_items.suwayomi_dl.sorting_hint)
-        assert.are.equal(5, #menu_items.suwayomi_dl.sub_item_table)
+        assert.are.equal(6, #menu_items.suwayomi_dl.sub_item_table)
+        assert.are.equal("Sync read state now", menu_items.suwayomi_dl.sub_item_table[2].text)
     end)
 
     it("configures the download queue with the saved parallel chapter limit", function()
@@ -434,6 +435,70 @@ describe("suwayomi plugin", function()
         assert.are.equal(50, plugin.read_sync_batch_size)
     end)
 
+    it("starts pending read sync immediately from the main menu", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                chapter_id = "398",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+        }
+        local marked_ids = {}
+
+        package.preload.suwayomi_api = function()
+            return {
+                markChaptersReadState = successful_batch_read_sync(marked_ids),
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+        plugin:addToMainMenu(menu_items)
+
+        menu_items.suwayomi_dl.sub_item_table[2].callback()
+
+        assert.are.equal("Read state sync started.", shown_messages[#shown_messages])
+        assert.are.equal(1, #scheduled_callbacks)
+        local poll_callback = table.remove(scheduled_callbacks, 1)
+        poll_callback()
+
+        assert.are.same({ "398" }, marked_ids)
+        assert.is_nil(saved_ledger["m1:398"].pending_read_sync)
+    end)
+
+    it("reports when manual read sync has nothing pending", function()
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+        plugin:addToMainMenu(menu_items)
+
+        menu_items.suwayomi_dl.sub_item_table[2].callback()
+
+        assert.are.equal("Read state is already synced.", shown_messages[#shown_messages])
+        assert.are.equal(0, #scheduled_callbacks)
+    end)
+
     it("opens and saves the parallel downloads setting from the main menu", function()
         local saved_parallel_downloads
         package.preload.suwayomi_settings = function()
@@ -455,7 +520,7 @@ describe("suwayomi plugin", function()
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].callback()
+        menu_items.suwayomi_dl.sub_item_table[6].callback()
         parallel_downloads_menu_options.onSelect(3)
 
         assert.are.equal(2, parallel_downloads_menu_options.current)
@@ -470,7 +535,7 @@ describe("suwayomi plugin", function()
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[2].callback()
+        menu_items.suwayomi_dl.sub_item_table[3].callback()
 
         assert.is_table(login_dialog_options)
         assert.are.equal("https://suwayomi.example", login_dialog_options.credentials.server_url)
@@ -485,7 +550,7 @@ describe("suwayomi plugin", function()
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[2].callback()
+        menu_items.suwayomi_dl.sub_item_table[3].callback()
 
         login_dialog_options.onSave({
             server_url = "https://suwayomi.example",
@@ -4985,7 +5050,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[3].callback()
+        menu_items.suwayomi_dl.sub_item_table[4].callback()
 
         assert.is_table(language_menu_options)
         assert.are.equal("en", language_menu_options.languages[1].code)
@@ -5001,7 +5066,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[4].callback()
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
 
         directory_chooser_callback("/storage/emulated/0/Books/Manga")
 
