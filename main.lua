@@ -338,6 +338,20 @@ function SuwayomiPlugin:clearChapterSelection(skip_refresh)
     end
 end
 
+function SuwayomiPlugin:selectAllChapters()
+    local context = self.current_chapter_context
+    local manga = context and context.manga
+    local chapters = context and context.chapters or {}
+
+    self.selected_chapters = {}
+    for _, chapter in ipairs(chapters) do
+        self.selected_chapters[self:getChapterSelectionKey(manga, chapter)] = true
+    end
+    self.selection_mode = self:getSelectedChapterCount() > 0
+    self:refreshChapterMenu()
+    return self:getSelectedChapterCount()
+end
+
 function SuwayomiPlugin:toggleChapterSelection(manga, chapter)
     self.selected_chapters = self.selected_chapters or {}
     local key = self:getChapterSelectionKey(manga, chapter)
@@ -1123,6 +1137,10 @@ end
 function SuwayomiPlugin:getBulkChapterActions()
     local actions = {}
 
+    if self.current_chapter_context and #(self.current_chapter_context.chapters or {}) > 0 then
+        table.insert(actions, { id = "select_all", text = _("Select all") })
+    end
+
     if self:getSelectedChapterCount() > 0 then
         table.insert(actions, { id = "download_selected", text = _("Download selected") })
         table.insert(actions, { id = "delete_selected", text = _("Delete selected from device") })
@@ -1560,6 +1578,10 @@ function SuwayomiPlugin:performBulkChapterAction(action_id)
     end
     if action_id == "mark_unread_selected" then
         self:markSelectedChaptersUnread()
+        return true
+    end
+    if action_id == "select_all" then
+        self:selectAllChapters()
         return true
     end
     if action_id == "clear_selection" then

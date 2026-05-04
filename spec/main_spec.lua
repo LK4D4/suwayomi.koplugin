@@ -1195,13 +1195,14 @@ describe("suwayomi plugin", function()
         tap_bulk_actions()
 
         assert.are.equal("2 selected chapters", shown_actions_menu.title)
-        assert.are.equal("Download selected", shown_actions_menu.actions[1].text)
-        assert.are.equal("Delete selected from device", shown_actions_menu.actions[2].text)
-        assert.are.equal("Mark selected as read", shown_actions_menu.actions[3].text)
-        assert.are.equal("Mark selected as unread", shown_actions_menu.actions[4].text)
-        assert.are.equal("Clear selection", shown_actions_menu.actions[5].text)
-        assert.are.equal("Download next 5 unread", shown_actions_menu.actions[6].text)
-        assert.are.equal("Download next 10 unread", shown_actions_menu.actions[7].text)
+        assert.are.equal("Select all", shown_actions_menu.actions[1].text)
+        assert.are.equal("Download selected", shown_actions_menu.actions[2].text)
+        assert.are.equal("Delete selected from device", shown_actions_menu.actions[3].text)
+        assert.are.equal("Mark selected as read", shown_actions_menu.actions[4].text)
+        assert.are.equal("Mark selected as unread", shown_actions_menu.actions[5].text)
+        assert.are.equal("Clear selection", shown_actions_menu.actions[6].text)
+        assert.are.equal("Download next 5 unread", shown_actions_menu.actions[7].text)
+        assert.are.equal("Download next 10 unread", shown_actions_menu.actions[8].text)
 
         plugin:performBulkChapterAction("download_selected")
         run_scheduled_callbacks()
@@ -1211,6 +1212,117 @@ describe("suwayomi plugin", function()
         assert.are.equal("Official_Vol. 1 Ch. 1  ↓", shown_chapter_menu.chapters[1].menu_text)
         assert.are.equal("Official_Vol. 1 Ch. 3  ↓", shown_chapter_menu.chapters[3].menu_text)
         assert.is_true(menu_updates > 0)
+    end)
+
+    it("selects all visible chapters from the chapter bulk actions menu", function()
+        local shown_chapter_menu
+        local tap_bulk_actions
+        local shown_actions_menu
+        local menu_updates = 0
+        local fake_chapter_menu = {
+            updateItems = function()
+                menu_updates = menu_updates + 1
+            end,
+        }
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
+                end,
+                fetchMangaForSource = function()
+                    return { ok = true, manga = { { id = "m1", title = "Sousou no Frieren" } } }
+                end,
+                fetchChaptersForManga = function()
+                    return {
+                        ok = true,
+                        chapters = {
+                            { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = false },
+                            { id = "399", name = "Official_Vol. 1 Ch. 2", is_read = false },
+                            { id = "400", name = "Official_Vol. 1 Ch. 3", is_read = false },
+                        },
+                    }
+                end,
+            }
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function()
+                    return false
+                end,
+            }
+        end
+
+        package.preload.suwayomi_ui = function()
+            return {
+                showSourcesMenu = function(sources, onSelect)
+                    onSelect(sources[1])
+                end,
+                showMangaMenu = function(manga, onSelect)
+                    onSelect(manga[1])
+                end,
+                showChapterMenu = function(options)
+                    shown_chapter_menu = options
+                    tap_bulk_actions = options.on_title_bar_left_tap
+                    return fake_chapter_menu
+                end,
+                updateChapterMenu = function(_, options)
+                    shown_chapter_menu = options
+                    tap_bulk_actions = options.on_title_bar_left_tap
+                    fake_chapter_menu:updateItems()
+                end,
+                showChapterActionsMenu = function(options)
+                    shown_actions_menu = options
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadSourceLanguages = function() return { "localsourcelang" } end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_ui = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin:browseSuwayomi()
+
+        tap_bulk_actions()
+
+        assert.are.equal("Chapter downloads", shown_actions_menu.title)
+        assert.are.equal("Select all", shown_actions_menu.actions[1].text)
+
+        plugin:performBulkChapterAction("select_all")
+
+        assert.is_true(plugin.selection_mode)
+        assert.are.equal(3, plugin:getSelectedChapterCount())
+        assert.are.equal("3 selected", shown_chapter_menu.title)
+        assert.are.equal("[x] Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("[x] Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.are.equal("[x] Official_Vol. 1 Ch. 3", shown_chapter_menu.chapters[3].menu_text)
+        assert.are.equal(1, menu_updates)
     end)
 
     it("opens chapter bulk actions from the titlebar without selection", function()
@@ -1292,13 +1404,14 @@ describe("suwayomi plugin", function()
         tap_bulk_actions()
 
         assert.are.equal("Chapter downloads", shown_actions_menu.title)
-        assert.are.equal("Download next 5 unread", shown_actions_menu.actions[1].text)
-        assert.are.equal("Download next 10 unread", shown_actions_menu.actions[2].text)
-        assert.are.equal("Download next 50 unread", shown_actions_menu.actions[3].text)
-        assert.are.equal("Keep next 5 unread downloaded", shown_actions_menu.actions[4].text)
-        assert.are.equal("Keep next 10 unread downloaded", shown_actions_menu.actions[5].text)
-        assert.are.equal("Keep next 50 unread downloaded", shown_actions_menu.actions[6].text)
-        assert.are.equal("Delete read chapters from device", shown_actions_menu.actions[7].text)
+        assert.are.equal("Select all", shown_actions_menu.actions[1].text)
+        assert.are.equal("Download next 5 unread", shown_actions_menu.actions[2].text)
+        assert.are.equal("Download next 10 unread", shown_actions_menu.actions[3].text)
+        assert.are.equal("Download next 50 unread", shown_actions_menu.actions[4].text)
+        assert.are.equal("Keep next 5 unread downloaded", shown_actions_menu.actions[5].text)
+        assert.are.equal("Keep next 10 unread downloaded", shown_actions_menu.actions[6].text)
+        assert.are.equal("Keep next 50 unread downloaded", shown_actions_menu.actions[7].text)
+        assert.are.equal("Delete read chapters from device", shown_actions_menu.actions[8].text)
         assert.is_false(plugin.selection_mode)
         assert.are.equal("Sousou no Frieren", shown_chapter_menu.title)
     end)
@@ -2026,7 +2139,7 @@ describe("suwayomi plugin", function()
         plugin.selection_mode = true
 
         local bulk_actions = plugin:getBulkChapterActions()
-        assert.are.equal("Delete selected from device", bulk_actions[2].text)
+        assert.are.equal("Delete selected from device", bulk_actions[3].text)
 
         plugin:performBulkChapterAction("delete_selected")
         os.remove = original_remove
