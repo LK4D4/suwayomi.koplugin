@@ -15,6 +15,7 @@ describe("suwayomi plugin", function()
     local scheduled_callbacks
     local original_io_open
     local original_os_rename
+    local original_os_remove
     local progress_files
 
     local function reset_plugin_environment()
@@ -33,8 +34,9 @@ describe("suwayomi plugin", function()
         progress_files = {}
         original_io_open = original_io_open or io.open
         original_os_rename = original_os_rename or os.rename
+        original_os_remove = original_os_remove or os.remove
         io.open = function(path, mode)
-            if tostring(path):match("%.suwayomi_dl_progress_") then
+            if tostring(path):match("%.suwayomi_dl_progress_") or tostring(path):match("suwayomi_dl_read_sync") then
                 if mode == "w" then
                     local chunks = {}
                     return {
@@ -61,6 +63,11 @@ describe("suwayomi plugin", function()
                 end
                 local index = 0
                 return {
+                    read = function(_, what)
+                        if what == "*a" then
+                            return content
+                        end
+                    end,
                     lines = function()
                         return function()
                             index = index + 1
@@ -73,12 +80,23 @@ describe("suwayomi plugin", function()
             return original_io_open(path, mode)
         end
         os.rename = function(from, to)
-            if tostring(from):match("%.suwayomi_dl_progress_") or tostring(to):match("%.suwayomi_dl_progress_") then
+            if tostring(from):match("%.suwayomi_dl_progress_")
+                or tostring(to):match("%.suwayomi_dl_progress_")
+                or tostring(from):match("suwayomi_dl_read_sync")
+                or tostring(to):match("suwayomi_dl_read_sync")
+            then
                 progress_files[to] = progress_files[from]
                 progress_files[from] = nil
                 return true
             end
             return original_os_rename(from, to)
+        end
+        os.remove = function(path)
+            if tostring(path):match("%.suwayomi_dl_progress_") or tostring(path):match("suwayomi_dl_read_sync") then
+                progress_files[path] = nil
+                return true
+            end
+            return original_os_remove(path)
         end
 
         package.loaded.main = nil
@@ -92,6 +110,7 @@ describe("suwayomi plugin", function()
         package.loaded.suwayomi_api = nil
         package.loaded.suwayomi_download_queue = nil
         package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_read_sync_worker = nil
         package.loaded.suwayomi_ui = nil
         package.loaded.suwayomi_settings = nil
         package.loaded.lfs = nil
@@ -326,6 +345,7 @@ describe("suwayomi plugin", function()
         package.preload.suwayomi_api = nil
         package.preload.suwayomi_download_queue = nil
         package.preload.suwayomi_downloader = nil
+        package.preload.suwayomi_read_sync_worker = nil
         package.preload.suwayomi_ui = nil
         package.preload.suwayomi_settings = nil
         package.preload.lfs = nil
@@ -334,6 +354,9 @@ describe("suwayomi plugin", function()
         end
         if original_os_rename then
             os.rename = original_os_rename
+        end
+        if original_os_remove then
+            os.remove = original_os_remove
         end
     end)
 
@@ -3599,7 +3622,7 @@ return {
         assert.is_true(saved_ledger["m1:398"].pending_read_sync)
     end)
 
-    it("retries pending read syncs and clears them after Suwayomi accepts", function()
+    it("retries pending read syncs through the worker and clears them after Suwayomi accepts", function()
         local saved_ledger = {
             ["m1:398"] = {
                 manga_id = "m1",
@@ -3645,11 +3668,412 @@ return {
         local plugin_class = require("main")
         local plugin = plugin_class{}
 
-        plugin:syncPendingReadMarks()
+        plugin:schedulePendingReadSync()
+        local start_callback = table.remove(scheduled_callbacks, 1)
+        start_callback()
+
+        local poll_callback = table.remove(scheduled_callbacks, 1)
+        poll_callback()
 
         assert.are.equal("398", marked_chapter_id)
         assert.is_true(saved_ledger["m1:398"].read)
         assert.is_nil(saved_ledger["m1:398"].pending_read_sync)
+    end)
+
+    it("starts pending read sync in a subprocess without calling HTTP on the UI callback", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                chapter_id = "398",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+        }
+        local child_callback
+        local http_calls = 0
+
+        package.preload.suwayomi_api = function()
+            return {
+                markChapterRead = function()
+                    http_calls = http_calls + 1
+                    return { ok = true }
+                end,
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                template = function(template_string, ...)
+                    local result = template_string
+                    local values = {...}
+                    for index, value in ipairs(values) do
+                        result = result:gsub("%%" .. index, tostring(value))
+                    end
+                    return result
+                end,
+                runInSubProcess = function(callback)
+                    child_callback = callback
+                    return 4321
+                end,
+                isSubProcessDone = function()
+                    return false
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin:schedulePendingReadSync()
+        local scheduled = table.remove(scheduled_callbacks, 1)
+        scheduled()
+
+        assert.is_function(child_callback)
+        assert.are.equal(0, http_calls)
+        assert.is_true(saved_ledger["m1:398"].pending_read_sync)
+    end)
+
+    it("uses a unique result path for each read sync worker", function()
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function() return { server_url = "https://suwayomi.example" } end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        assert.are_not.equal(plugin:getReadSyncResultPath(), plugin:getReadSyncResultPath())
+    end)
+
+    it("does not clear pending sync when child result is stale", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                chapter_id = "398",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+        }
+        local child_callback
+        local subprocess_done = false
+
+        package.preload.suwayomi_api = function()
+            return {
+                markChapterRead = function(_, chapter_id)
+                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
+                end,
+                markChapterUnread = function(_, chapter_id)
+                    return { ok = true, chapter = { id = chapter_id, is_read = false } }
+                end,
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                template = function(template_string, ...)
+                    local result = template_string
+                    local values = {...}
+                    for index, value in ipairs(values) do
+                        result = result:gsub("%%" .. index, tostring(value))
+                    end
+                    return result
+                end,
+                runInSubProcess = function(callback)
+                    child_callback = callback
+                    return 4321
+                end,
+                isSubProcessDone = function()
+                    return subprocess_done
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin:schedulePendingReadSync()
+        local start_callback = table.remove(scheduled_callbacks, 1)
+        start_callback()
+
+        saved_ledger["m1:398"].read = false
+        saved_ledger["m1:398"].pending_read_sync = true
+        saved_ledger["m1:398"].pending_read_state = false
+
+        child_callback()
+        subprocess_done = true
+        local poll_callback = table.remove(scheduled_callbacks, 1)
+        poll_callback()
+
+        assert.is_false(saved_ledger["m1:398"].read)
+        assert.is_true(saved_ledger["m1:398"].pending_read_sync)
+        assert.is_false(saved_ledger["m1:398"].pending_read_state)
+    end)
+
+    it("keeps pending sync when subprocess finishes without a result file", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                chapter_id = "398",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+        }
+
+        package.preload["ffi/util"] = function()
+            return {
+                template = function(template_string, ...)
+                    local result = template_string
+                    local values = {...}
+                    for index, value in ipairs(values) do
+                        result = result:gsub("%%" .. index, tostring(value))
+                    end
+                    return result
+                end,
+                runInSubProcess = function()
+                    return 4321
+                end,
+                isSubProcessDone = function()
+                    return true
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin:schedulePendingReadSync()
+        local start_callback = table.remove(scheduled_callbacks, 1)
+        start_callback()
+
+        local poll_callback = table.remove(scheduled_callbacks, 1)
+        poll_callback()
+
+        assert.is_true(saved_ledger["m1:398"].pending_read_sync)
+        assert.are.equal(1, #scheduled_callbacks)
+    end)
+
+    it("keeps pending sync and backs off when read sync subprocess cannot start", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                chapter_id = "398",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+        }
+
+        package.preload["ffi/util"] = function()
+            return {
+                template = function(template_string, ...)
+                    local result = template_string
+                    local values = {...}
+                    for index, value in ipairs(values) do
+                        result = result:gsub("%%" .. index, tostring(value))
+                    end
+                    return result
+                end,
+                runInSubProcess = function()
+                    return false, "fork failed"
+                end,
+                isSubProcessDone = function()
+                    return true
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+        package.preload["ui/uimanager"] = function()
+            return {
+                show = function(_, widget)
+                    table.insert(shown_messages, widget.text)
+                end,
+                nextTick = function(_, callback)
+                    callback()
+                end,
+                scheduleIn = function(_, delay, callback)
+                    table.insert(scheduled_callbacks, { delay = delay, callback = callback })
+                end,
+                setDirty = function() end,
+                forceRePaint = function() end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded["ui/uimanager"] = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin:schedulePendingReadSync()
+        local start_callback = table.remove(scheduled_callbacks, 1)
+        start_callback.callback()
+
+        assert.is_true(saved_ledger["m1:398"].pending_read_sync)
+        assert.are.equal("Could not start read sync: fork failed", shown_messages[#shown_messages])
+        assert.are.equal(1, #scheduled_callbacks)
+        assert.are.equal(5, scheduled_callbacks[1].delay)
+    end)
+
+    it("does not start a second read sync worker while a timed out subprocess is still alive", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                chapter_id = "398",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+        }
+        local subprocess_done = false
+        local run_count = 0
+        local terminated_pid
+
+        package.preload["ffi/util"] = function()
+            return {
+                template = function(template_string, ...)
+                    local result = template_string
+                    local values = {...}
+                    for index, value in ipairs(values) do
+                        result = result:gsub("%%" .. index, tostring(value))
+                    end
+                    return result
+                end,
+                runInSubProcess = function()
+                    run_count = run_count + 1
+                    return 4321
+                end,
+                isSubProcessDone = function()
+                    return subprocess_done
+                end,
+                terminateSubProcess = function(pid)
+                    terminated_pid = pid
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.read_sync_watchdog_timeout_seconds = 1
+        plugin:schedulePendingReadSync()
+        local start_callback = table.remove(scheduled_callbacks, 1)
+        start_callback()
+
+        plugin.pending_read_sync_active.started_at = os.time() - 2
+        local timeout_poll_callback = table.remove(scheduled_callbacks, 1)
+        timeout_poll_callback()
+
+        assert.are.equal(4321, terminated_pid)
+        assert.are.equal(1, run_count)
+        assert.is_truthy(plugin.pending_read_sync_active)
+        assert.are.equal(1, #scheduled_callbacks)
+
+        subprocess_done = true
+        local cleanup_poll_callback = table.remove(scheduled_callbacks, 1)
+        cleanup_poll_callback()
+
+        assert.are.equal(1, run_count)
+        assert.is_nil(plugin.pending_read_sync_active)
+        assert.are.equal(1, #scheduled_callbacks)
     end)
 
     it("syncs pending read marks in small scheduled batches", function()
@@ -3721,12 +4145,22 @@ return {
 
         assert.are.equal(2, #marked_ids)
         assert.are.equal(1, #scheduled_callbacks)
+
+        local first_poll_callback = table.remove(scheduled_callbacks, 1)
+        first_poll_callback()
+
+        assert.are.equal(1, #scheduled_callbacks)
         assert.is_true(plugin:hasPendingReadSync(saved_ledger))
 
         local second_callback = table.remove(scheduled_callbacks, 1)
         second_callback()
 
         assert.are.equal(3, #marked_ids)
+        assert.are.equal(1, #scheduled_callbacks)
+
+        local second_poll_callback = table.remove(scheduled_callbacks, 1)
+        second_poll_callback()
+
         assert.are.equal(0, #scheduled_callbacks)
         assert.is_false(plugin:hasPendingReadSync(saved_ledger))
     end)
@@ -3811,6 +4245,12 @@ return {
         first_callback.callback()
 
         assert.are.equal(2, attempts)
+        assert.are.equal(1, #scheduled_callbacks)
+        assert.are.equal(0.5, scheduled_callbacks[1].delay)
+
+        local poll_callback = table.remove(scheduled_callbacks, 1)
+        poll_callback.callback()
+
         assert.are.equal(1, #scheduled_callbacks)
         assert.are.equal(5, scheduled_callbacks[1].delay)
     end)

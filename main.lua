@@ -4,10 +4,12 @@ local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local InfoMessage = require("ui/widget/infomessage")
 local SuwayomiAPI = require("suwayomi_api")
 local SuwayomiDownloadQueue = require("suwayomi_download_queue")
+local SuwayomiReadSyncWorker = require("suwayomi_read_sync_worker")
 local SuwayomiSettings = require("suwayomi_settings")
 local SuwayomiUI = require("suwayomi_ui")
 local _ = require("gettext")
-local T = require("ffi/util").template
+local FFIUtil = require("ffi/util")
+local T = FFIUtil.template
 
 local SOURCE_LANGUAGE_OPTIONS = {
     { code = "en", label = "EN" },
@@ -24,8 +26,10 @@ local SuwayomiPlugin = WidgetContainer:extend{
     max_batch_queue_chapters = 50,
     read_sync_batch_size = 2,
     read_sync_delay_seconds = 0.5,
+    read_sync_poll_interval_seconds = 0.5,
     read_sync_failure_delay_seconds = 5,
     read_sync_max_failure_delay_seconds = 300,
+    read_sync_watchdog_timeout_seconds = 60,
 }
 
 function SuwayomiPlugin:createDownloadQueue()
@@ -1649,49 +1653,134 @@ function SuwayomiPlugin:hasPendingReadSync(ledger)
     return false
 end
 
-function SuwayomiPlugin:syncPendingReadMarks(credentials, max_count)
-    if not SuwayomiAPI.markChapterRead and not SuwayomiAPI.markChapterUnread then
-        return 0
+function SuwayomiPlugin:buildPendingReadSyncBatch(ledger, max_count)
+    local keys = {}
+    for key, entry in pairs(ledger or {}) do
+        if entry.pending_read_sync == true and entry.chapter_id then
+            table.insert(keys, key)
+        end
+    end
+    table.sort(keys)
+
+    local batch = {}
+    for _, key in ipairs(keys) do
+        if max_count and #batch >= max_count then
+            break
+        end
+        local entry = ledger[key]
+        local desired_read_state = entry.pending_read_state
+        if desired_read_state == nil then
+            desired_read_state = entry.read == true
+        end
+        table.insert(batch, {
+            key = key,
+            chapter_id = tostring(entry.chapter_id),
+            desired_read_state = desired_read_state == true,
+        })
+    end
+    return batch
+end
+
+function SuwayomiPlugin:getReadSyncResultPath()
+    local settings_dir = SuwayomiSettings.getSettingsDir and SuwayomiSettings:getSettingsDir() or "."
+    self.pending_read_sync_result_counter = (self.pending_read_sync_result_counter or 0) + 1
+    return tostring(settings_dir or "."):gsub("/+$", "")
+        .. "/suwayomi_dl_read_sync_"
+        .. tostring(os.time())
+        .. "_"
+        .. tostring(self.pending_read_sync_result_counter)
+        .. ".json"
+end
+
+function SuwayomiPlugin:schedulePendingReadSyncPoll()
+    if self.pending_read_sync_poll_scheduled or not self.pending_read_sync_active then
+        return
+    end
+
+    self.pending_read_sync_poll_scheduled = true
+    UIManager:scheduleIn(self.read_sync_poll_interval_seconds, function()
+        self:pollPendingReadSync()
+    end)
+end
+
+function SuwayomiPlugin:startPendingReadSyncWorker(credentials, max_count)
+    if self.pending_read_sync_active then
+        return true, 0
     end
 
     credentials = credentials or SuwayomiSettings:load()
+    local ledger = self:loadChapterLedger()
+    local batch = self:buildPendingReadSyncBatch(ledger, max_count)
+    if #batch == 0 then
+        return false, 0
+    end
     if not credentials or credentials.server_url == "" then
-        return 0
+        return false, #batch
+    end
+
+    local result_path = self:getReadSyncResultPath()
+    os.remove(result_path)
+    os.remove(result_path .. ".tmp")
+
+    local pid, err = FFIUtil.runInSubProcess(function()
+        SuwayomiReadSyncWorker:run(credentials, batch, result_path)
+    end)
+
+    if not pid then
+        self:showMessage(T(_("Could not start read sync: %1"), err or _("unknown error")))
+        return false, #batch
+    end
+
+    self.pending_read_sync_active = {
+        pid = pid,
+        credentials = credentials,
+        batch = batch,
+        result_path = result_path,
+        started_at = os.time(),
+    }
+    self:schedulePendingReadSyncPoll()
+    return true, #batch
+end
+
+function SuwayomiPlugin:getDesiredReadStateFromLedgerEntry(entry)
+    if not entry then
+        return nil
+    end
+    if entry.pending_read_state ~= nil then
+        return entry.pending_read_state == true
+    end
+    return entry.read == true
+end
+
+function SuwayomiPlugin:applyPendingReadSyncResult(active, result)
+    if not active or type(result) ~= "table" then
+        return 0, active and #(active.batch or {}) or 0
+    end
+
+    local snapshot_by_key = {}
+    for _, item in ipairs(active.batch or {}) do
+        snapshot_by_key[item.key] = item.desired_read_state == true
     end
 
     local ledger = self:loadChapterLedger()
     local synced = 0
-    local attempted = 0
     local changed = false
 
-    for key, entry in pairs(ledger) do
-        if max_count and attempted >= max_count then
-            break
-        end
-        if entry.pending_read_sync == true and entry.chapter_id then
-            attempted = attempted + 1
-            local desired_read_state = entry.pending_read_state
-            if desired_read_state == nil then
-                desired_read_state = entry.read == true
-            end
-
-            local result
-            if desired_read_state == true and SuwayomiAPI.markChapterRead then
-                result = SuwayomiAPI.markChapterRead(credentials, entry.chapter_id)
-            elseif SuwayomiAPI.markChapterUnread then
-                result = SuwayomiAPI.markChapterUnread(credentials, entry.chapter_id)
-            else
-                result = { ok = false }
-            end
-
-            if result.ok then
-                ledger[key].pending_read_sync = nil
-                ledger[key].pending_read_state = nil
-                synced = synced + 1
-                changed = true
-                if desired_read_state ~= true and not ledger[key].path then
-                    ledger[key] = nil
-                end
+    for _, item in ipairs(result.successes or {}) do
+        local key = item.key
+        local entry = ledger[key]
+        local desired_read_state = item.desired_read_state == true
+        if entry
+            and entry.pending_read_sync == true
+            and snapshot_by_key[key] == desired_read_state
+            and self:getDesiredReadStateFromLedgerEntry(entry) == desired_read_state
+        then
+            entry.pending_read_sync = nil
+            entry.pending_read_state = nil
+            synced = synced + 1
+            changed = true
+            if desired_read_state ~= true and not entry.path then
+                ledger[key] = nil
             end
         end
     end
@@ -1700,7 +1789,57 @@ function SuwayomiPlugin:syncPendingReadMarks(credentials, max_count)
         self:saveChapterLedger(ledger)
     end
 
-    return synced, attempted
+    return synced, tonumber(result.attempted) or #(active.batch or {})
+end
+
+function SuwayomiPlugin:finishPendingReadSync(active, synced, attempted)
+    self.pending_read_sync_active = nil
+    if active and active.result_path then
+        os.remove(active.result_path)
+        os.remove(active.result_path .. ".tmp")
+    end
+
+    if self:hasPendingReadSync(self:loadChapterLedger()) then
+        local next_delay = self.read_sync_delay_seconds
+        if attempted and attempted > 0 and synced == 0 then
+            next_delay = self.pending_read_sync_failure_delay or self.read_sync_failure_delay_seconds
+            self.pending_read_sync_failure_delay = math.min(
+                next_delay * 2,
+                self.read_sync_max_failure_delay_seconds
+            )
+        else
+            self.pending_read_sync_failure_delay = nil
+        end
+        self:schedulePendingReadSync(active and active.credentials or nil, next_delay)
+    else
+        self.pending_read_sync_failure_delay = nil
+    end
+end
+
+function SuwayomiPlugin:pollPendingReadSync()
+    self.pending_read_sync_poll_scheduled = false
+    local active = self.pending_read_sync_active
+    if not active then
+        return
+    end
+
+    local done = FFIUtil.isSubProcessDone(active.pid)
+    if not done then
+        if not active.terminating
+            and os.time() - (active.started_at or os.time()) > self.read_sync_watchdog_timeout_seconds
+        then
+            if FFIUtil.terminateSubProcess then
+                pcall(FFIUtil.terminateSubProcess, active.pid)
+            end
+            active.terminating = true
+        end
+        self:schedulePendingReadSyncPoll()
+        return
+    end
+
+    local result = SuwayomiReadSyncWorker:readResult(active.result_path)
+    local synced, attempted = self:applyPendingReadSyncResult(active, result)
+    self:finishPendingReadSync(active, synced, attempted)
 end
 
 function SuwayomiPlugin:schedulePendingReadSync(credentials, delay_seconds)
@@ -1711,22 +1850,27 @@ function SuwayomiPlugin:schedulePendingReadSync(credentials, delay_seconds)
     self.pending_read_sync_scheduled = true
     UIManager:scheduleIn(delay_seconds or self.read_sync_delay_seconds, function()
         self.pending_read_sync_scheduled = false
+        if self.pending_read_sync_active then
+            return
+        end
         local sync_credentials = credentials or SuwayomiSettings:load()
-        local synced, attempted = self:syncPendingReadMarks(sync_credentials, self.read_sync_batch_size)
-        if self:hasPendingReadSync(self:loadChapterLedger()) then
-            local next_delay = self.read_sync_delay_seconds
-            if attempted > 0 and synced == 0 then
-                next_delay = self.pending_read_sync_failure_delay or self.read_sync_failure_delay_seconds
-                self.pending_read_sync_failure_delay = math.min(
-                    next_delay * 2,
-                    self.read_sync_max_failure_delay_seconds
-                )
+        local started, attempted = self:startPendingReadSyncWorker(sync_credentials, self.read_sync_batch_size)
+        if not started then
+            if self:hasPendingReadSync(self:loadChapterLedger()) then
+                local next_delay = self.read_sync_delay_seconds
+                if attempted and attempted > 0 then
+                    next_delay = self.pending_read_sync_failure_delay or self.read_sync_failure_delay_seconds
+                    self.pending_read_sync_failure_delay = math.min(
+                        next_delay * 2,
+                        self.read_sync_max_failure_delay_seconds
+                    )
+                else
+                    self.pending_read_sync_failure_delay = nil
+                end
+                self:schedulePendingReadSync(sync_credentials, next_delay)
             else
                 self.pending_read_sync_failure_delay = nil
             end
-            self:schedulePendingReadSync(sync_credentials, next_delay)
-        else
-            self.pending_read_sync_failure_delay = nil
         end
     end)
 end
