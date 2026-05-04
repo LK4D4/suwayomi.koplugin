@@ -2200,6 +2200,8 @@ describe("suwayomi plugin", function()
         local saved_ledger = {}
         local marked_ids = {}
         local menu_updates = 0
+        local ledger_loads = 0
+        local ledger_saves = 0
 
         package.preload.suwayomi_api = function()
             return {
@@ -2230,8 +2232,12 @@ describe("suwayomi plugin", function()
                 loadDownloadDirectory = function() return "/books" end,
                 loadDownloadQueue = function() return {} end,
                 saveDownloadQueue = function(_, jobs) return jobs end,
-                loadChapterLedger = function() return saved_ledger end,
+                loadChapterLedger = function()
+                    ledger_loads = ledger_loads + 1
+                    return saved_ledger
+                end,
                 saveChapterLedger = function(_, ledger)
+                    ledger_saves = ledger_saves + 1
                     saved_ledger = ledger
                     return ledger
                 end,
@@ -2270,6 +2276,9 @@ describe("suwayomi plugin", function()
         assert.is_true(plugin.current_chapter_context.chapters[2].is_read)
         assert.is_false(plugin.selection_mode)
         assert.are.equal(1, menu_updates)
+        assert.are.equal(1, ledger_loads)
+        assert.are.equal(1, ledger_saves)
+        assert.are.equal(1, #scheduled_callbacks)
         assert.are.same({}, shown_messages)
 
         run_scheduled_callbacks()
@@ -2302,6 +2311,8 @@ describe("suwayomi plugin", function()
         }
         local marked_ids = {}
         local menu_updates = 0
+        local ledger_loads = 0
+        local ledger_saves = 0
 
         package.preload.suwayomi_api = function()
             return {
@@ -2332,8 +2343,12 @@ describe("suwayomi plugin", function()
                 loadDownloadDirectory = function() return "/books" end,
                 loadDownloadQueue = function() return {} end,
                 saveDownloadQueue = function(_, jobs) return jobs end,
-                loadChapterLedger = function() return saved_ledger end,
+                loadChapterLedger = function()
+                    ledger_loads = ledger_loads + 1
+                    return saved_ledger
+                end,
                 saveChapterLedger = function(_, ledger)
+                    ledger_saves = ledger_saves + 1
                     saved_ledger = ledger
                     return ledger
                 end,
@@ -2375,6 +2390,9 @@ describe("suwayomi plugin", function()
         assert.is_false(plugin.current_chapter_context.chapters[2].is_read)
         assert.is_false(plugin.selection_mode)
         assert.are.equal(1, menu_updates)
+        assert.are.equal(1, ledger_loads)
+        assert.are.equal(1, ledger_saves)
+        assert.are.equal(1, #scheduled_callbacks)
         assert.are.same({}, shown_messages)
 
         run_scheduled_callbacks()
@@ -2651,6 +2669,8 @@ describe("suwayomi plugin", function()
         local saved_ledger = {}
         local marked_ids = {}
         local menu_updates = 0
+        local ledger_loads = 0
+        local ledger_saves = 0
 
         package.preload.suwayomi_api = function()
             return {
@@ -2681,8 +2701,12 @@ describe("suwayomi plugin", function()
                 loadDownloadDirectory = function() return "/books" end,
                 loadDownloadQueue = function() return {} end,
                 saveDownloadQueue = function(_, jobs) return jobs end,
-                loadChapterLedger = function() return saved_ledger end,
+                loadChapterLedger = function()
+                    ledger_loads = ledger_loads + 1
+                    return saved_ledger
+                end,
                 saveChapterLedger = function(_, ledger)
+                    ledger_saves = ledger_saves + 1
                     saved_ledger = ledger
                     return ledger
                 end,
@@ -2723,6 +2747,9 @@ describe("suwayomi plugin", function()
         assert.is_true(plugin.current_chapter_context.chapters[3].is_read)
         assert.is_false(plugin.current_chapter_context.chapters[4].is_read)
         assert.are.equal(1, menu_updates)
+        assert.are.equal(1, ledger_loads)
+        assert.are.equal(1, ledger_saves)
+        assert.are.equal(1, #scheduled_callbacks)
 
         run_scheduled_callbacks()
 

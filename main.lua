@@ -369,8 +369,8 @@ function SuwayomiPlugin:saveChapterLedger(ledger)
     return SuwayomiSettings:saveChapterLedger(ledger or {})
 end
 
-function SuwayomiPlugin:upsertChapterLedgerEntry(manga, chapter, updates)
-    local ledger = self:loadChapterLedger()
+function SuwayomiPlugin:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, updates)
+    ledger = ledger or {}
     local key = self:getChapterLedgerKey(manga, chapter)
     local existing = ledger[key] or {}
 
@@ -390,6 +390,12 @@ function SuwayomiPlugin:upsertChapterLedgerEntry(manga, chapter, updates)
     end
 
     ledger[key] = entry
+    return entry
+end
+
+function SuwayomiPlugin:upsertChapterLedgerEntry(manga, chapter, updates)
+    local ledger = self:loadChapterLedger()
+    local entry = self:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, updates)
     self:saveChapterLedger(ledger)
     return entry
 end
@@ -675,7 +681,7 @@ function SuwayomiPlugin:loadKoreaderHistoryPaths()
     return paths
 end
 
-function SuwayomiPlugin:buildChapterMenuItems(manga, chapters)
+function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
     local SuwayomiDownloader = require("suwayomi_downloader")
     local download_directory = SuwayomiSettings:loadDownloadDirectory()
     local history_paths = self:loadKoreaderHistoryPaths()
@@ -723,11 +729,16 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters)
         end
 
         if chapter_exists then
-            self:upsertChapterLedgerEntry(manga, item, {
+            local updates = {
                 path = chapter_path,
                 read = item.is_read == true,
                 pending_read_sync = item.pending_read_sync == true or nil,
-            })
+            }
+            if ledger then
+                self:upsertChapterLedgerEntryInLedger(ledger, manga, item, updates)
+            else
+                self:upsertChapterLedgerEntry(manga, item, updates)
+            end
         end
 
         table.insert(items, item)
@@ -736,7 +747,7 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters)
     return items
 end
 
-function SuwayomiPlugin:buildChapterMenuOptions(manga, chapters)
+function SuwayomiPlugin:buildChapterMenuOptions(manga, chapters, ledger)
     local selected_count = self:getSelectedChapterCount()
     local title = manga.title
     if self.selection_mode then
@@ -745,7 +756,7 @@ function SuwayomiPlugin:buildChapterMenuOptions(manga, chapters)
 
     return {
         title = title,
-        chapters = self:buildChapterMenuItems(manga, chapters),
+        chapters = self:buildChapterMenuItems(manga, chapters, ledger),
         title_bar_left_icon = "appbar.menu",
         on_title_bar_left_tap = function()
             self:showBulkChapterActions(manga)
@@ -958,12 +969,17 @@ function SuwayomiPlugin:markChapterRead(manga, chapter, options)
     if downloaded and chapter_path then
         self:setKoreaderChapterReadState(chapter_path, true)
     end
-    self:upsertChapterLedgerEntry(manga, chapter, {
+    local updates = {
         path = chapter_path,
         read = true,
         pending_read_sync = true,
         pending_read_state = true,
-    })
+    }
+    if options.ledger then
+        self:upsertChapterLedgerEntryInLedger(options.ledger, manga, chapter, updates)
+    else
+        self:upsertChapterLedgerEntry(manga, chapter, updates)
+    end
 
     if self.current_chapter_context and self.current_chapter_context.chapters then
         for _, current in ipairs(self.current_chapter_context.chapters) do
@@ -988,12 +1004,17 @@ function SuwayomiPlugin:markChapterUnread(manga, chapter, options)
     if downloaded and chapter_path then
         self:setKoreaderChapterReadState(chapter_path, false)
     end
-    self:upsertChapterLedgerEntry(manga, chapter, {
+    local updates = {
         path = chapter_path,
         read = false,
         pending_read_sync = true,
         pending_read_state = false,
-    })
+    }
+    if options.ledger then
+        self:upsertChapterLedgerEntryInLedger(options.ledger, manga, chapter, updates)
+    else
+        self:upsertChapterLedgerEntry(manga, chapter, updates)
+    end
 
     if self.current_chapter_context and self.current_chapter_context.chapters then
         for _, current in ipairs(self.current_chapter_context.chapters) do
@@ -1046,14 +1067,17 @@ function SuwayomiPlugin:markChapterListRead(manga, chapters)
         return 0
     end
 
+    local ledger = self:loadChapterLedger()
     for _, current in ipairs(chapters) do
         self:markChapterRead(manga, current, {
+            ledger = ledger,
             skip_refresh = true,
             skip_schedule = true,
         })
     end
 
-    self:refreshChapterMenu()
+    self:refreshChapterMenu({ ledger = ledger })
+    self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
     return #chapters
 end
@@ -1459,15 +1483,18 @@ function SuwayomiPlugin:markSelectedChaptersRead()
         return 0
     end
 
+    local ledger = self:loadChapterLedger()
     for _, chapter in ipairs(chapters) do
         self:markChapterRead(manga, chapter, {
+            ledger = ledger,
             skip_refresh = true,
             skip_schedule = true,
         })
     end
 
     self:clearChapterSelection(true)
-    self:refreshChapterMenu()
+    self:refreshChapterMenu({ ledger = ledger })
+    self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
     return #chapters
 end
@@ -1484,15 +1511,18 @@ function SuwayomiPlugin:markSelectedChaptersUnread()
         return 0
     end
 
+    local ledger = self:loadChapterLedger()
     for _, chapter in ipairs(chapters) do
         self:markChapterUnread(manga, chapter, {
+            ledger = ledger,
             skip_refresh = true,
             skip_schedule = true,
         })
     end
 
     self:clearChapterSelection(true)
-    self:refreshChapterMenu()
+    self:refreshChapterMenu({ ledger = ledger })
+    self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
     return #chapters
 end
@@ -1729,7 +1759,8 @@ function SuwayomiPlugin:refreshChapterMenu(options)
     local menu_options = menu_options_builder(
         self,
         self.current_chapter_context.manga,
-        self.current_chapter_context.chapters
+        self.current_chapter_context.chapters,
+        options.ledger
     )
     self.current_chapter_options = self.current_chapter_options or {}
     self.current_chapter_options.title = menu_options.title
