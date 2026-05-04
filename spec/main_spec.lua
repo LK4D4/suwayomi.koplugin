@@ -334,6 +334,20 @@ describe("suwayomi plugin", function()
         end
     end
 
+    local function successful_batch_read_sync(marked_ids)
+        return function(_, chapter_ids, desired_read_state)
+            local chapters = {}
+            for _, chapter_id in ipairs(chapter_ids or {}) do
+                table.insert(marked_ids, chapter_id)
+                table.insert(chapters, {
+                    id = chapter_id,
+                    is_read = desired_read_state == true,
+                })
+            end
+            return { ok = true, chapters = chapters }
+        end
+    end
+
     after_each(function()
         package.preload.dispatcher = nil
         package.preload["ffi/util"] = nil
@@ -411,6 +425,13 @@ describe("suwayomi plugin", function()
         local queue = plugin:createDownloadQueue()
 
         assert.are.equal(3, queue.max_active_chapters)
+    end)
+
+    it("uses a larger default read sync worker batch", function()
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        assert.are.equal(50, plugin.read_sync_batch_size)
     end)
 
     it("opens and saves the parallel downloads setting from the main menu", function()
@@ -2341,10 +2362,7 @@ describe("suwayomi plugin", function()
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function(_, chapter_id)
-                    table.insert(marked_ids, chapter_id)
-                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
-                end,
+                markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
@@ -2452,10 +2470,7 @@ describe("suwayomi plugin", function()
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterUnread = function(_, chapter_id)
-                    table.insert(marked_ids, chapter_id)
-                    return { ok = true, chapter = { id = chapter_id, is_read = false } }
-                end,
+                markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
@@ -2738,9 +2753,9 @@ describe("suwayomi plugin", function()
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function(_, chapter_id)
-                    marked_chapter_id = chapter_id
-                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
+                markChaptersReadState = function(_, chapter_ids, desired_read_state)
+                    marked_chapter_id = chapter_ids[1]
+                    return { ok = true, chapters = { { id = chapter_ids[1], is_read = desired_read_state == true } } }
                 end,
             }
         end
@@ -2810,10 +2825,7 @@ describe("suwayomi plugin", function()
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function(_, chapter_id)
-                    table.insert(marked_ids, chapter_id)
-                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
-                end,
+                markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
@@ -2899,10 +2911,7 @@ describe("suwayomi plugin", function()
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function(_, chapter_id)
-                    table.insert(marked_ids, chapter_id)
-                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
-                end,
+                markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
@@ -3619,10 +3628,10 @@ return {
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function(credentials, chapter_id)
-                    marked_chapter_id = chapter_id
+                markChaptersReadState = function(credentials, chapter_ids, desired_read_state)
+                    marked_chapter_id = chapter_ids[1]
                     assert.are.equal("https://suwayomi.example", credentials.server_url)
-                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
+                    return { ok = true, chapters = { { id = chapter_ids[1], is_read = desired_read_state == true } } }
                 end,
             }
         end
@@ -3688,7 +3697,7 @@ return {
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function()
+                markChaptersReadState = function()
                     return { ok = false, error = "offline" }
                 end,
             }
@@ -3751,10 +3760,10 @@ return {
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function(credentials, chapter_id)
-                    marked_chapter_id = chapter_id
+                markChaptersReadState = function(credentials, chapter_ids, desired_read_state)
+                    marked_chapter_id = chapter_ids[1]
                     assert.are.equal("https://suwayomi.example", credentials.server_url)
-                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
+                    return { ok = true, chapters = { { id = chapter_ids[1], is_read = desired_read_state == true } } }
                 end,
             }
         end
@@ -3808,7 +3817,7 @@ return {
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function()
+                markChaptersReadState = function()
                     http_calls = http_calls + 1
                     return { ok = true }
                 end,
@@ -3901,11 +3910,8 @@ return {
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function(_, chapter_id)
-                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
-                end,
-                markChapterUnread = function(_, chapter_id)
-                    return { ok = true, chapter = { id = chapter_id, is_read = false } }
+                markChaptersReadState = function(_, chapter_ids, desired_read_state)
+                    return { ok = true, chapters = { { id = chapter_ids[1], is_read = desired_read_state == true } } }
                 end,
             }
         end
@@ -4223,10 +4229,7 @@ return {
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function(_, chapter_id)
-                    table.insert(marked_ids, chapter_id)
-                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
-                end,
+                markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
@@ -4306,8 +4309,9 @@ return {
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function()
+                markChaptersReadState = function(_, chapter_ids)
                     attempts = attempts + 1
+                    assert.are.equal(2, #(chapter_ids or {}))
                     return { ok = false, error = "offline" }
                 end,
             }
@@ -4357,7 +4361,7 @@ return {
         local first_callback = table.remove(scheduled_callbacks, 1)
         first_callback.callback()
 
-        assert.are.equal(2, attempts)
+        assert.are.equal(1, attempts)
         assert.are.equal(1, #scheduled_callbacks)
         assert.are.equal(0.5, scheduled_callbacks[1].delay)
 
@@ -4384,7 +4388,7 @@ return {
 
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function()
+                markChaptersReadState = function()
                     return { ok = false, error = "offline" }
                 end,
                 fetchSources = function()

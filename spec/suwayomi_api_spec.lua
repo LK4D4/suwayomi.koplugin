@@ -860,6 +860,56 @@ describe("suwayomi_api", function()
         assert.truthy(requested_body:match('"isRead":false'))
     end)
 
+    it("marks multiple chapters read through Suwayomi", function()
+        local requested_body
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    requested_body = options.source
+                    options.sink("ignored")
+                    return 1, 200
+                end,
+            }
+        end
+
+        package.preload.ltn12 = function()
+            return {
+                source = {
+                    string = function(value)
+                        return value
+                    end,
+                },
+                sink = {
+                    table = function(target)
+                        return function(_chunk)
+                            table.insert(
+                                target,
+                                [[{"data":{"updateChapters":{"chapters":[{"id":398,"isRead":true},{"id":399,"isRead":true}]}}}]]
+                            )
+                        end
+                    end,
+                },
+            }
+        end
+
+        local result = api.markChaptersReadState({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }, { "398", "399" }, true)
+
+        assert.is_true(result.ok)
+        assert.are.same({
+            { id = "398", is_read = true },
+            { id = "399", is_read = true },
+        }, result.chapters)
+        assert.truthy(requested_body:match("UPDATE_CHAPTERS_READ"))
+        assert.truthy(requested_body:match('"ids":%[398,399%]'))
+        assert.truthy(requested_body:match('"isRead":true'))
+    end)
+
     it("fetches chapters for a manga and parses the response", function()
         local requested_body
 

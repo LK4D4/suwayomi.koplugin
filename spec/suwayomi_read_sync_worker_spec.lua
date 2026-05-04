@@ -83,16 +83,25 @@ describe("suwayomi_read_sync_worker", function()
         package.preload.suwayomi_api = nil
     end)
 
-    it("dispatches read and unread mutations and writes mixed results atomically", function()
+    it("groups read and unread mutations and writes mixed results atomically", function()
         local calls = {}
         package.preload.suwayomi_api = function()
             return {
-                markChapterRead = function(credentials, chapter_id)
-                    table.insert(calls, { state = true, chapter_id = chapter_id, server_url = credentials.server_url })
-                    return { ok = true, chapter = { id = chapter_id, is_read = true } }
-                end,
-                markChapterUnread = function(credentials, chapter_id)
-                    table.insert(calls, { state = false, chapter_id = chapter_id, server_url = credentials.server_url })
+                markChaptersReadState = function(credentials, chapter_ids, desired_read_state)
+                    table.insert(calls, {
+                        state = desired_read_state,
+                        chapter_ids = chapter_ids,
+                        server_url = credentials.server_url,
+                    })
+                    if desired_read_state == true then
+                        return {
+                            ok = true,
+                            chapters = {
+                                { id = "398", is_read = true },
+                                { id = "400", is_read = true },
+                            },
+                        }
+                    end
                     return { ok = false, error = "offline" }
                 end,
             }
@@ -104,25 +113,65 @@ describe("suwayomi_read_sync_worker", function()
             {
                 { key = "m1:398", chapter_id = "398", desired_read_state = true },
                 { key = "m1:399", chapter_id = "399", desired_read_state = false },
+                { key = "m1:400", chapter_id = "400", desired_read_state = true },
             },
             "/settings/suwayomi_read_sync_result.json"
         )
 
         assert.are.same({
-            { state = true, chapter_id = "398", server_url = "https://suwayomi.example" },
-            { state = false, chapter_id = "399", server_url = "https://suwayomi.example" },
+            { state = true, chapter_ids = { "398", "400" }, server_url = "https://suwayomi.example" },
+            { state = false, chapter_ids = { "399" }, server_url = "https://suwayomi.example" },
         }, calls)
         assert.are.same({
             { from = "/settings/suwayomi_read_sync_result.json.tmp", to = "/settings/suwayomi_read_sync_result.json" },
         }, renamed_paths)
 
         local result = worker:readResult("/settings/suwayomi_read_sync_result.json")
-        assert.are.equal(2, result.attempted)
+        assert.are.equal(3, result.attempted)
+        assert.are.same({
+            { key = "m1:398", chapter_id = "398", desired_read_state = true },
+            { key = "m1:400", chapter_id = "400", desired_read_state = true },
+        }, result.successes)
+        assert.are.same({
+            { key = "m1:399", chapter_id = "399", desired_read_state = false, error = "offline" },
+        }, result.failures)
+    end)
+
+    it("fails batch items missing from the batch mutation response", function()
+        package.preload.suwayomi_api = function()
+            return {
+                markChaptersReadState = function()
+                    return {
+                        ok = true,
+                        chapters = {
+                            { id = "398", is_read = true },
+                        },
+                    }
+                end,
+            }
+        end
+
+        local worker = require("suwayomi_read_sync_worker")
+        worker:run(
+            { server_url = "https://suwayomi.example" },
+            {
+                { key = "m1:398", chapter_id = "398", desired_read_state = true },
+                { key = "m1:399", chapter_id = "399", desired_read_state = true },
+            },
+            "/settings/suwayomi_read_sync_result.json"
+        )
+
+        local result = worker:readResult("/settings/suwayomi_read_sync_result.json")
         assert.are.same({
             { key = "m1:398", chapter_id = "398", desired_read_state = true },
         }, result.successes)
         assert.are.same({
-            { key = "m1:399", chapter_id = "399", desired_read_state = false, error = "offline" },
+            {
+                key = "m1:399",
+                chapter_id = "399",
+                desired_read_state = true,
+                error = "Suwayomi server did not confirm chapter read state.",
+            },
         }, result.failures)
     end)
 

@@ -42,7 +42,7 @@ function ReadSyncWorker:readResult(result_path)
     return parsed
 end
 
-function ReadSyncWorker:syncItem(credentials, item)
+function ReadSyncWorker:validateItem(credentials, item)
     if type(item) ~= "table" then
         return false, "Malformed read sync item."
     end
@@ -52,20 +52,51 @@ function ReadSyncWorker:syncItem(credentials, item)
     if not item or not item.chapter_id or item.chapter_id == "" then
         return false, "Missing chapter id."
     end
+    return true
+end
 
-    local result
-    if item.desired_read_state == true and SuwayomiAPI.markChapterRead then
-        result = SuwayomiAPI.markChapterRead(credentials, item.chapter_id)
-    elseif SuwayomiAPI.markChapterUnread then
-        result = SuwayomiAPI.markChapterUnread(credentials, item.chapter_id)
-    else
-        result = { ok = false, error = "Read sync mutation is unavailable." }
+function ReadSyncWorker:resultEntry(item)
+    item = type(item) == "table" and item or {}
+    return {
+        key = item.key,
+        chapter_id = item.chapter_id,
+        desired_read_state = item.desired_read_state == true,
+    }
+end
+
+function ReadSyncWorker:appendGroupResult(credentials, items, desired_read_state, result)
+    local chapter_ids = {}
+    for _, item in ipairs(items or {}) do
+        table.insert(chapter_ids, item.chapter_id)
     end
 
-    if result and result.ok then
-        return true
+    local api_result = SuwayomiAPI.markChaptersReadState(credentials, chapter_ids, desired_read_state)
+    if not api_result or not api_result.ok then
+        local error_message = api_result and api_result.error or "Read sync failed."
+        for _, item in ipairs(items or {}) do
+            local entry = self:resultEntry(item)
+            entry.error = error_message
+            table.insert(result.failures, entry)
+        end
+        return
     end
-    return false, result and result.error or "Read sync failed."
+
+    local confirmed = {}
+    for _, chapter in ipairs(api_result.chapters or {}) do
+        if chapter.is_read == desired_read_state then
+            confirmed[tostring(chapter.id)] = true
+        end
+    end
+
+    for _, item in ipairs(items or {}) do
+        local entry = self:resultEntry(item)
+        if confirmed[tostring(item.chapter_id)] then
+            table.insert(result.successes, entry)
+        else
+            entry.error = "Suwayomi server did not confirm chapter read state."
+            table.insert(result.failures, entry)
+        end
+    end
 end
 
 function ReadSyncWorker:run(credentials, batch, result_path)
@@ -74,22 +105,28 @@ function ReadSyncWorker:run(credentials, batch, result_path)
         successes = {},
         failures = {},
     }
+    local groups = {}
+    local group_order = {}
 
     for _, item in ipairs(batch or {}) do
         result.attempted = result.attempted + 1
-        local ok, error_message = self:syncItem(credentials, item)
-        item = type(item) == "table" and item or {}
-        local entry = {
-            key = item.key,
-            chapter_id = item.chapter_id,
-            desired_read_state = item.desired_read_state == true,
-        }
+        local ok, error_message = self:validateItem(credentials, item)
         if ok then
-            table.insert(result.successes, entry)
+            local desired_read_state = item.desired_read_state == true
+            if not groups[desired_read_state] then
+                groups[desired_read_state] = {}
+                table.insert(group_order, desired_read_state)
+            end
+            table.insert(groups[desired_read_state], item)
         else
+            local entry = self:resultEntry(item)
             entry.error = error_message
             table.insert(result.failures, entry)
         end
+    end
+
+    for _, desired_read_state in ipairs(group_order) do
+        self:appendGroupResult(credentials, groups[desired_read_state], desired_read_state, result)
     end
 
     self:writeResult(result_path, result)

@@ -228,6 +228,25 @@ function SuwayomiAPI._buildUpdateChapterReadMutation(chapter_id, is_read)
     })
 end
 
+function SuwayomiAPI._buildUpdateChaptersReadMutation(chapter_ids, is_read)
+    local ids = {}
+    for _, chapter_id in ipairs(chapter_ids or {}) do
+        table.insert(ids, tonumber(chapter_id) or chapter_id)
+    end
+
+    return json.encode({
+        query = "mutation UPDATE_CHAPTERS_READ($input: UpdateChaptersInput!) { updateChapters(input: $input) { chapters { id isRead } } }",
+        variables = {
+            input = {
+                ids = ids,
+                patch = {
+                    isRead = is_read == true,
+                },
+            },
+        },
+    })
+end
+
 function SuwayomiAPI._buildMarkChapterReadMutation(chapter_id)
     return SuwayomiAPI._buildUpdateChapterReadMutation(chapter_id, true)
 end
@@ -438,6 +457,32 @@ function SuwayomiAPI.parseMarkChapterReadResponse(response_body)
     }
 end
 
+function SuwayomiAPI.parseMarkChaptersReadResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local chapter_nodes = payload
+        and payload.data
+        and payload.data.updateChapters
+        and payload.data.updateChapters.chapters
+
+    if type(chapter_nodes) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not update chapter read states."
+    end
+
+    local chapters = {}
+    for _, chapter in ipairs(chapter_nodes) do
+        table.insert(chapters, {
+            id = tostring(chapter.id),
+            is_read = chapter.isRead == true,
+        })
+    end
+    return chapters
+end
+
 performGraphQLRequest = function(credentials, request_body, operation_name)
     local ltn12 = require("ltn12")
     local server_url = credentials and credentials.server_url
@@ -614,6 +659,31 @@ function SuwayomiAPI.markChapterUnread(credentials, chapter_id)
     return {
         ok = true,
         chapter = chapter,
+    }
+end
+
+function SuwayomiAPI.markChaptersReadState(credentials, chapter_ids, is_read)
+    local result = performGraphQLRequest(
+        credentials,
+        SuwayomiAPI._buildUpdateChaptersReadMutation(chapter_ids, is_read),
+        "markChaptersReadState"
+    )
+    if not result.ok then
+        return result
+    end
+
+    local chapters, parse_error = SuwayomiAPI.parseMarkChaptersReadResponse(result.response_body)
+    if not chapters then
+        logDebugEvent({ operation = "markChaptersReadState", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        chapters = chapters,
     }
 end
 
