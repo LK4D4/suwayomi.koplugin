@@ -1966,6 +1966,17 @@ function SuwayomiPlugin:applyPendingReadSyncResult(active, result)
     local synced = 0
     local changed = false
 
+    for _, item in ipairs(result.failures or {}) do
+        SuwayomiDebug.log({
+            operation = "read_sync",
+            event = "failure",
+            key = item.key,
+            chapter_id = item.chapter_id,
+            desired_read_state = item.desired_read_state == true,
+            error = item.error or "Read sync failed.",
+        })
+    end
+
     for _, item in ipairs(result.successes or {}) do
         local key = item.key
         local entry = ledger[key]
@@ -1982,6 +1993,16 @@ function SuwayomiPlugin:applyPendingReadSyncResult(active, result)
             if desired_read_state ~= true and not entry.path then
                 ledger[key] = nil
             end
+        else
+            SuwayomiDebug.log({
+                operation = "read_sync",
+                event = "conflict",
+                key = key,
+                chapter_id = item.chapter_id,
+                worker_desired_read_state = desired_read_state,
+                current_desired_read_state = self:getDesiredReadStateFromLedgerEntry(entry),
+                pending_read_sync = entry and entry.pending_read_sync == true or false,
+            })
         end
     end
 

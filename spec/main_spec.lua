@@ -113,6 +113,7 @@ describe("suwayomi plugin", function()
         package.loaded.suwayomi_read_sync_worker = nil
         package.loaded.suwayomi_ui = nil
         package.loaded.suwayomi_settings = nil
+        package.loaded.suwayomi_debug = nil
         package.loaded.lfs = nil
 
         package.preload.dispatcher = function()
@@ -362,7 +363,9 @@ describe("suwayomi plugin", function()
         package.preload.suwayomi_read_sync_worker = nil
         package.preload.suwayomi_ui = nil
         package.preload.suwayomi_settings = nil
+        package.preload.suwayomi_debug = nil
         package.preload.lfs = nil
+        package.loaded.suwayomi_debug = nil
         if original_io_open then
             io.open = original_io_open
         end
@@ -4111,6 +4114,158 @@ return {
         poll_callback()
 
         assert.is_false(saved_ledger["m1:398"].read)
+        assert.is_true(saved_ledger["m1:398"].pending_read_sync)
+        assert.is_false(saved_ledger["m1:398"].pending_read_state)
+    end)
+
+    it("logs read sync worker failures with chapter context", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                chapter_id = "398",
+                read = true,
+                pending_read_sync = true,
+                pending_read_state = true,
+            },
+        }
+        local debug_events = {}
+
+        package.preload.suwayomi_debug = function()
+            return {
+                log = function(event)
+                    table.insert(debug_events, event)
+                end,
+                now = function() return 0 end,
+                elapsedMs = function() return 0 end,
+                time = function(_, fields, callback)
+                    if type(fields) == "function" then
+                        return fields()
+                    end
+                    return callback()
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_debug = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        local synced, attempted = plugin:applyPendingReadSyncResult({
+            batch = {
+                { key = "m1:398", chapter_id = "398", desired_read_state = true },
+            },
+        }, {
+            attempted = 1,
+            successes = {},
+            failures = {
+                {
+                    key = "m1:398",
+                    chapter_id = "398",
+                    desired_read_state = true,
+                    error = "offline",
+                },
+            },
+        })
+
+        assert.are.equal(0, synced)
+        assert.are.equal(1, attempted)
+        assert.are.same({
+            {
+                operation = "read_sync",
+                event = "failure",
+                key = "m1:398",
+                chapter_id = "398",
+                desired_read_state = true,
+                error = "offline",
+            },
+        }, debug_events)
+        assert.is_true(saved_ledger["m1:398"].pending_read_sync)
+    end)
+
+    it("logs stale read sync results as conflicts", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                chapter_id = "398",
+                read = false,
+                pending_read_sync = true,
+                pending_read_state = false,
+            },
+        }
+        local debug_events = {}
+
+        package.preload.suwayomi_debug = function()
+            return {
+                log = function(event)
+                    table.insert(debug_events, event)
+                end,
+                now = function() return 0 end,
+                elapsedMs = function() return 0 end,
+                time = function(_, fields, callback)
+                    if type(fields) == "function" then
+                        return fields()
+                    end
+                    return callback()
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_debug = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        local synced = plugin:applyPendingReadSyncResult({
+            batch = {
+                { key = "m1:398", chapter_id = "398", desired_read_state = true },
+            },
+        }, {
+            attempted = 1,
+            successes = {
+                { key = "m1:398", chapter_id = "398", desired_read_state = true },
+            },
+            failures = {},
+        })
+
+        assert.are.equal(0, synced)
+        assert.are.same({
+            {
+                operation = "read_sync",
+                event = "conflict",
+                key = "m1:398",
+                chapter_id = "398",
+                worker_desired_read_state = true,
+                current_desired_read_state = false,
+                pending_read_sync = true,
+            },
+        }, debug_events)
         assert.is_true(saved_ledger["m1:398"].pending_read_sync)
         assert.is_false(saved_ledger["m1:398"].pending_read_state)
     end)
