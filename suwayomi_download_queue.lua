@@ -376,6 +376,33 @@ function DownloadQueue:formatChapterMenuText(chapter, status)
     return self:formatChapterStatusSymbols(chapter, symbols)
 end
 
+function DownloadQueue:formatFailureMessage(manga, chapter, detail)
+    local label_parts = {}
+    if manga and manga.title and manga.title ~= "" then
+        table.insert(label_parts, manga.title)
+    end
+    if chapter and chapter.name and chapter.name ~= "" then
+        table.insert(label_parts, chapter.name)
+    end
+
+    local label = table.concat(label_parts, " / ")
+    if label == "" then
+        label = self:getKey(manga or {}, chapter or {})
+    end
+
+    local chapter_suffix = ""
+    if chapter and chapter.id and chapter.id ~= "" then
+        chapter_suffix = T(_(" (chapter %1)"), chapter.id)
+    end
+
+    local failure_detail = tostring(detail or "")
+    if failure_detail == "" then
+        failure_detail = _("Chapter download failed.")
+    end
+
+    return T(_("Could not download \"%1\"%2: %3"), label, chapter_suffix, failure_detail)
+end
+
 function DownloadQueue:readProgress(progress_path)
     local handle = io.open(progress_path, "r")
     if not handle then
@@ -692,7 +719,11 @@ function DownloadQueue:process()
 
         if not pid then
             self:setStatus(queued.manga, queued.chapter, { state = "failed" })
-            local message = T(_("Could not start chapter download: %1"), err or _("unknown error"))
+            local message = self:formatFailureMessage(
+                queued.manga,
+                queued.chapter,
+                T(_("Could not start chapter download: %1"), err or _("unknown error"))
+            )
             self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "failed", {
                 started_at = queued.started_at,
                 last_progress_at = self.now(),
@@ -733,7 +764,7 @@ function DownloadQueue:process()
 end
 
 function DownloadQueue:finishActiveWithFailure(active, message)
-    local failure_message = message or _("Chapter download failed.")
+    local failure_message = self:formatFailureMessage(active.manga, active.chapter, message or _("Chapter download failed."))
     self:removeActiveJob(active)
     os.remove(active.progress_path)
     self:setStatus(active.manga, active.chapter, { state = "failed" })
@@ -810,6 +841,11 @@ function DownloadQueue:poll()
                 if progress and (progress.state == "downloaded" or progress.state == "skipped") then
                     self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
                 elseif progress and progress.state == "failed" then
+                    local message = self:formatFailureMessage(
+                        active.manga,
+                        active.chapter,
+                        progress.error or _("Chapter download failed.")
+                    )
                     self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
                         started_at = active.started_at,
                         last_progress_at = active.last_progress_at or self.now(),
@@ -818,14 +854,14 @@ function DownloadQueue:poll()
                             current = progress.current,
                             total = progress.total,
                             path = progress.path,
-                            error = progress.error,
+                            error = message,
                             updated_at = active.last_progress_at or self.now(),
                         },
                     }))
-                    self.onMessage(_(progress.error or _("Chapter download failed.")))
+                    self.onMessage(message)
                 else
                     self:setStatus(active.manga, active.chapter, { state = "failed" })
-                    local message = _("Chapter download failed.")
+                    local message = self:formatFailureMessage(active.manga, active.chapter, _("Chapter download failed."))
                     self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
                         started_at = active.started_at,
                         last_progress_at = self.now(),

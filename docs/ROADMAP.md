@@ -87,7 +87,7 @@ Goal: make downloads survive interruption and failure cleanly.
 - [x] Improve recovery after KOReader restart / Android process kill
 - [x] Harden partial file cleanup and validation
 - [x] Add clearer retry / cancel behavior
-- [ ] Improve failure messages so bad chapters are easier to diagnose
+- [x] Improve failure messages so bad chapters are easier to diagnose
 
 Exit criteria:
 - Interrupted downloads recover safely and predictably.

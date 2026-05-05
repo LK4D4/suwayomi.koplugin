@@ -578,7 +578,7 @@ describe("suwayomi_download_queue", function()
         assert.is_nil(context.progress_files[progress_path .. ".tmp"])
     end)
 
-    it("persists failed state when the downloader reports failure", function()
+    it("persists chapter details when the downloader reports failure", function()
         local context = build_queue({
             downloader = {
                 getTargetPath = function(_, download_directory, manga, chapter)
@@ -602,15 +602,16 @@ describe("suwayomi_download_queue", function()
         context.run_scheduled()
 
         assert.are.equal("failed", context.saved_queue()[1].state)
+        local message = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (chapter 398): network timeout"
         assert.are.same({
             state = "failed",
             current = 0,
             total = 1,
             path = "",
-            error = "network timeout",
+            error = message,
             updated_at = 100,
         }, context.saved_queue()[1].progress)
-        assert.are.equal("network timeout", context.messages[#context.messages])
+        assert.are.equal(message, context.messages[#context.messages])
     end)
 
     it("reports retry state and clears failed artifacts before retrying", function()
@@ -880,10 +881,13 @@ describe("suwayomi_download_queue", function()
             state = "failed",
             current = 0,
             total = 0,
-            error = "Chapter download timed out.",
+            error = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (chapter 398): Chapter download timed out.",
             updated_at = 1901,
         }, context.saved_queue()[1].progress)
-        assert.are.equal("Chapter download timed out.", context.messages[#context.messages])
+        assert.are.equal(
+            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (chapter 398): Chapter download timed out.",
+            context.messages[#context.messages]
+        )
     end)
 
     it("does not time out an active job that is still reporting progress", function()
