@@ -48,6 +48,27 @@ function SuwayomiUI.showSourcesMenu(sources, onSelectCallback)
     }
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
+    return menu
+end
+
+function SuwayomiUI.updateSourcesMenu(menu, sources, onSelectCallback)
+    if not menu then
+        return
+    end
+
+    local menu_table = {}
+    for _, source in ipairs(sources or {}) do
+        table.insert(menu_table, {
+            text = source.name,
+            callback = function()
+                if onSelectCallback then onSelectCallback(source) end
+            end
+        })
+    end
+    menu.item_table = menu_table
+    if menu.updateItems then
+        menu:updateItems()
+    end
 end
 
 function SuwayomiUI.showMangaMenu(manga_list, onSelectCallback)

@@ -96,6 +96,30 @@ function SuwayomiSettings:saveSourceLanguages(source_languages)
     return normalized
 end
 
+function SuwayomiSettings:loadSourceCache(server_url)
+    local cache = self:open():readSetting("source_cache", nil)
+    if type(cache) ~= "table" or cache.server_url ~= server_url then
+        return nil
+    end
+    cache.sources = type(cache.sources) == "table" and cache.sources or {}
+    cache.updated_at = tonumber(cache.updated_at) or 0
+    return cache
+end
+
+function SuwayomiSettings:saveSourceCache(server_url, sources, updated_at)
+    local normalized = {
+        server_url = server_url or "",
+        sources = {},
+        updated_at = tonumber(updated_at) or os.time(),
+    }
+    for _, source in ipairs(sources or {}) do
+        table.insert(normalized.sources, source)
+    end
+
+    self:open():saveSetting("source_cache", normalized):flush()
+    return normalized
+end
+
 function SuwayomiSettings:loadDownloadDirectory()
     return self:open():readSetting("download_directory", DEFAULT_DOWNLOAD_DIRECTORY)
 end

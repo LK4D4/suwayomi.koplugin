@@ -33,6 +33,7 @@ local SuwayomiPlugin = WidgetContainer:extend{
     read_sync_max_failure_delay_seconds = 300,
     read_sync_watchdog_timeout_seconds = 60,
     source_fetch_poll_interval_seconds = 0.5,
+    source_cache_refresh_delay_seconds = 0.1,
     source_fetch_watchdog_timeout_seconds = 60,
 }
 
@@ -218,6 +219,20 @@ function SuwayomiPlugin:filterSourcesByLanguage(sources)
     return filtered
 end
 
+function SuwayomiPlugin:loadSourceCache(credentials)
+    if not SuwayomiSettings.loadSourceCache then
+        return nil
+    end
+    return SuwayomiSettings:loadSourceCache(credentials and credentials.server_url or "")
+end
+
+function SuwayomiPlugin:saveSourceCache(credentials, sources)
+    if not SuwayomiSettings.saveSourceCache then
+        return nil
+    end
+    return SuwayomiSettings:saveSourceCache(credentials and credentials.server_url or "", sources or {}, os.time())
+end
+
 function SuwayomiPlugin:showSourceLanguageDialog()
     local selected = self:buildSourceLanguageSet(SuwayomiSettings:loadSourceLanguages())
     local language_menu
@@ -278,7 +293,23 @@ function SuwayomiPlugin:showSourceLanguageDialog()
     })
 end
 
-function SuwayomiPlugin:showFetchedSources(result)
+function SuwayomiPlugin:showSourceList(sources, options)
+    options = options or {}
+    if not options.force_new and self.current_sources_menu and SuwayomiUI.updateSourcesMenu then
+        SuwayomiUI.updateSourcesMenu(self.current_sources_menu, sources, function(source)
+            self:showMangaForSource(source)
+        end)
+        return self.current_sources_menu
+    end
+
+    self.current_sources_menu = SuwayomiUI.showSourcesMenu(sources, function(source)
+        self:showMangaForSource(source)
+    end)
+    return self.current_sources_menu
+end
+
+function SuwayomiPlugin:showFetchedSources(result, options)
+    options = options or {}
     if not result then
         self:showMessage(_("Could not load Suwayomi sources."))
         return
@@ -288,10 +319,11 @@ function SuwayomiPlugin:showFetchedSources(result)
         return
     end
 
+    self:saveSourceCache(options.credentials, result.sources)
     local filtered_sources = self:filterSourcesByLanguage(result.sources)
     SuwayomiDebug.log({
         operation = "browseSuwayomi",
-        event = "sources_loaded",
+        event = options.refresh and "sources_refreshed" or "sources_loaded",
         source_count = #(result.sources or {}),
         filtered_source_count = #filtered_sources,
     })
@@ -300,8 +332,38 @@ function SuwayomiPlugin:showFetchedSources(result)
         return
     end
 
-    SuwayomiUI.showSourcesMenu(filtered_sources, function(source)
-        self:showMangaForSource(source)
+    self:showSourceList(filtered_sources)
+end
+
+function SuwayomiPlugin:showCachedSources(cache)
+    local filtered_sources = self:filterSourcesByLanguage(cache and cache.sources or {})
+    SuwayomiDebug.log({
+        operation = "browseSuwayomi",
+        event = "source_cache_hit",
+        source_count = #(cache and cache.sources or {}),
+        filtered_source_count = #filtered_sources,
+        cache_age_seconds = math.max(0, os.time() - (tonumber(cache and cache.updated_at) or os.time())),
+    })
+    if #filtered_sources == 0 then
+        return false
+    end
+
+    self:showSourceList(filtered_sources, { force_new = true })
+    return true
+end
+
+function SuwayomiPlugin:scheduleSourceCacheRefresh(credentials)
+    if self.source_cache_refresh_scheduled or self.source_fetch_active then
+        return
+    end
+
+    self.source_cache_refresh_scheduled = true
+    UIManager:scheduleIn(self.source_cache_refresh_delay_seconds, function()
+        self.source_cache_refresh_scheduled = false
+        self:startSourceFetchWorker(credentials, {
+            refresh = true,
+            loading_message = _("Refreshing sources..."),
+        })
     end)
 end
 
@@ -316,7 +378,9 @@ function SuwayomiPlugin:scheduleSourceFetchPoll()
     end)
 end
 
-function SuwayomiPlugin:startSourceFetchWorker(credentials)
+function SuwayomiPlugin:startSourceFetchWorker(credentials, options)
+    options = options or {}
+    options.credentials = options.credentials or credentials
     if self.source_fetch_active then
         return false
     end
@@ -327,9 +391,10 @@ function SuwayomiPlugin:startSourceFetchWorker(credentials)
 
     local active = {
         credentials = credentials,
+        options = options,
         result_path = result_path,
         started_at = os.time(),
-        loading_message = self:showLoadingMessage(_("Loading sources...")),
+        loading_message = self:showLoadingMessage(options.loading_message or _("Loading sources...")),
     }
     self.source_fetch_active = active
 
@@ -362,7 +427,7 @@ function SuwayomiPlugin:finishSourceFetch(active, result)
         os.remove(active.result_path)
         os.remove(active.result_path .. ".tmp")
     end
-    self:showFetchedSources(result)
+    self:showFetchedSources(result, active and active.options or {})
 end
 
 function SuwayomiPlugin:pollSourceFetch()
@@ -400,7 +465,13 @@ function SuwayomiPlugin:browseSuwayomi()
 
         self:schedulePendingReadSync(credentials)
 
-        self:startSourceFetchWorker(credentials)
+        local cache = self:loadSourceCache(credentials)
+        if cache and #(cache.sources or {}) > 0 and self:showCachedSources(cache) then
+            self:scheduleSourceCacheRefresh(credentials)
+            return
+        end
+
+        self:startSourceFetchWorker(credentials, { credentials = credentials })
     end)
 end
 

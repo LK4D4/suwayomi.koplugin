@@ -924,6 +924,183 @@ return {
         assert.is_nil(shown_sources)
     end)
 
+    it("shows cached sources immediately and schedules a source refresh", function()
+        local child_callback
+        local subprocess_done = false
+        local saved_cache
+        local updated_sources
+        local source_menu = {
+            updateItems = function() end,
+        }
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    return {
+                        ok = true,
+                        sources = {
+                            { id = "fresh", name = "MangaDex", lang = "en" },
+                        },
+                    }
+                end,
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                template = function(template_string, ...)
+                    local result = template_string
+                    local values = {...}
+                    for index, value in ipairs(values) do
+                        result = result:gsub("%%" .. index, tostring(value))
+                    end
+                    return result
+                end,
+                runInSubProcess = function(callback)
+                    child_callback = callback
+                    return 4321
+                end,
+                isSubProcessDone = function()
+                    return subprocess_done
+                end,
+            }
+        end
+        package.preload.suwayomi_ui = function()
+            return {
+                showSourcesMenu = function(sources)
+                    shown_sources = sources
+                    return source_menu
+                end,
+                updateSourcesMenu = function(menu, sources)
+                    assert.are.same(source_menu, menu)
+                    updated_sources = sources
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret" }
+                end,
+                loadSourceLanguages = function() return { "en" } end,
+                loadSourceCache = function()
+                    return {
+                        server_url = "https://suwayomi.example",
+                        updated_at = os.time() - 30,
+                        sources = {
+                            { id = "cached", name = "Cached Source", lang = "en" },
+                        },
+                    }
+                end,
+                saveSourceCache = function(_, server_url, sources, updated_at)
+                    saved_cache = {
+                        server_url = server_url,
+                        sources = sources,
+                        updated_at = updated_at,
+                    }
+                    return saved_cache
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_ui = nil
+        package.loaded.suwayomi_settings = nil
+        package.loaded.suwayomi_source_fetch_worker = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.schedulePendingReadSync = function() end
+
+        plugin:browseSuwayomi()
+
+        assert.are.same({
+            { id = "cached", name = "Cached Source", lang = "en" },
+        }, shown_sources)
+        assert.are.equal(1, #scheduled_callbacks)
+
+        table.remove(scheduled_callbacks, 1)()
+        assert.is_function(child_callback)
+        assert.are.same({ "Refreshing sources..." }, shown_loading_messages)
+
+        child_callback()
+        subprocess_done = true
+        table.remove(scheduled_callbacks, 1)()
+
+        assert.are.same({
+            { id = "fresh", name = "MangaDex", lang = "en" },
+        }, updated_sources)
+        assert.are.equal("https://suwayomi.example", saved_cache.server_url)
+        assert.are.same(updated_sources, saved_cache.sources)
+    end)
+
+    it("opens a fresh sources menu from cache after a previous sources menu was closed", function()
+        local update_calls = 0
+        local show_calls = 0
+
+        package.preload.suwayomi_ui = function()
+            return {
+                showSourcesMenu = function(sources)
+                    show_calls = show_calls + 1
+                    shown_sources = sources
+                    return { visible = true }
+                end,
+                updateSourcesMenu = function()
+                    update_calls = update_calls + 1
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret" }
+                end,
+                loadSourceLanguages = function() return { "en" } end,
+                loadSourceCache = function()
+                    return {
+                        server_url = "https://suwayomi.example",
+                        updated_at = os.time(),
+                        sources = {
+                            { id = "cached", name = "Cached Source", lang = "en" },
+                        },
+                    }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_ui = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.schedulePendingReadSync = function() end
+        plugin.current_sources_menu = { closed = true }
+
+        plugin:browseSuwayomi()
+
+        assert.are.equal(1, show_calls)
+        assert.are.equal(0, update_calls)
+        assert.are.same({
+            { id = "cached", name = "Cached Source", lang = "en" },
+        }, shown_sources)
+    end)
+
     it("downloads a selected chapter and shows the saved folder", function()
         local downloader_called
         local shown_chapter_menu

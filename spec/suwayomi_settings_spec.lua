@@ -96,6 +96,17 @@ describe("suwayomi_settings", function()
         assert.are.same({ "en", "ru", "de" }, stored_data.source_languages)
     end)
 
+    it("loads and saves source cache for the current server", function()
+        local settings = require("suwayomi_settings")
+        local cache = settings:saveSourceCache("https://suwayomi.example", {
+            { id = "1", name = "Local source", lang = "localsourcelang" },
+        }, 1777777777)
+
+        assert.is_true(flushed)
+        assert.are.same(cache, settings:loadSourceCache("https://suwayomi.example"))
+        assert.is_nil(settings:loadSourceCache("https://other.example"))
+    end)
+
     it("loads an empty download directory by default", function()
         local settings = require("suwayomi_settings")
 

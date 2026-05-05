@@ -275,6 +275,29 @@ describe("suwayomi_ui", function()
         }, selected)
     end)
 
+    it("updates a sources menu in place", function()
+        local ui = require("suwayomi_ui")
+        local selected
+        local menu = {
+            updateItems = function(self)
+                self.updated = true
+            end,
+        }
+
+        ui.updateSourcesMenu(menu, {
+            { id = "s4", name = "Local source" },
+        }, function(source)
+            selected = source
+        end)
+
+        assert.is_true(menu.updated)
+        assert.are.equal("Local source", menu.item_table[1].text)
+
+        menu.item_table[1].callback()
+
+        assert.are.same({ id = "s4", name = "Local source" }, selected)
+    end)
+
     it("uses KOReader download manager to choose a directory", function()
         local ui = require("suwayomi_ui")
         local chosen_path
