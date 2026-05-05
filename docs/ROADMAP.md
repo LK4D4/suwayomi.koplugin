@@ -83,7 +83,7 @@ Exit criteria:
 
 Goal: make downloads survive interruption and failure cleanly.
 
-- [ ] Persist richer active download progress
+- [x] Persist richer active download progress
 - [ ] Improve recovery after KOReader restart / Android process kill
 - [ ] Harden partial file cleanup and validation
 - [ ] Add clearer retry / cancel behavior

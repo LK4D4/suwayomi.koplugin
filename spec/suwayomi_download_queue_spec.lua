@@ -440,6 +440,84 @@ describe("suwayomi_download_queue", function()
         assert.are.equal("queued", context.queue:getStatus(manga, chapters[3]).state)
     end)
 
+    it("persists initial progress when a queued job becomes active", function()
+        local context = build_queue({
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        table.remove(context.scheduled, 1).callback()
+
+        local persisted = context.saved_queue()[1]
+        assert.are.equal("downloading", persisted.state)
+        assert.are.equal(100, persisted.started_at)
+        assert.are.equal(100, persisted.last_progress_at)
+        assert.are.same({
+            state = "downloading",
+            current = 0,
+            total = 0,
+            updated_at = 100,
+        }, persisted.progress)
+        assert.is_nil(persisted.pid)
+        assert.is_nil(persisted.credentials)
+        assert.is_nil(persisted.downloader)
+    end)
+
+    it("persists changed active progress while a subprocess keeps running", function()
+        local context = build_queue({
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        table.remove(context.scheduled, 1).callback()
+
+        context.advance(3)
+        context.write_progress(manga, chapter, "downloading", 2, 5, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        table.remove(context.scheduled, 1).callback()
+
+        local persisted = context.saved_queue()[1]
+        assert.are.equal("downloading", persisted.state)
+        assert.are.equal(100, persisted.started_at)
+        assert.are.equal(103, persisted.last_progress_at)
+        assert.are.same({
+            state = "downloading",
+            current = 2,
+            total = 5,
+            path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+            updated_at = 103,
+        }, persisted.progress)
+    end)
+
+    it("does not persist unchanged active progress on repeated polls", function()
+        local context = build_queue({
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        table.remove(context.scheduled, 1).callback()
+
+        context.advance(1)
+        context.write_progress(manga, chapter, "downloading", 1, 5, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        table.remove(context.scheduled, 1).callback()
+        local save_count_after_change = context.save_count()
+
+        context.advance(1)
+        table.remove(context.scheduled, 1).callback()
+
+        assert.are.equal(save_count_after_change, context.save_count())
+        assert.are.equal(101, context.saved_queue()[1].last_progress_at)
+        assert.are.equal(101, context.saved_queue()[1].progress.updated_at)
+    end)
+
     it("clamps the active chapter limit to the supported range", function()
         assert.are.equal(1, build_queue({ max_active_chapters = 0 }).queue.max_active_chapters)
         assert.are.equal(4, build_queue({ max_active_chapters = 99 }).queue.max_active_chapters)
@@ -519,6 +597,14 @@ describe("suwayomi_download_queue", function()
         context.run_scheduled()
 
         assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.are.same({
+            state = "failed",
+            current = 0,
+            total = 1,
+            path = "",
+            error = "network timeout",
+            updated_at = 100,
+        }, context.saved_queue()[1].progress)
         assert.are.equal("network timeout", context.messages[#context.messages])
     end)
 
@@ -587,6 +673,13 @@ describe("suwayomi_download_queue", function()
         poll.callback()
 
         assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.are.same({
+            state = "failed",
+            current = 0,
+            total = 0,
+            error = "Chapter download timed out.",
+            updated_at = 1901,
+        }, context.saved_queue()[1].progress)
         assert.are.equal("Chapter download timed out.", context.messages[#context.messages])
     end)
 

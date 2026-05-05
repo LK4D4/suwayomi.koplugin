@@ -108,8 +108,37 @@ function DownloadQueue:savePersistentJobs(jobs)
     return self.settings:saveDownloadQueue(jobs or {})
 end
 
-function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, state)
-    return {
+function DownloadQueue:normalizeProgress(progress)
+    if type(progress) ~= "table" then
+        return nil
+    end
+
+    local normalized = {}
+    if progress.state ~= nil then
+        normalized.state = tostring(progress.state)
+    end
+    if progress.current ~= nil then
+        normalized.current = tonumber(progress.current) or 0
+    end
+    if progress.total ~= nil then
+        normalized.total = tonumber(progress.total) or 0
+    end
+    if progress.path ~= nil then
+        normalized.path = tostring(progress.path)
+    end
+    if progress.error ~= nil then
+        normalized.error = tostring(progress.error)
+    end
+    if progress.updated_at ~= nil then
+        normalized.updated_at = tonumber(progress.updated_at) or progress.updated_at
+    end
+
+    return normalized
+end
+
+function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, state, details)
+    details = details or {}
+    local job = {
         key = self:getKey(manga, chapter),
         state = state or "queued",
         download_directory = download_directory,
@@ -122,6 +151,17 @@ function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, st
             name = chapter.name,
         },
     }
+    if details.started_at ~= nil then
+        job.started_at = tonumber(details.started_at) or details.started_at
+    end
+    if details.last_progress_at ~= nil then
+        job.last_progress_at = tonumber(details.last_progress_at) or details.last_progress_at
+    end
+    local progress = self:normalizeProgress(details.progress)
+    if progress then
+        job.progress = progress
+    end
+    return job
 end
 
 function DownloadQueue:upsertPersistentJob(job)
@@ -551,7 +591,16 @@ function DownloadQueue:process()
         queued.progress_path = self:buildProgressPath(queued.manga, queued.chapter, queued.download_directory)
         os.remove(queued.progress_path)
         queued.credentials = queued.credentials or self:getCredentialsForJob()
-        self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading"))
+        self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading", {
+            started_at = queued.started_at,
+            last_progress_at = queued.last_progress_at,
+            progress = {
+                state = "downloading",
+                current = 0,
+                total = 0,
+                updated_at = queued.last_progress_at,
+            },
+        }))
 
         local pid, err = self.ffi_util.runInSubProcess(function()
             self:runDownloaderJob(queued)
@@ -559,8 +608,19 @@ function DownloadQueue:process()
 
         if not pid then
             self:setStatus(queued.manga, queued.chapter, { state = "failed" })
-            self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "failed"))
-            self.onMessage(T(_("Could not start chapter download: %1"), err or _("unknown error")))
+            local message = T(_("Could not start chapter download: %1"), err or _("unknown error"))
+            self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "failed", {
+                started_at = queued.started_at,
+                last_progress_at = self.now(),
+                progress = {
+                    state = "failed",
+                    current = 0,
+                    total = 0,
+                    error = message,
+                    updated_at = self.now(),
+                },
+            }))
+            self.onMessage(message)
         else
             queued.pid = pid
             self:setActiveJob(queued)
@@ -589,11 +649,23 @@ function DownloadQueue:process()
 end
 
 function DownloadQueue:finishActiveWithFailure(active, message)
+    local failure_message = message or _("Chapter download failed.")
     self:removeActiveJob(active)
     os.remove(active.progress_path)
     self:setStatus(active.manga, active.chapter, { state = "failed" })
-    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed"))
-    self.onMessage(message or _("Chapter download failed."))
+    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
+        started_at = active.started_at,
+        last_progress_at = self.now(),
+        progress = {
+            state = "failed",
+            current = active.last_progress_current or 0,
+            total = active.last_progress_total or 0,
+            path = active.last_progress_path,
+            error = failure_message,
+            updated_at = self.now(),
+        },
+    }))
+    self.onMessage(failure_message)
 end
 
 function DownloadQueue:poll()
@@ -619,7 +691,22 @@ function DownloadQueue:poll()
             if progress.current ~= active.last_progress_current or progress.state ~= active.last_progress_state then
                 active.last_progress_at = self.now()
                 active.last_progress_current = progress.current
+                active.last_progress_total = progress.total
+                active.last_progress_path = progress.path
+                active.last_progress_error = progress.error
                 active.last_progress_state = progress.state
+                self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, progress.state, {
+                    started_at = active.started_at,
+                    last_progress_at = active.last_progress_at,
+                    progress = {
+                        state = progress.state,
+                        current = progress.current,
+                        total = progress.total,
+                        path = progress.path,
+                        error = progress.error,
+                        updated_at = active.last_progress_at,
+                    },
+                }))
             end
             self:setStatus(active.manga, active.chapter, {
                 state = progress.state,
@@ -639,12 +726,35 @@ function DownloadQueue:poll()
                 if progress and (progress.state == "downloaded" or progress.state == "skipped") then
                     self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
                 elseif progress and progress.state == "failed" then
-                    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed"))
+                    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
+                        started_at = active.started_at,
+                        last_progress_at = active.last_progress_at or self.now(),
+                        progress = {
+                            state = "failed",
+                            current = progress.current,
+                            total = progress.total,
+                            path = progress.path,
+                            error = progress.error,
+                            updated_at = active.last_progress_at or self.now(),
+                        },
+                    }))
                     self.onMessage(_(progress.error or _("Chapter download failed.")))
                 else
                     self:setStatus(active.manga, active.chapter, { state = "failed" })
-                    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed"))
-                    self.onMessage(_("Chapter download failed."))
+                    local message = _("Chapter download failed.")
+                    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
+                        started_at = active.started_at,
+                        last_progress_at = self.now(),
+                        progress = {
+                            state = "failed",
+                            current = active.last_progress_current or 0,
+                            total = active.last_progress_total or 0,
+                            path = active.last_progress_path,
+                            error = message,
+                            updated_at = self.now(),
+                        },
+                    }))
+                    self.onMessage(message)
                 end
             end
         end
