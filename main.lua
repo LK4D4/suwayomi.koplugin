@@ -1317,17 +1317,27 @@ end
 function SuwayomiPlugin:getBulkChapterActions()
     local actions = {}
 
-    if self.current_chapter_context and #(self.current_chapter_context.chapters or {}) > 0 then
-        table.insert(actions, { id = "select_all", text = _("Select all") })
-    end
-
     if self:getSelectedChapterCount() > 0 then
         table.insert(actions, { id = "download_selected", text = _("Download selected") })
         table.insert(actions, { id = "delete_selected", text = _("Delete selected from device") })
         table.insert(actions, { id = "mark_read_selected", text = _("Mark selected as read") })
         table.insert(actions, { id = "mark_unread_selected", text = _("Mark selected as unread") })
         table.insert(actions, { id = "clear_selection", text = _("Clear selection") })
+        return actions
     end
+
+    if self.current_chapter_context and #(self.current_chapter_context.chapters or {}) > 0 then
+        table.insert(actions, { id = "select_all", text = _("Select all") })
+    end
+
+    table.insert(actions, { id = "bulk_downloads", text = _("Bulk downloads") })
+    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read chapters from device") })
+
+    return actions
+end
+
+function SuwayomiPlugin:getBulkDownloadActions()
+    local actions = {}
 
     table.insert(actions, { id = "download_next_5_unread", text = _("Download next 5 unread") })
     table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
@@ -1335,7 +1345,6 @@ function SuwayomiPlugin:getBulkChapterActions()
     table.insert(actions, { id = "keep_next_5_unread", text = _("Keep next 5 unread downloaded") })
     table.insert(actions, { id = "keep_next_10_unread", text = _("Keep next 10 unread downloaded") })
     table.insert(actions, { id = "keep_next_50_unread", text = _("Keep next 50 unread downloaded") })
-    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read chapters from device") })
 
     return actions
 end
@@ -1779,6 +1788,10 @@ function SuwayomiPlugin:markSelectedChaptersUnread()
 end
 
 function SuwayomiPlugin:performBulkChapterAction(action_id)
+    if action_id == "bulk_downloads" then
+        self:showBulkDownloadActions()
+        return true
+    end
     local next_unread_count = tostring(action_id or ""):match("^download_next_(%d+)_unread$")
     if next_unread_count then
         self:enqueueNextUnreadChapterDownloads(tonumber(next_unread_count))
@@ -1818,6 +1831,19 @@ function SuwayomiPlugin:performBulkChapterAction(action_id)
         return true
     end
     return false
+end
+
+function SuwayomiPlugin:showBulkDownloadActions()
+    if not SuwayomiUI.showChapterActionsMenu then
+        return
+    end
+
+    SuwayomiUI.showChapterActionsMenu({
+        title = _("Bulk downloads"),
+        actions = self:getBulkDownloadActions(),
+    }, function(action)
+        self:performBulkChapterAction(action.id)
+    end)
 end
 
 function SuwayomiPlugin:showBulkChapterActions(manga)

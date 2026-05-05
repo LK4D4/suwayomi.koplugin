@@ -1477,14 +1477,12 @@ return {
         tap_bulk_actions()
 
         assert.are.equal("2 selected chapters", shown_actions_menu.title)
-        assert.are.equal("Select all", shown_actions_menu.actions[1].text)
-        assert.are.equal("Download selected", shown_actions_menu.actions[2].text)
-        assert.are.equal("Delete selected from device", shown_actions_menu.actions[3].text)
-        assert.are.equal("Mark selected as read", shown_actions_menu.actions[4].text)
-        assert.are.equal("Mark selected as unread", shown_actions_menu.actions[5].text)
-        assert.are.equal("Clear selection", shown_actions_menu.actions[6].text)
-        assert.are.equal("Download next 5 unread", shown_actions_menu.actions[7].text)
-        assert.are.equal("Download next 10 unread", shown_actions_menu.actions[8].text)
+        assert.are.equal("Download selected", shown_actions_menu.actions[1].text)
+        assert.are.equal("Delete selected from device", shown_actions_menu.actions[2].text)
+        assert.are.equal("Mark selected as read", shown_actions_menu.actions[3].text)
+        assert.are.equal("Mark selected as unread", shown_actions_menu.actions[4].text)
+        assert.are.equal("Clear selection", shown_actions_menu.actions[5].text)
+        assert.is_nil(shown_actions_menu.actions[6])
 
         plugin:performBulkChapterAction("download_selected")
         run_scheduled_callbacks()
@@ -1611,6 +1609,7 @@ return {
         local shown_chapter_menu
         local tap_bulk_actions
         local shown_actions_menu
+        local shown_actions_callback
 
         package.preload.suwayomi_api = function()
             return {
@@ -1650,8 +1649,9 @@ return {
                     shown_chapter_menu = options
                     tap_bulk_actions = options.on_title_bar_left_tap
                 end,
-                showChapterActionsMenu = function(options)
+                showChapterActionsMenu = function(options, onSelect)
                     shown_actions_menu = options
+                    shown_actions_callback = onSelect
                 end,
                 showDirectoryChooser = function() end,
                 showLoginDialog = function() end,
@@ -1687,13 +1687,19 @@ return {
 
         assert.are.equal("Chapter downloads", shown_actions_menu.title)
         assert.are.equal("Select all", shown_actions_menu.actions[1].text)
-        assert.are.equal("Download next 5 unread", shown_actions_menu.actions[2].text)
-        assert.are.equal("Download next 10 unread", shown_actions_menu.actions[3].text)
-        assert.are.equal("Download next 50 unread", shown_actions_menu.actions[4].text)
-        assert.are.equal("Keep next 5 unread downloaded", shown_actions_menu.actions[5].text)
-        assert.are.equal("Keep next 10 unread downloaded", shown_actions_menu.actions[6].text)
-        assert.are.equal("Keep next 50 unread downloaded", shown_actions_menu.actions[7].text)
-        assert.are.equal("Delete read chapters from device", shown_actions_menu.actions[8].text)
+        assert.are.equal("Bulk downloads", shown_actions_menu.actions[2].text)
+        assert.are.equal("Delete read chapters from device", shown_actions_menu.actions[3].text)
+        assert.is_nil(shown_actions_menu.actions[4])
+        shown_actions_callback(shown_actions_menu.actions[2])
+
+        assert.are.equal("Bulk downloads", shown_actions_menu.title)
+        assert.are.equal("Download next 5 unread", shown_actions_menu.actions[1].text)
+        assert.are.equal("Download next 10 unread", shown_actions_menu.actions[2].text)
+        assert.are.equal("Download next 50 unread", shown_actions_menu.actions[3].text)
+        assert.are.equal("Keep next 5 unread downloaded", shown_actions_menu.actions[4].text)
+        assert.are.equal("Keep next 10 unread downloaded", shown_actions_menu.actions[5].text)
+        assert.are.equal("Keep next 50 unread downloaded", shown_actions_menu.actions[6].text)
+        assert.is_nil(shown_actions_menu.actions[7])
         assert.is_false(plugin.selection_mode)
         assert.are.equal("Sousou no Frieren", shown_chapter_menu.title)
     end)
@@ -2421,7 +2427,7 @@ return {
         plugin.selection_mode = true
 
         local bulk_actions = plugin:getBulkChapterActions()
-        assert.are.equal("Delete selected from device", bulk_actions[3].text)
+        assert.are.equal("Delete selected from device", bulk_actions[2].text)
 
         plugin:performBulkChapterAction("delete_selected")
         os.remove = original_remove
