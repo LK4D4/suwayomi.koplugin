@@ -377,7 +377,7 @@ describe("suwayomi plugin", function()
         end
     end)
 
-    it("registers a dispatcher action and main-menu entry on init", function()
+    it("registers a file-manager dispatcher action and main-menu entry on init", function()
         local plugin_class = require("main")
         local plugin = plugin_class{
             ui = {
@@ -395,6 +395,27 @@ describe("suwayomi plugin", function()
         assert.are.equal(1, #registered_actions)
         assert.are.equal("suwayomi_action", registered_actions[1].name)
         assert.are.equal("Suwayomi", registered_actions[1].definition.title)
+        assert.are.equal(true, registered_actions[1].definition.filemanager)
+        assert.is_nil(registered_actions[1].definition.general)
+    end)
+
+    it("does not register a main-menu entry when initialized in book mode", function()
+        local plugin_class = require("main")
+        local plugin = plugin_class{
+            ui = {
+                document = {},
+                menu = {
+                    registerToMainMenu = function(_, instance)
+                        registered_menu_plugin = instance
+                    end,
+                },
+            },
+            document = {},
+        }
+
+        plugin:init()
+
+        assert.is_nil(registered_menu_plugin)
     end)
 
     it("adds the plugin under the search menu section", function()

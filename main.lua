@@ -84,8 +84,12 @@ function SuwayomiPlugin:onDispatcherRegisterActions()
         category = "none",
         event = "SuwayomiAction",
         title = _("Suwayomi"),
-        general = true,
+        filemanager = true,
     })
+end
+
+function SuwayomiPlugin:isBookMode()
+    return self.document ~= nil or (self.ui and self.ui.document ~= nil)
 end
 
 function SuwayomiPlugin:init()
@@ -97,7 +101,9 @@ function SuwayomiPlugin:init()
     self.selected_chapters = self.selected_chapters or {}
     self.selection_mode = self.selection_mode == true
     self:getDownloadQueue():recover()
-    self.ui.menu:registerToMainMenu(self)
+    if not self:isBookMode() then
+        self.ui.menu:registerToMainMenu(self)
+    end
     SuwayomiDebug.log({ operation = "plugin_init", event = "end" })
 end
 
