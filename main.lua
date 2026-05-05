@@ -1238,7 +1238,7 @@ function SuwayomiPlugin:getChapterActions(manga, chapter)
     else
         table.insert(actions, { id = "mark_read", text = _("Mark as read") })
         table.insert(actions, { id = "mark_previous_read", text = _("Mark previous as read") })
-        table.insert(actions, { id = "mark_through_read", text = _("Mark this and previous as read") })
+        table.insert(actions, { id = "mark_through_read", text = _("Mark through here") })
     end
     return actions
 end
@@ -1540,7 +1540,7 @@ function SuwayomiPlugin:getBulkChapterActions()
     end
 
     table.insert(actions, { id = "bulk_downloads", text = _("Bulk downloads") })
-    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read chapters from device") })
+    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read downloads") })
 
     return actions
 end
@@ -1548,12 +1548,12 @@ end
 function SuwayomiPlugin:getBulkDownloadActions()
     local actions = {}
 
-    table.insert(actions, { id = "download_next_5_unread", text = _("Download next 5 unread") })
-    table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
-    table.insert(actions, { id = "download_next_50_unread", text = _("Download next 50 unread") })
-    table.insert(actions, { id = "keep_next_5_unread", text = _("Keep next 5 unread downloaded") })
-    table.insert(actions, { id = "keep_next_10_unread", text = _("Keep next 10 unread downloaded") })
-    table.insert(actions, { id = "keep_next_50_unread", text = _("Keep next 50 unread downloaded") })
+    table.insert(actions, { id = "download_next_5_unread", text = _("Download 5 unread") })
+    table.insert(actions, { id = "download_next_10_unread", text = _("Download 10 unread") })
+    table.insert(actions, { id = "download_next_50_unread", text = _("Download 50 unread") })
+    table.insert(actions, { id = "keep_next_5_unread", text = _("Keep 5 unread") })
+    table.insert(actions, { id = "keep_next_10_unread", text = _("Keep 10 unread") })
+    table.insert(actions, { id = "keep_next_50_unread", text = _("Keep 50 unread") })
 
     return actions
 end
