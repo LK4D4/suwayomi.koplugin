@@ -5,6 +5,7 @@ local InfoMessage = require("ui/widget/infomessage")
 local SuwayomiAPI = require("suwayomi_api")
 local SuwayomiDownloadQueue = require("suwayomi_download_queue")
 local SuwayomiReadSyncWorker = require("suwayomi_read_sync_worker")
+local SuwayomiSourceFetchWorker = require("suwayomi_source_fetch_worker")
 local SuwayomiSettings = require("suwayomi_settings")
 local SuwayomiUI = require("suwayomi_ui")
 local SuwayomiDebug = require("suwayomi_debug")
@@ -31,6 +32,8 @@ local SuwayomiPlugin = WidgetContainer:extend{
     read_sync_failure_delay_seconds = 5,
     read_sync_max_failure_delay_seconds = 300,
     read_sync_watchdog_timeout_seconds = 60,
+    source_fetch_poll_interval_seconds = 0.5,
+    source_fetch_watchdog_timeout_seconds = 60,
 }
 
 function SuwayomiPlugin:createDownloadQueue()
@@ -149,6 +152,35 @@ function SuwayomiPlugin:withLoadingMessage(key, message, callback)
     return unpack(results)
 end
 
+function SuwayomiPlugin:showLoadingMessage(message)
+    local loading_message = InfoMessage:new{
+        text = message,
+        suwayomi_loading = true,
+    }
+    UIManager:show(loading_message)
+    if UIManager.forceRePaint then
+        UIManager:forceRePaint()
+    end
+    return loading_message
+end
+
+function SuwayomiPlugin:closeLoadingMessage(loading_message)
+    if loading_message and UIManager.close then
+        UIManager:close(loading_message)
+    end
+end
+
+function SuwayomiPlugin:getSourceFetchResultPath()
+    local settings_dir = SuwayomiSettings.getSettingsDir and SuwayomiSettings:getSettingsDir() or "."
+    self.source_fetch_result_counter = (self.source_fetch_result_counter or 0) + 1
+    return tostring(settings_dir or "."):gsub("/+$", "")
+        .. "/suwayomi_dl_source_fetch_"
+        .. tostring(os.time())
+        .. "_"
+        .. tostring(self.source_fetch_result_counter)
+        .. ".json"
+end
+
 function SuwayomiPlugin:onSuwayomiAction()
     self:showNotImplemented(_("Open Search > Suwayomi to access the plugin menu."))
 end
@@ -246,6 +278,118 @@ function SuwayomiPlugin:showSourceLanguageDialog()
     })
 end
 
+function SuwayomiPlugin:showFetchedSources(result)
+    if not result then
+        self:showMessage(_("Could not load Suwayomi sources."))
+        return
+    end
+    if not result.ok then
+        self:showMessage(_(result.error or "Could not load Suwayomi sources."))
+        return
+    end
+
+    local filtered_sources = self:filterSourcesByLanguage(result.sources)
+    SuwayomiDebug.log({
+        operation = "browseSuwayomi",
+        event = "sources_loaded",
+        source_count = #(result.sources or {}),
+        filtered_source_count = #filtered_sources,
+    })
+    if #filtered_sources == 0 then
+        self:showMessage(_("No Suwayomi sources match the selected languages."))
+        return
+    end
+
+    SuwayomiUI.showSourcesMenu(filtered_sources, function(source)
+        self:showMangaForSource(source)
+    end)
+end
+
+function SuwayomiPlugin:scheduleSourceFetchPoll()
+    if self.source_fetch_poll_scheduled or not self.source_fetch_active then
+        return
+    end
+
+    self.source_fetch_poll_scheduled = true
+    UIManager:scheduleIn(self.source_fetch_poll_interval_seconds, function()
+        self:pollSourceFetch()
+    end)
+end
+
+function SuwayomiPlugin:startSourceFetchWorker(credentials)
+    if self.source_fetch_active then
+        return false
+    end
+
+    local result_path = self:getSourceFetchResultPath()
+    os.remove(result_path)
+    os.remove(result_path .. ".tmp")
+
+    local active = {
+        credentials = credentials,
+        result_path = result_path,
+        started_at = os.time(),
+        loading_message = self:showLoadingMessage(_("Loading sources...")),
+    }
+    self.source_fetch_active = active
+
+    local pid, err = FFIUtil.runInSubProcess(function()
+        SuwayomiSourceFetchWorker:run(credentials, result_path)
+    end)
+
+    if not pid then
+        self.source_fetch_active = nil
+        self:closeLoadingMessage(active.loading_message)
+        os.remove(result_path)
+        os.remove(result_path .. ".tmp")
+        self:showMessage(T(_("Could not start source loading: %1"), err or _("unknown error")))
+        return false
+    end
+
+    active.pid = pid
+    if FFIUtil.isSubProcessDone(pid) then
+        self:pollSourceFetch()
+    else
+        self:scheduleSourceFetchPoll()
+    end
+    return true
+end
+
+function SuwayomiPlugin:finishSourceFetch(active, result)
+    self.source_fetch_active = nil
+    self:closeLoadingMessage(active and active.loading_message)
+    if active and active.result_path then
+        os.remove(active.result_path)
+        os.remove(active.result_path .. ".tmp")
+    end
+    self:showFetchedSources(result)
+end
+
+function SuwayomiPlugin:pollSourceFetch()
+    self.source_fetch_poll_scheduled = false
+    local active = self.source_fetch_active
+    if not active then
+        return
+    end
+
+    local done = FFIUtil.isSubProcessDone(active.pid)
+    if not done then
+        if not active.terminating
+            and os.time() - (active.started_at or os.time()) > self.source_fetch_watchdog_timeout_seconds
+        then
+            if FFIUtil.terminateSubProcess then
+                pcall(FFIUtil.terminateSubProcess, active.pid)
+            end
+            active.terminating = true
+        end
+        self:scheduleSourceFetchPoll()
+        return
+    end
+
+    local result = SuwayomiSourceFetchWorker:readResult(active.result_path)
+    self:finishSourceFetch(active, result)
+end
+
 function SuwayomiPlugin:browseSuwayomi()
     return SuwayomiDebug.time("browseSuwayomi", function()
         local credentials = SuwayomiSettings:load()
@@ -256,32 +400,7 @@ function SuwayomiPlugin:browseSuwayomi()
 
         self:schedulePendingReadSync(credentials)
 
-        local result = self:withLoadingMessage("sources", _("Loading sources..."), function()
-            return SuwayomiAPI.fetchSources(credentials)
-        end)
-        if not result then
-            return
-        end
-        if not result.ok then
-            self:showMessage(_(result.error))
-            return
-        end
-
-        local filtered_sources = self:filterSourcesByLanguage(result.sources)
-        SuwayomiDebug.log({
-            operation = "browseSuwayomi",
-            event = "sources_loaded",
-            source_count = #(result.sources or {}),
-            filtered_source_count = #filtered_sources,
-        })
-        if #filtered_sources == 0 then
-            self:showMessage(_("No Suwayomi sources match the selected languages."))
-            return
-        end
-
-        SuwayomiUI.showSourcesMenu(filtered_sources, function(source)
-            self:showMangaForSource(source)
-        end)
+        self:startSourceFetchWorker(credentials)
     end)
 end
 

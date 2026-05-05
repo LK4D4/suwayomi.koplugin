@@ -44,7 +44,10 @@ describe("suwayomi plugin", function()
         original_os_rename = original_os_rename or os.rename
         original_os_remove = original_os_remove or os.remove
         io.open = function(path, mode)
-            if tostring(path):match("%.suwayomi_dl_progress_") or tostring(path):match("suwayomi_dl_read_sync") then
+            if tostring(path):match("%.suwayomi_dl_progress_")
+                or tostring(path):match("suwayomi_dl_read_sync")
+                or tostring(path):match("suwayomi_dl_source_fetch")
+            then
                 if mode == "w" then
                     local chunks = {}
                     return {
@@ -92,6 +95,8 @@ describe("suwayomi plugin", function()
                 or tostring(to):match("%.suwayomi_dl_progress_")
                 or tostring(from):match("suwayomi_dl_read_sync")
                 or tostring(to):match("suwayomi_dl_read_sync")
+                or tostring(from):match("suwayomi_dl_source_fetch")
+                or tostring(to):match("suwayomi_dl_source_fetch")
             then
                 progress_files[to] = progress_files[from]
                 progress_files[from] = nil
@@ -100,7 +105,10 @@ describe("suwayomi plugin", function()
             return original_os_rename(from, to)
         end
         os.remove = function(path)
-            if tostring(path):match("%.suwayomi_dl_progress_") or tostring(path):match("suwayomi_dl_read_sync") then
+            if tostring(path):match("%.suwayomi_dl_progress_")
+                or tostring(path):match("suwayomi_dl_read_sync")
+                or tostring(path):match("suwayomi_dl_source_fetch")
+            then
                 progress_files[path] = nil
                 return true
             end
@@ -119,6 +127,7 @@ describe("suwayomi plugin", function()
         package.loaded.suwayomi_download_queue = nil
         package.loaded.suwayomi_downloader = nil
         package.loaded.suwayomi_read_sync_worker = nil
+        package.loaded.suwayomi_source_fetch_worker = nil
         package.loaded.suwayomi_ui = nil
         package.loaded.suwayomi_settings = nil
         package.loaded.suwayomi_debug = nil
@@ -297,6 +306,9 @@ describe("suwayomi plugin", function()
 
         package.preload.suwayomi_settings = function()
             return {
+                getSettingsDir = function()
+                    return "/settings"
+                end,
                 load = function()
                     return {
                         server_url = "https://suwayomi.example",
@@ -862,6 +874,54 @@ return {
         assert.are.equal(1, fetch_source_calls)
         assert.are.same({ "Loading sources..." }, shown_loading_messages)
         assert.are.same(shown_loading_messages, closed_loading_messages)
+    end)
+
+    it("starts source loading in a subprocess without calling HTTP on the UI callback", function()
+        local child_callback
+        local http_calls = 0
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    http_calls = http_calls + 1
+                    return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
+                end,
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                template = function(template_string, ...)
+                    local result = template_string
+                    local values = {...}
+                    for index, value in ipairs(values) do
+                        result = result:gsub("%%" .. index, tostring(value))
+                    end
+                    return result
+                end,
+                runInSubProcess = function(callback)
+                    child_callback = callback
+                    return 4321
+                end,
+                isSubProcessDone = function()
+                    return false
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_source_fetch_worker = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        plugin:browseSuwayomi()
+
+        assert.is_function(child_callback)
+        assert.are.equal(0, http_calls)
+        assert.are.same({ "Loading sources..." }, shown_loading_messages)
+        assert.are.same({}, closed_loading_messages)
+        assert.is_nil(shown_sources)
     end)
 
     it("downloads a selected chapter and shows the saved folder", function()
