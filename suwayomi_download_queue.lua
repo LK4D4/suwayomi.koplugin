@@ -262,6 +262,7 @@ function DownloadQueue:cancelPending(manga, chapter)
     if self:getActiveJob(key) then
         return false, "downloading"
     end
+    local status = self.statuses[key]
 
     local removed = false
     local remaining = {}
@@ -279,6 +280,10 @@ function DownloadQueue:cancelPending(manga, chapter)
         self.statuses[key] = nil
         self.onStatusChanged()
         return true, "queued"
+    end
+
+    if status then
+        return false, status.state
     end
 
     return false, nil
@@ -413,6 +418,18 @@ function DownloadQueue:cleanupInterruptedProgress(job)
     return true
 end
 
+function DownloadQueue:prepareFailedRetry(job)
+    local partial_cleanup_attempted = self:cleanupInterruptedDownload(job)
+    local progress_cleanup_attempted = self:cleanupInterruptedProgress(job)
+    self:logDebug({
+        operation = "downloadQueue.retry",
+        event = "failed",
+        key = job and job.manga and job.chapter and self:getKey(job.manga, job.chapter) or nil,
+        chapter_id = job and job.chapter and job.chapter.id,
+        cleanup_attempted = partial_cleanup_attempted or progress_cleanup_attempted,
+    })
+end
+
 function DownloadQueue:recoverInterruptedJob(job)
     local progress = self:normalizeProgress(job.progress)
     local partial_cleanup_attempted = self:cleanupInterruptedDownload(job)
@@ -488,14 +505,16 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
         if not options.quiet_duplicate then
             self.onMessage(_("Chapter download is already in progress."))
         end
-        return false
+        return false, status.state
     end
+    local enqueue_state = "queued"
     if status and status.state == "failed" then
-        self:cleanupInterruptedDownload({
+        self:prepareFailedRetry({
             download_directory = download_directory,
             manga = manga,
             chapter = chapter,
         })
+        enqueue_state = "retry"
     end
 
     local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued")
@@ -512,7 +531,7 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
     self.ui_manager:scheduleIn(0, function()
         self:process()
     end)
-    return true
+    return true, enqueue_state
 end
 
 function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options)
@@ -533,7 +552,7 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
             end
         else
             if status and status.state == "failed" then
-                self:cleanupInterruptedDownload({
+                self:prepareFailedRetry({
                     download_directory = download_directory,
                     manga = manga,
                     chapter = chapter,
