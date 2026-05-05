@@ -7,6 +7,9 @@ describe("suwayomi plugin", function()
     local language_menu_options
     local parallel_downloads_menu_options
     local shown_messages
+    local shown_loading_messages
+    local closed_loading_messages
+    local force_repaint_count
     local shown_sources
     local directory_chooser_callback
     local saved_download_directory
@@ -25,6 +28,9 @@ describe("suwayomi plugin", function()
         language_menu_options = nil
         parallel_downloads_menu_options = nil
         shown_messages = {}
+        shown_loading_messages = {}
+        closed_loading_messages = {}
+        force_repaint_count = 0
         shown_sources = nil
         directory_chooser_callback = nil
         saved_download_directory = nil
@@ -156,7 +162,16 @@ describe("suwayomi plugin", function()
         package.preload["ui/uimanager"] = function()
             return {
                 show = function(_, widget)
-                    table.insert(shown_messages, widget.text)
+                    if widget.suwayomi_loading then
+                        table.insert(shown_loading_messages, widget.text)
+                    else
+                        table.insert(shown_messages, widget.text)
+                    end
+                end,
+                close = function(_, widget)
+                    if widget and widget.suwayomi_loading then
+                        table.insert(closed_loading_messages, widget.text)
+                    end
                 end,
                 nextTick = function(_, callback)
                     callback()
@@ -165,7 +180,9 @@ describe("suwayomi plugin", function()
                     table.insert(scheduled_callbacks, callback)
                 end,
                 setDirty = function() end,
-                forceRePaint = function() end,
+                forceRePaint = function()
+                    force_repaint_count = force_repaint_count + 1
+                end,
             }
         end
 
@@ -674,6 +691,86 @@ return {
             { id = "2", name = "MangaDex (RU)", lang = "ru" },
             { id = "4", name = "Local source", lang = "localsourcelang" },
         }, shown_sources)
+    end)
+
+    it("shows loading feedback around source, manga, and chapter fetches", function()
+        local shown_chapter_menu
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
+                end,
+                fetchMangaForSource = function()
+                    return { ok = true, manga = { { id = "m1", title = "Sousou no Frieren" } } }
+                end,
+                fetchChaptersForManga = function()
+                    return { ok = true, chapters = { { id = "398", name = "Official_Vol. 1 Ch. 1" } } }
+                end,
+            }
+        end
+
+        package.preload.suwayomi_ui = function()
+            return {
+                showSourcesMenu = function(sources, onSelect)
+                    onSelect(sources[1])
+                end,
+                showMangaMenu = function(manga, onSelect)
+                    onSelect(manga[1])
+                end,
+                showChapterMenu = function(options)
+                    shown_chapter_menu = options
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_ui = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        plugin:browseSuwayomi()
+
+        assert.are.same({
+            "Loading sources...",
+            "Loading manga...",
+            "Loading chapters...",
+        }, shown_loading_messages)
+        assert.are.same(shown_loading_messages, closed_loading_messages)
+        assert.are.equal(3, force_repaint_count)
+        assert.are.equal("Sousou no Frieren", shown_chapter_menu.title)
+    end)
+
+    it("ignores duplicate browse taps while sources are loading", function()
+        local plugin
+        local fetch_source_calls = 0
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    fetch_source_calls = fetch_source_calls + 1
+                    if fetch_source_calls == 1 then
+                        plugin:browseSuwayomi()
+                    end
+                    return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+
+        local plugin_class = require("main")
+        plugin = plugin_class{}
+
+        plugin:browseSuwayomi()
+
+        assert.are.equal(1, fetch_source_calls)
+        assert.are.same({ "Loading sources..." }, shown_loading_messages)
+        assert.are.same(shown_loading_messages, closed_loading_messages)
     end)
 
     it("downloads a selected chapter and shows the saved folder", function()

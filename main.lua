@@ -119,6 +119,36 @@ function SuwayomiPlugin:showMessage(message, options)
     })
 end
 
+function SuwayomiPlugin:withLoadingMessage(key, message, callback)
+    self.loading_operations = self.loading_operations or {}
+    if self.loading_operations[key] then
+        return nil
+    end
+
+    self.loading_operations[key] = true
+    local loading_message = InfoMessage:new{
+        text = message,
+        suwayomi_loading = true,
+    }
+    UIManager:show(loading_message)
+    if UIManager.forceRePaint then
+        UIManager:forceRePaint()
+    end
+
+    local results = { pcall(callback) }
+    local ok = table.remove(results, 1)
+
+    if UIManager.close then
+        UIManager:close(loading_message)
+    end
+    self.loading_operations[key] = nil
+
+    if not ok then
+        error(results[1])
+    end
+    return unpack(results)
+end
+
 function SuwayomiPlugin:onSuwayomiAction()
     self:showNotImplemented(_("Open Search > Suwayomi to access the plugin menu."))
 end
@@ -226,7 +256,12 @@ function SuwayomiPlugin:browseSuwayomi()
 
         self:schedulePendingReadSync(credentials)
 
-        local result = SuwayomiAPI.fetchSources(credentials)
+        local result = self:withLoadingMessage("sources", _("Loading sources..."), function()
+            return SuwayomiAPI.fetchSources(credentials)
+        end)
+        if not result then
+            return
+        end
         if not result.ok then
             self:showMessage(_(result.error))
             return
@@ -255,7 +290,12 @@ function SuwayomiPlugin:showMangaForSource(source)
         source_id = source and source.id,
     }, function()
         local credentials = SuwayomiSettings:load()
-        local result = SuwayomiAPI.fetchMangaForSource(credentials, source.id)
+        local result = self:withLoadingMessage("manga", _("Loading manga..."), function()
+            return SuwayomiAPI.fetchMangaForSource(credentials, source.id)
+        end)
+        if not result then
+            return
+        end
         if not result.ok then
             self:showMessage(_(result.error))
             return
@@ -283,7 +323,12 @@ function SuwayomiPlugin:showChaptersForManga(manga)
         manga_id = manga and manga.id,
     }, function()
         local credentials = SuwayomiSettings:load()
-        local result = SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
+        local result = self:withLoadingMessage("chapters", _("Loading chapters..."), function()
+            return SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
+        end)
+        if not result then
+            return
+        end
         if not result.ok then
             self:showMessage(_(result.error))
             return
