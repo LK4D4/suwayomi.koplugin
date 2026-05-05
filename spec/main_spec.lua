@@ -1828,10 +1828,10 @@ return {
 
         assert.are.equal("2 selected chapters", shown_actions_menu.title)
         assert.are.equal("Download selected", shown_actions_menu.actions[1].text)
-        assert.are.equal("Delete downloads", shown_actions_menu.actions[2].text)
-        assert.are.equal("Mark read", shown_actions_menu.actions[3].text)
-        assert.are.equal("Mark unread", shown_actions_menu.actions[4].text)
-        assert.are.equal("Clear selection", shown_actions_menu.actions[5].text)
+        assert.are.equal("Mark read", shown_actions_menu.actions[2].text)
+        assert.are.equal("Mark unread", shown_actions_menu.actions[3].text)
+        assert.are.equal("Clear selection", shown_actions_menu.actions[4].text)
+        assert.are.equal("Delete downloads", shown_actions_menu.actions[5].text)
         assert.is_nil(shown_actions_menu.actions[6])
 
         plugin:performBulkChapterAction("download_selected")
@@ -2897,7 +2897,7 @@ return {
         plugin.selection_mode = true
 
         local bulk_actions = plugin:getBulkChapterActions()
-        assert.are.equal("Delete downloads", bulk_actions[2].text)
+        assert.are.equal("Delete downloads", bulk_actions[5].text)
 
         plugin:performBulkChapterAction("delete_selected")
         os.remove = original_remove
@@ -3482,6 +3482,42 @@ return {
 
         assert.are.equal("Download", actions[1].text)
         assert.are.equal("Mark as unread", actions[2].text)
+    end)
+
+    it("places downloaded chapter deletion after non-destructive actions", function()
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function()
+                    return true
+                end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                loadDownloadDirectory = function() return "/books" end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local actions = plugin:getChapterActions(
+            { id = "m1", title = "Sousou no Frieren" },
+            { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = true }
+        )
+
+        assert.are.equal("Open", actions[1].text)
+        assert.are.equal("Mark as unread", actions[2].text)
+        assert.are.equal("Delete from device", actions[3].text)
+        package.preload.suwayomi_downloader = nil
     end)
 
     it("marks a chapter read locally before syncing it in the background", function()

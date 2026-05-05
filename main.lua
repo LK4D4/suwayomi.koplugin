@@ -1228,7 +1228,6 @@ function SuwayomiPlugin:getChapterActions(manga, chapter)
 
     if downloaded then
         table.insert(actions, { id = "open", text = _("Open") })
-        table.insert(actions, { id = "delete", text = _("Delete from device") })
     else
         table.insert(actions, { id = "download", text = _("Download") })
     end
@@ -1239,6 +1238,9 @@ function SuwayomiPlugin:getChapterActions(manga, chapter)
         table.insert(actions, { id = "mark_read", text = _("Mark as read") })
         table.insert(actions, { id = "mark_previous_read", text = _("Mark previous as read") })
         table.insert(actions, { id = "mark_through_read", text = _("Mark through here") })
+    end
+    if downloaded then
+        table.insert(actions, { id = "delete", text = _("Delete from device") })
     end
     return actions
 end
@@ -1528,10 +1530,10 @@ function SuwayomiPlugin:getBulkChapterActions()
 
     if self:getSelectedChapterCount() > 0 then
         table.insert(actions, { id = "download_selected", text = _("Download selected") })
-        table.insert(actions, { id = "delete_selected", text = _("Delete downloads") })
         table.insert(actions, { id = "mark_read_selected", text = _("Mark read") })
         table.insert(actions, { id = "mark_unread_selected", text = _("Mark unread") })
         table.insert(actions, { id = "clear_selection", text = _("Clear selection") })
+        table.insert(actions, { id = "delete_selected", text = _("Delete downloads") })
         return actions
     end
 
