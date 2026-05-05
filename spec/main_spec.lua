@@ -1578,8 +1578,10 @@ return {
         hold_chapter(shown_chapter_menu.chapters[1])
 
         assert.are.equal("1 selected", shown_chapter_menu.title)
-        assert.are.equal("[x] Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
-        assert.are.equal("[ ] Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("●", shown_chapter_menu.chapters[1].menu_status)
+        assert.are.equal("Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.is_nil(shown_chapter_menu.chapters[2].menu_status)
         assert.is_true(plugin.selection_mode)
         assert.is_true(plugin:isChapterSelected("m1", "398"))
         assert.are.equal(1, menu_updates)
@@ -1588,16 +1590,20 @@ return {
 
         assert.is_nil(shown_actions_menu)
         assert.are.equal("2 selected", shown_chapter_menu.title)
-        assert.are.equal("[x] Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
-        assert.are.equal("[x] Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("●", shown_chapter_menu.chapters[1].menu_status)
+        assert.are.equal("Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.are.equal("●", shown_chapter_menu.chapters[2].menu_status)
         assert.is_true(plugin:isChapterSelected("m1", "399"))
         assert.are.equal(2, menu_updates)
 
         plugin:toggleChapterSelection({ id = "m1" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         assert.are.equal("1 selected", shown_chapter_menu.title)
-        assert.are.equal("[ ] Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
-        assert.are.equal("[x] Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.is_nil(shown_chapter_menu.chapters[1].menu_status)
+        assert.are.equal("Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.are.equal("●", shown_chapter_menu.chapters[2].menu_status)
         assert.is_false(plugin:isChapterSelected("m1", "398"))
         assert.is_true(plugin.selection_mode)
 
@@ -1633,8 +1639,10 @@ return {
 
         local quick_items = plugin:buildQuickChapterMenuItems(manga, chapters)
 
-        assert.are.equal("[x] Official_Vol. 1 Ch. 1", quick_items[1].menu_text)
-        assert.are.equal("[ ] Official_Vol. 1 Ch. 2", quick_items[2].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", quick_items[1].menu_text)
+        assert.are.equal("●", quick_items[1].menu_status)
+        assert.are.equal("Official_Vol. 1 Ch. 2", quick_items[2].menu_text)
+        assert.is_nil(quick_items[2].menu_status)
     end)
 
     it("clears stale selection when opening chapters for another manga", function()
@@ -1804,9 +1812,12 @@ return {
 
         assert.are.equal("2 selected", shown_chapter_menu.title)
         assert.are.equal("appbar.menu", shown_chapter_menu.title_bar_left_icon)
-        assert.are.equal("[x] Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
-        assert.are.equal("[ ] Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
-        assert.are.equal("[x] Official_Vol. 1 Ch. 3", shown_chapter_menu.chapters[3].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("●", shown_chapter_menu.chapters[1].menu_status)
+        assert.are.equal("Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.is_nil(shown_chapter_menu.chapters[2].menu_status)
+        assert.are.equal("Official_Vol. 1 Ch. 3", shown_chapter_menu.chapters[3].menu_text)
+        assert.are.equal("●", shown_chapter_menu.chapters[3].menu_status)
 
         tap_bulk_actions()
 
@@ -1935,9 +1946,12 @@ return {
         assert.is_true(plugin.selection_mode)
         assert.are.equal(3, plugin:getSelectedChapterCount())
         assert.are.equal("3 selected", shown_chapter_menu.title)
-        assert.are.equal("[x] Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
-        assert.are.equal("[x] Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
-        assert.are.equal("[x] Official_Vol. 1 Ch. 3", shown_chapter_menu.chapters[3].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("●", shown_chapter_menu.chapters[1].menu_status)
+        assert.are.equal("Official_Vol. 1 Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.are.equal("●", shown_chapter_menu.chapters[2].menu_status)
+        assert.are.equal("Official_Vol. 1 Ch. 3", shown_chapter_menu.chapters[3].menu_text)
+        assert.are.equal("●", shown_chapter_menu.chapters[3].menu_status)
         assert.are.equal(1, menu_updates)
     end)
 

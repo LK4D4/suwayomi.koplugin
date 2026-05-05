@@ -575,6 +575,24 @@ function SuwayomiPlugin:formatChapterMenuText(chapter, status)
     return self:getDownloadQueue():formatChapterMenuText(chapter, status)
 end
 
+function SuwayomiPlugin:addChapterSelectionMarker(menu_status)
+    if menu_status and menu_status ~= "" then
+        return "● " .. menu_status
+    end
+    return "●"
+end
+
+function SuwayomiPlugin:stripChapterSelectionStatus(menu_status)
+    if not menu_status then
+        return nil
+    end
+    local stripped = tostring(menu_status):gsub("^●%s*", "", 1)
+    if stripped == "" then
+        return nil
+    end
+    return stripped
+end
+
 function SuwayomiPlugin:getChapterSelectionKey(manga, chapter)
     return tostring(manga.id or manga.title or "") .. ":" .. tostring(chapter.id or chapter.name or "")
 end
@@ -1060,9 +1078,7 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
         item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, status)
         if self.selection_mode then
             if self:isChapterSelected(manga, item) then
-                item.menu_text = "[x] " .. item.menu_text
-            else
-                item.menu_text = "[ ] " .. item.menu_text
+                item.menu_status = self:addChapterSelectionMarker(item.menu_status)
             end
         end
 
@@ -1143,7 +1159,7 @@ function SuwayomiPlugin:buildQuickChapterMenuItems(manga, chapters)
             item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, status)
         elseif cached and cached.menu_text then
             item.menu_text = self:stripChapterSelectionMarker(cached.menu_text)
-            item.menu_status = cached.menu_status
+            item.menu_status = self:stripChapterSelectionStatus(cached.menu_status)
         elseif item.is_read then
             item.menu_text = item.name
             item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, { state = "read" })
@@ -1154,9 +1170,7 @@ function SuwayomiPlugin:buildQuickChapterMenuItems(manga, chapters)
 
         if self.selection_mode then
             if self:isChapterSelected(manga, item) then
-                item.menu_text = "[x] " .. item.menu_text
-            else
-                item.menu_text = "[ ] " .. item.menu_text
+                item.menu_status = self:addChapterSelectionMarker(item.menu_status)
             end
         end
 
