@@ -393,6 +393,137 @@ describe("suwayomi_downloader", function()
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
     end)
 
+    it("does not open a new archive when stale partial cleanup fails", function()
+        local partial_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
+        local removed_path
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchChapterPages = function()
+                    return { ok = true, pages = { "/page/0" } }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if path == partial_path and attribute == "mode" then
+                        return "file"
+                    end
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function()
+                                error("archive should not open when stale partial cleanup fails")
+                            end,
+                        }
+                    end,
+                }
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_remove = os.remove
+        os.remove = function(path)
+            removed_path = path
+            return nil, "permission denied"
+        end
+
+        local downloader = require("suwayomi_downloader")
+        local result = downloader:startChapterDownload({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.remove = original_remove
+
+        assert.is_false(result.ok)
+        assert.are.equal(partial_path, removed_path)
+        assert.are.equal("Could not remove partial chapter archive.", result.error)
+    end)
+
+    it("reports cleanup errors when a failed download leaves the partial archive behind", function()
+        local partial_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchChapterPages = function()
+                    return { ok = true, pages = { "/page/0" } }
+                end,
+                downloadBinary = function()
+                    return { ok = false, error = "Could not download chapter page." }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if path == partial_path and attribute == "mode" then
+                        return "file"
+                    end
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function() return true end,
+                            close = function() end,
+                        }
+                    end,
+                }
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_remove = os.remove
+        local remove_calls = 0
+        os.remove = function()
+            remove_calls = remove_calls + 1
+            if remove_calls == 1 then
+                return true
+            end
+            return nil, "permission denied"
+        end
+
+        local downloader = require("suwayomi_downloader")
+        local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.remove = original_remove
+
+        assert.is_false(result.ok)
+        assert.are.equal("Could not download chapter page.", result.error)
+        assert.are.equal("Could not remove partial chapter archive.", result.cleanup_error)
+    end)
+
     it("removes a partial cbz when archive writing fails", function()
         local removed_path
 

@@ -41,19 +41,34 @@ end
 
 function Downloader:cleanupPartialFile(path)
     if path and path ~= "" then
-        os.remove(path)
+        local removed = os.remove(path)
+        if removed then
+            return true
+        end
+        if not lfs.attributes then
+            return true
+        end
+        if lfs.attributes(path, "mode") ~= "file" then
+            return true
+        end
+        return false, "Could not remove partial chapter archive."
     end
+    return true
 end
 
 function Downloader:failAndCleanup(message, chapter_path, writer)
     if writer then
         writer:close()
     end
-    self:cleanupPartialFile(chapter_path)
-    return {
+    local cleanup_ok, cleanup_error = self:cleanupPartialFile(chapter_path)
+    local result = {
         ok = false,
         error = message,
     }
+    if not cleanup_ok then
+        result.cleanup_error = cleanup_error
+    end
+    return result
 end
 
 function Downloader:writeProgress(progress_path, state, current, total, path, error_message)
@@ -104,7 +119,10 @@ function Downloader:startChapterDownload(credentials, download_directory, manga,
         return { ok = false, error = directory_error }
     end
 
-    self:cleanupPartialFile(partial_path)
+    local cleanup_ok, cleanup_error = self:cleanupPartialFile(partial_path)
+    if not cleanup_ok then
+        return { ok = false, error = cleanup_error }
+    end
     local writer = Archiver.Writer:new()
     if not writer:open(partial_path, "zip") then
         return { ok = false, error = writer.err or "Could not create chapter archive." }
