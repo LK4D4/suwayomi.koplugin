@@ -1056,7 +1056,8 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
                 status = { state = "read" }
             end
         end
-        item.menu_text = self:formatChapterMenuText(item, status)
+        item.menu_text = item.name
+        item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, status)
         if self.selection_mode then
             if self:isChapterSelected(manga, item) then
                 item.menu_text = "[x] " .. item.menu_text
@@ -1138,13 +1139,17 @@ function SuwayomiPlugin:buildQuickChapterMenuItems(manga, chapters)
         local cached = cached_items[self:getChapterDownloadKey(manga, item)]
         local status = self:getChapterDownloadStatus(manga, item)
         if status then
-            item.menu_text = self:formatChapterMenuText(item, status)
+            item.menu_text = item.name
+            item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, status)
         elseif cached and cached.menu_text then
             item.menu_text = self:stripChapterSelectionMarker(cached.menu_text)
+            item.menu_status = cached.menu_status
         elseif item.is_read then
-            item.menu_text = self:formatChapterMenuText(item, { state = "read" })
+            item.menu_text = item.name
+            item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, { state = "read" })
         else
             item.menu_text = item.name
+            item.menu_status = nil
         end
 
         if self.selection_mode then

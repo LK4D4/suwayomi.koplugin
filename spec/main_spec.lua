@@ -1208,8 +1208,10 @@ return {
         assert.are.equal("Sousou no Frieren", downloader_called.manga.title)
         assert.are.equal("Official_Vol. 1 Ch. 1", downloader_called.chapter.name)
         assert.are.equal("Sousou no Frieren", shown_chapter_menu.title)
-        assert.are.equal("Official_Vol. 1 Ch. 1  ↓", shown_chapter_menu.chapters[1].menu_text)
-        assert.are.equal("Ch. 2  ↓", shown_chapter_menu.chapters[2].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("↓", shown_chapter_menu.chapters[1].menu_status)
+        assert.are.equal("Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.are.equal("↓", shown_chapter_menu.chapters[2].menu_status)
         assert.are.equal(0, #shown_messages)
     end)
 
@@ -1309,11 +1311,13 @@ return {
 
         plugin:browseSuwayomi()
 
-        assert.are.equal("Official_Vol. 1 Ch. 1  ⏳", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("⌛", shown_chapter_menu.chapters[1].menu_status)
         run_scheduled_callbacks()
 
         assert.is_true(menu_updates >= 2)
-        assert.are.equal("Official_Vol. 1 Ch. 1  ↓", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("↓", shown_chapter_menu.chapters[1].menu_status)
         assert.are.equal(0, #shown_messages)
     end)
 
@@ -1384,8 +1388,10 @@ return {
         local plugin = plugin_class{}
         plugin:browseSuwayomi()
 
-        assert.are.equal("Official_Vol. 1 Ch. 1  ✓", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("✓", shown_chapter_menu.chapters[1].menu_status)
         assert.are.equal("Ch. 2", shown_chapter_menu.chapters[2].menu_text)
+        assert.is_nil(shown_chapter_menu.chapters[2].menu_status)
         assert.is_true(saved_ledger["m1:398"].read)
     end)
 
@@ -1817,8 +1823,10 @@ return {
 
         assert.are.same({ "398", "400" }, download_calls)
         assert.is_false(plugin.selection_mode)
-        assert.are.equal("Official_Vol. 1 Ch. 1  ↓", shown_chapter_menu.chapters[1].menu_text)
-        assert.are.equal("Official_Vol. 1 Ch. 3  ↓", shown_chapter_menu.chapters[3].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("↓", shown_chapter_menu.chapters[1].menu_status)
+        assert.are.equal("Official_Vol. 1 Ch. 3", shown_chapter_menu.chapters[3].menu_text)
+        assert.are.equal("↓", shown_chapter_menu.chapters[3].menu_status)
         assert.is_true(menu_updates > 0)
     end)
 
@@ -2255,8 +2263,10 @@ return {
         assert.is_true(queued)
         assert.are.equal(5, #saved_queue)
         assert.are.equal(10, exists_checks)
-        assert.are.equal("Ch. 1  ⏳", refreshed_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Ch. 1", refreshed_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("⌛", refreshed_chapter_menu.chapters[1].menu_status)
         assert.are.equal("Ch. 6", refreshed_chapter_menu.chapters[6].menu_text)
+        assert.is_nil(refreshed_chapter_menu.chapters[6].menu_status)
     end)
 
     it("keeps the next unread chapter buffer downloaded or queued", function()
@@ -2532,7 +2542,8 @@ return {
 
         assert.is_true(deleted)
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", removed_paths[1])
-        assert.are.equal("Official_Vol. 1 Ch. 1  ✓", refreshed_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", refreshed_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("✓", refreshed_chapter_menu.chapters[1].menu_status)
         assert.is_nil(saved_ledger["m1:398"].path)
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 2.cbz", saved_ledger["m1:399"].path)
         assert.are.same({}, shown_messages)
@@ -3857,7 +3868,8 @@ return {
         local plugin = plugin_class{}
         plugin:browseSuwayomi()
 
-        assert.are.equal("Official_Vol. 1 Ch. 4  ✓ ↓", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 4", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("✓↓", shown_chapter_menu.chapters[1].menu_status)
         assert.is_true(saved_ledger["m1:401"].read)
         assert.is_true(saved_ledger["m1:401"].pending_read_sync)
     end)
@@ -3969,7 +3981,8 @@ return {
         local plugin = plugin_class{}
         plugin:browseSuwayomi()
 
-        assert.are.equal("Official_Vol. 1 Ch. 5  ✓ ↓", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 5", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("✓↓", shown_chapter_menu.chapters[1].menu_status)
         assert.is_true(saved_ledger["m1:402"].read)
         assert.is_true(saved_ledger["m1:402"].pending_read_sync)
     end)
@@ -4197,7 +4210,8 @@ return {
         plugin:browseSuwayomi()
         io.open = original_open
 
-        assert.are.equal("Official_Vol. 1 Ch. 1  ✓ ↓", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("✓↓", shown_chapter_menu.chapters[1].menu_status)
         local metadata = assert(loadstring(files["/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.sdr/metadata.cbz.lua"]))()
         assert.are.equal(1, metadata.percent_finished)
         assert.are.equal("complete", metadata.summary.status)
@@ -5318,7 +5332,8 @@ return {
         local plugin = plugin_class{}
         plugin:browseSuwayomi()
 
-        assert.are.equal("Official_Vol. 1 Ch. 1  ✓ ↓", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("✓↓", shown_chapter_menu.chapters[1].menu_status)
         assert.is_true(saved_ledger["m1:398"].pending_read_sync)
     end)
 

@@ -11,6 +11,7 @@ function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
     for _, chapter in ipairs(chapter_list) do
         table.insert(menu_table, {
             text = chapter.menu_text or chapter.name,
+            mandatory = chapter.menu_status,
             chapter = chapter,
             callback = function()
                 if onSelectCallback then onSelectCallback(chapter) end

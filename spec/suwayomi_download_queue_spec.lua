@@ -281,8 +281,8 @@ describe("suwayomi_download_queue", function()
         local context = build_queue()
 
         assert.are.equal(
-            "Official_Vol. 1 Ch. 1  ✓ ↓",
-            context.queue:formatChapterMenuText(
+            "✓↓",
+            context.queue:formatChapterMenuStatus(
                 { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = true },
                 { state = "downloaded" }
             )
@@ -300,7 +300,7 @@ describe("suwayomi_download_queue", function()
             )
         )
         assert.are.equal(
-            "Official_Vol. 25 Ch. 126 A Very Long Chapter Title  ⏳",
+            "Official_Vol. 25 Ch. 126 A Very Long Chapter Title  ⌛",
             context.queue:formatChapterMenuText(
                 { id = "398", name = "Official_Vol. 25 Ch. 126 A Very Long Chapter Title" },
                 { state = "downloading", current = 0, total = 0 }

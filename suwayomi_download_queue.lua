@@ -328,9 +328,15 @@ function DownloadQueue:shortenChapterTitle(title, reserved_chars)
     return table.concat(shortened)
 end
 
+function DownloadQueue:joinChapterStatusSymbols(symbols)
+    if not symbols or #symbols == 0 then
+        return nil
+    end
+    return table.concat(symbols, "")
+end
+
 function DownloadQueue:formatChapterStatusSymbols(chapter, symbols)
-    symbols = symbols or {}
-    if #symbols == 0 then
+    if not symbols or #symbols == 0 then
         return chapter.name
     end
     local suffix = table.concat(symbols, " ")
@@ -338,41 +344,50 @@ function DownloadQueue:formatChapterStatusSymbols(chapter, symbols)
     return title .. "  " .. suffix
 end
 
-function DownloadQueue:formatChapterMenuText(chapter, status)
+function DownloadQueue:buildChapterStatusSymbols(chapter, status)
     local symbols = {}
     if chapter and chapter.is_read == true then
         table.insert(symbols, "✓")
     end
 
     if not status then
-        return self:formatChapterStatusSymbols(chapter, symbols)
+        return symbols
     end
     if status.state == "queued" then
-        table.insert(symbols, "⏳")
-        return self:formatChapterStatusSymbols(chapter, symbols)
+        table.insert(symbols, "⌛")
+        return symbols
     end
     if status.state == "downloading" then
         if status.total and status.total > 0 and status.current then
             table.insert(symbols, T(_("↓ %1/%2"), status.current, status.total))
-            return self:formatChapterStatusSymbols(chapter, symbols)
+            return symbols
         end
-        table.insert(symbols, "⏳")
-        return self:formatChapterStatusSymbols(chapter, symbols)
+        table.insert(symbols, "⌛")
+        return symbols
     end
     if status.state == "downloaded" or status.state == "skipped" then
         table.insert(symbols, "↓")
-        return self:formatChapterStatusSymbols(chapter, symbols)
+        return symbols
     end
     if status.state == "read" then
         if #symbols == 0 then
             table.insert(symbols, "✓")
         end
-        return self:formatChapterStatusSymbols(chapter, symbols)
+        return symbols
     end
     if status.state == "failed" then
         table.insert(symbols, "⚠")
-        return self:formatChapterStatusSymbols(chapter, symbols)
+        return symbols
     end
+    return symbols
+end
+
+function DownloadQueue:formatChapterMenuStatus(chapter, status)
+    return self:joinChapterStatusSymbols(self:buildChapterStatusSymbols(chapter, status))
+end
+
+function DownloadQueue:formatChapterMenuText(chapter, status)
+    local symbols = self:buildChapterStatusSymbols(chapter, status)
     return self:formatChapterStatusSymbols(chapter, symbols)
 end
 
