@@ -1,5 +1,6 @@
 local Menu = require("ui/widget/menu")
 local ButtonDialog = require("ui/widget/buttondialog")
+local ConfirmBox = require("ui/widget/confirmbox")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local _ = require("gettext")
 
@@ -124,6 +125,18 @@ function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
     dialog = ButtonDialog:new{
         title = options.title or _("Chapter actions"),
         buttons = buttons,
+    }
+    UIManager:show(dialog)
+    return dialog
+end
+
+function SuwayomiUI.showConfirm(options)
+    local UIManager = require("ui/uimanager")
+    local dialog = ConfirmBox:new{
+        text = options.text,
+        ok_text = options.ok_text,
+        ok_callback = options.ok_callback,
+        cancel_text = options.cancel_text,
     }
     UIManager:show(dialog)
     return dialog

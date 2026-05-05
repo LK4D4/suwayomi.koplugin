@@ -1490,6 +1490,102 @@ function SuwayomiPlugin:getUnreadDownloadBufferCandidates(manga, limit)
     return missing, unread_count
 end
 
+function SuwayomiPlugin:showBulkActionConfirmation(text, ok_text, callback)
+    if SuwayomiUI.showConfirm then
+        SuwayomiUI.showConfirm({
+            text = text,
+            ok_text = ok_text,
+            ok_callback = callback,
+        })
+    else
+        callback()
+    end
+    return true
+end
+
+function SuwayomiPlugin:getReadChaptersFromCurrentContext()
+    local read_chapters = {}
+    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+        if chapter.is_read == true then
+            table.insert(read_chapters, chapter)
+        end
+    end
+    return read_chapters
+end
+
+function SuwayomiPlugin:confirmNextUnreadChapterDownloads(limit)
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        SuwayomiUI.showDirectoryChooser(function(path)
+            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
+            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+            self:confirmNextUnreadChapterDownloads(limit)
+        end)
+        return 0
+    end
+
+    local chapters = self:getNextUnreadChaptersForDownload(manga, limit)
+    if #chapters == 0 then
+        self:showMessage(_("No unread chapters available to download."))
+        return 0
+    end
+
+    return self:showBulkActionConfirmation(
+        T(
+            self:pluralize(#chapters, _("Queue %1 unread chapter download?"), _("Queue %1 unread chapter downloads?")),
+            #chapters
+        ),
+        _("Queue"),
+        function()
+            self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+        end
+    )
+end
+
+function SuwayomiPlugin:confirmKeepNextUnreadChaptersDownloaded(limit)
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        SuwayomiUI.showDirectoryChooser(function(path)
+            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
+            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+            self:confirmKeepNextUnreadChaptersDownloaded(limit)
+        end)
+        return 0
+    end
+
+    local chapters = self:getUnreadDownloadBufferCandidates(manga, limit)
+    if #chapters == 0 then
+        self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
+        return 0
+    end
+
+    return self:showBulkActionConfirmation(
+        T(
+            self:pluralize(
+                #chapters,
+                _("Queue %1 missing download to keep the next %2 unread chapters available?"),
+                _("Queue %1 missing downloads to keep the next %2 unread chapters available?")
+            ),
+            #chapters,
+            limit
+        ),
+        _("Queue"),
+        function()
+            self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+        end
+    )
+end
+
 function SuwayomiPlugin:enqueueNextUnreadChapterDownloads(limit)
     if not self.current_chapter_context then
         return 0
@@ -1666,12 +1762,7 @@ function SuwayomiPlugin:deleteReadChaptersFromDevice()
     end
 
     local manga = self.current_chapter_context.manga
-    local read_chapters = {}
-    for _, chapter in ipairs(self.current_chapter_context.chapters or {}) do
-        if chapter.is_read == true then
-            table.insert(read_chapters, chapter)
-        end
-    end
+    local read_chapters = self:getReadChaptersFromCurrentContext()
 
     if #read_chapters == 0 then
         self:showMessage(_("No read chapters to delete."))
@@ -1713,6 +1804,33 @@ function SuwayomiPlugin:deleteReadChaptersFromDevice()
         elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
     })
     return deleted
+end
+
+function SuwayomiPlugin:confirmDeleteReadChaptersFromDevice()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local read_chapters = self:getReadChaptersFromCurrentContext()
+    if #read_chapters == 0 then
+        self:showMessage(_("No read chapters to delete."))
+        return 0
+    end
+
+    return self:showBulkActionConfirmation(
+        T(
+            self:pluralize(
+                #read_chapters,
+                _("Delete downloaded files for %1 read chapter?"),
+                _("Delete downloaded files for %1 read chapters?")
+            ),
+            #read_chapters
+        ),
+        _("Delete"),
+        function()
+            self:deleteReadChaptersFromDevice()
+        end
+    )
 end
 
 function SuwayomiPlugin:markSelectedChaptersRead()
@@ -1794,16 +1912,26 @@ function SuwayomiPlugin:performBulkChapterAction(action_id)
     end
     local next_unread_count = tostring(action_id or ""):match("^download_next_(%d+)_unread$")
     if next_unread_count then
-        self:enqueueNextUnreadChapterDownloads(tonumber(next_unread_count))
+        local limit = tonumber(next_unread_count)
+        if limit >= 50 then
+            self:confirmNextUnreadChapterDownloads(limit)
+        else
+            self:enqueueNextUnreadChapterDownloads(limit)
+        end
         return true
     end
     local keep_unread_count = tostring(action_id or ""):match("^keep_next_(%d+)_unread$")
     if keep_unread_count then
-        self:keepNextUnreadChaptersDownloaded(tonumber(keep_unread_count))
+        local limit = tonumber(keep_unread_count)
+        if limit >= 50 then
+            self:confirmKeepNextUnreadChaptersDownloaded(limit)
+        else
+            self:keepNextUnreadChaptersDownloaded(limit)
+        end
         return true
     end
     if action_id == "delete_read_downloaded" then
-        self:deleteReadChaptersFromDevice()
+        self:confirmDeleteReadChaptersFromDevice()
         return true
     end
     if action_id == "download_selected" then

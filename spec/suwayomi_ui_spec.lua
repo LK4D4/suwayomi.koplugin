@@ -14,6 +14,7 @@ describe("suwayomi_ui", function()
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
         package.loaded["ui/widget/buttondialog"] = nil
+        package.loaded["ui/widget/confirmbox"] = nil
         package.loaded["ui/widget/multiinputdialog"] = nil
         package.loaded["ui/downloadmgr"] = nil
         package.loaded["ui/uimanager"] = nil
@@ -33,6 +34,14 @@ describe("suwayomi_ui", function()
         end
 
         package.preload["ui/widget/buttondialog"] = function()
+            return {
+                new = function(_, options)
+                    return options
+                end,
+            }
+        end
+
+        package.preload["ui/widget/confirmbox"] = function()
             return {
                 new = function(_, options)
                     return options
@@ -85,6 +94,7 @@ describe("suwayomi_ui", function()
         package.preload.gettext = nil
         package.preload["ui/widget/menu"] = nil
         package.preload["ui/widget/buttondialog"] = nil
+        package.preload["ui/widget/confirmbox"] = nil
         package.preload["ui/widget/multiinputdialog"] = nil
         package.preload["ui/downloadmgr"] = nil
         package.preload["ui/uimanager"] = nil
@@ -215,6 +225,26 @@ describe("suwayomi_ui", function()
         assert.are.same({ "close", "action" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
         assert.are.same({ id = "open", text = "Open" }, selected)
+    end)
+
+    it("shows a confirmation dialog", function()
+        local ui = require("suwayomi_ui")
+        local confirmed = false
+
+        ui.showConfirm({
+            text = "Queue 50 unread chapter downloads?",
+            ok_text = "Queue",
+            ok_callback = function()
+                confirmed = true
+            end,
+        })
+
+        assert.are.equal("Queue 50 unread chapter downloads?", shown_dialog.text)
+        assert.are.equal("Queue", shown_dialog.ok_text)
+
+        shown_dialog.ok_callback()
+
+        assert.is_true(confirmed)
     end)
 
     it("shows a sources menu", function()
