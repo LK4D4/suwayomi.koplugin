@@ -136,6 +136,28 @@ function DownloadQueue:normalizeProgress(progress)
     return normalized
 end
 
+function DownloadQueue:normalizeRecovery(recovery)
+    if type(recovery) ~= "table" then
+        return nil
+    end
+
+    local normalized = {}
+    if recovery.reason ~= nil then
+        normalized.reason = tostring(recovery.reason)
+    end
+    if recovery.recovered_at ~= nil then
+        normalized.recovered_at = tonumber(recovery.recovered_at) or recovery.recovered_at
+    end
+    if recovery.previous_state ~= nil then
+        normalized.previous_state = tostring(recovery.previous_state)
+    end
+    local progress = self:normalizeProgress(recovery.progress)
+    if progress then
+        normalized.progress = progress
+    end
+    return normalized
+end
+
 function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, state, details)
     details = details or {}
     local job = {
@@ -160,6 +182,10 @@ function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, st
     local progress = self:normalizeProgress(details.progress)
     if progress then
         job.progress = progress
+    end
+    local recovery = self:normalizeRecovery(details.recovery)
+    if recovery then
+        job.recovery = recovery
     end
     return job
 end
@@ -371,11 +397,48 @@ end
 
 function DownloadQueue:cleanupInterruptedDownload(job)
     if not job or not job.download_directory or not job.manga or not job.chapter then
-        return
+        return false
     end
     local _, chapter_path = self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter)
     local partial_path = self.downloader.getPartialPath and self.downloader:getPartialPath(chapter_path) or (chapter_path .. ".part")
     os.remove(partial_path)
+    return true
+end
+
+function DownloadQueue:cleanupInterruptedProgress(job)
+    if not job or not job.download_directory or not job.manga or not job.chapter then
+        return false
+    end
+    os.remove(self:buildProgressPath(job.manga, job.chapter, job.download_directory))
+    return true
+end
+
+function DownloadQueue:recoverInterruptedJob(job)
+    local progress = self:normalizeProgress(job.progress)
+    local partial_cleanup_attempted = self:cleanupInterruptedDownload(job)
+    local progress_cleanup_attempted = self:cleanupInterruptedProgress(job)
+    local recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued", {
+        started_at = job.started_at,
+        last_progress_at = job.last_progress_at,
+        recovery = {
+            reason = "interrupted",
+            recovered_at = self.now(),
+            previous_state = "downloading",
+            progress = progress,
+        },
+    })
+    self:logDebug({
+        operation = "downloadQueue.recover",
+        event = "interrupted",
+        key = recovered.key,
+        chapter_id = recovered.chapter and recovered.chapter.id,
+        previous_state = "downloading",
+        progress_state = progress and progress.state or nil,
+        progress_current = progress and progress.current or nil,
+        progress_total = progress and progress.total or nil,
+        cleanup_attempted = partial_cleanup_attempted or progress_cleanup_attempted,
+    })
+    return recovered
 end
 
 function DownloadQueue:recover()
@@ -388,10 +451,12 @@ function DownloadQueue:recover()
     local should_process = false
     for _, job in ipairs(jobs) do
         if job.manga and job.chapter and job.download_directory and (job.state == "queued" or job.state == "downloading") then
+            local recovered
             if job.state == "downloading" then
-                self:cleanupInterruptedDownload(job)
+                recovered = self:recoverInterruptedJob(job)
+            else
+                recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued")
             end
-            local recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued")
             table.insert(recovered_jobs, recovered)
             table.insert(self.items, {
                 key = recovered.key,

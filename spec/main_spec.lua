@@ -5245,6 +5245,7 @@ return {
             "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part",
             "/books/.suwayomi_dl_progress_m1_398.txt",
             "/books/.suwayomi_dl_progress_m1_398.txt",
+            "/books/.suwayomi_dl_progress_m1_398.txt",
         }, removed_paths)
         assert.are.equal(1, start_calls)
         assert.are.same({}, saved_queue)

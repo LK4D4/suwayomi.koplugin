@@ -81,6 +81,7 @@ describe("suwayomi_download_queue", function()
         local messages = {}
         local status_changes = 0
         local download_calls = 0
+        local debug_events = {}
         local next_pid = 1233
         local subprocess_done = options.subprocess_done
 
@@ -162,6 +163,9 @@ describe("suwayomi_download_queue", function()
             onMessage = function(message)
                 table.insert(messages, message)
             end,
+            debug_logger = function(event)
+                table.insert(debug_events, event)
+            end,
         }
 
         local context
@@ -171,6 +175,7 @@ describe("suwayomi_download_queue", function()
             saved_queue = function() return saved_queue end,
             save_count = function() return save_count end,
             messages = messages,
+            debug_events = debug_events,
             status_changes = function() return status_changes end,
             download_calls = function() return download_calls end,
             progress_files = progress_files,
@@ -656,6 +661,166 @@ describe("suwayomi_download_queue", function()
         assert.are.same({}, context.saved_queue())
         assert.are.equal(1, context.download_calls())
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_paths[1])
+    end)
+
+    it("requeues interrupted downloads with preserved recovery progress", function()
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m1:398",
+                    state = "downloading",
+                    download_directory = "/books",
+                    started_at = 90,
+                    last_progress_at = 98,
+                    progress = {
+                        state = "downloading",
+                        current = "2",
+                        total = "5",
+                        path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+                        updated_at = 98,
+                    },
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        local recovered = context.saved_queue()[1]
+        assert.are.equal("queued", recovered.state)
+        assert.are.equal(90, recovered.started_at)
+        assert.are.equal(98, recovered.last_progress_at)
+        assert.are.same({
+            reason = "interrupted",
+            recovered_at = 100,
+            previous_state = "downloading",
+            progress = {
+                state = "downloading",
+                current = 2,
+                total = 5,
+                path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+                updated_at = 98,
+            },
+        }, recovered.recovery)
+        assert.are.equal("queued", context.queue:getStatus(
+            { id = "m1", title = "Sousou no Frieren" },
+            { id = "398", name = "Official_Vol. 1 Ch. 1" }
+        ).state)
+    end)
+
+    it("removes stale partial and progress files while recovering interrupted downloads", function()
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m1:398",
+                    state = "downloading",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        assert.are.same({
+            "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part",
+            "/books/.suwayomi_dl_progress_m1_398.txt",
+        }, removed_paths)
+    end)
+
+    it("recovers multiple interrupted downloads in order and schedules one process callback", function()
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m1:398",
+                    state = "downloading",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+                {
+                    key = "m1:399",
+                    state = "downloading",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "399", name = "Official_Vol. 1 Ch. 2" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        assert.are.equal(1, #context.scheduled)
+        assert.are.equal("m1:398", context.saved_queue()[1].key)
+        assert.are.equal("m1:399", context.saved_queue()[2].key)
+    end)
+
+    it("keeps failed jobs with progress failed during recovery", function()
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m1:398",
+                    state = "failed",
+                    download_directory = "/books",
+                    progress = {
+                        state = "failed",
+                        current = 2,
+                        total = 5,
+                        error = "network timeout",
+                        updated_at = 99,
+                    },
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        assert.are.equal(0, #context.scheduled)
+        assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.are.equal("network timeout", context.saved_queue()[1].progress.error)
+        assert.are.equal("failed", context.queue:getStatus(
+            { id = "m1", title = "Sousou no Frieren" },
+            { id = "398", name = "Official_Vol. 1 Ch. 1" }
+        ).state)
+    end)
+
+    it("logs recovered interrupted downloads with progress context", function()
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m1:398",
+                    state = "downloading",
+                    download_directory = "/books",
+                    progress = {
+                        state = "downloading",
+                        current = 2,
+                        total = 5,
+                    },
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        assert.are.same({
+            {
+                operation = "downloadQueue.recover",
+                event = "interrupted",
+                key = "m1:398",
+                chapter_id = "398",
+                previous_state = "downloading",
+                progress_state = "downloading",
+                progress_current = 2,
+                progress_total = 5,
+                cleanup_attempted = true,
+            },
+        }, context.debug_events)
     end)
 
     it("marks the active job failed when the watchdog expires", function()
