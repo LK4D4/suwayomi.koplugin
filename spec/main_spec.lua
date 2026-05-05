@@ -368,6 +368,95 @@ describe("suwayomi plugin", function()
         end
     end
 
+    local function install_bulk_confirmation_ui_stub(options)
+        options = options or {}
+        package.preload.suwayomi_ui = function()
+            return {
+                showConfirm = function(confirm_options)
+                    shown_confirm = confirm_options
+                end,
+                updateChapterMenu = options.updateChapterMenu or function() end,
+                showDirectoryChooser = function(callback)
+                    directory_chooser_callback = callback
+                end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+        package.loaded.suwayomi_ui = nil
+    end
+
+    local function install_bulk_download_settings(saved_queue, saved_ledger)
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue or {} end,
+                saveDownloadQueue = function(_, jobs)
+                    if saved_queue and saved_queue ~= jobs then
+                        for index = #saved_queue, 1, -1 do
+                            saved_queue[index] = nil
+                        end
+                        for _, job in ipairs(jobs or {}) do
+                            table.insert(saved_queue, job)
+                        end
+                    end
+                    return jobs
+                end,
+                loadChapterLedger = function() return saved_ledger or {} end,
+                saveChapterLedger = function(_, ledger)
+                    return ledger
+                end,
+            }
+        end
+        package.loaded.suwayomi_settings = nil
+    end
+
+    local function install_bulk_downloader_stub(options)
+        options = options or {}
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path)
+                    return chapter_path .. ".part"
+                end,
+                chapterExists = options.chapterExists or function()
+                    return false
+                end,
+                downloadChapterWithProgress = function() end,
+            }
+        end
+        package.loaded.suwayomi_downloader = nil
+    end
+
+    local function load_plugin_with_chapters(chapters, manga)
+        package.loaded.main = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.current_chapter_context = {
+            manga = manga or { id = "m1", title = "Sousou no Frieren" },
+            chapters = chapters,
+        }
+        return plugin
+    end
+
+    local function unread_chapters(count)
+        local chapters = {}
+        for index = 1, count do
+            table.insert(chapters, {
+                id = tostring(index),
+                name = "Ch. " .. tostring(index),
+                is_read = false,
+            })
+        end
+        return chapters
+    end
+
     after_each(function()
         package.preload.dispatcher = nil
         package.preload["ffi/util"] = nil
@@ -2004,69 +2093,11 @@ return {
     it("confirms before queueing the next 50 unread chapter downloads", function()
         local saved_queue = {}
 
-        package.preload.suwayomi_downloader = function()
-            return {
-                getTargetPath = function(_, download_directory, manga, chapter)
-                    return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
-                end,
-                getPartialPath = function(_, chapter_path)
-                    return chapter_path .. ".part"
-                end,
-                chapterExists = function()
-                    return false
-                end,
-                downloadChapterWithProgress = function() end,
-            }
-        end
+        install_bulk_downloader_stub()
+        install_bulk_confirmation_ui_stub()
+        install_bulk_download_settings(saved_queue)
 
-        package.preload.suwayomi_ui = function()
-            return {
-                showConfirm = function(options)
-                    shown_confirm = options
-                end,
-                updateChapterMenu = function() end,
-                showDirectoryChooser = function() end,
-                showLoginDialog = function() end,
-                showLanguageMenu = function() end,
-            }
-        end
-
-        package.preload.suwayomi_settings = function()
-            return {
-                load = function()
-                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
-                end,
-                loadDownloadDirectory = function() return "/books" end,
-                loadDownloadQueue = function() return saved_queue end,
-                saveDownloadQueue = function(_, jobs)
-                    saved_queue = jobs
-                    return jobs
-                end,
-                loadChapterLedger = function() return {} end,
-                saveChapterLedger = function(_, ledger) return ledger end,
-            }
-        end
-
-        package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
-
-        local plugin_class = require("main")
-        local plugin = plugin_class{}
-        local chapters = {}
-        for index = 1, 60 do
-            table.insert(chapters, {
-                id = tostring(index),
-                name = "Ch. " .. tostring(index),
-                is_read = false,
-            })
-        end
-        plugin.current_chapter_context = {
-            manga = { id = "m1", title = "Sousou no Frieren" },
-            chapters = chapters,
-        }
+        local plugin = load_plugin_with_chapters(unread_chapters(60))
 
         local handled = plugin:performBulkChapterAction("download_next_50_unread")
 
@@ -2083,56 +2114,11 @@ return {
     it("cancels the next 50 unread confirmation without queueing downloads", function()
         local saved_queue = {}
 
-        package.preload.suwayomi_downloader = function()
-            return {
-                getTargetPath = function(_, download_directory, manga, chapter)
-                    return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
-                end,
-                chapterExists = function()
-                    return false
-                end,
-            }
-        end
+        install_bulk_downloader_stub()
+        install_bulk_confirmation_ui_stub()
+        install_bulk_download_settings(saved_queue)
 
-        package.preload.suwayomi_ui = function()
-            return {
-                showConfirm = function(options)
-                    shown_confirm = options
-                end,
-                showDirectoryChooser = function() end,
-                showLoginDialog = function() end,
-                showLanguageMenu = function() end,
-            }
-        end
-
-        package.preload.suwayomi_settings = function()
-            return {
-                loadDownloadDirectory = function() return "/books" end,
-                loadDownloadQueue = function() return saved_queue end,
-                saveDownloadQueue = function(_, jobs)
-                    saved_queue = jobs
-                    return jobs
-                end,
-                loadChapterLedger = function() return {} end,
-                saveChapterLedger = function(_, ledger) return ledger end,
-            }
-        end
-
-        package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
-
-        local plugin_class = require("main")
-        local plugin = plugin_class{}
-        plugin.current_chapter_context = {
-            manga = { id = "m1", title = "Sousou no Frieren" },
-            chapters = {
-                { id = "1", name = "Ch. 1", is_read = false },
-                { id = "2", name = "Ch. 2", is_read = false },
-            },
-        }
+        local plugin = load_plugin_with_chapters(unread_chapters(2))
 
         plugin:performBulkChapterAction("download_next_50_unread")
 
@@ -2143,62 +2129,15 @@ return {
     it("confirms missing downloads before keeping the next 50 unread downloaded", function()
         local saved_queue = {}
 
-        package.preload.suwayomi_downloader = function()
-            return {
-                getTargetPath = function(_, download_directory, manga, chapter)
-                    return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
-                end,
-                getPartialPath = function(_, chapter_path)
-                    return chapter_path .. ".part"
-                end,
-                chapterExists = function(_, chapter_path)
-                    return chapter_path == "/books/Sousou no Frieren/Ch. 2.cbz"
-                end,
-                downloadChapterWithProgress = function() end,
-            }
-        end
+        install_bulk_downloader_stub({
+            chapterExists = function(_, chapter_path)
+                return chapter_path == "/books/Sousou no Frieren/Ch. 2.cbz"
+            end,
+        })
+        install_bulk_confirmation_ui_stub()
+        install_bulk_download_settings(saved_queue)
 
-        package.preload.suwayomi_ui = function()
-            return {
-                showConfirm = function(options)
-                    shown_confirm = options
-                end,
-                updateChapterMenu = function() end,
-                showDirectoryChooser = function() end,
-                showLoginDialog = function() end,
-                showLanguageMenu = function() end,
-            }
-        end
-
-        package.preload.suwayomi_settings = function()
-            return {
-                loadDownloadDirectory = function() return "/books" end,
-                loadDownloadQueue = function() return saved_queue end,
-                saveDownloadQueue = function(_, jobs)
-                    saved_queue = jobs
-                    return jobs
-                end,
-                loadChapterLedger = function() return {} end,
-                saveChapterLedger = function(_, ledger) return ledger end,
-            }
-        end
-
-        package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
-
-        local plugin_class = require("main")
-        local plugin = plugin_class{}
-        plugin.current_chapter_context = {
-            manga = { id = "m1", title = "Sousou no Frieren" },
-            chapters = {
-                { id = "1", name = "Ch. 1", is_read = false },
-                { id = "2", name = "Ch. 2", is_read = false },
-                { id = "3", name = "Ch. 3", is_read = false },
-            },
-        }
+        local plugin = load_plugin_with_chapters(unread_chapters(3))
 
         plugin:performBulkChapterAction("keep_next_50_unread")
 
@@ -2381,58 +2320,19 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
-            return {
-                getTargetPath = function(_, download_directory, manga, chapter)
-                    return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
-                end,
-                chapterExists = function(_, chapter_path)
-                    return chapter_path == "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
-                end,
-            }
-        end
+        install_bulk_downloader_stub({
+            chapterExists = function(_, chapter_path)
+                return chapter_path == "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
+            end,
+        })
+        install_bulk_confirmation_ui_stub()
+        install_bulk_download_settings({}, saved_ledger)
 
-        package.preload.suwayomi_ui = function()
-            return {
-                showConfirm = function(options)
-                    shown_confirm = options
-                end,
-                updateChapterMenu = function() end,
-                showDirectoryChooser = function() end,
-                showLoginDialog = function() end,
-                showLanguageMenu = function() end,
-            }
-        end
-
-        package.preload.suwayomi_settings = function()
-            return {
-                loadDownloadDirectory = function() return "/books" end,
-                loadDownloadQueue = function() return {} end,
-                saveDownloadQueue = function(_, jobs) return jobs end,
-                loadChapterLedger = function() return saved_ledger end,
-                saveChapterLedger = function(_, ledger)
-                    saved_ledger = ledger
-                    return ledger
-                end,
-            }
-        end
-
-        package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
-
-        local plugin_class = require("main")
-        local plugin = plugin_class{}
+        local plugin = load_plugin_with_chapters({
+            { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = true },
+            { id = "399", name = "Official_Vol. 1 Ch. 2", is_read = false },
+        })
         plugin.current_chapter_menu = {}
-        plugin.current_chapter_context = {
-            manga = { id = "m1", title = "Sousou no Frieren" },
-            chapters = {
-                { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = true },
-                { id = "399", name = "Official_Vol. 1 Ch. 2", is_read = false },
-            },
-        }
         plugin:setChapterDownloadStatus(
             plugin.current_chapter_context.manga,
             plugin.current_chapter_context.chapters[1],
