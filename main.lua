@@ -1528,9 +1528,9 @@ function SuwayomiPlugin:getBulkChapterActions()
 
     if self:getSelectedChapterCount() > 0 then
         table.insert(actions, { id = "download_selected", text = _("Download selected") })
-        table.insert(actions, { id = "delete_selected", text = _("Delete selected from device") })
-        table.insert(actions, { id = "mark_read_selected", text = _("Mark selected as read") })
-        table.insert(actions, { id = "mark_unread_selected", text = _("Mark selected as unread") })
+        table.insert(actions, { id = "delete_selected", text = _("Delete downloads") })
+        table.insert(actions, { id = "mark_read_selected", text = _("Mark read") })
+        table.insert(actions, { id = "mark_unread_selected", text = _("Mark unread") })
         table.insert(actions, { id = "clear_selection", text = _("Clear selection") })
         return actions
     end
@@ -2190,8 +2190,15 @@ function SuwayomiPlugin:showBulkChapterActions(manga)
     end
 
     local count = self:getSelectedChapterCount()
+    local title = _("Chapter downloads")
+    if count > 0 then
+        title = T(
+            self:pluralize(count, _("%1 selected chapter"), _("%1 selected chapters")),
+            count
+        )
+    end
     local options = {
-        title = count > 0 and T(_("%1 selected chapters"), count) or _("Chapter downloads"),
+        title = title,
         actions = self:getBulkChapterActions(),
     }
 

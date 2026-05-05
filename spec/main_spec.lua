@@ -1808,6 +1808,11 @@ return {
         plugin:browseSuwayomi()
 
         hold_chapter(shown_chapter_menu.chapters[1])
+
+        assert.are.equal("1 selected", shown_chapter_menu.title)
+        tap_bulk_actions()
+        assert.are.equal("1 selected chapter", shown_actions_menu.title)
+
         tap_chapter(shown_chapter_menu.chapters[3])
 
         assert.are.equal("2 selected", shown_chapter_menu.title)
@@ -1823,9 +1828,9 @@ return {
 
         assert.are.equal("2 selected chapters", shown_actions_menu.title)
         assert.are.equal("Download selected", shown_actions_menu.actions[1].text)
-        assert.are.equal("Delete selected from device", shown_actions_menu.actions[2].text)
-        assert.are.equal("Mark selected as read", shown_actions_menu.actions[3].text)
-        assert.are.equal("Mark selected as unread", shown_actions_menu.actions[4].text)
+        assert.are.equal("Delete downloads", shown_actions_menu.actions[2].text)
+        assert.are.equal("Mark read", shown_actions_menu.actions[3].text)
+        assert.are.equal("Mark unread", shown_actions_menu.actions[4].text)
         assert.are.equal("Clear selection", shown_actions_menu.actions[5].text)
         assert.is_nil(shown_actions_menu.actions[6])
 
@@ -2892,7 +2897,7 @@ return {
         plugin.selection_mode = true
 
         local bulk_actions = plugin:getBulkChapterActions()
-        assert.are.equal("Delete selected from device", bulk_actions[2].text)
+        assert.are.equal("Delete downloads", bulk_actions[2].text)
 
         plugin:performBulkChapterAction("delete_selected")
         os.remove = original_remove
