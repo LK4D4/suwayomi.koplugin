@@ -137,7 +137,10 @@ end
 function SuwayomiPlugin:getHomeMenuOptions()
     return {
         title_bar_left_icon = "appbar.home",
-        on_title_bar_left_tap = function()
+        on_title_bar_left_tap = function(menu)
+            if menu and UIManager.close then
+                UIManager:close(menu)
+            end
             self:showHome()
             return true
         end,

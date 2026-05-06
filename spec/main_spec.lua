@@ -10,6 +10,7 @@ describe("suwayomi plugin", function()
     local shown_messages
     local shown_loading_messages
     local closed_loading_messages
+    local closed_widgets
     local force_repaint_count
     local shown_sources
     local shown_sources_menu_options
@@ -39,6 +40,7 @@ describe("suwayomi plugin", function()
         shown_messages = {}
         shown_loading_messages = {}
         closed_loading_messages = {}
+        closed_widgets = {}
         force_repaint_count = 0
         shown_sources = nil
         shown_sources_menu_options = nil
@@ -197,6 +199,7 @@ describe("suwayomi plugin", function()
                     end
                 end,
                 close = function(_, widget)
+                    table.insert(closed_widgets, widget)
                     if widget and widget.suwayomi_loading then
                         table.insert(closed_loading_messages, widget.text)
                     end
@@ -1118,16 +1121,18 @@ return {
         local plugin_class = require("main")
         local menu_items = {}
         local plugin = plugin_class{}
+        local source_menu = { name = "source-menu" }
 
         plugin:addToMainMenu(menu_items)
         triggerHomeAction(plugin, "browse")
 
         assert.are.equal("appbar.home", shown_sources_menu_options.title_bar_left_icon)
 
-        shown_sources_menu_options.on_title_bar_left_tap()
+        shown_sources_menu_options.on_title_bar_left_tap(source_menu)
 
         assert.is_table(home_dialog_options)
         assert.are.equal("Library", home_dialog_options.actions[1].text)
+        assert.are.equal(source_menu, closed_widgets[#closed_widgets])
     end)
 
     it("shows loading feedback around source, manga, and chapter fetches", function()
