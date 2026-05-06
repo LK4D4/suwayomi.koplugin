@@ -3,6 +3,7 @@ local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local InfoMessage = require("ui/widget/infomessage")
 local SuwayomiAPI = require("suwayomi_api")
+local SuwayomiClient = require("suwayomi_client")
 local SuwayomiDownloadQueue = require("suwayomi_download_queue")
 local SuwayomiReadSyncWorker = require("suwayomi_read_sync_worker")
 local SuwayomiSourceFetchWorker = require("suwayomi_source_fetch_worker")
@@ -68,6 +69,24 @@ function SuwayomiPlugin:getDownloadQueue()
         self.download_queue = self:createDownloadQueue()
     end
     return self.download_queue
+end
+
+function SuwayomiPlugin:createClient()
+    return SuwayomiClient:new{
+        api = SuwayomiAPI,
+        ui = SuwayomiUI,
+        settings = SuwayomiSettings,
+        debug = SuwayomiDebug,
+        plugin = self,
+        gettext = _,
+    }
+end
+
+function SuwayomiPlugin:getClient()
+    if not self.client then
+        self.client = self:createClient()
+    end
+    return self.client
 end
 
 function SuwayomiPlugin:withChapterMenuRefreshSuppressed(callback)
@@ -609,50 +628,11 @@ function SuwayomiPlugin:browseSuwayomi()
 end
 
 function SuwayomiPlugin:showMangaForSource(source)
-    return SuwayomiDebug.time("showMangaForSource", {
-        source_id = source and source.id,
-    }, function()
-        local credentials = SuwayomiSettings:load()
-        local result = self:withLoadingMessage("manga", _("Loading manga..."), function()
-            return SuwayomiAPI.fetchMangaForSource(credentials, source.id)
-        end)
-        if not result then
-            return
-        end
-        if not result.ok then
-            self:showMessage(_(result.error))
-            return
-        end
-
-        SuwayomiDebug.log({
-            operation = "showMangaForSource",
-            event = "manga_loaded",
-            source_id = source and source.id,
-            manga_count = #(result.manga or {}),
-        })
-        if not result.manga or #result.manga == 0 then
-            self:showMessage(_("This source has no manga."))
-            return
-        end
-
-        SuwayomiUI.showMangaMenu(result.manga, function(manga)
-            self:attachSourceToManga(manga, source)
-            self:showChaptersForManga(manga)
-        end)
-    end)
+    return self:getClient():showMangaForSource(source)
 end
 
 function SuwayomiPlugin:attachSourceToManga(manga, source)
-    if type(manga) ~= "table" or type(source) ~= "table" then
-        return manga
-    end
-
-    manga.source = manga.source or {}
-    manga.source.id = manga.source.id or source.id
-    manga.source.displayName = manga.source.displayName or source.displayName or source.display_name
-    manga.source.name = manga.source.name or source.raw_name or source.name
-    manga.source.lang = manga.source.lang or source.lang
-    return manga
+    return self:getClient():attachSourceToManga(manga, source)
 end
 
 function SuwayomiPlugin:showChaptersForManga(manga)

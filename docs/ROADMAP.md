@@ -84,13 +84,13 @@ Exit criteria:
 
 ### 1.2 Client orchestration module
 
-- [ ] Add `suwayomi_client.lua`
-- [ ] Move small existing browse orchestration pieces out of `main.lua` when it reduces pressure
-- [ ] Keep plugin lifecycle, main menu registration, and KOReader integration in `main.lua`
-- [ ] Keep API parsing in `suwayomi_api.lua`
-- [ ] Keep KOReader menu/dialog construction in `suwayomi_ui.lua`
-- [ ] Keep queue mechanics in `suwayomi_download_queue.lua`
-- [ ] Avoid extracting read-state reconciliation unless a later slice truly needs it
+- [x] Add `suwayomi_client.lua`
+- [x] Move small existing browse orchestration pieces out of `main.lua` when it reduces pressure
+- [x] Keep plugin lifecycle, main menu registration, and KOReader integration in `main.lua`
+- [x] Keep API parsing in `suwayomi_api.lua`
+- [x] Keep KOReader menu/dialog construction in `suwayomi_ui.lua`
+- [x] Keep queue mechanics in `suwayomi_download_queue.lua`
+- [x] Avoid extracting read-state reconciliation unless a later slice truly needs it
 
 Exit criteria:
 

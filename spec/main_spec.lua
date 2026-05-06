@@ -128,6 +128,7 @@ describe("suwayomi plugin", function()
         package.loaded["ui/widget/infomessage"] = nil
         package.loaded["ui/widget/container/widgetcontainer"] = nil
         package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_client = nil
         package.loaded.suwayomi_download_queue = nil
         package.loaded.suwayomi_downloader = nil
         package.loaded.suwayomi_read_sync_worker = nil
@@ -137,6 +138,7 @@ describe("suwayomi plugin", function()
         package.loaded.suwayomi_debug = nil
         package.loaded.lfs = nil
         package.loaded.device = nil
+        package.preload.suwayomi_client = nil
 
         package.preload.dispatcher = function()
             return {
