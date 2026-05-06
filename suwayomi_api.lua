@@ -134,14 +134,159 @@ function SuwayomiAPI.parseSourcesResponse(response_body)
     return parsed_sources
 end
 
-function SuwayomiAPI._buildMangaQuery(source_id)
+local function normalizeNumber(value, fallback)
+    local number = tonumber(value)
+    if number then
+        return number
+    end
+    return fallback
+end
+
+local function parseSource(source)
+    if type(source) ~= "table" then
+        return nil
+    end
+    return {
+        id = source.id ~= nil and tostring(source.id) or nil,
+        displayName = source.displayName,
+        name = source.name,
+        lang = source.lang,
+    }
+end
+
+local function parseChapterNode(chapter)
+    if type(chapter) ~= "table" then
+        return nil
+    end
+
+    local chapter_name = chapter.name
+    if not chapter_name or chapter_name == "" then
+        chapter_name = chapter.chapterNumber and ("Chapter " .. tostring(chapter.chapterNumber)) or tostring(chapter.id)
+    end
+
+    return {
+        id = tostring(chapter.id),
+        name = chapter_name,
+        chapter_number = chapter.chapterNumber,
+        source_order = chapter.sourceOrder,
+        is_read = chapter.isRead == true,
+    }
+end
+
+local function parseMangaNode(entry)
+    local manga = {
+        id = tostring(entry.id),
+        title = entry.title or tostring(entry.id),
+    }
+    if entry.inLibrary ~= nil then
+        manga.in_library = entry.inLibrary == true
+    end
+    if entry.unreadCount ~= nil then
+        manga.unread_count = tonumber(entry.unreadCount) or 0
+    end
+    if entry.downloadCount ~= nil then
+        manga.download_count = tonumber(entry.downloadCount) or 0
+    end
+    if entry.initialized ~= nil then
+        manga.initialized = entry.initialized == true
+    end
+    if entry.thumbnailUrl ~= nil then
+        manga.thumbnail_url = entry.thumbnailUrl
+    end
+
+    local source = parseSource(entry.source)
+    if source then
+        manga.source = source
+    end
+
+    if entry.categories and type(entry.categories.nodes) == "table" then
+        manga.categories = {}
+        for _, category in ipairs(entry.categories.nodes) do
+            table.insert(manga.categories, {
+                id = tostring(category.id),
+                name = category.name or tostring(category.id),
+                order = category.order,
+            })
+        end
+    end
+
+    manga.first_unread_chapter = parseChapterNode(entry.firstUnreadChapter)
+    manga.latest_fetched_chapter = parseChapterNode(entry.latestFetchedChapter)
+    return manga
+end
+
+function SuwayomiAPI._buildMangaQuery(options)
+    options = options or {}
+    local input = {
+        source = tostring(options.source_id),
+        page = normalizeNumber(options.page, 1),
+        type = options.type or "POPULAR",
+    }
+    if options.query and options.query ~= "" then
+        input.query = options.query
+    end
+    if options.filters then
+        input.filters = options.filters
+    end
+
     return json.encode({
-        query = "mutation GET_SOURCE_MANGAS_FETCH($input: FetchSourceMangaInput!) { fetchSourceManga(input: $input) { hasNextPage mangas { id title } } }",
+        query = "mutation GET_SOURCE_MANGAS_FETCH($input: FetchSourceMangaInput!) { fetchSourceManga(input: $input) { hasNextPage mangas { id title inLibrary initialized thumbnailUrl source { id displayName name lang } } } }",
+        variables = {
+            input = input,
+        },
+    })
+end
+
+function SuwayomiAPI._buildLibraryMangaQuery(options)
+    options = options or {}
+    local variables = {
+        filter = {
+            inLibrary = {
+                equalTo = true,
+            },
+        },
+        first = normalizeNumber(options.first, 100),
+        offset = normalizeNumber(options.offset, 0),
+    }
+    if options.order then
+        variables.order = options.order
+    end
+
+    return json.encode({
+        query = "query GET_LIBRARY_MANGAS($filter: MangaFilterInput, $first: Int, $offset: Int, $order: [MangaOrderInput!]) { mangas(filter: $filter, first: $first, offset: $offset, order: $order) { totalCount nodes { id title inLibrary unreadCount downloadCount initialized thumbnailUrl source { id displayName name lang } categories { nodes { id name order } } firstUnreadChapter { id name chapterNumber sourceOrder isRead } latestFetchedChapter { id name chapterNumber sourceOrder isRead } } } }",
+        variables = variables,
+    })
+end
+
+function SuwayomiAPI._buildCategoryQuery()
+    return json.encode({
+        query = "query GET_LIBRARY_CATEGORIES { categories { nodes { id name order mangas(condition: { inLibrary: true }) { totalCount } } } }",
+    })
+end
+
+function SuwayomiAPI._buildUpdateMangaLibraryMutation(manga_id, in_library)
+    return json.encode({
+        query = "mutation UPDATE_MANGA_LIBRARY($input: UpdateMangaInput!) { updateManga(input: $input) { manga { id inLibrary inLibraryAt } } }",
         variables = {
             input = {
-                source = tostring(source_id),
-                page = 1,
-                type = "POPULAR",
+                id = tonumber(manga_id) or manga_id,
+                patch = {
+                    inLibrary = in_library == true,
+                },
+            },
+        },
+    })
+end
+
+function SuwayomiAPI._buildRefreshMangaMutation(manga_id)
+    return json.encode({
+        query = "mutation REFRESH_MANGA($manga: FetchMangaInput!, $chapters: FetchChaptersInput!) { fetchManga(input: $manga) { manga { id title initialized thumbnailUrl source { id displayName name lang } } } fetchChapters(input: $chapters) { chapters { id name chapterNumber sourceOrder scanlator isRead } } }",
+        variables = {
+            manga = {
+                id = tonumber(manga_id) or manga_id,
+            },
+            chapters = {
+                mangaId = tonumber(manga_id) or manga_id,
             },
         },
     })
@@ -153,10 +298,11 @@ function SuwayomiAPI.parseMangaResponse(response_body)
         return nil, "Invalid response from Suwayomi server."
     end
 
-    local manga_nodes = payload
+    local source_manga = payload
         and payload.data
         and payload.data.fetchSourceManga
-        and payload.data.fetchSourceManga.mangas
+    local manga_nodes = source_manga
+        and source_manga.mangas
 
     if type(manga_nodes) ~= "table" then
         local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
@@ -165,13 +311,116 @@ function SuwayomiAPI.parseMangaResponse(response_body)
 
     local manga = {}
     for _, entry in ipairs(manga_nodes) do
-        table.insert(manga, {
-            id = tostring(entry.id),
-            title = entry.title or tostring(entry.id),
-        })
+        table.insert(manga, parseMangaNode(entry))
     end
 
-    return manga
+    return manga, source_manga.hasNextPage == true
+end
+
+function SuwayomiAPI.parseLibraryMangaResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local mangas = payload and payload.data and payload.data.mangas
+    local manga_nodes = mangas and mangas.nodes
+    if type(manga_nodes) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not return a library manga list."
+    end
+
+    local parsed = {}
+    for _, entry in ipairs(manga_nodes) do
+        table.insert(parsed, parseMangaNode(entry))
+    end
+    return {
+        total_count = tonumber(mangas.totalCount) or #parsed,
+        manga = parsed,
+    }
+end
+
+function SuwayomiAPI.parseCategoryResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local category_nodes = payload
+        and payload.data
+        and payload.data.categories
+        and payload.data.categories.nodes
+    if type(category_nodes) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not return categories."
+    end
+
+    local categories = {}
+    for _, category in ipairs(category_nodes) do
+        table.insert(categories, {
+            id = tostring(category.id),
+            name = category.name or tostring(category.id),
+            order = category.order,
+            manga_count = category.mangas and tonumber(category.mangas.totalCount) or 0,
+        })
+    end
+    return categories
+end
+
+function SuwayomiAPI.parseUpdateMangaLibraryResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local manga = payload
+        and payload.data
+        and payload.data.updateManga
+        and payload.data.updateManga.manga
+    if type(manga) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not update manga library state."
+    end
+
+    return {
+        id = tostring(manga.id),
+        in_library = manga.inLibrary == true,
+        in_library_at = manga.inLibraryAt,
+    }
+end
+
+function SuwayomiAPI.parseRefreshMangaResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local manga = payload
+        and payload.data
+        and payload.data.fetchManga
+        and payload.data.fetchManga.manga
+    local chapter_nodes = payload
+        and payload.data
+        and payload.data.fetchChapters
+        and payload.data.fetchChapters.chapters
+    if type(manga) ~= "table" or type(chapter_nodes) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not refresh manga."
+    end
+
+    local chapters = {}
+    for _, chapter in ipairs(chapter_nodes) do
+        local parsed_chapter = parseChapterNode(chapter)
+        table.insert(chapters, {
+            id = parsed_chapter.id,
+            name = parsed_chapter.name,
+            is_read = parsed_chapter.is_read,
+        })
+    end
+    return {
+        manga = parseMangaNode(manga),
+        chapters = chapters,
+    }
 end
 
 function SuwayomiAPI._buildChapterQuery(manga_id)
@@ -612,14 +861,15 @@ function SuwayomiAPI.fetchSources(credentials)
     }
 end
 
-function SuwayomiAPI.fetchMangaForSource(credentials, source_id)
-    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildMangaQuery(source_id), "fetchMangaForSource")
+function SuwayomiAPI.fetchMangaForSource(credentials, options)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildMangaQuery(options), "fetchMangaForSource")
     if not result.ok then
         return result
     end
 
-    local manga, parse_error = SuwayomiAPI.parseMangaResponse(result.response_body)
+    local manga, parse_result = SuwayomiAPI.parseMangaResponse(result.response_body)
     if not manga then
+        local parse_error = parse_result
         logDebugEvent({ operation = "fetchMangaForSource", event = "parse_error", error = parse_error })
         return {
             ok = false,
@@ -630,6 +880,97 @@ function SuwayomiAPI.fetchMangaForSource(credentials, source_id)
     return {
         ok = true,
         manga = manga,
+        has_next_page = parse_result == true,
+    }
+end
+
+function SuwayomiAPI.fetchLibraryManga(credentials, options)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildLibraryMangaQuery(options), "fetchLibraryManga")
+    if not result.ok then
+        return result
+    end
+
+    local parsed, parse_error = SuwayomiAPI.parseLibraryMangaResponse(result.response_body)
+    if not parsed then
+        logDebugEvent({ operation = "fetchLibraryManga", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        manga = parsed.manga,
+        total_count = parsed.total_count,
+    }
+end
+
+function SuwayomiAPI.fetchCategories(credentials)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildCategoryQuery(), "fetchCategories")
+    if not result.ok then
+        return result
+    end
+
+    local categories, parse_error = SuwayomiAPI.parseCategoryResponse(result.response_body)
+    if not categories then
+        logDebugEvent({ operation = "fetchCategories", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        categories = categories,
+    }
+end
+
+function SuwayomiAPI.updateMangaLibraryState(credentials, manga_id, in_library)
+    local result = performGraphQLRequest(
+        credentials,
+        SuwayomiAPI._buildUpdateMangaLibraryMutation(manga_id, in_library),
+        "updateMangaLibraryState"
+    )
+    if not result.ok then
+        return result
+    end
+
+    local manga, parse_error = SuwayomiAPI.parseUpdateMangaLibraryResponse(result.response_body)
+    if not manga then
+        logDebugEvent({ operation = "updateMangaLibraryState", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        manga = manga,
+    }
+end
+
+function SuwayomiAPI.refreshManga(credentials, manga_id)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildRefreshMangaMutation(manga_id), "refreshManga")
+    if not result.ok then
+        return result
+    end
+
+    local parsed, parse_error = SuwayomiAPI.parseRefreshMangaResponse(result.response_body)
+    if not parsed then
+        logDebugEvent({ operation = "refreshManga", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        manga = parsed.manga,
+        chapters = parsed.chapters,
     }
 end
 

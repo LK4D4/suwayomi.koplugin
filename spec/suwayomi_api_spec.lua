@@ -11,6 +11,49 @@ describe("suwayomi_api", function()
         api = require("suwayomi_api")
     end)
 
+    local function install_graphql_stub(response_body)
+        local request = {}
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    request.body = options.source
+                    request.timeout = options.timeout
+                    options.sink("ignored")
+                    return 1, 200
+                end,
+            }
+        end
+
+        package.preload.ltn12 = function()
+            return {
+                source = {
+                    string = function(value)
+                        return value
+                    end,
+                },
+                sink = {
+                    table = function(target)
+                        return function(_chunk)
+                            table.insert(target, response_body)
+                        end
+                    end,
+                },
+            }
+        end
+
+        return request
+    end
+
+    local function valid_credentials()
+        return {
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }
+    end
+
     it("should build correct GraphQL query for sources", function()
         local query = api._buildSourcesQuery()
         assert.truthy(query:match("query getSources"))
@@ -18,11 +61,73 @@ describe("suwayomi_api", function()
     end)
 
     it("builds the manga query for a source", function()
-        local query = api._buildMangaQuery("2499283573021220255")
+        local query = api._buildMangaQuery({
+            source_id = "2499283573021220255",
+            page = 2,
+            type = "SEARCH",
+            query = "frieren",
+        })
         assert.truthy(query:match("mutation GET_SOURCE_MANGAS_FETCH"))
         assert.truthy(query:match('"source":"2499283573021220255"'))
-        assert.truthy(query:match('"page":1'))
-        assert.truthy(query:match('"type":"POPULAR"'))
+        assert.truthy(query:match('"page":2'))
+        assert.truthy(query:match('"type":"SEARCH"'))
+        assert.truthy(query:match('"query":"frieren"'))
+        assert.truthy(query:match("hasNextPage"))
+        assert.truthy(query:match("inLibrary"))
+        assert.truthy(query:match("initialized"))
+        assert.truthy(query:match("thumbnailUrl"))
+        assert.truthy(query:match("source { id displayName name lang }"))
+    end)
+
+    it("builds source manga queries for browse modes", function()
+        for _, mode in ipairs({ "POPULAR", "LATEST", "SEARCH" }) do
+            local query = api._buildMangaQuery({
+                source_id = "source-1",
+                type = mode,
+            })
+
+            assert.truthy(query:match('"source":"source%-1"'))
+            assert.truthy(query:match('"type":"' .. mode .. '"'))
+        end
+    end)
+
+    it("builds the library manga query", function()
+        local query = api._buildLibraryMangaQuery({ first = 50, offset = 10 })
+
+        assert.truthy(query:match("query GET_LIBRARY_MANGAS"))
+        assert.truthy(query:match('"inLibrary":%{"equalTo":true%}'))
+        assert.truthy(query:match('"first":50'))
+        assert.truthy(query:match('"offset":10'))
+        assert.truthy(query:match("unreadCount"))
+        assert.truthy(query:match("firstUnreadChapter"))
+        assert.truthy(query:match("categories"))
+    end)
+
+    it("builds the category query", function()
+        local query = api._buildCategoryQuery()
+
+        assert.truthy(query:match("query GET_LIBRARY_CATEGORIES"))
+        assert.truthy(query:match("categories"))
+        assert.truthy(query:match("mangas%(condition: { inLibrary: true }%)"))
+    end)
+
+    it("builds the manga library update mutation", function()
+        local query = api._buildUpdateMangaLibraryMutation("17", true)
+
+        assert.truthy(query:match("mutation UPDATE_MANGA_LIBRARY"))
+        assert.truthy(query:match('"id":17'))
+        assert.truthy(query:match('"inLibrary":true'))
+        assert.truthy(query:match("inLibraryAt"))
+    end)
+
+    it("builds the manga refresh mutation", function()
+        local query = api._buildRefreshMangaMutation("17")
+
+        assert.truthy(query:match("mutation REFRESH_MANGA"))
+        assert.truthy(query:match("fetchManga"))
+        assert.truthy(query:match("fetchChapters"))
+        assert.truthy(query:match('"id":17'))
+        assert.truthy(query:match('"mangaId":17'))
     end)
 
     it("builds a basic auth header from credentials", function()
@@ -73,21 +178,132 @@ describe("suwayomi_api", function()
             {
                 "data": {
                     "fetchSourceManga": {
+                        "hasNextPage": true,
                         "mangas": [
-                            { "id": 1, "title": "One Piece" },
-                            { "id": 2, "title": "Frieren" }
+                            {
+                                "id": 1,
+                                "title": "One Piece",
+                                "inLibrary": true,
+                                "initialized": false,
+                                "thumbnailUrl": "/thumb/op.jpg",
+                                "source": { "id": "s1", "displayName": "MangaDex (EN)", "name": "MangaDex", "lang": "en" }
+                            },
+                            { "id": 2, "title": "Frieren", "inLibrary": false, "initialized": true }
                         ]
                     }
                 }
             }
         ]]
 
-        local manga = api.parseMangaResponse(response)
+        local manga, has_next_page = api.parseMangaResponse(response)
 
         assert.are.same({
-            { id = "1", title = "One Piece" },
-            { id = "2", title = "Frieren" },
+            {
+                id = "1",
+                title = "One Piece",
+                in_library = true,
+                initialized = false,
+                thumbnail_url = "/thumb/op.jpg",
+                source = { id = "s1", displayName = "MangaDex (EN)", name = "MangaDex", lang = "en" },
+            },
+            { id = "2", title = "Frieren", in_library = false, initialized = true },
         }, manga)
+        assert.is_true(has_next_page)
+    end)
+
+    it("parses library manga responses", function()
+        local response = [[
+            {
+                "data": {
+                    "mangas": {
+                        "totalCount": 1,
+                        "nodes": [
+                            {
+                                "id": 17,
+                                "title": "Sousou no Frieren",
+                                "inLibrary": true,
+                                "unreadCount": 12,
+                                "downloadCount": 3,
+                                "initialized": true,
+                                "thumbnailUrl": "/thumb/frieren.jpg",
+                                "source": { "id": "local", "displayName": "Local source", "name": "Local", "lang": "localsourcelang" },
+                                "categories": { "nodes": [ { "id": 1, "name": "Default", "order": 0 } ] },
+                                "firstUnreadChapter": { "id": 398, "name": "Ch. 1", "chapterNumber": 1, "sourceOrder": 1, "isRead": false },
+                                "latestFetchedChapter": { "id": 399, "name": "Ch. 2", "chapterNumber": 2, "sourceOrder": 2, "isRead": false }
+                            }
+                        ]
+                    }
+                }
+            }
+        ]]
+
+        local result = api.parseLibraryMangaResponse(response)
+
+        assert.are.equal(1, result.total_count)
+        assert.are.same({
+            {
+                id = "17",
+                title = "Sousou no Frieren",
+                in_library = true,
+                unread_count = 12,
+                download_count = 3,
+                initialized = true,
+                thumbnail_url = "/thumb/frieren.jpg",
+                source = { id = "local", displayName = "Local source", name = "Local", lang = "localsourcelang" },
+                categories = { { id = "1", name = "Default", order = 0 } },
+                first_unread_chapter = { id = "398", name = "Ch. 1", chapter_number = 1, source_order = 1, is_read = false },
+                latest_fetched_chapter = { id = "399", name = "Ch. 2", chapter_number = 2, source_order = 2, is_read = false },
+            },
+        }, result.manga)
+    end)
+
+    it("parses categories responses", function()
+        local response = [[
+            {
+                "data": {
+                    "categories": {
+                        "nodes": [
+                            { "id": 1, "name": "Default", "order": 0, "mangas": { "totalCount": 5 } },
+                            { "id": 2, "name": "Reading", "order": 1, "mangas": { "totalCount": 12 } }
+                        ]
+                    }
+                }
+            }
+        ]]
+
+        local categories = api.parseCategoryResponse(response)
+
+        assert.are.same({
+            { id = "1", name = "Default", order = 0, manga_count = 5 },
+            { id = "2", name = "Reading", order = 1, manga_count = 12 },
+        }, categories)
+    end)
+
+    it("parses manga library update responses", function()
+        local response = [[
+            { "data": { "updateManga": { "manga": { "id": 17, "inLibrary": true, "inLibraryAt": "2026-05-06T12:00:00Z" } } } }
+        ]]
+
+        local manga = api.parseUpdateMangaLibraryResponse(response)
+
+        assert.are.same({
+            id = "17",
+            in_library = true,
+            in_library_at = "2026-05-06T12:00:00Z",
+        }, manga)
+    end)
+
+    it("parses manga refresh responses", function()
+        local response = [[
+            { "data": { "fetchManga": { "manga": { "id": 17, "title": "Frieren", "initialized": true } }, "fetchChapters": { "chapters": [ { "id": 398, "name": "Ch. 1", "isRead": false } ] } } }
+        ]]
+
+        local result = api.parseRefreshMangaResponse(response)
+
+        assert.are.same({
+            manga = { id = "17", title = "Frieren", initialized = true },
+            chapters = { { id = "398", name = "Ch. 1", is_read = false } },
+        }, result)
     end)
 
     it("fetches manga for a source and parses the response", function()
@@ -127,13 +343,76 @@ describe("suwayomi_api", function()
             username = "alice",
             password = "secret",
             auth_method = "basic_auth",
-        }, "source-1")
+        }, {
+            source_id = "source-1",
+            page = 3,
+            type = "LATEST",
+        })
 
         assert.is_true(result.ok)
         assert.truthy(requested_body:match("GET_SOURCE_MANGAS_FETCH"))
         assert.truthy(requested_body:match('"source":"source%-1"'))
+        assert.truthy(requested_body:match('"page":3'))
+        assert.truthy(requested_body:match('"type":"LATEST"'))
         assert.are.equal(15, requested_timeout)
         assert.are.same({ { id = "1", title = "One Piece" } }, result.manga)
+        assert.is_false(result.has_next_page)
+    end)
+
+    it("fetches library manga and parses totals", function()
+        local request = install_graphql_stub([[{"data":{"mangas":{"totalCount":1,"nodes":[{"id":17,"title":"Frieren","inLibrary":true}]}}}]])
+
+        local result = api.fetchLibraryManga(valid_credentials(), { first = 20, offset = 40 })
+
+        assert.is_true(result.ok)
+        assert.truthy(request.body:match("GET_LIBRARY_MANGAS"))
+        assert.truthy(request.body:match('"first":20'))
+        assert.truthy(request.body:match('"offset":40'))
+        assert.are.equal(15, request.timeout)
+        assert.are.equal(1, result.total_count)
+        assert.are.same({
+            { id = "17", title = "Frieren", in_library = true },
+        }, result.manga)
+    end)
+
+    it("fetches library categories", function()
+        local request = install_graphql_stub([[{"data":{"categories":{"nodes":[{"id":1,"name":"Default","order":0,"mangas":{"totalCount":7}}]}}}]])
+
+        local result = api.fetchCategories(valid_credentials())
+
+        assert.is_true(result.ok)
+        assert.truthy(request.body:match("GET_LIBRARY_CATEGORIES"))
+        assert.are.same({
+            { id = "1", name = "Default", order = 0, manga_count = 7 },
+        }, result.categories)
+    end)
+
+    it("updates manga library membership", function()
+        local request = install_graphql_stub([[{"data":{"updateManga":{"manga":{"id":17,"inLibrary":true,"inLibraryAt":"2026-05-06T12:00:00Z"}}}}]])
+
+        local result = api.updateMangaLibraryState(valid_credentials(), "17", true)
+
+        assert.is_true(result.ok)
+        assert.truthy(request.body:match("UPDATE_MANGA_LIBRARY"))
+        assert.truthy(request.body:match('"id":17'))
+        assert.truthy(request.body:match('"inLibrary":true'))
+        assert.are.same({
+            id = "17",
+            in_library = true,
+            in_library_at = "2026-05-06T12:00:00Z",
+        }, result.manga)
+    end)
+
+    it("refreshes manga and chapters", function()
+        local request = install_graphql_stub([[{"data":{"fetchManga":{"manga":{"id":17,"title":"Frieren","initialized":true}},"fetchChapters":{"chapters":[{"id":398,"name":"Ch. 1","isRead":false}]}}}]])
+
+        local result = api.refreshManga(valid_credentials(), "17")
+
+        assert.is_true(result.ok)
+        assert.truthy(request.body:match("REFRESH_MANGA"))
+        assert.truthy(request.body:match('"mangaId":17'))
+        assert.are.same({ id = "17", title = "Frieren", initialized = true }, result.manga)
+        assert.are.same({ { id = "398", name = "Ch. 1", is_read = false } }, result.chapters)
     end)
 
     it("returns a missing URL error when source fetch credentials omit server_url", function()
@@ -141,7 +420,7 @@ describe("suwayomi_api", function()
             username = "alice",
             password = "secret",
             auth_method = "basic_auth",
-        }, "source-1")
+        }, { source_id = "source-1" })
 
         assert.is_false(result.ok)
         assert.are.equal("Missing Suwayomi server URL.", result.error)
@@ -195,7 +474,7 @@ describe("suwayomi_api", function()
             username = "alice",
             password = "secret",
             auth_method = "basic_auth",
-        }, "source-1")
+        }, { source_id = "source-1" })
 
         io.open = original_io_open
 
@@ -236,7 +515,7 @@ describe("suwayomi_api", function()
             username = "alice",
             password = "secret",
             auth_method = "basic_auth",
-        }, "source-1")
+        }, { source_id = "source-1" })
 
         assert.is_false(result.ok)
         assert.are.equal("No manga found", result.error)

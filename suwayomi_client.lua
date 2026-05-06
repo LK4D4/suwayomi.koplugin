@@ -49,7 +49,11 @@ function SuwayomiClient:showMangaForSource(source)
     }, function()
         local credentials = self.settings:load()
         local result = self.plugin:withLoadingMessage("manga", self:translate("Loading manga..."), function()
-            return self.api.fetchMangaForSource(credentials, source.id)
+            return self.api.fetchMangaForSource(credentials, {
+                source_id = source.id,
+                page = 1,
+                type = "POPULAR",
+            })
         end)
         if not result then
             return

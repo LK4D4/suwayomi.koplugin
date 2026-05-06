@@ -135,30 +135,30 @@ Exit criteria:
 
 Goal: expose the Suwayomi GraphQL operations needed by Library, Browse, pagination, and library membership.
 
-- [ ] Add library manga query builder/parser/fetch helper
-- [ ] Add category query builder/parser/fetch helper
-- [ ] Add parameterized `fetchMangaForSource` input:
+- [x] Add library manga query builder/parser/fetch helper
+- [x] Add category query builder/parser/fetch helper
+- [x] Add parameterized `fetchMangaForSource` input:
   - source id
   - page
   - type: `POPULAR`, `LATEST`, `SEARCH`
   - query text
   - filters, reserved for later
-- [ ] Preserve `hasNextPage` in source manga responses
-- [ ] Preserve `inLibrary`, `initialized`, thumbnail URL, and source metadata in manga responses
-- [ ] Replace the old fixed `fetchMangaForSource(credentials, source_id)` calling style
-- [ ] Add manga add/remove library mutation helper
-- [ ] Add manga/chapter refresh helper
-- [ ] Keep full dynamic source filters out of the MVP UI
+- [x] Preserve `hasNextPage` in source manga responses
+- [x] Preserve `inLibrary`, `initialized`, thumbnail URL, and source metadata in manga responses
+- [x] Replace the old fixed `fetchMangaForSource(credentials, source_id)` calling style
+- [x] Add manga add/remove library mutation helper
+- [x] Add manga/chapter refresh helper
+- [x] Keep full dynamic source filters out of the MVP UI
 
 Tests:
 
-- [ ] Library manga query and parser
-- [ ] Category query and parser
-- [ ] Source manga query for `POPULAR`, `LATEST`, and `SEARCH`
-- [ ] Source manga parser with `hasNextPage` and `inLibrary`
-- [ ] Manga library mutation builder and parser
-- [ ] Refresh helper response parsing
-- [ ] Malformed response and GraphQL error handling
+- [x] Library manga query and parser
+- [x] Category query and parser
+- [x] Source manga query for `POPULAR`, `LATEST`, and `SEARCH`
+- [x] Source manga parser with `hasNextPage` and `inLibrary`
+- [x] Manga library mutation builder and parser
+- [x] Refresh helper response parsing
+- [x] Malformed response and GraphQL error handling
 
 Exit criteria:
 

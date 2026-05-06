@@ -43,8 +43,12 @@ describe("suwayomi_client", function()
                 end,
             },
             api = {
-                fetchMangaForSource = function(_, source_id)
-                    assert.are.equal("s1", source_id)
+                fetchMangaForSource = function(_, options)
+                    assert.are.same({
+                        source_id = "s1",
+                        page = 1,
+                        type = "POPULAR",
+                    }, options)
                     return {
                         ok = true,
                         manga = {
