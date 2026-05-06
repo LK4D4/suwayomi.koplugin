@@ -549,6 +549,49 @@ describe("suwayomi_ui", function()
         assert.are.equal(shown_dialog, closed_dialog)
     end)
 
+    it("runs the language menu close callback when KOReader closes the menu natively", function()
+        local ui = require("suwayomi_ui")
+
+        ui.showLanguageMenu({
+            languages = {
+                { code = "en", label = "EN", enabled = true },
+            },
+            onClose = function()
+                table.insert(events, "summary")
+            end,
+        })
+
+        shown_dialog.close_callback()
+        shown_dialog.item_table[2].callback()
+
+        assert.are.same({ "summary" }, events)
+        assert.is_nil(closed_dialog)
+    end)
+
+    it("does not run the language close callback after toggling a checkbox row", function()
+        local ui = require("suwayomi_ui")
+        local toggled
+
+        ui.showLanguageMenu({
+            languages = {
+                { code = "en", label = "EN", enabled = true },
+                { code = "ru", label = "RU", enabled = false },
+            },
+            onToggle = function(code, enabled)
+                toggled = { code = code, enabled = enabled }
+            end,
+            onClose = function()
+                table.insert(events, "summary")
+            end,
+        })
+
+        shown_dialog.item_table[2].callback()
+        shown_dialog.close_callback()
+
+        assert.are.same({ code = "ru", enabled = true }, toggled)
+        assert.are.same({}, events)
+    end)
+
     it("updates an existing language menu instead of requiring a new menu", function()
         local ui = require("suwayomi_ui")
         local update_count = 0
@@ -582,6 +625,37 @@ describe("suwayomi_ui", function()
         menu.item_table[3].callback()
 
         assert.are.equal(menu, closed_dialog)
+        assert.are.equal(1, summary_count)
+    end)
+
+    it("does not run the language close callback during an in-place menu refresh", function()
+        local ui = require("suwayomi_ui")
+        local summary_count = 0
+        local menu = {
+            close_callback = function()
+                summary_count = summary_count + 10
+            end,
+            updateItems = function(self)
+                if self.close_callback then
+                    self.close_callback()
+                end
+            end,
+        }
+
+        ui.updateLanguageMenu(menu, {
+            languages = {
+                { code = "en", label = "EN", enabled = true },
+                { code = "ru", label = "RU", enabled = true },
+            },
+            onClose = function()
+                summary_count = summary_count + 1
+            end,
+        }, function() end)
+
+        assert.are.equal(0, summary_count)
+
+        menu.close_callback()
+
         assert.are.equal(1, summary_count)
     end)
 end)

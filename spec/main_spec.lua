@@ -840,9 +840,15 @@ return {
         local plugin_class = require("main")
         local menu_items = {}
         local plugin = plugin_class{}
+        local refresh_count = 0
+        local touchmenu_instance = {
+            updateItems = function()
+                refresh_count = refresh_count + 1
+            end,
+        }
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[3].sub_item_table[1].callback()
+        menu_items.suwayomi_dl.sub_item_table[3].sub_item_table[1].callback(touchmenu_instance)
 
         login_dialog_options.onSave({
             server_url = "https://suwayomi.example",
@@ -851,6 +857,7 @@ return {
             auth_method = "basic_auth",
         })
 
+        assert.are.equal(1, refresh_count)
         assert.are.equal("Suwayomi login settings saved for https://suwayomi.example.", shown_messages[#shown_messages])
     end)
 
@@ -6024,16 +6031,44 @@ return {
         assert.are.equal(false, language_menu_options.languages[3].enabled)
     end)
 
+    it("refreshes the settings menu when the source language menu closes", function()
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+        local refresh_count = 0
+        local touchmenu_instance = {
+            updateItems = function()
+                refresh_count = refresh_count + 1
+            end,
+        }
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[3].sub_item_table[2].callback(touchmenu_instance)
+
+        language_menu_options.onToggle("de", true)
+        language_menu_options.onClose()
+
+        assert.are.equal(1, refresh_count)
+        assert.are.equal("Suwayomi source languages saved: EN, RU, DE", shown_messages[#shown_messages])
+    end)
+
     it("saves the chosen download directory and shows a confirmation", function()
         local plugin_class = require("main")
         local menu_items = {}
         local plugin = plugin_class{}
+        local refresh_count = 0
+        local touchmenu_instance = {
+            updateItems = function()
+                refresh_count = refresh_count + 1
+            end,
+        }
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[3].sub_item_table[3].callback()
+        menu_items.suwayomi_dl.sub_item_table[3].sub_item_table[3].callback(touchmenu_instance)
 
         directory_chooser_callback("/storage/emulated/0/Books/Manga")
 
+        assert.are.equal(1, refresh_count)
         assert.are.equal("/storage/emulated/0/Books/Manga", saved_download_directory)
         assert.are.equal("Suwayomi download directory saved: /storage/emulated/0/Books/Manga", shown_messages[#shown_messages])
     end)

@@ -264,6 +264,9 @@ function SuwayomiUI.buildLanguageMenuTable(options, onToggleCallback)
                 return language.enabled == true
             end,
             callback = function()
+                if options.skipNextCloseCallback then
+                    options.skipNextCloseCallback()
+                end
                 if onToggleCallback then
                     onToggleCallback(language.code, not language.enabled)
                 end
@@ -288,16 +291,29 @@ function SuwayomiUI.showLanguageMenu(options)
     options = options or {}
     local UIManager = require("ui/uimanager")
     local menu
+    local close_ran = false
     local menu_options = {}
     for key, value in pairs(options) do
         menu_options[key] = value
     end
-    menu_options.onClose = function()
-        if menu then
+    local function runClose(close_menu)
+        if close_ran then
+            return
+        end
+        close_ran = true
+        if close_menu and menu then
             UIManager:close(menu)
         end
         if options.onClose then
             options.onClose()
+        end
+    end
+    menu_options.onClose = function()
+        runClose(true)
+    end
+    menu_options.skipNextCloseCallback = function()
+        if menu then
+            menu.suwayomi_skip_next_close_callback = true
         end
     end
 
@@ -305,6 +321,13 @@ function SuwayomiUI.showLanguageMenu(options)
         title = _("Suwayomi source languages"),
         item_table = SuwayomiUI.buildLanguageMenuTable(menu_options, options.onToggle),
         state_w = getStateMarkWidth(),
+        close_callback = function()
+            if menu and menu.suwayomi_skip_next_close_callback then
+                menu.suwayomi_skip_next_close_callback = nil
+                return
+            end
+            runClose(false)
+        end,
     }
     UIManager:show(menu)
     return menu
@@ -368,16 +391,37 @@ function SuwayomiUI.updateLanguageMenu(menu, options, onToggleCallback)
     for key, value in pairs(options) do
         menu_options[key] = value
     end
-    menu_options.onClose = function()
-        UIManager:close(menu)
+    local close_ran = false
+    local function runClose(close_menu)
+        if close_ran then
+            return
+        end
+        close_ran = true
+        if close_menu then
+            UIManager:close(menu)
+        end
         if options.onClose then
             options.onClose()
         end
     end
+    menu_options.onClose = function()
+        runClose(true)
+    end
+    menu_options.skipNextCloseCallback = function()
+        menu.suwayomi_skip_next_close_callback = true
+    end
 
     menu.item_table = SuwayomiUI.buildLanguageMenuTable(menu_options, onToggleCallback or options.onToggle)
+    menu.close_callback = nil
     if menu.updateItems then
         menu:updateItems(nil, true)
+    end
+    menu.close_callback = function()
+        if menu.suwayomi_skip_next_close_callback then
+            menu.suwayomi_skip_next_close_callback = nil
+            return
+        end
+        runClose(false)
     end
 end
 
