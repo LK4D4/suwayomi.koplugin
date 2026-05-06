@@ -293,6 +293,23 @@ function SuwayomiPlugin:showSourceLanguageDialog()
     })
 end
 
+function SuwayomiPlugin:getDownloadDirectoryChooserStartDir()
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        return nil
+    end
+
+    local ok, lfs = pcall(require, "lfs")
+    if not ok or not lfs or not lfs.attributes then
+        return nil
+    end
+
+    if lfs.attributes(download_directory, "mode") == "directory" then
+        return download_directory
+    end
+    return nil
+end
+
 function SuwayomiPlugin:showSourceList(sources, options)
     options = options or {}
     if not options.force_new and self.current_sources_menu and SuwayomiUI.updateSourcesMenu then
@@ -2670,7 +2687,7 @@ function SuwayomiPlugin:addToMainMenu(menu_items)
                     SuwayomiUI.showDirectoryChooser(function(path)
                         local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
                         self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
-                    end)
+                    end, self:getDownloadDirectoryChooserStartDir())
                 end
             },
             {

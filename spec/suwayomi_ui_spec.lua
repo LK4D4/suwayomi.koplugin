@@ -4,11 +4,13 @@ describe("suwayomi_ui", function()
     local shown_dialog
     local closed_dialog
     local events
+    local chooser_start_dir
 
     before_each(function()
         shown_dialog = nil
         closed_dialog = nil
         events = {}
+        chooser_start_dir = nil
 
         package.loaded.suwayomi_ui = nil
         package.loaded.gettext = nil
@@ -70,6 +72,7 @@ describe("suwayomi_ui", function()
                 new = function(_, options)
                     return {
                         chooseDir = function()
+                            chooser_start_dir = nil
                             shown_dialog = options
                         end,
                     }
@@ -311,6 +314,28 @@ describe("suwayomi_ui", function()
         assert.are.equal("Choose download directory", shown_dialog.title)
         shown_dialog.onConfirm("/storage/emulated/0/Books/Manga")
         assert.are.equal("/storage/emulated/0/Books/Manga", chosen_path)
+    end)
+
+    it("starts the directory chooser in the provided directory", function()
+        package.preload["ui/downloadmgr"] = function()
+            return {
+                new = function(_, options)
+                    return {
+                        chooseDir = function(_, start_dir)
+                            chooser_start_dir = start_dir
+                            shown_dialog = options
+                        end,
+                    }
+                end,
+            }
+        end
+        package.loaded.suwayomi_ui = nil
+
+        local ui = require("suwayomi_ui")
+
+        ui.showDirectoryChooser(function() end, "/storage/emulated/0/Books/Manga")
+
+        assert.are.equal("/storage/emulated/0/Books/Manga", chooser_start_dir)
     end)
 
     it("shows a parallel chapter downloads menu", function()

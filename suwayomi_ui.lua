@@ -21,7 +21,7 @@ function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
     return menu_table
 end
 
-function SuwayomiUI.showDirectoryChooser(callback)
+function SuwayomiUI.showDirectoryChooser(callback, start_dir)
     require("ui/downloadmgr"):new{
         title = _("Choose download directory"),
         onConfirm = function(path)
@@ -29,7 +29,7 @@ function SuwayomiUI.showDirectoryChooser(callback)
                 callback(path)
             end
         end,
-    }:chooseDir()
+    }:chooseDir(start_dir)
 end
 
 function SuwayomiUI.showSourcesMenu(sources, onSelectCallback)

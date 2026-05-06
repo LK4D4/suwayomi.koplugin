@@ -13,6 +13,7 @@ describe("suwayomi plugin", function()
     local shown_sources
     local shown_confirm
     local directory_chooser_callback
+    local directory_chooser_start_dir
     local saved_download_directory
     local trapper_wrapped
     local trapper_subprocess_calls
@@ -35,6 +36,7 @@ describe("suwayomi plugin", function()
         shown_sources = nil
         shown_confirm = nil
         directory_chooser_callback = nil
+        directory_chooser_start_dir = nil
         saved_download_directory = nil
         trapper_wrapped = 0
         trapper_subprocess_calls = {}
@@ -286,8 +288,9 @@ describe("suwayomi plugin", function()
 
         package.preload.suwayomi_ui = function()
             return {
-                showDirectoryChooser = function(callback)
+                showDirectoryChooser = function(callback, start_dir)
                     directory_chooser_callback = callback
+                    directory_chooser_start_dir = start_dir
                 end,
                 showLoginDialog = function(options)
                     login_dialog_options = options
@@ -5940,5 +5943,40 @@ return {
 
         assert.are.equal("/storage/emulated/0/Books/Manga", saved_download_directory)
         assert.are.equal("Suwayomi download directory saved: /storage/emulated/0/Books/Manga", shown_messages[#shown_messages])
+    end)
+
+    it("starts download directory setup in the configured directory when it exists", function()
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and path == "/storage/emulated/0/Books/Manga" then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                loadDownloadDirectory = function()
+                    return "/storage/emulated/0/Books/Manga"
+                end,
+                saveDownloadDirectory = function(_, path)
+                    saved_download_directory = path
+                    return path
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+        package.loaded.lfs = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
     end)
 end)
