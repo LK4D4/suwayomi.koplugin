@@ -881,6 +881,40 @@ return {
         assert.are.equal("Suwayomi library category picker saved: always", shown_messages[#shown_messages])
     end)
 
+    it("keeps library settings renderable when category picker persistence is unavailable", function()
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example" }
+                end,
+                loadSourceLanguages = function()
+                    return { "en" }
+                end,
+                loadDownloadDirectory = function()
+                    return ""
+                end,
+                loadMaxParallelChapterDownloads = function()
+                    return 2
+                end,
+            }
+        end
+        package.loaded.suwayomi_settings = nil
+        package.loaded.main = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        local library_settings_item = menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[2].sub_item_table[1]
+
+        assert.are.equal("Category picker: automatic", library_settings_item.text_func())
+
+        library_settings_item.callback()
+
+        assert.are.equal("Library category picker settings are unavailable.", shown_messages[#shown_messages])
+    end)
+
     it("opens library from the top-level entry", function()
         local opened_library = false
         package.preload.suwayomi_client = function()

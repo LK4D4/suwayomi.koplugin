@@ -458,10 +458,20 @@ function SuwayomiPlugin:showParallelDownloadsDialog(touchmenu_instance)
 end
 
 function SuwayomiPlugin:getLibraryCategoryPickerBehaviorSummary()
-    return SuwayomiSettings:loadLibraryCategoryPickerBehavior()
+    if SuwayomiSettings.loadLibraryCategoryPickerBehavior then
+        return SuwayomiSettings:loadLibraryCategoryPickerBehavior()
+    end
+    return "automatic"
 end
 
 function SuwayomiPlugin:showLibraryCategoryPickerBehaviorDialog(touchmenu_instance)
+    if not SuwayomiSettings.loadLibraryCategoryPickerBehavior
+        or not SuwayomiSettings.saveLibraryCategoryPickerBehavior
+    then
+        self:showMessage(_("Library category picker settings are unavailable."))
+        return
+    end
+
     local picker_menu
     local choices = { "automatic", "always", "never" }
     local function onSelect(behavior)
