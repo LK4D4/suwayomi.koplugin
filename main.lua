@@ -563,7 +563,7 @@ function SuwayomiPlugin:scheduleSourceCacheRefresh(credentials)
         self.source_cache_refresh_scheduled = false
         self:startSourceFetchWorker(credentials, {
             refresh = true,
-            loading_message = _("Refreshing sources..."),
+            silent = true,
         })
     end)
 end
@@ -595,7 +595,9 @@ function SuwayomiPlugin:startSourceFetchWorker(credentials, options)
         options = options,
         result_path = result_path,
         started_at = os.time(),
-        loading_message = self:showLoadingMessage(options.loading_message or _("Loading sources...")),
+        loading_message = not options.silent
+            and self:showLoadingMessage(options.loading_message or _("Loading sources..."))
+            or nil,
     }
     self.source_fetch_active = active
 

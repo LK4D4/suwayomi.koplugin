@@ -1248,7 +1248,7 @@ return {
         assert.is_nil(shown_sources)
     end)
 
-    it("shows cached sources immediately and schedules a source refresh", function()
+    it("shows cached sources immediately and refreshes sources silently in the background", function()
         local child_callback
         local subprocess_done = false
         local saved_cache
@@ -1353,7 +1353,7 @@ return {
 
         table.remove(scheduled_callbacks, 1)()
         assert.is_function(child_callback)
-        assert.are.same({ "Refreshing sources..." }, shown_loading_messages)
+        assert.are.same({}, shown_loading_messages)
 
         child_callback()
         subprocess_done = true
@@ -1364,6 +1364,7 @@ return {
         }, updated_sources)
         assert.are.equal("https://suwayomi.example", saved_cache.server_url)
         assert.are.same(updated_sources, saved_cache.sources)
+        assert.are.same({}, closed_loading_messages)
     end)
 
     it("opens a fresh sources menu from cache after a previous sources menu was closed", function()
