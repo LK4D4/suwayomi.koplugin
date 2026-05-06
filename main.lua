@@ -186,11 +186,18 @@ function SuwayomiPlugin:onSuwayomiAction()
     self:showNotImplemented(_("Open Search > Suwayomi to access the plugin menu."))
 end
 
-function SuwayomiPlugin:showLoginDialog()
+function SuwayomiPlugin:refreshSettingsMenu(touchmenu_instance)
+    if touchmenu_instance and touchmenu_instance.updateItems then
+        touchmenu_instance:updateItems()
+    end
+end
+
+function SuwayomiPlugin:showLoginDialog(touchmenu_instance)
     SuwayomiUI.showLoginDialog({
         credentials = SuwayomiSettings:load(),
         onSave = function(credentials)
             local saved_credentials = SuwayomiSettings:save(credentials)
+            self:refreshSettingsMenu(touchmenu_instance)
             UIManager:nextTick(function()
                 self:showMessage(T(_("Suwayomi login settings saved for %1."), saved_credentials.server_url))
             end)
@@ -233,7 +240,7 @@ function SuwayomiPlugin:saveSourceCache(credentials, sources)
     return SuwayomiSettings:saveSourceCache(credentials and credentials.server_url or "", sources or {}, os.time())
 end
 
-function SuwayomiPlugin:showSourceLanguageDialog()
+function SuwayomiPlugin:showSourceLanguageDialog(touchmenu_instance)
     local selected = self:buildSourceLanguageSet(SuwayomiSettings:loadSourceLanguages())
     local language_menu
 
@@ -268,6 +275,7 @@ function SuwayomiPlugin:showSourceLanguageDialog()
         end
         local summary = #labels > 0 and table.concat(labels, ", ") or _("none")
         self:showMessage(T(_("Suwayomi source languages saved: %1"), summary))
+        self:refreshSettingsMenu(touchmenu_instance)
     end
 
     local function onToggle(code, enabled)
@@ -291,6 +299,17 @@ function SuwayomiPlugin:showSourceLanguageDialog()
         onToggle = onToggle,
         onClose = showSavedSummary,
     })
+end
+
+function SuwayomiPlugin:getSourceLanguageSummary()
+    local selected = self:buildSourceLanguageSet(SuwayomiSettings:loadSourceLanguages())
+    local labels = {}
+    for _, language in ipairs(SOURCE_LANGUAGE_OPTIONS) do
+        if selected[language.code] then
+            table.insert(labels, language.label)
+        end
+    end
+    return #labels > 0 and table.concat(labels, ", ") or _("none")
 end
 
 function SuwayomiPlugin:getDownloadDirectoryChooserStartDir()
@@ -356,6 +375,55 @@ function SuwayomiPlugin:getDownloadDirectoryChooserStartDir()
         return Device.home_dir
     end
     return nil
+end
+
+function SuwayomiPlugin:getDownloadDirectorySummary()
+    local path = SuwayomiSettings:loadDownloadDirectory()
+    if not path or path == "" then
+        return _("not set")
+    end
+
+    path = tostring(path):gsub("/+$", "")
+    local parts = {}
+    for part in path:gmatch("[^/]+") do
+        table.insert(parts, part)
+    end
+    if #parts >= 2 then
+        return parts[#parts - 1] .. "/" .. parts[#parts]
+    end
+    return path
+end
+
+function SuwayomiPlugin:showDownloadDirectoryDialog(touchmenu_instance)
+    SuwayomiUI.showDirectoryChooser(function(path)
+        local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
+        self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+        self:refreshSettingsMenu(touchmenu_instance)
+    end, self:getDownloadDirectoryChooserStartDir())
+end
+
+function SuwayomiPlugin:showParallelDownloadsDialog(touchmenu_instance)
+    local parallel_menu
+    local choices = { 1, 2, 3, 4 }
+    local function onSelect(value)
+        local saved_value = SuwayomiSettings:saveMaxParallelChapterDownloads(value)
+        self.download_queue = nil
+        self:showMessage(T(_("Suwayomi parallel chapter downloads saved: %1"), saved_value))
+        self:refreshSettingsMenu(touchmenu_instance)
+        if SuwayomiUI.updateParallelDownloadsMenu then
+            SuwayomiUI.updateParallelDownloadsMenu(parallel_menu, {
+                current = saved_value,
+                choices = choices,
+                onSelect = onSelect,
+            })
+        end
+    end
+
+    parallel_menu = SuwayomiUI.showParallelDownloadsMenu({
+        current = SuwayomiSettings:loadMaxParallelChapterDownloads(),
+        choices = choices,
+        onSelect = onSelect,
+    })
 end
 
 function SuwayomiPlugin:showSourceList(sources, options)
@@ -2718,39 +2786,46 @@ function SuwayomiPlugin:addToMainMenu(menu_items)
                 end
             },
             {
-                text = _("Setup login information"),
-                callback = function()
-                    self:showLoginDialog()
-                end
-            },
-            {
-                text = _("Setup source languages"),
-                callback = function()
-                    self:showSourceLanguageDialog()
-                end
-            },
-            {
-                text = _("Setup download directory"),
-                callback = function()
-                    SuwayomiUI.showDirectoryChooser(function(path)
-                        local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-                        self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
-                    end, self:getDownloadDirectoryChooserStartDir())
-                end
-            },
-            {
-                text = _("Setup parallel downloads"),
-                callback = function()
-                    SuwayomiUI.showParallelDownloadsMenu({
-                        current = SuwayomiSettings:loadMaxParallelChapterDownloads(),
-                        choices = { 1, 2, 3, 4 },
-                        onSelect = function(value)
-                            local saved_value = SuwayomiSettings:saveMaxParallelChapterDownloads(value)
-                            self.download_queue = nil
-                            self:showMessage(T(_("Suwayomi parallel chapter downloads saved: %1"), saved_value))
+                text = _("Settings"),
+                sub_item_table = {
+                    {
+                        text = _("Login information"),
+                        keep_menu_open = true,
+                        callback = function(touchmenu_instance)
+                            self:showLoginDialog(touchmenu_instance)
                         end,
-                    })
-                end
+                    },
+                    {
+                        text_func = function()
+                            return T(_("Source languages: %1"), self:getSourceLanguageSummary())
+                        end,
+                        keep_menu_open = true,
+                        callback = function(touchmenu_instance)
+                            self:showSourceLanguageDialog(touchmenu_instance)
+                        end,
+                    },
+                    {
+                        text_func = function()
+                            return T(_("Download directory: %1"), self:getDownloadDirectorySummary())
+                        end,
+                        keep_menu_open = true,
+                        callback = function(touchmenu_instance)
+                            self:showDownloadDirectoryDialog(touchmenu_instance)
+                        end,
+                    },
+                    {
+                        text_func = function()
+                            return T(
+                                _("Parallel downloads: %1"),
+                                SuwayomiSettings:loadMaxParallelChapterDownloads()
+                            )
+                        end,
+                        keep_menu_open = true,
+                        callback = function(touchmenu_instance)
+                            self:showParallelDownloadsDialog(touchmenu_instance)
+                        end,
+                    },
+                },
             }
         }
     }

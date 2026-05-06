@@ -6,6 +6,28 @@ local _ = require("gettext")
 
 local SuwayomiUI = {}
 
+local function newStateMark(mark_type, checked)
+    local module_name = mark_type == "radio" and "ui/widget/radiomark" or "ui/widget/checkmark"
+    local ok, Mark = pcall(require, module_name)
+    if not ok or not Mark then
+        return nil
+    end
+    return Mark:new{
+        checked = checked == true,
+    }
+end
+
+local function getStateMarkWidth()
+    local mark = newStateMark("check", true)
+    if mark and mark.getSize then
+        return mark:getSize().w + 12
+    end
+    if mark and mark.dimen then
+        return mark.dimen.w + 12
+    end
+    return nil
+end
+
 local function isKOReaderCurrentFolderItem(item)
     return item and type(item.path) == "string" and item.path:sub(-2, -1) == "/."
 end
@@ -236,12 +258,17 @@ function SuwayomiUI.buildLanguageMenuTable(options, onToggleCallback)
 
     for _, language in ipairs(options.languages or {}) do
         table.insert(menu_table, {
-            text = string.format("%s %s", language.enabled and "[x]" or "[ ]", language.label),
+            text = language.label,
+            state = newStateMark("check", language.enabled),
+            checked_func = function()
+                return language.enabled == true
+            end,
             callback = function()
                 if onToggleCallback then
                     onToggleCallback(language.code, not language.enabled)
                 end
             end,
+            keep_menu_open = true,
         })
     end
 
@@ -258,10 +285,26 @@ function SuwayomiUI.buildLanguageMenuTable(options, onToggleCallback)
 end
 
 function SuwayomiUI.showLanguageMenu(options)
+    options = options or {}
     local UIManager = require("ui/uimanager")
-    local menu = Menu:new{
+    local menu
+    local menu_options = {}
+    for key, value in pairs(options) do
+        menu_options[key] = value
+    end
+    menu_options.onClose = function()
+        if menu then
+            UIManager:close(menu)
+        end
+        if options.onClose then
+            options.onClose()
+        end
+    end
+
+    menu = Menu:new{
         title = _("Suwayomi source languages"),
-        item_table = SuwayomiUI.buildLanguageMenuTable(options, options.onToggle),
+        item_table = SuwayomiUI.buildLanguageMenuTable(menu_options, options.onToggle),
+        state_w = getStateMarkWidth(),
     }
     UIManager:show(menu)
     return menu
@@ -269,26 +312,49 @@ end
 
 function SuwayomiUI.showParallelDownloadsMenu(options)
     options = options or {}
+    local UIManager = require("ui/uimanager")
+    local menu = Menu:new{
+        title = _("Parallel chapter downloads"),
+        item_table = SuwayomiUI.buildParallelDownloadsMenuTable(options),
+        state_w = getStateMarkWidth(),
+    }
+    UIManager:show(menu)
+    return menu
+end
+
+function SuwayomiUI.buildParallelDownloadsMenuTable(options)
+    options = options or {}
     local menu_table = {}
     local current = tonumber(options.current) or 2
     for _, value in ipairs(options.choices or { 1, 2, 3, 4 }) do
         table.insert(menu_table, {
-            text = string.format("%s %d", value == current and "[x]" or "[ ]", value),
+            text = tostring(value),
+            radio = true,
+            state = newStateMark("radio", value == current),
+            checked_func = function()
+                return value == current
+            end,
             callback = function()
                 if options.onSelect then
                     options.onSelect(value)
                 end
             end,
+            keep_menu_open = true,
         })
     end
 
-    local UIManager = require("ui/uimanager")
-    local menu = Menu:new{
-        title = _("Parallel chapter downloads"),
-        item_table = menu_table,
-    }
-    UIManager:show(menu)
-    return menu
+    return menu_table
+end
+
+function SuwayomiUI.updateParallelDownloadsMenu(menu, options)
+    if not menu then
+        return
+    end
+
+    menu.item_table = SuwayomiUI.buildParallelDownloadsMenuTable(options)
+    if menu.updateItems then
+        menu:updateItems(nil, true)
+    end
 end
 
 function SuwayomiUI.updateLanguageMenu(menu, options, onToggleCallback)
@@ -296,7 +362,20 @@ function SuwayomiUI.updateLanguageMenu(menu, options, onToggleCallback)
         return
     end
 
-    menu.item_table = SuwayomiUI.buildLanguageMenuTable(options, onToggleCallback or options.onToggle)
+    options = options or {}
+    local UIManager = require("ui/uimanager")
+    local menu_options = {}
+    for key, value in pairs(options) do
+        menu_options[key] = value
+    end
+    menu_options.onClose = function()
+        UIManager:close(menu)
+        if options.onClose then
+            options.onClose()
+        end
+    end
+
+    menu.item_table = SuwayomiUI.buildLanguageMenuTable(menu_options, onToggleCallback or options.onToggle)
     if menu.updateItems then
         menu:updateItems(nil, true)
     end

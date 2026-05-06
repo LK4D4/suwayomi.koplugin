@@ -55,10 +55,10 @@ Manual installation:
 
 1. Open the **Search** tab in KOReader's top menu.
 2. Tap **Suwayomi**.
-3. First time use: Tap **Setup login information** to enter your Suwayomi server URL, username, and password.
+3. First time use: Tap **Settings** > **Login information** to enter your Suwayomi server URL, username, and password.
 4. Optionally tap **Sync read state now** to flush any pending local read/unread changes.
-5. Optionally tap **Setup source languages** to filter the source list.
-6. Tap **Setup download directory** to choose where manga will be downloaded.
+5. Optionally tap **Settings** > **Source languages** to filter the source list.
+6. Tap **Settings** > **Download directory** to choose where manga will be downloaded.
 7. Tap **Browse Suwayomi** to explore the server.
 8. Tap a chapter to open the chapter actions dialog.
 9. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.

@@ -16,6 +16,8 @@ describe("suwayomi_ui", function()
         package.loaded["ui/widget/buttondialog"] = nil
         package.loaded["ui/widget/confirmbox"] = nil
         package.loaded["ui/widget/multiinputdialog"] = nil
+        package.loaded["ui/widget/checkmark"] = nil
+        package.loaded["ui/widget/radiomark"] = nil
         package.loaded["ui/widget/pathchooser"] = nil
         package.loaded["ui/downloadmgr"] = nil
         package.loaded["ui/uimanager"] = nil
@@ -62,6 +64,36 @@ describe("suwayomi_ui", function()
                     end
                     options.onShowKeyboard = function() end
                     return options
+                end,
+            }
+        end
+
+        package.preload["ui/widget/checkmark"] = function()
+            return {
+                new = function(_, options)
+                    return {
+                        mark_type = "check",
+                        checked = options.checked,
+                        dimen = { w = 20 },
+                        getSize = function(self)
+                            return self.dimen
+                        end,
+                    }
+                end,
+            }
+        end
+
+        package.preload["ui/widget/radiomark"] = function()
+            return {
+                new = function(_, options)
+                    return {
+                        mark_type = "radio",
+                        checked = options.checked,
+                        dimen = { w = 20 },
+                        getSize = function(self)
+                            return self.dimen
+                        end,
+                    }
                 end,
             }
         end
@@ -161,6 +193,8 @@ describe("suwayomi_ui", function()
         package.preload["ui/widget/buttondialog"] = nil
         package.preload["ui/widget/confirmbox"] = nil
         package.preload["ui/widget/multiinputdialog"] = nil
+        package.preload["ui/widget/checkmark"] = nil
+        package.preload["ui/widget/radiomark"] = nil
         package.preload["ui/widget/pathchooser"] = nil
         package.preload["ui/downloadmgr"] = nil
         package.preload["ui/uimanager"] = nil
@@ -469,19 +503,56 @@ describe("suwayomi_ui", function()
         })
 
         assert.are.equal("Parallel chapter downloads", shown_dialog.title)
-        assert.are.equal("[ ] 1", shown_dialog.item_table[1].text)
-        assert.are.equal("[x] 2", shown_dialog.item_table[2].text)
-        assert.are.equal("[ ] 3", shown_dialog.item_table[3].text)
-        assert.are.equal("[ ] 4", shown_dialog.item_table[4].text)
+        assert.are.equal(32, shown_dialog.state_w)
+        assert.are.equal("1", shown_dialog.item_table[1].text)
+        assert.is_true(shown_dialog.item_table[1].radio)
+        assert.is_false(shown_dialog.item_table[1].checked_func())
+        assert.are.same({ mark_type = "radio", checked = false, dimen = { w = 20 }, getSize = shown_dialog.item_table[1].state.getSize }, shown_dialog.item_table[1].state)
+        assert.are.equal("2", shown_dialog.item_table[2].text)
+        assert.is_true(shown_dialog.item_table[2].radio)
+        assert.is_true(shown_dialog.item_table[2].checked_func())
+        assert.is_true(shown_dialog.item_table[2].state.checked)
+        assert.are.equal("3", shown_dialog.item_table[3].text)
+        assert.is_true(shown_dialog.item_table[3].radio)
+        assert.is_false(shown_dialog.item_table[3].checked_func())
+        assert.are.equal("4", shown_dialog.item_table[4].text)
+        assert.is_true(shown_dialog.item_table[4].radio)
+        assert.is_false(shown_dialog.item_table[4].checked_func())
 
         shown_dialog.item_table[3].callback()
 
         assert.are.equal(3, selected)
     end)
 
+    it("closes the language menu from Done before running the close callback", function()
+        local ui = require("suwayomi_ui")
+
+        ui.showLanguageMenu({
+            languages = {
+                { code = "en", label = "EN", enabled = true },
+                { code = "ru", label = "RU", enabled = false },
+            },
+            onClose = function()
+                table.insert(events, "summary")
+            end,
+        })
+
+        assert.are.equal("Suwayomi source languages", shown_dialog.title)
+        assert.are.equal(32, shown_dialog.state_w)
+        assert.are.equal("check", shown_dialog.item_table[1].state.mark_type)
+        assert.is_true(shown_dialog.item_table[1].state.checked)
+        assert.is_false(shown_dialog.item_table[2].state.checked)
+
+        shown_dialog.item_table[3].callback()
+
+        assert.are.same({ "close", "summary" }, events)
+        assert.are.equal(shown_dialog, closed_dialog)
+    end)
+
     it("updates an existing language menu instead of requiring a new menu", function()
         local ui = require("suwayomi_ui")
         local update_count = 0
+        local summary_count = 0
         local menu = {
             updateItems = function()
                 update_count = update_count + 1
@@ -493,11 +564,24 @@ describe("suwayomi_ui", function()
                 { code = "en", label = "EN", enabled = true },
                 { code = "ru", label = "RU", enabled = false },
             },
+            onClose = function()
+                summary_count = summary_count + 1
+            end,
         }, function() end)
 
-        assert.are.equal("[x] EN", menu.item_table[1].text)
-        assert.are.equal("[ ] RU", menu.item_table[2].text)
+        assert.are.equal("EN", menu.item_table[1].text)
+        assert.is_true(menu.item_table[1].checked_func())
+        assert.are.equal("check", menu.item_table[1].state.mark_type)
+        assert.is_true(menu.item_table[1].state.checked)
+        assert.are.equal("RU", menu.item_table[2].text)
+        assert.is_false(menu.item_table[2].checked_func())
+        assert.is_false(menu.item_table[2].state.checked)
         assert.are.equal("Done", menu.item_table[3].text)
         assert.are.equal(1, update_count)
+
+        menu.item_table[3].callback()
+
+        assert.are.equal(menu, closed_dialog)
+        assert.are.equal(1, summary_count)
     end)
 end)
