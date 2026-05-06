@@ -6,6 +6,10 @@ local _ = require("gettext")
 
 local SuwayomiUI = {}
 
+local function isKOReaderCurrentFolderItem(item)
+    return item and type(item.path) == "string" and item.path:sub(-2, -1) == "/."
+end
+
 function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
     local menu_table = {}
     for _, chapter in ipairs(chapter_list) do
@@ -49,8 +53,8 @@ function SuwayomiUI.showDirectoryChooser(callback, start_dir)
     end
 
     function DirectoryChooser:onMenuSelect(item)
-        if item and type(item.path) == "string" and item.path:sub(-2, -1) == "/." then
-            return self:onMenuHold(item)
+        if isKOReaderCurrentFolderItem(item) then
+            return PathChooser.onMenuHold(self, item)
         end
         return PathChooser.onMenuSelect(self, item)
     end

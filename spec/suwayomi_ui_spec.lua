@@ -417,6 +417,45 @@ describe("suwayomi_ui", function()
         assert.are.equal("/storage/emulated/0/Books/Manga", chosen_path)
     end)
 
+    it("keeps current folder selection under KOReader path chooser hold handling", function()
+        local ui = require("suwayomi_ui")
+        local chosen_path
+        local instance_hold_called = false
+
+        ui.showDirectoryChooser(function(path)
+            chosen_path = path
+        end, "/storage/emulated/0/Books/Manga")
+
+        local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books/Manga")
+        shown_dialog.onMenuHold = function()
+            instance_hold_called = true
+            return true
+        end
+
+        shown_dialog:onMenuSelect(item_table[1])
+
+        assert.is_false(instance_hold_called)
+        assert.are.equal("/storage/emulated/0/Books/Manga/.", shown_dialog.held_path)
+        assert.are.equal("/storage/emulated/0/Books/Manga", chosen_path)
+    end)
+
+    it("keeps child folder taps under KOReader path chooser navigation handling", function()
+        local ui = require("suwayomi_ui")
+        local chosen_path
+
+        ui.showDirectoryChooser(function(path)
+            chosen_path = path
+        end, "/storage/emulated/0/Books/Manga")
+
+        local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books/Manga")
+
+        shown_dialog:onMenuSelect(item_table[2])
+
+        assert.are.equal("/storage/emulated/0/Books/Manga/Sousou no Frieren", shown_dialog.selected_path)
+        assert.is_nil(shown_dialog.held_path)
+        assert.is_nil(chosen_path)
+    end)
+
     it("shows a parallel chapter downloads menu", function()
         local ui = require("suwayomi_ui")
         local selected
