@@ -13,6 +13,7 @@ describe("suwayomi plugin", function()
     local shown_sources
     local shown_confirm
     local directory_chooser_callback
+    local directory_chooser_start_dir
     local saved_download_directory
     local trapper_wrapped
     local trapper_subprocess_calls
@@ -20,6 +21,7 @@ describe("suwayomi plugin", function()
     local original_io_open
     local original_os_rename
     local original_os_remove
+    local original_reader_settings
     local progress_files
 
     local function reset_plugin_environment()
@@ -35,6 +37,7 @@ describe("suwayomi plugin", function()
         shown_sources = nil
         shown_confirm = nil
         directory_chooser_callback = nil
+        directory_chooser_start_dir = nil
         saved_download_directory = nil
         trapper_wrapped = 0
         trapper_subprocess_calls = {}
@@ -43,6 +46,7 @@ describe("suwayomi plugin", function()
         original_io_open = original_io_open or io.open
         original_os_rename = original_os_rename or os.rename
         original_os_remove = original_os_remove or os.remove
+        original_reader_settings = original_reader_settings or _G.G_reader_settings
         io.open = function(path, mode)
             if tostring(path):match("%.suwayomi_dl_progress_")
                 or tostring(path):match("suwayomi_dl_read_sync")
@@ -132,6 +136,7 @@ describe("suwayomi plugin", function()
         package.loaded.suwayomi_settings = nil
         package.loaded.suwayomi_debug = nil
         package.loaded.lfs = nil
+        package.loaded.device = nil
 
         package.preload.dispatcher = function()
             return {
@@ -286,8 +291,9 @@ describe("suwayomi plugin", function()
 
         package.preload.suwayomi_ui = function()
             return {
-                showDirectoryChooser = function(callback)
+                showDirectoryChooser = function(callback, start_dir)
                     directory_chooser_callback = callback
+                    directory_chooser_start_dir = start_dir
                 end,
                 showLoginDialog = function(options)
                     login_dialog_options = options
@@ -388,8 +394,9 @@ describe("suwayomi plugin", function()
                     shown_confirm = confirm_options
                 end,
                 updateChapterMenu = options.updateChapterMenu or function() end,
-                showDirectoryChooser = function(callback)
+                showDirectoryChooser = function(callback, start_dir)
                     directory_chooser_callback = callback
+                    directory_chooser_start_dir = start_dir
                 end,
                 showLoginDialog = function() end,
                 showLanguageMenu = function() end,
@@ -485,7 +492,9 @@ describe("suwayomi plugin", function()
         package.preload.suwayomi_settings = nil
         package.preload.suwayomi_debug = nil
         package.preload.lfs = nil
+        package.preload.device = nil
         package.loaded.suwayomi_debug = nil
+        _G.G_reader_settings = original_reader_settings
         if original_io_open then
             io.open = original_io_open
         end
@@ -5603,8 +5612,9 @@ return {
                 showChapterMenu = function(options, onSelect)
                     onSelect(options.chapters[1])
                 end,
-                showDirectoryChooser = function(callback)
+                showDirectoryChooser = function(callback, start_dir)
                     directory_chooser_callback = callback
+                    directory_chooser_start_dir = start_dir
                 end,
                 showLoginDialog = function() end,
                 showLanguageMenu = function() end,
@@ -5628,17 +5638,39 @@ return {
                 saveSourceLanguages = function(_, value) return value end,
             }
         end
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and (
+                        path == "/storage/emulated/0"
+                            or path == "/storage/emulated/0/Books"
+                            or path == "/storage/emulated/0/Books/Manga"
+                    ) then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.preload.device = function()
+            return {
+                home_dir = "/storage/emulated/0",
+            }
+        end
 
         package.loaded.main = nil
         package.loaded.suwayomi_api = nil
         package.loaded.suwayomi_downloader = nil
         package.loaded.suwayomi_ui = nil
         package.loaded.suwayomi_settings = nil
+        package.loaded.lfs = nil
+        package.loaded.device = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
 
+        assert.are.equal("/storage/emulated/0/Books/Manga", plugin:getDownloadDirectoryChooserStartDir())
         plugin:browseSuwayomi()
+        assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
         directory_chooser_callback("/storage/emulated/0/Books/Manga")
         run_scheduled_callbacks()
 
@@ -5940,5 +5972,171 @@ return {
 
         assert.are.equal("/storage/emulated/0/Books/Manga", saved_download_directory)
         assert.are.equal("Suwayomi download directory saved: /storage/emulated/0/Books/Manga", shown_messages[#shown_messages])
+    end)
+
+    it("starts download directory setup in the configured directory when it exists", function()
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and path == "/storage/emulated/0/Books/Manga" then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                loadDownloadDirectory = function()
+                    return "/storage/emulated/0/Books/Manga"
+                end,
+                saveDownloadDirectory = function(_, path)
+                    saved_download_directory = path
+                    return path
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+        package.loaded.lfs = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
+    end)
+
+    it("starts download directory setup in KOReader home when no download directory is configured", function()
+        _G.G_reader_settings = {
+            readSetting = function(_, key)
+                if key == "home_dir" then
+                    return "/storage/emulated/0/Books"
+                end
+            end,
+        }
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and path == "/storage/emulated/0/Books" then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.lfs = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal("/storage/emulated/0/Books", directory_chooser_start_dir)
+    end)
+
+    it("starts download directory setup in Android shared storage when no KOReader home is configured", function()
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and path == "/storage/emulated/0" then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.preload.device = function()
+            return {
+                home_dir = "/storage/emulated/0",
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.lfs = nil
+        package.loaded.device = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal("/storage/emulated/0", directory_chooser_start_dir)
+    end)
+
+    it("starts download directory setup in Books/Manga when it already exists", function()
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and (
+                        path == "/storage/emulated/0"
+                            or path == "/storage/emulated/0/Books"
+                            or path == "/storage/emulated/0/Books/Manga"
+                    ) then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.preload.device = function()
+            return {
+                home_dir = "/storage/emulated/0",
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.lfs = nil
+        package.loaded.device = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
+    end)
+
+    it("creates Books/Manga for download directory setup when Books exists", function()
+        local created_paths = {}
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and (
+                        path == "/storage/emulated/0"
+                            or path == "/storage/emulated/0/Books"
+                            or created_paths[path]
+                    ) then
+                        return "directory"
+                    end
+                end,
+                mkdir = function(path)
+                    created_paths[path] = true
+                    return true
+                end,
+            }
+        end
+        package.preload.device = function()
+            return {
+                home_dir = "/storage/emulated/0",
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.lfs = nil
+        package.loaded.device = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal(true, created_paths["/storage/emulated/0/Books/Manga"])
+        assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
     end)
 end)

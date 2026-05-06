@@ -293,6 +293,71 @@ function SuwayomiPlugin:showSourceLanguageDialog()
     })
 end
 
+function SuwayomiPlugin:getDownloadDirectoryChooserStartDir()
+    local ok, lfs = pcall(require, "lfs")
+    if not ok or not lfs or not lfs.attributes then
+        return nil
+    end
+
+    local function directoryExists(path)
+        return path and path ~= "" and lfs.attributes(path, "mode") == "directory"
+    end
+
+    local function joinPath(base, name)
+        if base:sub(-1) == "/" then
+            return base .. name
+        end
+        return base .. "/" .. name
+    end
+
+    local function getDefaultMangaDirectory(home_dir)
+        if not directoryExists(home_dir) then
+            return nil
+        end
+
+        local books_dir = joinPath(home_dir, "Books")
+        if not directoryExists(books_dir) then
+            return nil
+        end
+
+        local manga_dir = joinPath(books_dir, "Manga")
+        if directoryExists(manga_dir) then
+            return manga_dir
+        end
+
+        if lfs.mkdir then
+            local ok = lfs.mkdir(manga_dir)
+            if ok and directoryExists(manga_dir) then
+                return manga_dir
+            end
+        end
+        return nil
+    end
+
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if directoryExists(download_directory) then
+        return download_directory
+    end
+
+    local reader_settings = _G.G_reader_settings
+    if reader_settings and reader_settings.readSetting then
+        local home_dir = reader_settings:readSetting("home_dir")
+        if directoryExists(home_dir) then
+            return home_dir
+        end
+    end
+
+    local device_ok, Device = pcall(require, "device")
+    if device_ok and Device and directoryExists(Device.home_dir) then
+        local default_manga_dir = getDefaultMangaDirectory(Device.home_dir)
+        if default_manga_dir then
+            return default_manga_dir
+        end
+        return Device.home_dir
+    end
+    return nil
+end
+
 function SuwayomiPlugin:showSourceList(sources, options)
     options = options or {}
     if not options.force_new and self.current_sources_menu and SuwayomiUI.updateSourcesMenu then
@@ -1736,7 +1801,7 @@ function SuwayomiPlugin:confirmNextUnreadChapterDownloads(limit)
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:confirmNextUnreadChapterDownloads(limit)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -1770,7 +1835,7 @@ function SuwayomiPlugin:confirmKeepNextUnreadChaptersDownloaded(limit)
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:confirmKeepNextUnreadChaptersDownloaded(limit)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -1809,7 +1874,7 @@ function SuwayomiPlugin:enqueueNextUnreadChapterDownloads(limit)
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:enqueueNextUnreadChapterDownloads(limit)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -1834,7 +1899,7 @@ function SuwayomiPlugin:keepNextUnreadChaptersDownloaded(limit)
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:keepNextUnreadChaptersDownloaded(limit)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -1865,7 +1930,7 @@ function SuwayomiPlugin:downloadSelectedChapters()
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:enqueueSelectedChapterDownloads(manga, chapters, saved_path)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -2617,7 +2682,7 @@ function SuwayomiPlugin:enqueueChapterDownload(manga, chapter)
             UIManager:nextTick(function()
                 self:enqueueChapterDownload(manga, chapter)
             end)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return
     end
 
@@ -2670,7 +2735,7 @@ function SuwayomiPlugin:addToMainMenu(menu_items)
                     SuwayomiUI.showDirectoryChooser(function(path)
                         local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
                         self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
-                    end)
+                    end, self:getDownloadDirectoryChooserStartDir())
                 end
             },
             {

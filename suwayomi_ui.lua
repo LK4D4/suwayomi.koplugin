@@ -6,6 +6,10 @@ local _ = require("gettext")
 
 local SuwayomiUI = {}
 
+local function isKOReaderCurrentFolderItem(item)
+    return item and type(item.path) == "string" and item.path:sub(-2, -1) == "/."
+end
+
 function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
     local menu_table = {}
     for _, chapter in ipairs(chapter_list) do
@@ -21,15 +25,49 @@ function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
     return menu_table
 end
 
-function SuwayomiUI.showDirectoryChooser(callback)
-    require("ui/downloadmgr"):new{
+function SuwayomiUI.showDirectoryChooser(callback, start_dir)
+    local PathChooser = require("ui/widget/pathchooser")
+    local UIManager = require("ui/uimanager")
+
+    local DirectoryChooser = PathChooser:extend{
         title = _("Choose download directory"),
+        select_directory = true,
+        select_file = false,
+        show_files = false,
+        show_path = true,
+    }
+
+    function DirectoryChooser:genItemTable(dirs, files, path)
+        local item_table = PathChooser.genItemTable(self, dirs, files, path)
+        if path then
+            local current_folder_path = path .. "/."
+            for __, item in ipairs(item_table) do
+                if item.path == current_folder_path then
+                    item.text = _("Use this folder")
+                    item.bold = true
+                    break
+                end
+            end
+        end
+        return item_table
+    end
+
+    function DirectoryChooser:onMenuSelect(item)
+        if isKOReaderCurrentFolderItem(item) then
+            return PathChooser.onMenuHold(self, item)
+        end
+        return PathChooser.onMenuSelect(self, item)
+    end
+
+    local path_chooser = DirectoryChooser:new{
+        path = start_dir,
         onConfirm = function(path)
             if callback then
                 callback(path)
             end
         end,
-    }:chooseDir()
+    }
+    UIManager:show(path_chooser)
 end
 
 function SuwayomiUI.showSourcesMenu(sources, onSelectCallback)
