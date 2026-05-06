@@ -43,6 +43,144 @@ function SuwayomiClient:attachSourceToManga(manga, source)
     return manga
 end
 
+function SuwayomiClient:formatLibraryMangaRow(manga)
+    local parts = {
+        manga.title or tostring(manga.id),
+    }
+    local details = {}
+    if manga.unread_count ~= nil then
+        table.insert(details, tostring(manga.unread_count) .. " unread")
+    end
+    local source = manga.source
+    local source_name = source and (source.displayName or source.name or source.lang)
+    if source_name and source_name ~= "" then
+        table.insert(details, source_name)
+    end
+    if #details > 0 then
+        table.insert(parts, "(" .. table.concat(details, " / ") .. ")")
+    end
+    return table.concat(parts, " ")
+end
+
+function SuwayomiClient:withLibraryMenuText(manga_list)
+    for _, manga in ipairs(manga_list or {}) do
+        manga.menu_text = self:formatLibraryMangaRow(manga)
+    end
+    return manga_list
+end
+
+function SuwayomiClient:mangaBelongsToCategory(manga, category)
+    if not category or not category.id then
+        return true
+    end
+    for _, candidate in ipairs(manga.categories or {}) do
+        if tostring(candidate.id) == tostring(category.id) then
+            return true
+        end
+    end
+    return false
+end
+
+function SuwayomiClient:filterLibraryMangaByCategory(manga_list, category)
+    if not category or not category.id then
+        return manga_list or {}
+    end
+
+    local filtered = {}
+    for _, manga in ipairs(manga_list or {}) do
+        if self:mangaBelongsToCategory(manga, category) then
+            table.insert(filtered, manga)
+        end
+    end
+    return filtered
+end
+
+function SuwayomiClient:buildLibraryCategoryChoices(categories)
+    local choices = {
+        {
+            id = nil,
+            name = self:translate("All manga"),
+        },
+    }
+    for _, category in ipairs(categories or {}) do
+        table.insert(choices, category)
+    end
+    return choices
+end
+
+function SuwayomiClient:showLibraryManga(category, credentials)
+    credentials = credentials or self.settings:load()
+    local result = self.plugin:withLoadingMessage("library-manga", self:translate("Loading library manga..."), function()
+        return self.api.fetchLibraryManga(credentials, {
+            first = 100,
+            offset = 0,
+        })
+    end)
+    if not result then
+        return
+    end
+    if not result.ok then
+        self.plugin:showMessage(self:translate(result.error))
+        return
+    end
+
+    local manga = self:filterLibraryMangaByCategory(result.manga or {}, category)
+    self:log({
+        operation = "showLibrary",
+        event = "library_manga_loaded",
+        category_id = category and category.id,
+        manga_count = #manga,
+        total_count = result.total_count,
+    })
+
+    if #manga == 0 then
+        if category and category.id then
+            self.plugin:showMessage(self:translate("This category has no manga."))
+        else
+            self.plugin:showMessage(self:translate("Your Suwayomi library is empty."))
+        end
+        return
+    end
+
+    self.ui.showLibraryMangaMenu(self:withLibraryMenuText(manga), function(selected_manga)
+        self.plugin:showChaptersForManga(selected_manga)
+    end)
+end
+
+function SuwayomiClient:showLibrary()
+    return self:time("showLibrary", {}, function()
+        local credentials = self.settings:load()
+        if not credentials.server_url or credentials.server_url == "" then
+            self.plugin:showMessage(self:translate("Set up your Suwayomi server login first."))
+            return
+        end
+        if self.plugin.schedulePendingReadSync then
+            self.plugin:schedulePendingReadSync(credentials)
+        end
+
+        local result = self.plugin:withLoadingMessage("library-categories", self:translate("Loading library..."), function()
+            return self.api.fetchCategories(credentials)
+        end)
+        if not result then
+            return
+        end
+        if not result.ok then
+            self.plugin:showMessage(self:translate(result.error))
+            return
+        end
+
+        local categories = result.categories or {}
+        if #categories > 1 then
+            self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
+                self:showLibraryManga(category, credentials)
+            end)
+            return
+        end
+
+        self:showLibraryManga(nil, credentials)
+    end)
+end
+
 function SuwayomiClient:showMangaForSource(source)
     return self:time("showMangaForSource", {
         source_id = source and source.id,

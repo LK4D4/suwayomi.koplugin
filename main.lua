@@ -135,7 +135,7 @@ function SuwayomiPlugin:showNotImplemented(message)
 end
 
 function SuwayomiPlugin:showLibrary()
-    self:showNotImplemented(_("Library is not implemented yet."))
+    return self:getClient():showLibrary()
 end
 
 function SuwayomiPlugin:showDownloads()

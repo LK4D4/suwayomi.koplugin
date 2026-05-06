@@ -838,7 +838,20 @@ return {
         assert.are.equal(2, parallel_downloads_menu_options.current)
     end)
 
-    it("shows placeholders for library and downloads top-level entries", function()
+    it("opens library from the top-level entry", function()
+        local opened_library = false
+        package.preload.suwayomi_client = function()
+            return {
+                new = function()
+                    return {
+                        showLibrary = function()
+                            opened_library = true
+                        end,
+                    }
+                end,
+            }
+        end
+
         local plugin_class = require("main")
         local menu_items = {}
         local plugin = plugin_class{}
@@ -846,7 +859,16 @@ return {
         plugin:addToMainMenu(menu_items)
 
         menu_items.suwayomi_dl.sub_item_table[1].callback()
-        assert.are.equal("Library is not implemented yet.", shown_messages[#shown_messages])
+
+        assert.is_true(opened_library)
+    end)
+
+    it("shows a placeholder for downloads top-level entry", function()
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
 
         menu_items.suwayomi_dl.sub_item_table[3].callback()
         assert.are.equal("Downloads are not implemented yet.", shown_messages[#shown_messages])

@@ -169,28 +169,28 @@ Exit criteria:
 
 Goal: make `Library` the primary reading entry point.
 
-- [ ] Fetch categories when opening Library
-- [ ] If multiple categories exist, show a category picker
-- [ ] If only the default category exists, go directly to manga list
-- [ ] Fetch library manga for the selected category or all manga
-- [ ] Add compact library manga rows with:
+- [x] Fetch categories when opening Library
+- [x] If multiple categories exist, show a category picker
+- [x] If only the default category exists, go directly to manga list
+- [x] Fetch library manga for the selected category or all manga
+- [x] Add compact library manga rows with:
   - title
   - unread count
   - source label
   - optional KOReader-local availability computed from source-scoped paths
-- [ ] Open selected library manga through the existing chapter screen
-- [ ] Keep pending read-state sync scheduling on Library entry
+- [x] Open selected library manga through the existing chapter screen
+- [x] Keep pending read-state sync scheduling on Library entry
 - [ ] Wire Library settings that are cheap after the menu exists:
   - remember last selected category, optional
   - category picker behavior
 
 Tests:
 
-- [ ] Empty library shows a friendly message
-- [ ] Category selection works when categories are present
-- [ ] Single/default category can skip category picker
-- [ ] Library manga rows format correctly
-- [ ] Selecting a library manga opens chapter flow
+- [x] Empty library shows a friendly message
+- [x] Category selection works when categories are present
+- [x] Single/default category can skip category picker
+- [x] Library manga rows format correctly
+- [x] Selecting a library manga opens chapter flow
 - [ ] Existing chapter actions work for library-opened manga
 
 Exit criteria:
