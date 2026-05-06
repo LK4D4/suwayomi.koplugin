@@ -17,6 +17,18 @@ local function applyTitleBarOptions(menu, options)
     return menu
 end
 
+local function bindMenuCallbacks(items, menu)
+    for _, item in ipairs(items or {}) do
+        if item.callback then
+            local callback = item.callback
+            item.callback = function(...)
+                return callback(menu, ...)
+            end
+        end
+        bindMenuCallbacks(item.sub_item_table, menu)
+    end
+end
+
 local function newStateMark(mark_type, checked)
     local module_name = mark_type == "radio" and "ui/widget/radiomark" or "ui/widget/checkmark"
     local ok, Mark = pcall(require, module_name)
@@ -135,6 +147,7 @@ function SuwayomiUI.showSettingsMenu(items)
         title = _("Suwayomi Settings"),
         item_table = items or {},
     }
+    bindMenuCallbacks(menu.item_table, menu)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu

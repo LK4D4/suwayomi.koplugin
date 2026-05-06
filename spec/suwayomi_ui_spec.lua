@@ -362,6 +362,29 @@ describe("suwayomi_ui", function()
         assert.are.same({ "browse" }, selected)
     end)
 
+    it("passes the native settings menu instance to setting callbacks", function()
+        local ui = require("suwayomi_ui")
+        local callback_menu
+
+        ui.showSettingsMenu({
+            {
+                text = "Connection",
+                sub_item_table = {
+                    {
+                        text = "Login information",
+                        callback = function(menu)
+                            callback_menu = menu
+                        end,
+                    },
+                },
+            },
+        })
+
+        shown_dialog.item_table[1].sub_item_table[1].callback()
+
+        assert.are.equal(shown_dialog, callback_menu)
+    end)
+
     it("shows a confirmation dialog", function()
         local ui = require("suwayomi_ui")
         local confirmed = false
