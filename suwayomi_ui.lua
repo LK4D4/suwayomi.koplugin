@@ -22,14 +22,47 @@ function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
 end
 
 function SuwayomiUI.showDirectoryChooser(callback, start_dir)
-    require("ui/downloadmgr"):new{
+    local PathChooser = require("ui/widget/pathchooser")
+    local UIManager = require("ui/uimanager")
+
+    local DirectoryChooser = PathChooser:extend{
         title = _("Choose download directory"),
+        select_directory = true,
+        select_file = false,
+        show_files = false,
+    }
+
+    function DirectoryChooser:genItemTable(dirs, files, path)
+        local item_table = PathChooser.genItemTable(self, dirs, files, path)
+        if path then
+            local current_folder_path = path .. "/."
+            for __, item in ipairs(item_table) do
+                if item.path == current_folder_path then
+                    item.text = _("Use this folder")
+                    item.bold = true
+                    break
+                end
+            end
+        end
+        return item_table
+    end
+
+    function DirectoryChooser:onMenuSelect(item)
+        if item and type(item.path) == "string" and item.path:sub(-2, -1) == "/." then
+            return self:onMenuHold(item)
+        end
+        return PathChooser.onMenuSelect(self, item)
+    end
+
+    local path_chooser = DirectoryChooser:new{
+        path = start_dir,
         onConfirm = function(path)
             if callback then
                 callback(path)
             end
         end,
-    }:chooseDir(start_dir)
+    }
+    UIManager:show(path_chooser)
 end
 
 function SuwayomiUI.showSourcesMenu(sources, onSelectCallback)
