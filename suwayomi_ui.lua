@@ -6,6 +6,17 @@ local _ = require("gettext")
 
 local SuwayomiUI = {}
 
+local function applyTitleBarOptions(menu, options)
+    options = options or {}
+    if options.title_bar_left_icon then
+        menu.title_bar_left_icon = options.title_bar_left_icon
+    end
+    if options.on_title_bar_left_tap then
+        menu.onLeftButtonTap = options.on_title_bar_left_tap
+    end
+    return menu
+end
+
 local function newStateMark(mark_type, checked)
     local module_name = mark_type == "radio" and "ui/widget/radiomark" or "ui/widget/checkmark"
     local ok, Mark = pcall(require, module_name)
@@ -92,8 +103,13 @@ function SuwayomiUI.showDirectoryChooser(callback, start_dir)
     UIManager:show(path_chooser)
 end
 
-function SuwayomiUI.showSourcesMenu(sources, onSelectCallback)
+function SuwayomiUI.showSourcesMenu(sources, onSelectCallback, options)
     local menu_table = {}
+    options = options or {}
+    if type(onSelectCallback) == "table" then
+        options = onSelectCallback
+        onSelectCallback = options.onSelect
+    end
     for _, source in ipairs(sources) do
         table.insert(menu_table, {
             text = source.name,
@@ -105,14 +121,26 @@ function SuwayomiUI.showSourcesMenu(sources, onSelectCallback)
 
     local menu = Menu:new{
         title = _("Suwayomi Sources"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = menu_table,
+    }
+    applyTitleBarOptions(menu, options)
+    local UIManager = require("ui/uimanager")
+    UIManager:show(menu)
+    return menu
+end
+
+function SuwayomiUI.showSettingsMenu(items)
+    local menu = Menu:new{
+        title = _("Suwayomi Settings"),
+        item_table = items or {},
     }
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
 end
 
-function SuwayomiUI.updateSourcesMenu(menu, sources, onSelectCallback)
+function SuwayomiUI.updateSourcesMenu(menu, sources, onSelectCallback, options)
     if not menu then
         return
     end
@@ -127,12 +155,13 @@ function SuwayomiUI.updateSourcesMenu(menu, sources, onSelectCallback)
         })
     end
     menu.item_table = menu_table
+    applyTitleBarOptions(menu, options)
     if menu.updateItems then
         menu:updateItems()
     end
 end
 
-function SuwayomiUI.showMangaMenu(manga_list, onSelectCallback)
+function SuwayomiUI.showMangaMenu(manga_list, onSelectCallback, options)
     local menu_table = {}
     for _, manga in ipairs(manga_list) do
         table.insert(menu_table, {
@@ -145,13 +174,15 @@ function SuwayomiUI.showMangaMenu(manga_list, onSelectCallback)
 
     local menu = Menu:new{
         title = _("Suwayomi Manga"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = menu_table,
     }
+    applyTitleBarOptions(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
 end
 
-function SuwayomiUI.showLibraryCategoryMenu(categories, onSelectCallback)
+function SuwayomiUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
     local menu_table = {}
     for _, category in ipairs(categories or {}) do
         local suffix = ""
@@ -168,14 +199,16 @@ function SuwayomiUI.showLibraryCategoryMenu(categories, onSelectCallback)
 
     local menu = Menu:new{
         title = _("Suwayomi Library"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = menu_table,
     }
+    applyTitleBarOptions(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
 end
 
-function SuwayomiUI.showLibraryMangaMenu(manga_list, onSelectCallback)
+function SuwayomiUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
     local menu_table = {}
     for _, manga in ipairs(manga_list or {}) do
         table.insert(menu_table, {
@@ -188,8 +221,10 @@ function SuwayomiUI.showLibraryMangaMenu(manga_list, onSelectCallback)
 
     local menu = Menu:new{
         title = _("Suwayomi Library"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = menu_table,
     }
+    applyTitleBarOptions(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
@@ -221,6 +256,43 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
+end
+
+function SuwayomiUI.showHomeDialog(options, onSelectCallback)
+    local UIManager = require("ui/uimanager")
+    local dialog
+    local buttons = {}
+    local row = {}
+
+    options = options or {}
+    for _, action in ipairs(options.actions or {}) do
+        table.insert(row, {
+            text = action.text,
+            callback = function()
+                UIManager:close(dialog)
+                if onSelectCallback then
+                    onSelectCallback(action)
+                elseif action.callback then
+                    action.callback(action)
+                end
+            end,
+        })
+        if #row == 2 then
+            table.insert(buttons, row)
+            row = {}
+        end
+    end
+
+    if #row > 0 then
+        table.insert(buttons, row)
+    end
+
+    dialog = ButtonDialog:new{
+        title = options.title or _("Suwayomi"),
+        buttons = buttons,
+    }
+    UIManager:show(dialog)
+    return dialog
 end
 
 function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)

@@ -329,6 +329,39 @@ describe("suwayomi_ui", function()
         assert.are.same({ id = "open", text = "Open" }, selected)
     end)
 
+    it("shows the Suwayomi home hub as two-column buttons", function()
+        local ui = require("suwayomi_ui")
+        local selected = {}
+
+        ui.showHomeDialog({
+            actions = {
+                { id = "library", text = "Library" },
+                { id = "browse", text = "Browse" },
+                { id = "downloads", text = "Downloads" },
+                { id = "sync", text = "Sync" },
+                { id = "settings", text = "Settings" },
+                { id = "close", text = "Close" },
+            },
+        }, function(action)
+            table.insert(selected, action.id)
+            table.insert(events, action.id)
+        end)
+
+        assert.are.equal("Suwayomi", shown_dialog.title)
+        assert.are.equal("Library", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Browse", shown_dialog.buttons[1][2].text)
+        assert.are.equal("Downloads", shown_dialog.buttons[2][1].text)
+        assert.are.equal("Sync", shown_dialog.buttons[2][2].text)
+        assert.are.equal("Settings", shown_dialog.buttons[3][1].text)
+        assert.are.equal("Close", shown_dialog.buttons[3][2].text)
+
+        shown_dialog.buttons[1][2].callback()
+
+        assert.are.same({ "close", "browse" }, events)
+        assert.are.equal(shown_dialog, closed_dialog)
+        assert.are.same({ "browse" }, selected)
+    end)
+
     it("shows a confirmation dialog", function()
         local ui = require("suwayomi_ui")
         local confirmed = false
@@ -375,6 +408,48 @@ describe("suwayomi_ui", function()
             { id = "s2", name = "ComicK" },
             { id = "s3", name = "Local source" },
         }, selected)
+    end)
+
+    it("adds a home title-bar action to sources menus when requested", function()
+        local ui = require("suwayomi_ui")
+        local tapped_home = false
+
+        ui.showSourcesMenu({
+            { id = "s1", name = "MangaDex" },
+        }, nil, {
+            title_bar_left_icon = "appbar.home",
+            on_title_bar_left_tap = function()
+                tapped_home = true
+                return true
+            end,
+        })
+
+        assert.are.equal("appbar.home", shown_dialog.title_bar_left_icon)
+
+        shown_dialog.onLeftButtonTap()
+
+        assert.is_true(tapped_home)
+    end)
+
+    it("adds a home title-bar action to library manga menus when requested", function()
+        local ui = require("suwayomi_ui")
+        local tapped_home = false
+
+        ui.showLibraryMangaMenu({
+            { id = "m1", title = "Sousou no Frieren" },
+        }, nil, {
+            title_bar_left_icon = "appbar.home",
+            on_title_bar_left_tap = function()
+                tapped_home = true
+                return true
+            end,
+        })
+
+        assert.are.equal("appbar.home", shown_dialog.title_bar_left_icon)
+
+        shown_dialog.onLeftButtonTap()
+
+        assert.is_true(tapped_home)
     end)
 
     it("updates a sources menu in place", function()

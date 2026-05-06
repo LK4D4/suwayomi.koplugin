@@ -12,7 +12,10 @@ describe("suwayomi plugin", function()
     local closed_loading_messages
     local force_repaint_count
     local shown_sources
+    local shown_sources_menu_options
     local shown_confirm
+    local home_dialog_options
+    local settings_menu_items
     local directory_chooser_callback
     local directory_chooser_start_dir
     local saved_download_directory
@@ -38,7 +41,10 @@ describe("suwayomi plugin", function()
         closed_loading_messages = {}
         force_repaint_count = 0
         shown_sources = nil
+        shown_sources_menu_options = nil
         shown_confirm = nil
+        home_dialog_options = nil
+        settings_menu_items = nil
         directory_chooser_callback = nil
         directory_chooser_start_dir = nil
         saved_download_directory = nil
@@ -323,8 +329,15 @@ describe("suwayomi plugin", function()
                     parallel_downloads_menu_options = options
                     parallel_downloads_menu_options.menu = menu
                 end,
-                showSourcesMenu = function(sources)
+                showHomeDialog = function(options)
+                    home_dialog_options = options
+                end,
+                showSettingsMenu = function(items)
+                    settings_menu_items = items
+                end,
+                showSourcesMenu = function(sources, _, options)
                     shown_sources = sources
+                    shown_sources_menu_options = options
                 end,
             }
         end
@@ -396,6 +409,28 @@ describe("suwayomi plugin", function()
             local callback = table.remove(scheduled_callbacks, 1)
             callback()
         end
+    end
+
+    local function findHomeAction(id)
+        for _, action in ipairs((home_dialog_options and home_dialog_options.actions) or {}) do
+            if action.id == id then
+                return action
+            end
+        end
+        return nil
+    end
+
+    local function triggerHomeAction(plugin, id)
+        plugin:showHome()
+        local action = findHomeAction(id)
+        assert.is_table(action)
+        action.callback()
+    end
+
+    local function getSettingsMenu(plugin)
+        plugin:showSettings()
+        assert.is_table(settings_menu_items)
+        return settings_menu_items
     end
 
     local function successful_batch_read_sync(marked_ids)
@@ -573,21 +608,28 @@ describe("suwayomi plugin", function()
         assert.is_nil(registered_menu_plugin)
     end)
 
-    it("adds the plugin under the search menu section", function()
+    it("adds the plugin under the search menu section and opens the Suwayomi hub", function()
         local plugin_class = require("main")
         local menu_items = {}
+        local plugin = plugin_class{}
 
-        plugin_class:addToMainMenu(menu_items)
+        plugin:addToMainMenu(menu_items)
 
         assert.is_table(menu_items.suwayomi_dl)
         assert.are.equal("Suwayomi", menu_items.suwayomi_dl.text)
         assert.are.equal("search", menu_items.suwayomi_dl.sorting_hint)
-        assert.are.equal(5, #menu_items.suwayomi_dl.sub_item_table)
-        assert.are.equal("Library", menu_items.suwayomi_dl.sub_item_table[1].text)
-        assert.are.equal("Browse", menu_items.suwayomi_dl.sub_item_table[2].text)
-        assert.are.equal("Downloads", menu_items.suwayomi_dl.sub_item_table[3].text)
-        assert.are.equal("Sync read state now", menu_items.suwayomi_dl.sub_item_table[4].text)
-        assert.are.equal("Settings", menu_items.suwayomi_dl.sub_item_table[5].text)
+        assert.is_function(menu_items.suwayomi_dl.callback)
+        assert.is_nil(menu_items.suwayomi_dl.sub_item_table)
+
+        menu_items.suwayomi_dl.callback()
+
+        assert.is_table(home_dialog_options)
+        assert.are.equal("Library", home_dialog_options.actions[1].text)
+        assert.are.equal("Browse", home_dialog_options.actions[2].text)
+        assert.are.equal("Downloads", home_dialog_options.actions[3].text)
+        assert.are.equal("Sync", home_dialog_options.actions[4].text)
+        assert.are.equal("Settings", home_dialog_options.actions[5].text)
+        assert.are.equal("Close", home_dialog_options.actions[6].text)
     end)
 
     it("configures the download queue with the saved parallel chapter limit", function()
@@ -659,7 +701,7 @@ describe("suwayomi plugin", function()
         local plugin = plugin_class{}
         plugin:addToMainMenu(menu_items)
 
-        menu_items.suwayomi_dl.sub_item_table[4].callback()
+        triggerHomeAction(plugin, "sync")
 
         assert.are.equal("Read state sync started.", shown_messages[#shown_messages])
         assert.are.equal(1, #scheduled_callbacks)
@@ -676,7 +718,7 @@ describe("suwayomi plugin", function()
         local plugin = plugin_class{}
         plugin:addToMainMenu(menu_items)
 
-        menu_items.suwayomi_dl.sub_item_table[4].callback()
+        triggerHomeAction(plugin, "sync")
 
         assert.are.equal("Read state is already synced.", shown_messages[#shown_messages])
         assert.are.equal(0, #scheduled_callbacks)
@@ -744,7 +786,7 @@ return {
         local plugin = plugin_class{}
         plugin:addToMainMenu(menu_items)
 
-        menu_items.suwayomi_dl.sub_item_table[4].callback()
+        triggerHomeAction(plugin, "sync")
 
         assert.are.equal("Read state sync started.", shown_messages[#shown_messages])
         assert.is_true(saved_ledger["m1:398"].read)
@@ -784,7 +826,7 @@ return {
         }
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[4].sub_item_table[2].callback(touchmenu_instance)
+        getSettingsMenu(plugin)[4].sub_item_table[2].callback(touchmenu_instance)
 
         assert.are.equal(2, parallel_downloads_menu_options.current)
         assert.are.same({ 1, 2, 3, 4 }, parallel_downloads_menu_options.choices)
@@ -805,16 +847,16 @@ return {
 
         plugin:addToMainMenu(menu_items)
 
-        local suwayomi_menu = menu_items.suwayomi_dl.sub_item_table
-        assert.are.equal("Library", suwayomi_menu[1].text)
-        assert.are.equal("Browse", suwayomi_menu[2].text)
-        assert.are.equal("Downloads", suwayomi_menu[3].text)
-        assert.are.equal("Sync read state now", suwayomi_menu[4].text)
-        assert.is_true(suwayomi_menu[4].keep_menu_open)
-        assert.are.equal("Settings", suwayomi_menu[5].text)
-        assert.are.equal(5, #suwayomi_menu)
+        plugin:showHome()
+        assert.are.equal("Library", home_dialog_options.actions[1].text)
+        assert.are.equal("Browse", home_dialog_options.actions[2].text)
+        assert.are.equal("Downloads", home_dialog_options.actions[3].text)
+        assert.are.equal("Sync", home_dialog_options.actions[4].text)
+        assert.are.equal("Settings", home_dialog_options.actions[5].text)
+        assert.are.equal("Close", home_dialog_options.actions[6].text)
+        assert.are.equal(6, #home_dialog_options.actions)
 
-        local settings_menu = suwayomi_menu[5].sub_item_table
+        local settings_menu = getSettingsMenu(plugin)
         assert.is_table(settings_menu)
         assert.are.equal("Connection", settings_menu[1].text)
         assert.are.equal("Library", settings_menu[2].text)
@@ -834,7 +876,7 @@ return {
 
         plugin:addToMainMenu(menu_items)
 
-        local settings_menu = menu_items.suwayomi_dl.sub_item_table[5].sub_item_table
+        local settings_menu = getSettingsMenu(plugin)
         for _, section in ipairs(settings_menu) do
             for _, item in ipairs(section.sub_item_table or {}) do
                 assert.is_true(item.keep_menu_open)
@@ -869,7 +911,7 @@ return {
         }
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[2].sub_item_table[1].callback(touchmenu_instance)
+        getSettingsMenu(plugin)[2].sub_item_table[1].callback(touchmenu_instance)
 
         assert.are.same({ "automatic", "always", "never" }, library_category_picker_menu_options.choices)
         library_category_picker_menu_options.onSelect("always")
@@ -906,7 +948,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        local library_settings_item = menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[2].sub_item_table[1]
+        local library_settings_item = getSettingsMenu(plugin)[2].sub_item_table[1]
 
         assert.are.equal("Category picker: automatic", library_settings_item.text_func())
 
@@ -935,7 +977,7 @@ return {
 
         plugin:addToMainMenu(menu_items)
 
-        menu_items.suwayomi_dl.sub_item_table[1].callback()
+        triggerHomeAction(plugin, "library")
 
         assert.is_true(opened_library)
     end)
@@ -983,6 +1025,9 @@ return {
                     shown_chapter_menu_options = options
                     return { name = "chapter-menu" }
                 end,
+                showHomeDialog = function(options)
+                    home_dialog_options = options
+                end,
                 showDirectoryChooser = function() end,
                 showLoginDialog = function() end,
                 showLanguageMenu = function() end,
@@ -994,7 +1039,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[1].callback()
+        triggerHomeAction(plugin, "library")
 
         assert.are.equal("Sousou no Frieren (1 unread / MangaDex EN)", shown_library_manga[1].menu_text)
         assert.are.equal("Sousou no Frieren", plugin.current_chapter_context.manga.title)
@@ -1010,7 +1055,7 @@ return {
 
         plugin:addToMainMenu(menu_items)
 
-        menu_items.suwayomi_dl.sub_item_table[3].callback()
+        triggerHomeAction(plugin, "downloads")
         assert.are.equal("Downloads are not implemented yet.", shown_messages[#shown_messages])
     end)
 
@@ -1020,7 +1065,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[1].sub_item_table[1].callback()
+        getSettingsMenu(plugin)[1].sub_item_table[1].callback()
 
         assert.is_table(login_dialog_options)
         assert.are.equal("https://suwayomi.example", login_dialog_options.credentials.server_url)
@@ -1041,7 +1086,7 @@ return {
         }
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[1].sub_item_table[1].callback(touchmenu_instance)
+        getSettingsMenu(plugin)[1].sub_item_table[1].callback(touchmenu_instance)
 
         login_dialog_options.onSave({
             server_url = "https://suwayomi.example",
@@ -1060,13 +1105,29 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[2].callback()
+        triggerHomeAction(plugin, "browse")
 
         assert.are.same({
             { id = "1", name = "MangaDex (EN)", lang = "en" },
             { id = "2", name = "MangaDex (RU)", lang = "ru" },
             { id = "4", name = "Local source", lang = "localsourcelang" },
         }, shown_sources)
+    end)
+
+    it("adds a home action to browse source menus", function()
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        triggerHomeAction(plugin, "browse")
+
+        assert.are.equal("appbar.home", shown_sources_menu_options.title_bar_left_icon)
+
+        shown_sources_menu_options.on_title_bar_left_tap()
+
+        assert.is_table(home_dialog_options)
+        assert.are.equal("Library", home_dialog_options.actions[1].text)
     end)
 
     it("shows loading feedback around source, manga, and chapter fetches", function()
@@ -6352,7 +6413,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[2].callback()
+        triggerHomeAction(plugin, "browse")
 
         assert.are.equal("Authentication failed.", shown_messages[#shown_messages])
     end)
@@ -6363,7 +6424,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[3].sub_item_table[1].callback()
+        getSettingsMenu(plugin)[3].sub_item_table[1].callback()
 
         assert.is_table(language_menu_options)
         assert.are.equal("en", language_menu_options.languages[1].code)
@@ -6385,7 +6446,7 @@ return {
         }
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[3].sub_item_table[1].callback(touchmenu_instance)
+        getSettingsMenu(plugin)[3].sub_item_table[1].callback(touchmenu_instance)
 
         language_menu_options.onToggle("de", true)
         language_menu_options.onClose()
@@ -6406,7 +6467,7 @@ return {
         }
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[4].sub_item_table[1].callback(touchmenu_instance)
+        getSettingsMenu(plugin)[4].sub_item_table[1].callback(touchmenu_instance)
 
         directory_chooser_callback("/storage/emulated/0/Books/Manga")
 
@@ -6445,7 +6506,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[4].sub_item_table[1].callback()
+        getSettingsMenu(plugin)[4].sub_item_table[1].callback()
 
         assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
     end)
@@ -6475,7 +6536,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[4].sub_item_table[1].callback()
+        getSettingsMenu(plugin)[4].sub_item_table[1].callback()
 
         assert.are.equal("/storage/emulated/0/Books", directory_chooser_start_dir)
     end)
@@ -6504,7 +6565,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[4].sub_item_table[1].callback()
+        getSettingsMenu(plugin)[4].sub_item_table[1].callback()
 
         assert.are.equal("/storage/emulated/0", directory_chooser_start_dir)
     end)
@@ -6537,7 +6598,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[4].sub_item_table[1].callback()
+        getSettingsMenu(plugin)[4].sub_item_table[1].callback()
 
         assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
     end)
@@ -6575,7 +6636,7 @@ return {
         local plugin = plugin_class{}
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[4].sub_item_table[1].callback()
+        getSettingsMenu(plugin)[4].sub_item_table[1].callback()
 
         assert.are.equal(true, created_paths["/storage/emulated/0/Books/Manga"])
         assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)

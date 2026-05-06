@@ -134,6 +134,70 @@ function SuwayomiPlugin:showNotImplemented(message)
     self:showMessage(message)
 end
 
+function SuwayomiPlugin:getHomeMenuOptions()
+    return {
+        title_bar_left_icon = "appbar.home",
+        on_title_bar_left_tap = function()
+            self:showHome()
+            return true
+        end,
+    }
+end
+
+function SuwayomiPlugin:buildHomeActions()
+    return {
+        {
+            id = "library",
+            text = _("Library"),
+            callback = function()
+                self:showLibrary()
+            end,
+        },
+        {
+            id = "browse",
+            text = _("Browse"),
+            callback = function()
+                self:browseSuwayomi()
+            end,
+        },
+        {
+            id = "downloads",
+            text = _("Downloads"),
+            callback = function()
+                self:showDownloads()
+            end,
+        },
+        {
+            id = "sync",
+            text = _("Sync"),
+            callback = function()
+                self:syncReadStateNow()
+            end,
+        },
+        {
+            id = "settings",
+            text = _("Settings"),
+            callback = function()
+                self:showSettings()
+            end,
+        },
+        {
+            id = "close",
+            text = _("Close"),
+        },
+    }
+end
+
+function SuwayomiPlugin:showHome()
+    return SuwayomiUI.showHomeDialog({
+        actions = self:buildHomeActions(),
+    }, function(action)
+        if action and action.callback then
+            action.callback()
+        end
+    end)
+end
+
 function SuwayomiPlugin:showLibrary()
     return self:getClient():showLibrary()
 end
@@ -144,6 +208,13 @@ end
 
 function SuwayomiPlugin:showLibrarySettings(touchmenu_instance)
     return self:showLibraryCategoryPickerBehaviorDialog(touchmenu_instance)
+end
+
+function SuwayomiPlugin:showSettings()
+    if SuwayomiUI.showSettingsMenu then
+        return SuwayomiUI.showSettingsMenu(self:buildSettingsMenu())
+    end
+    self:showMessage(_("Settings are unavailable."))
 end
 
 function SuwayomiPlugin:showMessage(message, options)
@@ -499,13 +570,13 @@ function SuwayomiPlugin:showSourceList(sources, options)
     if not options.force_new and self.current_sources_menu and SuwayomiUI.updateSourcesMenu then
         SuwayomiUI.updateSourcesMenu(self.current_sources_menu, sources, function(source)
             self:showMangaForSource(source)
-        end)
+        end, self:getHomeMenuOptions())
         return self.current_sources_menu
     end
 
     self.current_sources_menu = SuwayomiUI.showSourcesMenu(sources, function(source)
         self:showMangaForSource(source)
-    end)
+    end, self:getHomeMenuOptions())
     return self.current_sources_menu
 end
 
@@ -2896,37 +2967,9 @@ function SuwayomiPlugin:addToMainMenu(menu_items)
     menu_items.suwayomi_dl = {
         text = _("Suwayomi"),
         sorting_hint = "search",
-        sub_item_table = {
-            {
-                text = _("Library"),
-                callback = function()
-                    self:showLibrary()
-                end
-            },
-            {
-                text = _("Browse"),
-                callback = function()
-                    self:browseSuwayomi()
-                end
-            },
-            {
-                text = _("Downloads"),
-                callback = function()
-                    self:showDownloads()
-                end
-            },
-            {
-                text = _("Sync read state now"),
-                keep_menu_open = true,
-                callback = function()
-                    self:syncReadStateNow()
-                end
-            },
-            {
-                text = _("Settings"),
-                sub_item_table = self:buildSettingsMenu(),
-            }
-        }
+        callback = function()
+            self:showHome()
+        end,
     }
 end
 

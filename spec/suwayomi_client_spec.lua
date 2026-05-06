@@ -46,6 +46,9 @@ describe("suwayomi_client", function()
                 schedulePendingReadSync = function(_, credentials)
                     scheduled_sync_credentials = credentials
                 end,
+                getHomeMenuOptions = function()
+                    return options.home_menu_options
+                end,
             },
             gettext = function(text)
                 return text
@@ -118,8 +121,9 @@ describe("suwayomi_client", function()
                 end,
             },
             ui = {
-                showMangaMenu = function(manga, onSelect)
+                showMangaMenu = function(manga, onSelect, menu_options)
                     assert.are.equal("Sousou no Frieren", manga[1].title)
+                    assert.are.same({ title_bar_left_icon = "appbar.home" }, menu_options)
                     onSelect(manga[1])
                 end,
             },
@@ -141,6 +145,9 @@ describe("suwayomi_client", function()
                 end,
                 showChaptersForManga = function(_, manga)
                     opened_manga = manga
+                end,
+                getHomeMenuOptions = function()
+                    return { title_bar_left_icon = "appbar.home" }
                 end,
             },
             gettext = function(text)
@@ -234,7 +241,9 @@ describe("suwayomi_client", function()
 
     it("skips the category picker for a single category and opens selected library manga", function()
         local shown_manga
+        local shown_menu_options
         local client, state = newClient({
+            home_menu_options = { title_bar_left_icon = "appbar.home" },
             api = {
                 fetchCategories = function()
                     return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
@@ -260,8 +269,9 @@ describe("suwayomi_client", function()
                 showLibraryCategoryMenu = function()
                     error("unexpected category menu")
                 end,
-                showLibraryMangaMenu = function(manga, onSelect)
+                showLibraryMangaMenu = function(manga, onSelect, menu_options)
                     shown_manga = manga
+                    shown_menu_options = menu_options
                     onSelect(manga[1])
                 end,
             },
@@ -270,14 +280,17 @@ describe("suwayomi_client", function()
         client:showLibrary()
 
         assert.are.equal("Sousou no Frieren (12 unread / MangaDex EN)", shown_manga[1].menu_text)
+        assert.are.same({ title_bar_left_icon = "appbar.home" }, shown_menu_options)
         assert.are.equal("m1", state.opened_manga().id)
         assert.are.equal("library_manga_loaded", state.log_events[#state.log_events].event)
     end)
 
     it("shows categories when multiple categories are present and filters selected category manga", function()
         local shown_categories
+        local shown_category_menu_options
         local shown_manga
         local client = newClient({
+            home_menu_options = { title_bar_left_icon = "appbar.home" },
             api = {
                 fetchCategories = function()
                     return {
@@ -308,8 +321,9 @@ describe("suwayomi_client", function()
                 end,
             },
             ui = {
-                showLibraryCategoryMenu = function(categories, onSelect)
+                showLibraryCategoryMenu = function(categories, onSelect, menu_options)
                     shown_categories = categories
+                    shown_category_menu_options = menu_options
                     onSelect(categories[3])
                 end,
                 showLibraryMangaMenu = function(manga)
@@ -323,6 +337,7 @@ describe("suwayomi_client", function()
         assert.are.equal("All manga", shown_categories[1].name)
         assert.are.equal("Default", shown_categories[2].name)
         assert.are.equal("Reading", shown_categories[3].name)
+        assert.are.same({ title_bar_left_icon = "appbar.home" }, shown_category_menu_options)
         assert.are.same({ "Reading Manga (3 unread)" }, { shown_manga[1].menu_text })
     end)
 

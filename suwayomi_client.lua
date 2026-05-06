@@ -30,6 +30,13 @@ function SuwayomiClient:log(event)
     end
 end
 
+function SuwayomiClient:getHomeMenuOptions()
+    if self.plugin and self.plugin.getHomeMenuOptions then
+        return self.plugin:getHomeMenuOptions()
+    end
+    return nil
+end
+
 function SuwayomiClient:attachSourceToManga(manga, source)
     if type(manga) ~= "table" or type(source) ~= "table" then
         return manga
@@ -175,7 +182,7 @@ function SuwayomiClient:showLibraryManga(category, credentials)
 
     self.ui.showLibraryMangaMenu(self:withLibraryMenuText(manga), function(selected_manga)
         self.plugin:showChaptersForManga(selected_manga)
-    end)
+    end, self:getHomeMenuOptions())
 end
 
 function SuwayomiClient:showLibrary()
@@ -210,7 +217,7 @@ function SuwayomiClient:showLibrary()
         if should_show_category_picker and #categories > 0 then
             self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
                 self:showLibraryManga(category, credentials)
-            end)
+            end, self:getHomeMenuOptions())
             return
         end
 
@@ -252,7 +259,7 @@ function SuwayomiClient:showMangaForSource(source)
         self.ui.showMangaMenu(result.manga, function(manga)
             self:attachSourceToManga(manga, source)
             self.plugin:showChaptersForManga(manga)
-        end)
+        end, self:getHomeMenuOptions())
     end)
 end
 
