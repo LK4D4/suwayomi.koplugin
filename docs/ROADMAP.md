@@ -101,30 +101,30 @@ Exit criteria:
 
 Goal: make the top-level UI match the MVP surfaces before each surface is fully implemented.
 
-- [ ] Change top-level menu order to:
+- [x] Change top-level menu order to:
   - Library
   - Browse
   - Downloads
   - Sync read state now
   - Settings
-- [ ] Rename `Browse Suwayomi` to `Browse`
-- [ ] Add `Settings` menu with sections:
+- [x] Rename `Browse Suwayomi` to `Browse`
+- [x] Add `Settings` menu with sections:
   - Connection
   - Library
   - Browse
   - Downloads
-- [ ] Move login/server URL setup under `Settings -> Connection`
-- [ ] Move source language setup under `Settings -> Browse`
-- [ ] Move download directory setup under `Settings -> Downloads`
-- [ ] Move parallel download setup under `Settings -> Downloads`
-- [ ] Add placeholder Library settings for category picker behavior and last category, even if only one is wired first
-- [ ] Keep temporary top-level duplicates only inside narrow transition commits
+- [x] Move login/server URL setup under `Settings -> Connection`
+- [x] Move source language setup under `Settings -> Browse`
+- [x] Move download directory setup under `Settings -> Downloads`
+- [x] Move parallel download setup under `Settings -> Downloads`
+- [x] Add placeholder Library settings for category picker behavior and last category, even if only one is wired first
+- [x] Keep temporary top-level duplicates only inside narrow transition commits
 
 Tests:
 
-- [ ] Main menu includes `Library`, `Browse`, `Downloads`, and `Settings`
-- [ ] Settings menu routes to Connection, Library, Browse, and Downloads
-- [ ] Existing login, source language, download directory, and parallel-download settings still work from their new homes
+- [x] Main menu includes `Library`, `Browse`, `Downloads`, and `Settings`
+- [x] Settings menu routes to Connection, Library, Browse, and Downloads
+- [x] Existing login, source language, download directory, and parallel-download settings still work from their new homes
 
 Exit criteria:
 

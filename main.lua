@@ -134,6 +134,18 @@ function SuwayomiPlugin:showNotImplemented(message)
     self:showMessage(message)
 end
 
+function SuwayomiPlugin:showLibrary()
+    self:showNotImplemented(_("Library is not implemented yet."))
+end
+
+function SuwayomiPlugin:showDownloads()
+    self:showNotImplemented(_("Downloads are not implemented yet."))
+end
+
+function SuwayomiPlugin:showLibrarySettings()
+    self:showNotImplemented(_("Library settings are not implemented yet."))
+end
+
 function SuwayomiPlugin:showMessage(message, options)
     options = options or {}
     UIManager:show(InfoMessage:new{
@@ -2762,15 +2774,96 @@ function SuwayomiPlugin:pollChapterDownload()
     self:getDownloadQueue():poll()
 end
 
+function SuwayomiPlugin:buildSettingsMenu()
+    return {
+        {
+            text = _("Connection"),
+            sub_item_table = {
+                {
+                    text = _("Login information"),
+                    keep_menu_open = true,
+                    callback = function(touchmenu_instance)
+                        self:showLoginDialog(touchmenu_instance)
+                    end,
+                },
+            },
+        },
+        {
+            text = _("Library"),
+            sub_item_table = {
+                {
+                    text = _("Category picker: automatic"),
+                    keep_menu_open = true,
+                    callback = function()
+                        self:showLibrarySettings()
+                    end,
+                },
+            },
+        },
+        {
+            text = _("Browse"),
+            sub_item_table = {
+                {
+                    text_func = function()
+                        return T(_("Source languages: %1"), self:getSourceLanguageSummary())
+                    end,
+                    keep_menu_open = true,
+                    callback = function(touchmenu_instance)
+                        self:showSourceLanguageDialog(touchmenu_instance)
+                    end,
+                },
+            },
+        },
+        {
+            text = _("Downloads"),
+            sub_item_table = {
+                {
+                    text_func = function()
+                        return T(_("Download directory: %1"), self:getDownloadDirectorySummary())
+                    end,
+                    keep_menu_open = true,
+                    callback = function(touchmenu_instance)
+                        self:showDownloadDirectoryDialog(touchmenu_instance)
+                    end,
+                },
+                {
+                    text_func = function()
+                        return T(
+                            _("Parallel downloads: %1"),
+                            SuwayomiSettings:loadMaxParallelChapterDownloads()
+                        )
+                    end,
+                    keep_menu_open = true,
+                    callback = function(touchmenu_instance)
+                        self:showParallelDownloadsDialog(touchmenu_instance)
+                    end,
+                },
+            },
+        },
+    }
+end
+
 function SuwayomiPlugin:addToMainMenu(menu_items)
     menu_items.suwayomi_dl = {
         text = _("Suwayomi"),
         sorting_hint = "search",
         sub_item_table = {
             {
-                text = _("Browse Suwayomi"),
+                text = _("Library"),
+                callback = function()
+                    self:showLibrary()
+                end
+            },
+            {
+                text = _("Browse"),
                 callback = function()
                     self:browseSuwayomi()
+                end
+            },
+            {
+                text = _("Downloads"),
+                callback = function()
+                    self:showDownloads()
                 end
             },
             {
@@ -2782,45 +2875,7 @@ function SuwayomiPlugin:addToMainMenu(menu_items)
             },
             {
                 text = _("Settings"),
-                sub_item_table = {
-                    {
-                        text = _("Login information"),
-                        keep_menu_open = true,
-                        callback = function(touchmenu_instance)
-                            self:showLoginDialog(touchmenu_instance)
-                        end,
-                    },
-                    {
-                        text_func = function()
-                            return T(_("Source languages: %1"), self:getSourceLanguageSummary())
-                        end,
-                        keep_menu_open = true,
-                        callback = function(touchmenu_instance)
-                            self:showSourceLanguageDialog(touchmenu_instance)
-                        end,
-                    },
-                    {
-                        text_func = function()
-                            return T(_("Download directory: %1"), self:getDownloadDirectorySummary())
-                        end,
-                        keep_menu_open = true,
-                        callback = function(touchmenu_instance)
-                            self:showDownloadDirectoryDialog(touchmenu_instance)
-                        end,
-                    },
-                    {
-                        text_func = function()
-                            return T(
-                                _("Parallel downloads: %1"),
-                                SuwayomiSettings:loadMaxParallelChapterDownloads()
-                            )
-                        end,
-                        keep_menu_open = true,
-                        callback = function(touchmenu_instance)
-                            self:showParallelDownloadsDialog(touchmenu_instance)
-                        end,
-                    },
-                },
+                sub_item_table = self:buildSettingsMenu(),
             }
         }
     }
