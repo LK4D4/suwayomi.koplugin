@@ -180,7 +180,7 @@ Goal: make `Library` the primary reading entry point.
   - optional KOReader-local availability computed from source-scoped paths
 - [x] Open selected library manga through the existing chapter screen
 - [x] Keep pending read-state sync scheduling on Library entry
-- [ ] Wire Library settings that are cheap after the menu exists:
+- [x] Wire Library settings that are cheap after the menu exists:
   - remember last selected category, optional
   - category picker behavior
 

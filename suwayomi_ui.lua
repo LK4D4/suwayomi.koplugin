@@ -389,6 +389,58 @@ function SuwayomiUI.showParallelDownloadsMenu(options)
     return menu
 end
 
+function SuwayomiUI.showLibraryCategoryPickerBehaviorMenu(options)
+    options = options or {}
+    local UIManager = require("ui/uimanager")
+    local menu = Menu:new{
+        title = _("Library category picker"),
+        item_table = SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options),
+        state_w = getStateMarkWidth(),
+    }
+    UIManager:show(menu)
+    return menu
+end
+
+function SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options)
+    options = options or {}
+    local labels = {
+        automatic = _("Automatic"),
+        always = _("Always ask"),
+        never = _("Never ask"),
+    }
+    local menu_table = {}
+    local current = options.current or "automatic"
+    for _, behavior in ipairs(options.choices or { "automatic", "always", "never" }) do
+        table.insert(menu_table, {
+            text = labels[behavior] or behavior,
+            radio = true,
+            state = newStateMark("radio", behavior == current),
+            checked_func = function()
+                return behavior == current
+            end,
+            callback = function()
+                if options.onSelect then
+                    options.onSelect(behavior)
+                end
+            end,
+            keep_menu_open = true,
+        })
+    end
+
+    return menu_table
+end
+
+function SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu(menu, options)
+    if not menu then
+        return
+    end
+
+    menu.item_table = SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options)
+    if menu.updateItems then
+        menu:updateItems()
+    end
+end
+
 function SuwayomiUI.buildParallelDownloadsMenuTable(options)
     options = options or {}
     local menu_table = {}

@@ -18,6 +18,9 @@ describe("suwayomi_client", function()
                 load = function()
                     return options.credentials or { server_url = "https://suwayomi.example" }
                 end,
+                loadLibraryCategoryPickerBehavior = function()
+                    return options.picker_behavior or "automatic"
+                end,
             },
             api = options.api,
             ui = options.ui,
@@ -321,6 +324,77 @@ describe("suwayomi_client", function()
         assert.are.equal("Default", shown_categories[2].name)
         assert.are.equal("Reading", shown_categories[3].name)
         assert.are.same({ "Reading Manga (3 unread)" }, { shown_manga[1].menu_text })
+    end)
+
+    it("can always show the category picker even for a single category", function()
+        local shown_categories
+        local client = newClient({
+            picker_behavior = "always",
+            api = {
+                fetchCategories = function()
+                    return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
+                end,
+                fetchLibraryManga = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Default Manga", categories = { { id = "1", name = "Default" } } },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showLibraryCategoryMenu = function(categories, onSelect)
+                    shown_categories = categories
+                    onSelect(categories[2])
+                end,
+                showLibraryMangaMenu = function() end,
+            },
+        })
+
+        client:showLibrary()
+
+        assert.are.equal("All manga", shown_categories[1].name)
+        assert.are.equal("Default", shown_categories[2].name)
+    end)
+
+    it("can skip the category picker even when multiple categories exist", function()
+        local shown_manga
+        local client = newClient({
+            picker_behavior = "never",
+            api = {
+                fetchCategories = function()
+                    return {
+                        ok = true,
+                        categories = {
+                            { id = "1", name = "Default", manga_count = 1 },
+                            { id = "2", name = "Reading", manga_count = 1 },
+                        },
+                    }
+                end,
+                fetchLibraryManga = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Default Manga", categories = { { id = "1", name = "Default" } } },
+                            { id = "m2", title = "Reading Manga", categories = { { id = "2", name = "Reading" } } },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showLibraryCategoryMenu = function()
+                    error("unexpected category menu")
+                end,
+                showLibraryMangaMenu = function(manga)
+                    shown_manga = manga
+                end,
+            },
+        })
+
+        client:showLibrary()
+
+        assert.are.equal(2, #shown_manga)
     end)
 
     it("paginates library manga before filtering a selected category", function()

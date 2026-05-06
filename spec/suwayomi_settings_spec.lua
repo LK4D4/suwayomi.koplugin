@@ -96,6 +96,31 @@ describe("suwayomi_settings", function()
         assert.are.same({ "en", "ru", "de" }, stored_data.source_languages)
     end)
 
+    it("loads automatic library category picker behavior by default", function()
+        local settings = require("suwayomi_settings")
+
+        assert.are.equal("automatic", settings:loadLibraryCategoryPickerBehavior())
+    end)
+
+    it("saves supported library category picker behavior", function()
+        local settings = require("suwayomi_settings")
+
+        local saved = settings:saveLibraryCategoryPickerBehavior("always")
+
+        assert.is_true(flushed)
+        assert.are.equal("always", saved)
+        assert.are.equal("always", stored_data.library_category_picker_behavior)
+    end)
+
+    it("normalizes unsupported library category picker behavior to automatic", function()
+        local settings = require("suwayomi_settings")
+
+        stored_data.library_category_picker_behavior = "mystery"
+
+        assert.are.equal("automatic", settings:loadLibraryCategoryPickerBehavior())
+        assert.are.equal("automatic", settings:saveLibraryCategoryPickerBehavior("mystery"))
+    end)
+
     it("loads and saves source cache for the current server", function()
         local settings = require("suwayomi_settings")
         local cache = settings:saveSourceCache("https://suwayomi.example", {

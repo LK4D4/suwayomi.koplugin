@@ -142,8 +142,8 @@ function SuwayomiPlugin:showDownloads()
     self:showNotImplemented(_("Downloads are not implemented yet."))
 end
 
-function SuwayomiPlugin:showLibrarySettings()
-    self:showNotImplemented(_("Library settings are not implemented yet."))
+function SuwayomiPlugin:showLibrarySettings(touchmenu_instance)
+    return self:showLibraryCategoryPickerBehaviorDialog(touchmenu_instance)
 end
 
 function SuwayomiPlugin:showMessage(message, options)
@@ -452,6 +452,33 @@ function SuwayomiPlugin:showParallelDownloadsDialog(touchmenu_instance)
 
     parallel_menu = SuwayomiUI.showParallelDownloadsMenu({
         current = SuwayomiSettings:loadMaxParallelChapterDownloads(),
+        choices = choices,
+        onSelect = onSelect,
+    })
+end
+
+function SuwayomiPlugin:getLibraryCategoryPickerBehaviorSummary()
+    return SuwayomiSettings:loadLibraryCategoryPickerBehavior()
+end
+
+function SuwayomiPlugin:showLibraryCategoryPickerBehaviorDialog(touchmenu_instance)
+    local picker_menu
+    local choices = { "automatic", "always", "never" }
+    local function onSelect(behavior)
+        local saved_behavior = SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
+        self:refreshSettingsMenu(touchmenu_instance)
+        self:showMessage(T(_("Suwayomi library category picker saved: %1"), saved_behavior))
+        if SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu then
+            SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu(picker_menu, {
+                current = saved_behavior,
+                choices = choices,
+                onSelect = onSelect,
+            })
+        end
+    end
+
+    picker_menu = SuwayomiUI.showLibraryCategoryPickerBehaviorMenu({
+        current = SuwayomiSettings:loadLibraryCategoryPickerBehavior(),
         choices = choices,
         onSelect = onSelect,
     })
@@ -2792,10 +2819,12 @@ function SuwayomiPlugin:buildSettingsMenu()
             text = _("Library"),
             sub_item_table = {
                 {
-                    text = _("Category picker: automatic"),
+                    text_func = function()
+                        return T(_("Category picker: %1"), self:getLibraryCategoryPickerBehaviorSummary())
+                    end,
                     keep_menu_open = true,
-                    callback = function()
-                        self:showLibrarySettings()
+                    callback = function(touchmenu_instance)
+                        self:showLibrarySettings(touchmenu_instance)
                     end,
                 },
             },

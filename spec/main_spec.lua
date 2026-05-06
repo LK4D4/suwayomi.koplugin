@@ -5,6 +5,7 @@ describe("suwayomi plugin", function()
     local registered_menu_plugin
     local login_dialog_options
     local language_menu_options
+    local library_category_picker_menu_options
     local parallel_downloads_menu_options
     local shown_messages
     local shown_loading_messages
@@ -15,6 +16,7 @@ describe("suwayomi plugin", function()
     local directory_chooser_callback
     local directory_chooser_start_dir
     local saved_download_directory
+    local saved_library_category_picker_behavior
     local trapper_wrapped
     local trapper_subprocess_calls
     local scheduled_callbacks
@@ -29,6 +31,7 @@ describe("suwayomi plugin", function()
         registered_menu_plugin = nil
         login_dialog_options = nil
         language_menu_options = nil
+        library_category_picker_menu_options = nil
         parallel_downloads_menu_options = nil
         shown_messages = {}
         shown_loading_messages = {}
@@ -39,6 +42,7 @@ describe("suwayomi plugin", function()
         directory_chooser_callback = nil
         directory_chooser_start_dir = nil
         saved_download_directory = nil
+        saved_library_category_picker_behavior = nil
         trapper_wrapped = 0
         trapper_subprocess_calls = {}
         scheduled_callbacks = {}
@@ -303,6 +307,14 @@ describe("suwayomi plugin", function()
                 showLanguageMenu = function(options)
                     language_menu_options = options
                 end,
+                showLibraryCategoryPickerBehaviorMenu = function(options)
+                    library_category_picker_menu_options = options
+                    return { name = "library-category-picker-menu" }
+                end,
+                updateLibraryCategoryPickerBehaviorMenu = function(menu, options)
+                    library_category_picker_menu_options = options
+                    library_category_picker_menu_options.menu = menu
+                end,
                 showParallelDownloadsMenu = function(options)
                     parallel_downloads_menu_options = options
                     return { name = "parallel-downloads-menu" }
@@ -340,6 +352,13 @@ describe("suwayomi plugin", function()
                 end,
                 saveSourceLanguages = function(_, languages)
                     return languages
+                end,
+                loadLibraryCategoryPickerBehavior = function()
+                    return saved_library_category_picker_behavior or "automatic"
+                end,
+                saveLibraryCategoryPickerBehavior = function(_, behavior)
+                    saved_library_category_picker_behavior = behavior
+                    return behavior
                 end,
                 loadDownloadDirectory = function()
                     return ""
@@ -802,7 +821,7 @@ return {
         assert.are.equal("Browse", settings_menu[3].text)
         assert.are.equal("Downloads", settings_menu[4].text)
         assert.are.equal("Login information", settings_menu[1].sub_item_table[1].text)
-        assert.are.equal("Category picker: automatic", settings_menu[2].sub_item_table[1].text)
+        assert.are.equal("Category picker: automatic", settings_menu[2].sub_item_table[1].text_func())
         assert.are.equal("Source languages: EN, RU", settings_menu[3].sub_item_table[1].text_func())
         assert.are.equal("Download directory: not set", settings_menu[4].sub_item_table[1].text_func())
         assert.are.equal("Parallel downloads: 2", settings_menu[4].sub_item_table[2].text_func())
@@ -826,7 +845,7 @@ return {
         assert.is_table(login_dialog_options)
 
         settings_menu[2].sub_item_table[1].callback()
-        assert.are.equal("Library settings are not implemented yet.", shown_messages[#shown_messages])
+        assert.are.equal("automatic", library_category_picker_menu_options.current)
 
         settings_menu[3].sub_item_table[1].callback()
         assert.is_table(language_menu_options)
@@ -836,6 +855,30 @@ return {
 
         settings_menu[4].sub_item_table[2].callback()
         assert.are.equal(2, parallel_downloads_menu_options.current)
+    end)
+
+    it("saves library category picker behavior from settings", function()
+        local plugin_class = require("main")
+        local menu_items = {}
+        local refresh_count = 0
+        local plugin = plugin_class{}
+        local touchmenu_instance = {
+            updateItems = function()
+                refresh_count = refresh_count + 1
+            end,
+        }
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].sub_item_table[2].sub_item_table[1].callback(touchmenu_instance)
+
+        assert.are.same({ "automatic", "always", "never" }, library_category_picker_menu_options.choices)
+        library_category_picker_menu_options.onSelect("always")
+
+        assert.are.equal("always", saved_library_category_picker_behavior)
+        assert.are.equal("always", library_category_picker_menu_options.current)
+        assert.are.equal("library-category-picker-menu", library_category_picker_menu_options.menu.name)
+        assert.are.equal(1, refresh_count)
+        assert.are.equal("Suwayomi library category picker saved: always", shown_messages[#shown_messages])
     end)
 
     it("opens library from the top-level entry", function()

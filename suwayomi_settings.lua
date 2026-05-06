@@ -14,6 +14,12 @@ local DEFAULT_CREDENTIALS = {
 }
 
 local DEFAULT_SOURCE_LANGUAGES = { "en" }
+local DEFAULT_LIBRARY_CATEGORY_PICKER_BEHAVIOR = "automatic"
+local LIBRARY_CATEGORY_PICKER_BEHAVIORS = {
+    automatic = true,
+    always = true,
+    never = true,
+}
 local DEFAULT_DOWNLOAD_DIRECTORY = ""
 local DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS = 2
 local MIN_PARALLEL_CHAPTER_DOWNLOADS = 1
@@ -93,6 +99,25 @@ function SuwayomiSettings:saveSourceLanguages(source_languages)
     end
 
     self:open():saveSetting("source_languages", normalized):flush()
+    return normalized
+end
+
+function SuwayomiSettings:normalizeLibraryCategoryPickerBehavior(behavior)
+    if LIBRARY_CATEGORY_PICKER_BEHAVIORS[behavior] then
+        return behavior
+    end
+    return DEFAULT_LIBRARY_CATEGORY_PICKER_BEHAVIOR
+end
+
+function SuwayomiSettings:loadLibraryCategoryPickerBehavior()
+    return self:normalizeLibraryCategoryPickerBehavior(
+        self:open():readSetting("library_category_picker_behavior", DEFAULT_LIBRARY_CATEGORY_PICKER_BEHAVIOR)
+    )
+end
+
+function SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
+    local normalized = self:normalizeLibraryCategoryPickerBehavior(behavior)
+    self:open():saveSetting("library_category_picker_behavior", normalized):flush()
     return normalized
 end
 

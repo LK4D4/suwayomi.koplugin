@@ -201,7 +201,13 @@ function SuwayomiClient:showLibrary()
         end
 
         local categories = result.categories or {}
-        if #categories > 1 then
+        local picker_behavior = self.settings.loadLibraryCategoryPickerBehavior
+            and self.settings:loadLibraryCategoryPickerBehavior()
+            or "automatic"
+        local should_show_category_picker = picker_behavior == "always"
+            or (picker_behavior == "automatic" and #categories > 1)
+
+        if should_show_category_picker and #categories > 0 then
             self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
                 self:showLibraryManga(category, credentials)
             end)
