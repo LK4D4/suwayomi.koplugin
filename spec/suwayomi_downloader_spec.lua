@@ -3,11 +3,13 @@ package.path = "?.lua;" .. package.path
 describe("suwayomi_downloader", function()
     after_each(function()
         package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_paths = nil
         package.loaded.suwayomi_api = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
 
+        package.preload.suwayomi_paths = nil
         package.preload.suwayomi_api = nil
         package.preload.lfs = nil
         package.preload["ffi/archiver"] = nil
@@ -30,7 +32,7 @@ describe("suwayomi_downloader", function()
         package.preload.lfs = function()
             return {
                 attributes = function(path, attribute)
-                    if path == "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz" and attribute == "mode" then
+                    if path == "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz" and attribute == "mode" then
                         return "file"
                     end
                 end,
@@ -55,13 +57,14 @@ describe("suwayomi_downloader", function()
 
         assert.is_true(result.ok)
         assert.is_true(result.skipped)
-        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", result.path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", result.path)
     end)
 
     it("builds a cbz from fetched page bytes", function()
         local added_files = {}
         local renamed_from
         local renamed_to
+        local created_paths = {}
 
         package.loaded.suwayomi_downloader = nil
         package.loaded.suwayomi_api = nil
@@ -91,11 +94,14 @@ describe("suwayomi_downloader", function()
         end
         package.preload.lfs = function()
             return {
-                attributes = function()
+                attributes = function(path, attribute)
+                    if path == "/books" and attribute == "mode" then
+                        return "directory"
+                    end
                     return nil
                 end,
                 mkdir = function(path)
-                    assert.are.equal("/books/Sousou no Frieren", path)
+                    table.insert(created_paths, path)
                     return true
                 end,
             }
@@ -106,7 +112,7 @@ describe("suwayomi_downloader", function()
                     new = function()
                         return {
                             open = function(_, path, format)
-                                assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", path)
+                                assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", path)
                                 assert.are.equal("zip", format)
                                 return true
                             end,
@@ -144,13 +150,54 @@ describe("suwayomi_downloader", function()
         os.rename = original_rename
 
         assert.is_true(result.ok)
-        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", result.path)
-        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", renamed_from)
-        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", renamed_to)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", result.path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", renamed_from)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", renamed_to)
+        assert.are.same({
+            "/books/Unknown source",
+            "/books/Unknown source/Sousou no Frieren",
+        }, created_paths)
         assert.are.same({
             { path = "0001.jpg", content = "page-one" },
             { path = "0002.jpg", content = "page-two" },
         }, added_files)
+    end)
+
+    it("builds target paths with source metadata", function()
+        package.preload.suwayomi_api = function()
+            return {}
+        end
+        package.preload.lfs = function()
+            return {}
+        end
+        package.preload["ffi/archiver"] = function()
+            return {}
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local downloader = require("suwayomi_downloader")
+        local manga_dir, chapter_path = downloader:getTargetPath("/books", {
+            title = "Frieren: Beyond Journey's End",
+            source = {
+                displayName = "MangaDex (EN)",
+                name = "MangaDex",
+                lang = "en",
+            },
+        }, {
+            name = "Vol. 1 / Ch. 1",
+        })
+
+        assert.are.equal("/books/MangaDex (EN)/Frieren_ Beyond Journey's End", manga_dir)
+        assert.are.equal("/books/MangaDex (EN)/Frieren_ Beyond Journey's End/Vol. 1 _ Ch. 1.cbz", chapter_path)
     end)
 
     it("supports stepping through a chapter download with progress", function()
@@ -321,7 +368,7 @@ describe("suwayomi_downloader", function()
         os.rename = original_rename
 
         assert.is_true(result.ok)
-        assert.are.equal("state=downloaded\ncurrent=2\ntotal=2\npath=/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz\n", progress_content)
+        assert.are.equal("state=downloaded\ncurrent=2\ntotal=2\npath=/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz\n", progress_content)
     end)
 
     it("removes a partial cbz when a page download fails", function()
@@ -390,11 +437,11 @@ describe("suwayomi_downloader", function()
         os.remove = original_remove
 
         assert.is_false(result.ok)
-        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
     end)
 
     it("does not open a new archive when stale partial cleanup fails", function()
-        local partial_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
+        local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
         local removed_path
 
         package.preload.suwayomi_api = function()
@@ -457,7 +504,7 @@ describe("suwayomi_downloader", function()
     end)
 
     it("reports cleanup errors when a failed download leaves the partial archive behind", function()
-        local partial_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
+        local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
 
         package.preload.suwayomi_api = function()
             return {
@@ -589,7 +636,7 @@ describe("suwayomi_downloader", function()
 
         assert.is_false(result.ok)
         assert.are.equal("Could not write chapter archive.", result.error)
-        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
     end)
 
     it("reports a failure when finalizing the completed cbz fails", function()
@@ -661,7 +708,7 @@ describe("suwayomi_downloader", function()
 
         assert.is_false(result.ok)
         assert.are.equal("Could not finalize chapter archive.", result.error)
-        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
     end)
 
     it("rejects empty downloaded page bodies", function()
@@ -729,7 +776,7 @@ describe("suwayomi_downloader", function()
 
         assert.is_false(result.ok)
         assert.are.equal("Downloaded chapter page was empty.", result.error)
-        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
     end)
 
     it("rejects non-image downloaded page content", function()
@@ -894,6 +941,7 @@ describe("suwayomi_downloader", function()
 
     it("neutralizes traversal-only manga and chapter names", function()
         package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_paths = nil
         package.loaded.suwayomi_api = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
@@ -921,7 +969,7 @@ describe("suwayomi_downloader", function()
         local downloader = require("suwayomi_downloader")
         local manga_dir, chapter_path = downloader:getTargetPath("/books", { title = ".." }, { name = ".." })
 
-        assert.are.equal("/books/untitled", manga_dir)
-        assert.are.equal("/books/untitled/untitled.cbz", chapter_path)
+        assert.are.equal("/books/Unknown source/untitled", manga_dir)
+        assert.are.equal("/books/Unknown source/untitled/untitled.cbz", chapter_path)
     end)
 end)

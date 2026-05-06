@@ -125,6 +125,7 @@ function SuwayomiAPI.parseSourcesResponse(response_body)
         table.insert(parsed_sources, {
             id = tostring(source.id),
             name = source.displayName or ((source.name or tostring(source.id)) .. (source.lang and source.lang ~= "" and source.lang ~= "localsourcelang" and (" (" .. string.upper(source.lang) .. ")") or "")),
+            display_name = source.displayName,
             raw_name = source.name,
             lang = source.lang,
         })

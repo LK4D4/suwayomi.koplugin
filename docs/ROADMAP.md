@@ -57,24 +57,24 @@ Goal: create small homes for path and client orchestration before adding more be
 
 ### 1.1 Source-scoped paths
 
-- [ ] Add `suwayomi_paths.lua`
-- [ ] Move path segment sanitization into the path module, or make the downloader delegate to it
-- [ ] Add source label selection:
+- [x] Add `suwayomi_paths.lua`
+- [x] Move path segment sanitization into the path module, or make the downloader delegate to it
+- [x] Add source label selection:
   - `manga.source.displayName`
   - `manga.source.name` plus language
   - source id
   - `Unknown source`
-- [ ] Change new target layout to:
+- [x] Change new target layout to:
 
 ```text
 <download_directory>/<source_label>/<manga_title>/<chapter_name>.cbz
 ```
 
-- [ ] Update downloader target path generation
-- [ ] Update queue/existence/open/delete callers to use the new path logic
-- [ ] Do not add old unscoped path detection or migration
-- [ ] Add `spec/suwayomi_paths_spec.lua`
-- [ ] Update downloader, queue, and main specs for source-scoped paths
+- [x] Update downloader target path generation
+- [x] Update queue/existence/open/delete callers to use the new path logic
+- [x] Do not add old unscoped path detection or migration
+- [x] Add `spec/suwayomi_paths_spec.lua`
+- [x] Update downloader, queue, and main specs for source-scoped paths
 
 Exit criteria:
 

@@ -928,6 +928,57 @@ return {
         assert.are.equal("Sousou no Frieren", shown_chapter_menu.title)
     end)
 
+    it("attaches selected source metadata to manga opened from browse", function()
+        local fetched_manga
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchMangaForSource = function(_, source_id)
+                    assert.are.equal("s1", source_id)
+                    return { ok = true, manga = { { id = "m1", title = "Sousou no Frieren" } } }
+                end,
+                fetchChaptersForManga = function(_, manga_id)
+                    assert.are.equal("m1", manga_id)
+                    fetched_manga = manga_id
+                    return { ok = true, chapters = { { id = "398", name = "Official_Vol. 1 Ch. 1" } } }
+                end,
+            }
+        end
+
+        package.preload.suwayomi_ui = function()
+            return {
+                showMangaMenu = function(manga, onSelect)
+                    onSelect(manga[1])
+                end,
+                showChapterMenu = function() end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_ui = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin:showMangaForSource({
+            id = "s1",
+            name = "MangaDex (EN)",
+            display_name = "MangaDex (EN)",
+            raw_name = "MangaDex",
+            lang = "en",
+        })
+
+        assert.are.equal("m1", fetched_manga)
+        assert.are.same({
+            id = "s1",
+            displayName = "MangaDex (EN)",
+            name = "MangaDex",
+            lang = "en",
+        }, plugin.current_chapter_context.manga.source)
+    end)
+
     it("ignores duplicate browse taps while sources are loading", function()
         local plugin
         local fetch_source_calls = 0

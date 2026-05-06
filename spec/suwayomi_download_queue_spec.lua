@@ -277,6 +277,29 @@ describe("suwayomi_download_queue", function()
         ).state)
     end)
 
+    it("persists source metadata for queued downloads", function()
+        local context = build_queue({ subprocess_done = false })
+        local manga = {
+            id = "m1",
+            title = "Sousou no Frieren",
+            source = {
+                id = "mangadex",
+                displayName = "MangaDex (EN)",
+                name = "MangaDex",
+                lang = "en",
+            },
+        }
+
+        context.queue:enqueue(manga, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
+
+        assert.are.same({
+            id = "mangadex",
+            displayName = "MangaDex (EN)",
+            name = "MangaDex",
+            lang = "en",
+        }, context.saved_queue()[1].manga.source)
+    end)
+
     it("keeps read indication visible alongside download state", function()
         local context = build_queue()
 

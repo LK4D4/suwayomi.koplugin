@@ -1,22 +1,16 @@
 local lfs = require("lfs")
 local Archiver = require("ffi/archiver")
-local FFIUtil = require("ffi/util")
 local SuwayomiAPI = require("suwayomi_api")
+local SuwayomiPaths = require("suwayomi_paths")
 
 local Downloader = {}
 
 function Downloader:sanitizePathSegment(name)
-    local sanitized = tostring(name or ""):gsub("[\\/:*?\"<>|]", "_"):gsub("^%s+", ""):gsub("%s+$", "")
-    if sanitized == "" or sanitized == "." or sanitized == ".." then
-        return "untitled"
-    end
-    return sanitized
+    return SuwayomiPaths.sanitizePathSegment(name)
 end
 
 function Downloader:getTargetPath(download_directory, manga, chapter)
-    local manga_dir = FFIUtil.joinPath(download_directory, self:sanitizePathSegment(manga.title))
-    local chapter_path = FFIUtil.joinPath(manga_dir, self:sanitizePathSegment(chapter.name) .. ".cbz")
-    return manga_dir, chapter_path
+    return SuwayomiPaths.getTargetPath(download_directory, manga, chapter)
 end
 
 function Downloader:getPartialPath(chapter_path)
@@ -30,6 +24,14 @@ end
 function Downloader:ensureDirectory(path)
     if lfs.attributes(path, "mode") == "directory" then
         return true
+    end
+
+    local parent = tostring(path or ""):match("^(.*)/[^/]+$")
+    if parent and parent ~= "" and parent ~= path and lfs.attributes(parent, "mode") ~= "directory" then
+        local parent_ok, parent_error = self:ensureDirectory(parent)
+        if not parent_ok then
+            return false, parent_error
+        end
     end
 
     if lfs.mkdir(path) then

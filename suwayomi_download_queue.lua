@@ -158,16 +158,42 @@ function DownloadQueue:normalizeRecovery(recovery)
     return normalized
 end
 
+function DownloadQueue:copySourceMetadata(source)
+    if type(source) ~= "table" then
+        return nil
+    end
+
+    local copied = {}
+    for _, key in ipairs({ "id", "displayName", "display_name", "name", "raw_name", "lang" }) do
+        if source[key] ~= nil then
+            copied[key] = source[key]
+        end
+    end
+    if next(copied) then
+        return copied
+    end
+    return nil
+end
+
+function DownloadQueue:copyMangaMetadata(manga)
+    local copied = {
+        id = manga.id,
+        title = manga.title,
+    }
+    local source = self:copySourceMetadata(manga.source)
+    if source then
+        copied.source = source
+    end
+    return copied
+end
+
 function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, state, details)
     details = details or {}
     local job = {
         key = self:getKey(manga, chapter),
         state = state or "queued",
         download_directory = download_directory,
-        manga = {
-            id = manga.id,
-            title = manga.title,
-        },
+        manga = self:copyMangaMetadata(manga),
         chapter = {
             id = chapter.id,
             name = chapter.name,

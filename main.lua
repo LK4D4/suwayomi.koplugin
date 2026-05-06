@@ -636,9 +636,23 @@ function SuwayomiPlugin:showMangaForSource(source)
         end
 
         SuwayomiUI.showMangaMenu(result.manga, function(manga)
+            self:attachSourceToManga(manga, source)
             self:showChaptersForManga(manga)
         end)
     end)
+end
+
+function SuwayomiPlugin:attachSourceToManga(manga, source)
+    if type(manga) ~= "table" or type(source) ~= "table" then
+        return manga
+    end
+
+    manga.source = manga.source or {}
+    manga.source.id = manga.source.id or source.id
+    manga.source.displayName = manga.source.displayName or source.displayName or source.display_name
+    manga.source.name = manga.source.name or source.raw_name or source.name
+    manga.source.lang = manga.source.lang or source.lang
+    return manga
 end
 
 function SuwayomiPlugin:showChaptersForManga(manga)

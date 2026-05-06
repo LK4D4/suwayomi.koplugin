@@ -63,7 +63,7 @@ describe("suwayomi_api", function()
         local sources = api.parseSourcesResponse(response)
 
         assert.are.same({
-            { id = "1", name = "MangaDex (EN)", raw_name = "MangaDex", lang = "en" },
+            { id = "1", name = "MangaDex (EN)", display_name = "MangaDex (EN)", raw_name = "MangaDex", lang = "en" },
             { id = "2", name = "ComicK (FR)", raw_name = "ComicK", lang = "fr" },
         }, sources)
     end)
