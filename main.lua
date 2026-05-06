@@ -1801,7 +1801,7 @@ function SuwayomiPlugin:confirmNextUnreadChapterDownloads(limit)
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:confirmNextUnreadChapterDownloads(limit)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -1835,7 +1835,7 @@ function SuwayomiPlugin:confirmKeepNextUnreadChaptersDownloaded(limit)
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:confirmKeepNextUnreadChaptersDownloaded(limit)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -1874,7 +1874,7 @@ function SuwayomiPlugin:enqueueNextUnreadChapterDownloads(limit)
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:enqueueNextUnreadChapterDownloads(limit)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -1899,7 +1899,7 @@ function SuwayomiPlugin:keepNextUnreadChaptersDownloaded(limit)
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:keepNextUnreadChaptersDownloaded(limit)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -1930,7 +1930,7 @@ function SuwayomiPlugin:downloadSelectedChapters()
             local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
             self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
             self:enqueueSelectedChapterDownloads(manga, chapters, saved_path)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return 0
     end
 
@@ -2682,7 +2682,7 @@ function SuwayomiPlugin:enqueueChapterDownload(manga, chapter)
             UIManager:nextTick(function()
                 self:enqueueChapterDownload(manga, chapter)
             end)
-        end)
+        end, self:getDownloadDirectoryChooserStartDir())
         return
     end
 

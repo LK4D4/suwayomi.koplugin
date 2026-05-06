@@ -394,8 +394,9 @@ describe("suwayomi plugin", function()
                     shown_confirm = confirm_options
                 end,
                 updateChapterMenu = options.updateChapterMenu or function() end,
-                showDirectoryChooser = function(callback)
+                showDirectoryChooser = function(callback, start_dir)
                     directory_chooser_callback = callback
+                    directory_chooser_start_dir = start_dir
                 end,
                 showLoginDialog = function() end,
                 showLanguageMenu = function() end,
@@ -5611,8 +5612,9 @@ return {
                 showChapterMenu = function(options, onSelect)
                     onSelect(options.chapters[1])
                 end,
-                showDirectoryChooser = function(callback)
+                showDirectoryChooser = function(callback, start_dir)
                     directory_chooser_callback = callback
+                    directory_chooser_start_dir = start_dir
                 end,
                 showLoginDialog = function() end,
                 showLanguageMenu = function() end,
@@ -5636,17 +5638,39 @@ return {
                 saveSourceLanguages = function(_, value) return value end,
             }
         end
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and (
+                        path == "/storage/emulated/0"
+                            or path == "/storage/emulated/0/Books"
+                            or path == "/storage/emulated/0/Books/Manga"
+                    ) then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.preload.device = function()
+            return {
+                home_dir = "/storage/emulated/0",
+            }
+        end
 
         package.loaded.main = nil
         package.loaded.suwayomi_api = nil
         package.loaded.suwayomi_downloader = nil
         package.loaded.suwayomi_ui = nil
         package.loaded.suwayomi_settings = nil
+        package.loaded.lfs = nil
+        package.loaded.device = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
 
+        assert.are.equal("/storage/emulated/0/Books/Manga", plugin:getDownloadDirectoryChooserStartDir())
         plugin:browseSuwayomi()
+        assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
         directory_chooser_callback("/storage/emulated/0/Books/Manga")
         run_scheduled_callbacks()
 
