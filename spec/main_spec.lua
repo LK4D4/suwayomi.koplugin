@@ -21,6 +21,7 @@ describe("suwayomi plugin", function()
     local original_io_open
     local original_os_rename
     local original_os_remove
+    local original_reader_settings
     local progress_files
 
     local function reset_plugin_environment()
@@ -45,6 +46,7 @@ describe("suwayomi plugin", function()
         original_io_open = original_io_open or io.open
         original_os_rename = original_os_rename or os.rename
         original_os_remove = original_os_remove or os.remove
+        original_reader_settings = original_reader_settings or _G.G_reader_settings
         io.open = function(path, mode)
             if tostring(path):match("%.suwayomi_dl_progress_")
                 or tostring(path):match("suwayomi_dl_read_sync")
@@ -134,6 +136,7 @@ describe("suwayomi plugin", function()
         package.loaded.suwayomi_settings = nil
         package.loaded.suwayomi_debug = nil
         package.loaded.lfs = nil
+        package.loaded.device = nil
 
         package.preload.dispatcher = function()
             return {
@@ -488,7 +491,9 @@ describe("suwayomi plugin", function()
         package.preload.suwayomi_settings = nil
         package.preload.suwayomi_debug = nil
         package.preload.lfs = nil
+        package.preload.device = nil
         package.loaded.suwayomi_debug = nil
+        _G.G_reader_settings = original_reader_settings
         if original_io_open then
             io.open = original_io_open
         end
@@ -5978,5 +5983,64 @@ return {
         menu_items.suwayomi_dl.sub_item_table[5].callback()
 
         assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
+    end)
+
+    it("starts download directory setup in KOReader home when no download directory is configured", function()
+        _G.G_reader_settings = {
+            readSetting = function(_, key)
+                if key == "home_dir" then
+                    return "/storage/emulated/0/Books"
+                end
+            end,
+        }
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and path == "/storage/emulated/0/Books" then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.lfs = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal("/storage/emulated/0/Books", directory_chooser_start_dir)
+    end)
+
+    it("starts download directory setup in Android shared storage when no KOReader home is configured", function()
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and path == "/storage/emulated/0" then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.preload.device = function()
+            return {
+                home_dir = "/storage/emulated/0",
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.lfs = nil
+        package.loaded.device = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal("/storage/emulated/0", directory_chooser_start_dir)
     end)
 end)

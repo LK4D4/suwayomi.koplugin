@@ -294,18 +294,31 @@ function SuwayomiPlugin:showSourceLanguageDialog()
 end
 
 function SuwayomiPlugin:getDownloadDirectoryChooserStartDir()
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        return nil
-    end
-
     local ok, lfs = pcall(require, "lfs")
     if not ok or not lfs or not lfs.attributes then
         return nil
     end
 
-    if lfs.attributes(download_directory, "mode") == "directory" then
+    local function directoryExists(path)
+        return path and path ~= "" and lfs.attributes(path, "mode") == "directory"
+    end
+
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if directoryExists(download_directory) then
         return download_directory
+    end
+
+    local reader_settings = _G.G_reader_settings
+    if reader_settings and reader_settings.readSetting then
+        local home_dir = reader_settings:readSetting("home_dir")
+        if directoryExists(home_dir) then
+            return home_dir
+        end
+    end
+
+    local device_ok, Device = pcall(require, "device")
+    if device_ok and Device and directoryExists(Device.home_dir) then
+        return Device.home_dir
     end
     return nil
 end
