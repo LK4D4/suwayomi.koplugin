@@ -8,19 +8,16 @@ The design source for this roadmap is:
 
 ## Direction
 
-The plugin should become a library-first Suwayomi client for KOReader:
+The MVP should expose four first-class client surfaces:
 
 ```text
 Suwayomi -> Library -> Manga -> First unread / Download next unread / Keep next unread
+Suwayomi -> Browse -> Source -> Popular / Latest / Search -> Manga -> Add to library / Open chapters
+Suwayomi -> Downloads -> Active / Queued / Failed -> Retry / Clear / Open manga
+Suwayomi -> Settings -> Connection / Library / Browse / Downloads
 ```
 
-Source browsing and search should exist, but they serve the reading workflow:
-
-```text
-Suwayomi -> Browse/Search source -> Manga -> Add to library / Open chapters
-```
-
-The plugin should not try to clone Suwayomi-WebUI. KOReader already owns the reading experience, and this plugin already owns the device-local download/read-state loop.
+The plugin should not try to clone Suwayomi-WebUI. KOReader already owns the reading experience, and this plugin already owns the device-local download/read-state loop. The roadmap mirrors WebUI's Library, Browse, Downloads, and Settings information architecture only where it helps e-ink reading.
 
 ## Current Baseline
 
@@ -46,6 +43,8 @@ Already implemented:
 Current limitations:
 
 - The UI is still browse-first, not library-first.
+- There is no first-class Downloads screen even though a local queue exists.
+- Setup actions are scattered at top level instead of grouped under Settings.
 - Source manga browsing only fetches the first popular page.
 - Remote source search, latest, and pagination are missing.
 - Library membership cannot be managed from KOReader.
@@ -95,12 +94,46 @@ Exit criteria:
 
 Exit criteria:
 
-- New library/search flows have a clear module to grow into.
+- New Library, Browse, Downloads, and Settings flows have a clear module to grow into.
 - `main.lua` remains the top-level plugin coordinator instead of the owner of every client workflow.
 
-## Phase 2: API Foundation For Client MVP
+## Phase 2: Navigation And Settings Shell
 
-Goal: expose the Suwayomi GraphQL operations needed by library, source search, pagination, and library membership.
+Goal: make the top-level UI match the MVP surfaces before each surface is fully implemented.
+
+- [ ] Change top-level menu order to:
+  - Library
+  - Browse
+  - Downloads
+  - Sync read state now
+  - Settings
+- [ ] Rename `Browse Suwayomi` to `Browse`
+- [ ] Add `Settings` menu with sections:
+  - Connection
+  - Library
+  - Browse
+  - Downloads
+- [ ] Move login/server URL setup under `Settings -> Connection`
+- [ ] Move source language setup under `Settings -> Browse`
+- [ ] Move download directory setup under `Settings -> Downloads`
+- [ ] Move parallel download setup under `Settings -> Downloads`
+- [ ] Add placeholder Library settings for category picker behavior and last category, even if only one is wired first
+- [ ] Keep temporary top-level duplicates only inside narrow transition commits
+
+Tests:
+
+- [ ] Main menu includes `Library`, `Browse`, `Downloads`, and `Settings`
+- [ ] Settings menu routes to Connection, Library, Browse, and Downloads
+- [ ] Existing login, source language, download directory, and parallel-download settings still work from their new homes
+
+Exit criteria:
+
+- The plugin presents the same top-level shape as the MVP spec.
+- Existing setup behavior is still available through grouped Settings.
+
+## Phase 3: API Foundation For Client MVP
+
+Goal: expose the Suwayomi GraphQL operations needed by Library, Browse, pagination, and library membership.
 
 - [ ] Add library manga query builder/parser/fetch helper
 - [ ] Add category query builder/parser/fetch helper
@@ -129,15 +162,14 @@ Tests:
 
 Exit criteria:
 
-- API helpers can drive the library and source-search UI without schema guessing.
+- API helpers can drive the Library and Browse UI without schema guessing.
 - Existing source/chapter/download APIs still pass their tests.
 
-## Phase 3: Library-First Entry Point
+## Phase 4: Library Surface
 
 Goal: make `Library` the primary reading entry point.
 
-- [ ] Add top-level `Library` menu item before `Browse sources`
-- [ ] Fetch categories when opening library
+- [ ] Fetch categories when opening Library
 - [ ] If multiple categories exist, show a category picker
 - [ ] If only the default category exists, go directly to manga list
 - [ ] Fetch library manga for the selected category or all manga
@@ -147,11 +179,13 @@ Goal: make `Library` the primary reading entry point.
   - source label
   - optional KOReader-local availability computed from source-scoped paths
 - [ ] Open selected library manga through the existing chapter screen
-- [ ] Keep pending read-state sync scheduling on library entry
+- [ ] Keep pending read-state sync scheduling on Library entry
+- [ ] Wire Library settings that are cheap after the menu exists:
+  - remember last selected category, optional
+  - category picker behavior
 
 Tests:
 
-- [ ] Main menu includes `Library`
 - [ ] Empty library shows a friendly message
 - [ ] Category selection works when categories are present
 - [ ] Single/default category can skip category picker
@@ -163,9 +197,42 @@ Exit criteria:
 
 - A user can open KOReader, enter Suwayomi Library, choose manga, and use existing chapter actions.
 
-## Phase 4: Manga-Level Client Actions
+## Phase 5: Downloads Surface
 
-Goal: add manga-level actions that fit the library-first workflow.
+Goal: make the existing KOReader-local download queue inspectable and manageable from the top level.
+
+- [ ] Add top-level `Downloads` menu implementation
+- [ ] Read active and queued items from `suwayomi_download_queue.lua`
+- [ ] Surface failed items with last error where available
+- [ ] Surface completed history only if current state persists it or adding it is small
+- [ ] Add compact rows with status, manga title, and chapter name
+- [ ] Add retry for failed local downloads
+- [ ] Add clear failed
+- [ ] Add cancel queued item when supported by the queue
+- [ ] Add clear completed history if completed history exists
+- [ ] Add open manga/chapter context for queue items when enough metadata exists
+- [ ] Keep Suwayomi server downloader mutations out of this surface
+- [ ] Wire Downloads settings:
+  - KOReader download directory
+  - max parallel device downloads
+  - read-only source-scoped layout explanation
+
+Tests:
+
+- [ ] Downloads menu groups active, queued, failed, and completed items where state exists
+- [ ] Failed rows expose retry
+- [ ] Clear failed calls local queue cleanup only
+- [ ] Cancel queued item calls local queue cancellation only
+- [ ] Downloads settings route to existing local directory and parallel-download settings
+- [ ] Suwayomi server `downloadCount` is not used as KOReader-local availability
+
+Exit criteria:
+
+- A user can inspect the local queue, retry failed local downloads, and adjust local download settings without opening manga chapters first.
+
+## Phase 6: Manga-Level Client Actions
+
+Goal: add manga-level actions that fit the Library and Browse workflow.
 
 - [ ] Add manga action menu
 - [ ] Add `Refresh manga and chapters`
@@ -189,14 +256,18 @@ Tests:
 
 Exit criteria:
 
-- Library entries are useful without drilling into individual chapters first.
+- Library and Browse entries are useful without drilling into individual chapters first.
 - Library membership can be managed from KOReader.
 
-## Phase 5: Source Browse, Search, And Pagination
+## Phase 7: Browse Surface
 
 Goal: make remote source discovery usable enough to add manga without leaving KOReader.
 
-- [ ] Rename `Browse Suwayomi` to `Browse sources`
+- [ ] Selecting Browse opens enabled sources grouped or filtered by language
+- [ ] Apply Browse settings:
+  - source languages
+  - show/hide NSFW sources when metadata exists
+  - hide in-library manga from source results, optional
 - [ ] Selecting a source opens a mode menu:
   - Popular
   - Latest, only when supported
@@ -216,27 +287,31 @@ Goal: make remote source discovery usable enough to add manga without leaving KO
 
 Tests:
 
+- [ ] Browse source list respects language settings
 - [ ] Source mode menu construction
 - [ ] Search prompt calls `SEARCH`
 - [ ] Popular and latest call the correct modes
 - [ ] Latest is hidden or rejected when unsupported
 - [ ] Next/previous page update result context
 - [ ] Search results show library state
+- [ ] Optional hide-in-library setting filters visible results only where intended
 - [ ] Add/remove from source results updates visible state
 
 Exit criteria:
 
 - A user can search a remote source, page results, add a manga to the library, and open its chapters.
 
-## Phase 6: Remote Source Verification
+## Phase 8: Remote Source Verification
 
 Goal: prove the client MVP works with real remote source flows.
 
 - [ ] Verify MangaDex search, library add/remove, refresh, chapter listing, and download
 - [ ] Verify Comick search, library add/remove, refresh, chapter listing, and download
 - [ ] Verify Local source still works with source-scoped paths
+- [ ] Confirm Downloads shows KOReader-local queue state
 - [ ] Confirm KOReader-local download does not call Suwayomi server download queue mutations
 - [ ] Confirm server-side downloaded state is not treated as KOReader-local availability
+- [ ] Confirm Settings exposes Connection, Library, Browse, and Downloads on device
 - [ ] Document any source-specific quirks in debug notes or README
 - [ ] Add regression tests for any live-server bug that can be reasonably reproduced in unit tests
 
@@ -245,12 +320,13 @@ Exit criteria:
 - Remote source support can be described as usable for the tested sources.
 - The README no longer needs to say the practical flow is Local-source-only.
 
-## Phase 7: Documentation And Release Polish
+## Phase 9: Documentation And Release Polish
 
 Goal: keep public documentation aligned with the client MVP.
 
 - [ ] Update README feature list
-- [ ] Update README usage flow to start with Library
+- [ ] Update README usage flow to start with Library, Browse, and Downloads
+- [ ] Document grouped Settings
 - [ ] Document source-scoped download layout
 - [ ] Document that KOReader downloads are device-local, not Suwayomi server downloads
 - [ ] Document unsupported/deferred features:
@@ -258,6 +334,7 @@ Goal: keep public documentation aligned with the client MVP.
   - source preferences
   - extension management
   - server-side download queue management
+  - server-side download settings
   - per-source download directory overrides
 - [ ] Add screenshots or short demo media if useful
 - [ ] Improve debug logging guidance for remote source failures
@@ -265,7 +342,7 @@ Goal: keep public documentation aligned with the client MVP.
 
 Exit criteria:
 
-- The shipped behavior, README, and roadmap tell the same story.
+- The shipped behavior, README, spec, and roadmap tell the same story.
 
 ## Deferred Ideas
 
@@ -278,7 +355,10 @@ These are intentionally outside the client MVP:
 - Per-source download directory overrides
 - Server-side `Download on server` action
 - Server-side download queue inspection/management
+- Server-side download settings, including Suwayomi server download path
 - Extension install/update/uninstall
+- Extension repository management
+- Server local-source path management
 - Source preference editor
 - Migration between sources
 - Duplicate manga manager
@@ -292,9 +372,11 @@ These are intentionally outside the client MVP:
 
 1. Source-scoped path module
 2. Thin client orchestration module
-3. Client API foundation
-4. Library entry point
-5. Manga-level actions
-6. Source search and pagination
-7. Live remote-source verification
-8. README and release polish
+3. Navigation and grouped Settings shell
+4. Client API foundation
+5. Library surface
+6. Downloads surface
+7. Manga-level actions
+8. Browse surface
+9. Live remote-source verification
+10. README and release polish
