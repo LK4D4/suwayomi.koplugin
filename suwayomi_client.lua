@@ -108,13 +108,44 @@ function SuwayomiClient:buildLibraryCategoryChoices(categories)
     return choices
 end
 
+function SuwayomiClient:fetchLibraryMangaPages(credentials)
+    local page_size = 100
+    local offset = 0
+    local all_manga = {}
+    local total_count
+
+    while true do
+        local result = self.api.fetchLibraryManga(credentials, {
+            first = page_size,
+            offset = offset,
+        })
+        if not result.ok then
+            return result
+        end
+
+        local page_manga = result.manga or {}
+        for _, manga in ipairs(page_manga) do
+            table.insert(all_manga, manga)
+        end
+        total_count = tonumber(result.total_count) or #all_manga
+
+        if #page_manga == 0 or #page_manga < page_size or #all_manga >= total_count then
+            break
+        end
+        offset = offset + page_size
+    end
+
+    return {
+        ok = true,
+        manga = all_manga,
+        total_count = total_count,
+    }
+end
+
 function SuwayomiClient:showLibraryManga(category, credentials)
     credentials = credentials or self.settings:load()
     local result = self.plugin:withLoadingMessage("library-manga", self:translate("Loading library manga..."), function()
-        return self.api.fetchLibraryManga(credentials, {
-            first = 100,
-            offset = 0,
-        })
+        return self:fetchLibraryMangaPages(credentials)
     end)
     if not result then
         return

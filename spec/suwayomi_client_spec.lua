@@ -323,6 +323,63 @@ describe("suwayomi_client", function()
         assert.are.same({ "Reading Manga (3 unread)" }, { shown_manga[1].menu_text })
     end)
 
+    it("paginates library manga before filtering a selected category", function()
+        local fetch_offsets = {}
+        local first_page = {}
+        for index = 1, 100 do
+            table.insert(first_page, {
+                id = "default-" .. tostring(index),
+                title = "Default " .. tostring(index),
+                categories = { { id = "1", name = "Default" } },
+            })
+        end
+
+        local shown_manga
+        local client = newClient({
+            api = {
+                fetchCategories = function()
+                    return {
+                        ok = true,
+                        categories = {
+                            { id = "1", name = "Default", manga_count = 100 },
+                            { id = "2", name = "Reading", manga_count = 1 },
+                        },
+                    }
+                end,
+                fetchLibraryManga = function(_, options)
+                    table.insert(fetch_offsets, options.offset)
+                    if options.offset == 0 then
+                        return { ok = true, manga = first_page, total_count = 101 }
+                    end
+                    return {
+                        ok = true,
+                        manga = {
+                            {
+                                id = "reading-1",
+                                title = "Reading Manga",
+                                categories = { { id = "2", name = "Reading" } },
+                            },
+                        },
+                        total_count = 101,
+                    }
+                end,
+            },
+            ui = {
+                showLibraryCategoryMenu = function(categories, onSelect)
+                    onSelect(categories[3])
+                end,
+                showLibraryMangaMenu = function(manga)
+                    shown_manga = manga
+                end,
+            },
+        })
+
+        client:showLibrary()
+
+        assert.are.same({ 0, 100 }, fetch_offsets)
+        assert.are.equal("Reading Manga", shown_manga[1].menu_text)
+    end)
+
     it("shows a selected-category empty message", function()
         local client, state = newClient({
             api = {

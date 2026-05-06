@@ -191,7 +191,7 @@ Tests:
 - [x] Single/default category can skip category picker
 - [x] Library manga rows format correctly
 - [x] Selecting a library manga opens chapter flow
-- [ ] Existing chapter actions work for library-opened manga
+- [x] Existing chapter actions work for library-opened manga
 
 Exit criteria:
 

@@ -863,6 +863,69 @@ return {
         assert.is_true(opened_library)
     end)
 
+    it("opens chapters and actions for manga selected from library", function()
+        local shown_library_manga
+        local shown_chapter_menu_options
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchCategories = function()
+                    return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
+                end,
+                fetchLibraryManga = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            {
+                                id = "m1",
+                                title = "Sousou no Frieren",
+                                unread_count = 1,
+                                source = { displayName = "MangaDex EN" },
+                                categories = { { id = "1", name = "Default" } },
+                            },
+                        },
+                    }
+                end,
+                fetchChaptersForManga = function(_, manga_id)
+                    assert.are.equal("m1", manga_id)
+                    return { ok = true, chapters = { { id = "398", name = "Ch. 1" } } }
+                end,
+            }
+        end
+
+        package.preload.suwayomi_ui = function()
+            return {
+                showLibraryMangaMenu = function(manga, onSelect)
+                    shown_library_manga = manga
+                    onSelect(manga[1])
+                end,
+                showLibraryCategoryMenu = function()
+                    error("unexpected category menu")
+                end,
+                showChapterMenu = function(options)
+                    shown_chapter_menu_options = options
+                    return { name = "chapter-menu" }
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[1].callback()
+
+        assert.are.equal("Sousou no Frieren (1 unread / MangaDex EN)", shown_library_manga[1].menu_text)
+        assert.are.equal("Sousou no Frieren", plugin.current_chapter_context.manga.title)
+        assert.are.equal("Ch. 1", plugin.current_chapter_context.chapters[1].name)
+        assert.are.equal("Sousou no Frieren", shown_chapter_menu_options.title)
+        assert.is_true(#shown_chapter_menu_options.chapters > 0)
+    end)
+
     it("shows a placeholder for downloads top-level entry", function()
         local plugin_class = require("main")
         local menu_items = {}
