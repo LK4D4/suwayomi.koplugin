@@ -784,6 +784,7 @@ return {
         local suwayomi_menu = menu_items.suwayomi_dl.sub_item_table
         assert.are.equal("Browse Suwayomi", suwayomi_menu[1].text)
         assert.are.equal("Sync read state now", suwayomi_menu[2].text)
+        assert.is_true(suwayomi_menu[2].keep_menu_open)
         assert.are.equal("Settings", suwayomi_menu[3].text)
         assert.are.equal(3, #suwayomi_menu)
 

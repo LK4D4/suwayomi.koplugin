@@ -2781,6 +2781,7 @@ function SuwayomiPlugin:addToMainMenu(menu_items)
             },
             {
                 text = _("Sync read state now"),
+                keep_menu_open = true,
                 callback = function()
                     self:syncReadStateNow()
                 end
