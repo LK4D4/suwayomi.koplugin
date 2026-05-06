@@ -6043,4 +6043,76 @@ return {
 
         assert.are.equal("/storage/emulated/0", directory_chooser_start_dir)
     end)
+
+    it("starts download directory setup in Books/Manga when it already exists", function()
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and (
+                        path == "/storage/emulated/0"
+                            or path == "/storage/emulated/0/Books"
+                            or path == "/storage/emulated/0/Books/Manga"
+                    ) then
+                        return "directory"
+                    end
+                end,
+            }
+        end
+        package.preload.device = function()
+            return {
+                home_dir = "/storage/emulated/0",
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.lfs = nil
+        package.loaded.device = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
+    end)
+
+    it("creates Books/Manga for download directory setup when Books exists", function()
+        local created_paths = {}
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if attribute == "mode" and (
+                        path == "/storage/emulated/0"
+                            or path == "/storage/emulated/0/Books"
+                            or created_paths[path]
+                    ) then
+                        return "directory"
+                    end
+                end,
+                mkdir = function(path)
+                    created_paths[path] = true
+                    return true
+                end,
+            }
+        end
+        package.preload.device = function()
+            return {
+                home_dir = "/storage/emulated/0",
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.lfs = nil
+        package.loaded.device = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.sub_item_table[5].callback()
+
+        assert.are.equal(true, created_paths["/storage/emulated/0/Books/Manga"])
+        assert.are.equal("/storage/emulated/0/Books/Manga", directory_chooser_start_dir)
+    end)
 end)

@@ -303,6 +303,37 @@ function SuwayomiPlugin:getDownloadDirectoryChooserStartDir()
         return path and path ~= "" and lfs.attributes(path, "mode") == "directory"
     end
 
+    local function joinPath(base, name)
+        if base:sub(-1) == "/" then
+            return base .. name
+        end
+        return base .. "/" .. name
+    end
+
+    local function getDefaultMangaDirectory(home_dir)
+        if not directoryExists(home_dir) then
+            return nil
+        end
+
+        local books_dir = joinPath(home_dir, "Books")
+        if not directoryExists(books_dir) then
+            return nil
+        end
+
+        local manga_dir = joinPath(books_dir, "Manga")
+        if directoryExists(manga_dir) then
+            return manga_dir
+        end
+
+        if lfs.mkdir then
+            local ok = lfs.mkdir(manga_dir)
+            if ok and directoryExists(manga_dir) then
+                return manga_dir
+            end
+        end
+        return nil
+    end
+
     local download_directory = SuwayomiSettings:loadDownloadDirectory()
     if directoryExists(download_directory) then
         return download_directory
@@ -318,6 +349,10 @@ function SuwayomiPlugin:getDownloadDirectoryChooserStartDir()
 
     local device_ok, Device = pcall(require, "device")
     if device_ok and Device and directoryExists(Device.home_dir) then
+        local default_manga_dir = getDefaultMangaDirectory(Device.home_dir)
+        if default_manga_dir then
+            return default_manga_dir
+        end
         return Device.home_dir
     end
     return nil
