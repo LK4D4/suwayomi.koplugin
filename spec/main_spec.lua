@@ -1367,6 +1367,103 @@ return {
         assert.are.same({}, closed_loading_messages)
     end)
 
+    it("keeps cached sources visible without foreground errors when silent refresh fails", function()
+        local child_callback
+        local subprocess_done = false
+        local source_menu = {
+            updateItems = function() end,
+        }
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    return { ok = false, error = "Could not reach the Suwayomi server." }
+                end,
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                template = function(template_string, ...)
+                    local result = template_string
+                    local values = {...}
+                    for index, value in ipairs(values) do
+                        result = result:gsub("%%" .. index, tostring(value))
+                    end
+                    return result
+                end,
+                runInSubProcess = function(callback)
+                    child_callback = callback
+                    return 4321
+                end,
+                isSubProcessDone = function()
+                    return subprocess_done
+                end,
+            }
+        end
+        package.preload.suwayomi_ui = function()
+            return {
+                showSourcesMenu = function(sources)
+                    shown_sources = sources
+                    return source_menu
+                end,
+                updateSourcesMenu = function()
+                    error("unexpected source menu update")
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret" }
+                end,
+                loadSourceLanguages = function() return { "en" } end,
+                loadSourceCache = function()
+                    return {
+                        server_url = "https://suwayomi.example",
+                        updated_at = os.time() - 30,
+                        sources = {
+                            { id = "cached", name = "Cached Source", lang = "en" },
+                        },
+                    }
+                end,
+                saveSourceCache = function()
+                    error("unexpected cache save")
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_ui = nil
+        package.loaded.suwayomi_settings = nil
+        package.loaded.suwayomi_source_fetch_worker = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.schedulePendingReadSync = function() end
+
+        plugin:browseSuwayomi()
+        table.remove(scheduled_callbacks, 1)()
+        child_callback()
+        subprocess_done = true
+        table.remove(scheduled_callbacks, 1)()
+
+        assert.are.same({
+            { id = "cached", name = "Cached Source", lang = "en" },
+        }, shown_sources)
+        assert.are.same({}, shown_messages)
+        assert.are.same({}, shown_loading_messages)
+        assert.are.same({}, closed_loading_messages)
+    end)
+
     it("opens a fresh sources menu from cache after a previous sources menu was closed", function()
         local update_calls = 0
         local show_calls = 0

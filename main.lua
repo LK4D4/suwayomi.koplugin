@@ -512,11 +512,15 @@ end
 function SuwayomiPlugin:showFetchedSources(result, options)
     options = options or {}
     if not result then
-        self:showMessage(_("Could not load Suwayomi sources."))
+        if not options.silent then
+            self:showMessage(_("Could not load Suwayomi sources."))
+        end
         return
     end
     if not result.ok then
-        self:showMessage(_(result.error or "Could not load Suwayomi sources."))
+        if not options.silent then
+            self:showMessage(_(result.error or "Could not load Suwayomi sources."))
+        end
         return
     end
 
@@ -529,7 +533,9 @@ function SuwayomiPlugin:showFetchedSources(result, options)
         filtered_source_count = #filtered_sources,
     })
     if #filtered_sources == 0 then
-        self:showMessage(_("No Suwayomi sources match the selected languages."))
+        if not options.silent then
+            self:showMessage(_("No Suwayomi sources match the selected languages."))
+        end
         return
     end
 
@@ -610,7 +616,9 @@ function SuwayomiPlugin:startSourceFetchWorker(credentials, options)
         self:closeLoadingMessage(active.loading_message)
         os.remove(result_path)
         os.remove(result_path .. ".tmp")
-        self:showMessage(T(_("Could not start source loading: %1"), err or _("unknown error")))
+        if not options.silent then
+            self:showMessage(T(_("Could not start source loading: %1"), err or _("unknown error")))
+        end
         return false
     end
 
