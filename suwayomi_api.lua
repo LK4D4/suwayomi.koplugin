@@ -260,7 +260,7 @@ end
 
 function SuwayomiAPI._buildCategoryQuery()
     return json.encode({
-        query = "query GET_LIBRARY_CATEGORIES { categories { nodes { id name order mangas(condition: { inLibrary: true }) { totalCount } } } }",
+        query = "query GET_LIBRARY_CATEGORIES { categories { nodes { id name order mangas { totalCount } } } }",
     })
 end
 

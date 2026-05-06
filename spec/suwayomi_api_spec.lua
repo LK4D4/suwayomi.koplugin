@@ -13,6 +13,8 @@ describe("suwayomi_api", function()
 
     local function install_graphql_stub(response_body)
         local request = {}
+        package.loaded["ssl.https"] = nil
+        package.loaded.ltn12 = nil
 
         package.preload["ssl.https"] = function()
             return {
@@ -108,7 +110,8 @@ describe("suwayomi_api", function()
 
         assert.truthy(query:match("query GET_LIBRARY_CATEGORIES"))
         assert.truthy(query:match("categories"))
-        assert.truthy(query:match("mangas%(condition: { inLibrary: true }%)"))
+        assert.truthy(query:match("mangas { totalCount }"))
+        assert.is_nil(query:match("condition:"))
     end)
 
     it("builds the manga library update mutation", function()
@@ -413,6 +416,62 @@ describe("suwayomi_api", function()
         assert.truthy(request.body:match('"mangaId":17'))
         assert.are.same({ id = "17", title = "Frieren", initialized = true }, result.manga)
         assert.are.same({ { id = "398", name = "Ch. 1", is_read = false } }, result.chapters)
+    end)
+
+    it("propagates credential errors from new client api helpers", function()
+        local missing_url_credentials = {
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }
+
+        local library = api.fetchLibraryManga(missing_url_credentials)
+        local categories = api.fetchCategories(missing_url_credentials)
+        local membership = api.updateMangaLibraryState(missing_url_credentials, "17", true)
+        local refresh = api.refreshManga(missing_url_credentials, "17")
+
+        assert.are.same({ ok = false, error = "Missing Suwayomi server URL." }, library)
+        assert.are.same({ ok = false, error = "Missing Suwayomi server URL." }, categories)
+        assert.are.same({ ok = false, error = "Missing Suwayomi server URL." }, membership)
+        assert.are.same({ ok = false, error = "Missing Suwayomi server URL." }, refresh)
+    end)
+
+    it("reports malformed responses from new client api helpers", function()
+        install_graphql_stub("{not-json")
+        local library = api.fetchLibraryManga(valid_credentials())
+
+        install_graphql_stub("{not-json")
+        local categories = api.fetchCategories(valid_credentials())
+
+        install_graphql_stub("{not-json")
+        local membership = api.updateMangaLibraryState(valid_credentials(), "17", true)
+
+        install_graphql_stub("{not-json")
+        local refresh = api.refreshManga(valid_credentials(), "17")
+
+        assert.are.same({ ok = false, error = "Invalid response from Suwayomi server." }, library)
+        assert.are.same({ ok = false, error = "Invalid response from Suwayomi server." }, categories)
+        assert.are.same({ ok = false, error = "Invalid response from Suwayomi server." }, membership)
+        assert.are.same({ ok = false, error = "Invalid response from Suwayomi server." }, refresh)
+    end)
+
+    it("reports GraphQL errors from new client api helpers", function()
+        install_graphql_stub([[{"data":{"mangas":null},"errors":[{"message":"Library unavailable"}]}]])
+        local library = api.fetchLibraryManga(valid_credentials())
+
+        install_graphql_stub([[{"data":{"categories":null},"errors":[{"message":"Categories unavailable"}]}]])
+        local categories = api.fetchCategories(valid_credentials())
+
+        install_graphql_stub([[{"data":{"updateManga":null},"errors":[{"message":"Cannot update manga"}]}]])
+        local membership = api.updateMangaLibraryState(valid_credentials(), "17", true)
+
+        install_graphql_stub([[{"data":{"fetchManga":null,"fetchChapters":null},"errors":[{"message":"Cannot refresh manga"}]}]])
+        local refresh = api.refreshManga(valid_credentials(), "17")
+
+        assert.are.same({ ok = false, error = "Library unavailable" }, library)
+        assert.are.same({ ok = false, error = "Categories unavailable" }, categories)
+        assert.are.same({ ok = false, error = "Cannot update manga" }, membership)
+        assert.are.same({ ok = false, error = "Cannot refresh manga" }, refresh)
     end)
 
     it("returns a missing URL error when source fetch credentials omit server_url", function()
