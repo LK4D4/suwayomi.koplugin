@@ -390,6 +390,14 @@ describe("suwayomi_ui", function()
         assert.are.equal("/storage/emulated/0/Books/Manga", shown_dialog.path)
     end)
 
+    it("keeps KOReader-style current path visibility in the directory chooser", function()
+        local ui = require("suwayomi_ui")
+
+        ui.showDirectoryChooser(function() end, "/storage/emulated/0/Books/Manga")
+
+        assert.is_true(shown_dialog.show_path)
+    end)
+
     it("shows a visible use-this-folder action for the current directory", function()
         local ui = require("suwayomi_ui")
         local chosen_path

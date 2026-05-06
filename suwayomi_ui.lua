@@ -30,6 +30,7 @@ function SuwayomiUI.showDirectoryChooser(callback, start_dir)
         select_directory = true,
         select_file = false,
         show_files = false,
+        show_path = true,
     }
 
     function DirectoryChooser:genItemTable(dirs, files, path)
