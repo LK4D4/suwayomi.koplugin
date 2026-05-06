@@ -37,18 +37,15 @@ Already implemented:
 - [x] Bulk policies: download next unread, keep next unread downloaded, delete read downloaded chapters
 - [x] Read-state reconciliation from Suwayomi, KOReader metadata, and the plugin ledger
 - [x] Background retry for pending read/unread sync
-- [x] Manual `Sync read state now`
+- [x] Manual read-state sync action
 - [x] App Store installation path
 
 Current limitations:
 
-- The UI is still browse-first, not library-first.
 - There is no first-class Downloads screen even though a local queue exists.
-- Setup actions are scattered at top level instead of grouped under Settings.
 - Source manga browsing only fetches the first popular page.
 - Remote source search, latest, and pagination are missing.
 - Library membership cannot be managed from KOReader.
-- Download paths are still shaped by the original Local-source-only layout.
 - `main.lua` owns too much orchestration for the next client features to remain comfortable.
 
 ## Phase 1: Refactor For Client Work
@@ -101,12 +98,15 @@ Exit criteria:
 
 Goal: make the top-level UI match the MVP surfaces before each surface is fully implemented.
 
-- [x] Change top-level menu order to:
+- [x] Replace the old top-level submenu with a native Suwayomi hub:
   - Library
   - Browse
   - Downloads
-  - Sync read state now
+  - Sync
   - Settings
+  - Close
+- [x] Add title-bar return-to-hub affordance on Suwayomi Library/Browse/Manga list screens
+- [x] Use a built-in KOReader icon for the return-to-hub affordance
 - [x] Rename `Browse Suwayomi` to `Browse`
 - [x] Add `Settings` menu with sections:
   - Connection
@@ -122,14 +122,16 @@ Goal: make the top-level UI match the MVP surfaces before each surface is fully 
 
 Tests:
 
-- [x] Main menu includes `Library`, `Browse`, `Downloads`, and `Settings`
+- [x] Main menu opens the Suwayomi hub with `Library`, `Browse`, `Downloads`, `Sync`, `Settings`, and `Close`
 - [x] Settings menu routes to Connection, Library, Browse, and Downloads
 - [x] Existing login, source language, download directory, and parallel-download settings still work from their new homes
+- [x] Hub navigation verified on Boox Palma
 
 Exit criteria:
 
 - The plugin presents the same top-level shape as the MVP spec.
 - Existing setup behavior is still available through grouped Settings.
+- Library/Browse screens can return to the hub without stacking stale menus underneath.
 
 ## Phase 3: API Foundation For Client MVP
 
@@ -380,3 +382,7 @@ These are intentionally outside the client MVP:
 8. Browse surface
 9. Live remote-source verification
 10. README and release polish
+
+## Current Next Step
+
+Implement the Downloads surface. The hub, grouped Settings, cached Browse entry, source-scoped download paths, API foundation, and Library surface are now in place. The next slice should expose the existing KOReader-local queue from the `Downloads` hub action, starting with active/queued/failed rows and retry/clear failed actions where the queue already supports them.

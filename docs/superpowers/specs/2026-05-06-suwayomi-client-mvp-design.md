@@ -35,6 +35,15 @@ Implemented already:
 
 The strongest existing behavior is the reading loop after the user has already found a manga. The weakest behavior is the client loop before that point: library navigation, source search, pagination, add/remove library, and source-specific discovery.
 
+Implementation status as of 2026-05-06:
+
+- Source-scoped download paths are implemented for new downloads.
+- A native Suwayomi hub is implemented under KOReader's Search menu with Library, Browse, Downloads, Sync, Settings, and Close actions.
+- Library opens Suwayomi library manga, including category picker behavior.
+- Browse uses the cached source list immediately and refreshes sources silently in the background.
+- Library/Browse/Manga list screens have a title-bar return-to-hub affordance using KOReader's built-in `appbar.filebrowser` icon.
+- Downloads remains the next unimplemented top-level surface.
+
 ## Product Direction
 
 ### Recommended direction: library-first client
@@ -97,15 +106,16 @@ The source filter model is powerful but expensive for a KOReader MVP. The first 
 
 ### 1. Open library
 
-Add a new top-level menu entry:
+Add a new top-level hub entry:
 
 ```text
 Suwayomi
   Library
   Browse
   Downloads
-  Sync read state now
+  Sync
   Settings
+  Close
 ```
 
 `Library` should be the primary entry point once credentials exist.
@@ -139,7 +149,7 @@ The existing chapter action menu remains the detailed chapter control surface.
 
 ### 3. Browse and search sources
 
-`Browse` should be the remote discovery entry point. It replaces the current browse-first home screen and owns source selection, source mode, and source search.
+`Browse` should be the remote discovery entry point. It owns source selection, source mode, and source search from the Suwayomi hub.
 
 The first Browse screen should show enabled sources grouped or filtered by language. Selecting a source should offer:
 
@@ -500,15 +510,16 @@ The MVP should stay menu-based.
 
 ### Main menu
 
-Recommended order:
+The KOReader Search menu should expose a single `Suwayomi` entry. Selecting it opens a native hub with:
 
 1. Library
 2. Browse
 3. Downloads
-4. Sync read state now
+4. Sync
 5. Settings
+6. Close
 
-`Browse Suwayomi` can be renamed to `Browse` once `Library` and `Downloads` exist.
+Library, Browse, and Manga list screens should provide a title-bar return-to-hub action so the user can move between surfaces without backing out to KOReader's file browser.
 
 ### Library manga menu
 
