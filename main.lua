@@ -136,7 +136,7 @@ end
 
 function SuwayomiPlugin:getHomeMenuOptions()
     return {
-        title_bar_left_icon = "appbar.home",
+        title_bar_left_icon = "appbar.filebrowser",
         on_title_bar_left_tap = function(menu)
             if menu and UIManager.close then
                 UIManager:close(menu)

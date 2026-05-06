@@ -123,7 +123,7 @@ describe("suwayomi_client", function()
             ui = {
                 showMangaMenu = function(manga, onSelect, menu_options)
                     assert.are.equal("Sousou no Frieren", manga[1].title)
-                    assert.are.same({ title_bar_left_icon = "appbar.home" }, menu_options)
+                    assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, menu_options)
                     onSelect(manga[1])
                 end,
             },
@@ -147,7 +147,7 @@ describe("suwayomi_client", function()
                     opened_manga = manga
                 end,
                 getHomeMenuOptions = function()
-                    return { title_bar_left_icon = "appbar.home" }
+                    return { title_bar_left_icon = "appbar.filebrowser" }
                 end,
             },
             gettext = function(text)
@@ -243,7 +243,7 @@ describe("suwayomi_client", function()
         local shown_manga
         local shown_menu_options
         local client, state = newClient({
-            home_menu_options = { title_bar_left_icon = "appbar.home" },
+            home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
             api = {
                 fetchCategories = function()
                     return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
@@ -280,7 +280,7 @@ describe("suwayomi_client", function()
         client:showLibrary()
 
         assert.are.equal("Sousou no Frieren (12 unread / MangaDex EN)", shown_manga[1].menu_text)
-        assert.are.same({ title_bar_left_icon = "appbar.home" }, shown_menu_options)
+        assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, shown_menu_options)
         assert.are.equal("m1", state.opened_manga().id)
         assert.are.equal("library_manga_loaded", state.log_events[#state.log_events].event)
     end)
@@ -290,7 +290,7 @@ describe("suwayomi_client", function()
         local shown_category_menu_options
         local shown_manga
         local client = newClient({
-            home_menu_options = { title_bar_left_icon = "appbar.home" },
+            home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
             api = {
                 fetchCategories = function()
                     return {
@@ -337,7 +337,7 @@ describe("suwayomi_client", function()
         assert.are.equal("All manga", shown_categories[1].name)
         assert.are.equal("Default", shown_categories[2].name)
         assert.are.equal("Reading", shown_categories[3].name)
-        assert.are.same({ title_bar_left_icon = "appbar.home" }, shown_category_menu_options)
+        assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, shown_category_menu_options)
         assert.are.same({ "Reading Manga (3 unread)" }, { shown_manga[1].menu_text })
     end)
 

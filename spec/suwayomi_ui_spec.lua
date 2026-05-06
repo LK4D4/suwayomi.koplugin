@@ -440,14 +440,14 @@ describe("suwayomi_ui", function()
         ui.showSourcesMenu({
             { id = "s1", name = "MangaDex" },
         }, nil, {
-            title_bar_left_icon = "appbar.home",
+            title_bar_left_icon = "appbar.filebrowser",
             on_title_bar_left_tap = function()
                 tapped_home = true
                 return true
             end,
         })
 
-        assert.are.equal("appbar.home", shown_dialog.title_bar_left_icon)
+        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
 
         shown_dialog.onLeftButtonTap()
 
@@ -461,14 +461,14 @@ describe("suwayomi_ui", function()
         ui.showLibraryMangaMenu({
             { id = "m1", title = "Sousou no Frieren" },
         }, nil, {
-            title_bar_left_icon = "appbar.home",
+            title_bar_left_icon = "appbar.filebrowser",
             on_title_bar_left_tap = function()
                 tapped_home = true
                 return true
             end,
         })
 
-        assert.are.equal("appbar.home", shown_dialog.title_bar_left_icon)
+        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
 
         shown_dialog.onLeftButtonTap()
 

@@ -1126,7 +1126,7 @@ return {
         plugin:addToMainMenu(menu_items)
         triggerHomeAction(plugin, "browse")
 
-        assert.are.equal("appbar.home", shown_sources_menu_options.title_bar_left_icon)
+        assert.are.equal("appbar.filebrowser", shown_sources_menu_options.title_bar_left_icon)
 
         shown_sources_menu_options.on_title_bar_left_tap(source_menu)
 
