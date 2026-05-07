@@ -1,6 +1,6 @@
 # Suwayomi KOReader Plugin Roadmap
 
-This roadmap tracks the next implementation path from the current downloader-oriented plugin to a small KOReader-native Suwayomi client.
+This roadmap tracks the next implementation path from the current downloader-oriented plugin to a small KOReader-native Suwayomi library, download, and sync client.
 
 The design source for this roadmap is:
 
@@ -12,12 +12,24 @@ The MVP should expose four first-class client surfaces:
 
 ```text
 Suwayomi -> Library -> Manga -> First unread / Download next unread / Keep next unread
-Suwayomi -> Browse -> Source -> Popular / Latest / Search -> Manga -> Add to library / Open chapters
+Suwayomi -> Browse -> Source -> Popular / Latest / Search -> Manga -> Add to library / Open chapter list
 Suwayomi -> Downloads -> Active / Queued / Failed -> Retry / Clear / Open manga
 Suwayomi -> Settings -> Connection / Library / Browse / Downloads
 ```
 
-The plugin should not try to clone Suwayomi-WebUI. KOReader already owns the reading experience, and this plugin already owns the device-local download/read-state loop. The roadmap mirrors WebUI's Library, Browse, Downloads, and Settings information architecture only where it helps e-ink reading.
+The plugin should not try to clone Suwayomi-WebUI, and it should not try to become a custom manga reader. KOReader already owns the reading experience, including CBZ rendering, page navigation, zoom/crop behavior, bookmarks, history, gestures, and file-manager access. This plugin owns the Suwayomi-side client work around library navigation, source discovery, device-local downloads, and read-state reconciliation.
+
+## Reading Boundary
+
+The intended reading model is:
+
+```text
+Suwayomi plugin chooses and downloads manga -> KOReader file manager / reader opens local CBZ files
+```
+
+The plugin may keep small convenience actions such as `Open`, `Open first unread`, or `Open manga folder`, but those actions should only hand a local file or folder to KOReader. They should not grow into an in-plugin reader, page streaming UI, reader event loop, custom navigation stack, or replacement for KOReader's document features.
+
+This boundary is intentional. Earlier experiments toward a full manga-reader experience proved expensive, and other KOReader plugins show the same split: catalog/download plugins hand files to KOReader, while true reader plugins patch KOReader's reader modules directly. For this plugin, the lower-risk path is to make local files, queue state, and sync state reliable, then let KOReader do what it already does well.
 
 ## Current Baseline
 
@@ -31,7 +43,7 @@ Already implemented:
 - [x] Local `.cbz` creation on the KOReader device
 - [x] Persistent device-local download queue
 - [x] Download queue recovery after interruption
-- [x] Chapter actions: open, download, delete from device, mark read/unread
+- [x] Chapter actions: open local CBZ in KOReader, download, delete from device, mark read/unread
 - [x] Chapter selection mode
 - [x] Bulk chapter actions
 - [x] Bulk policies: download next unread, keep next unread downloaded, delete read downloaded chapters
@@ -169,7 +181,7 @@ Exit criteria:
 
 ## Phase 4: Library Surface
 
-Goal: make `Library` the primary reading entry point.
+Goal: make `Library` the primary manga selection and local-download entry point.
 
 - [x] Fetch categories when opening Library
 - [x] If multiple categories exist, show a category picker
@@ -180,7 +192,7 @@ Goal: make `Library` the primary reading entry point.
   - unread count
   - source label
   - optional KOReader-local availability computed from source-scoped paths
-- [x] Open selected library manga through the existing chapter screen
+- [x] Open selected library manga through the existing chapter list screen
 - [x] Keep pending read-state sync scheduling on Library entry
 - [x] Wire Library settings that are cheap after the menu exists:
   - remember last selected category, optional
@@ -197,7 +209,7 @@ Tests:
 
 Exit criteria:
 
-- A user can open KOReader, enter Suwayomi Library, choose manga, and use existing chapter actions.
+- A user can open KOReader, enter Suwayomi Library, choose manga, and use existing chapter/download actions.
 
 ## Phase 5: Downloads Surface
 
@@ -212,7 +224,7 @@ Goal: make the existing KOReader-local download queue inspectable and manageable
 - [x] Add clear failed
 - [ ] Add cancel queued item when supported by the queue
 - [ ] Add clear completed history if completed history exists
-- [ ] Add open manga/chapter context for queue items when enough metadata exists
+- [ ] Add open manga/chapter-list context for queue items when enough metadata exists
 - [ ] Keep Suwayomi server downloader mutations out of this surface
 - [ ] Wire Downloads settings:
   - KOReader download directory
@@ -230,7 +242,7 @@ Tests:
 
 Exit criteria:
 
-- A user can inspect the local queue, retry failed local downloads, and adjust local download settings without opening manga chapters first.
+- A user can inspect the local queue, retry failed local downloads, and adjust local download settings without drilling into manga chapter lists first.
 
 ## Phase 6: Manga-Level Client Actions
 
@@ -240,7 +252,7 @@ Goal: add manga-level actions that fit the Library and Browse workflow.
 - [ ] Add `Refresh manga and chapters`
 - [ ] Add `Add to library`
 - [ ] Add `Remove from library` with confirmation
-- [ ] Add `Open first unread` when the first unread chapter is locally available
+- [ ] Add `Open first unread in KOReader` when the first unread chapter is locally available
 - [ ] Add `Download first unread`
 - [ ] Add `Download next 5/10/50 unread`
 - [ ] Add `Keep next 5/10/50 unread downloaded`
@@ -260,6 +272,7 @@ Exit criteria:
 
 - Library and Browse entries are useful without drilling into individual chapters first.
 - Library membership can be managed from KOReader.
+- Reader-like behavior remains limited to opening already-downloaded local files in KOReader.
 
 ## Phase 7: Browse Surface
 
@@ -282,7 +295,7 @@ Goal: make remote source discovery usable enough to add manga without leaving KO
 - [ ] Add `Previous page` when page is greater than 1
 - [ ] Preserve current source/mode/query/page context while paging
 - [ ] Selecting a result opens manga actions:
-  - Open chapters
+  - Open chapter list
   - Add to library
   - Remove from library
   - Refresh details/chapters
@@ -301,7 +314,7 @@ Tests:
 
 Exit criteria:
 
-- A user can search a remote source, page results, add a manga to the library, and open its chapters.
+- A user can search a remote source, page results, add a manga to the library, and open its chapter list.
 
 ## Phase 8: Remote Source Verification
 
@@ -313,6 +326,8 @@ Goal: prove the client MVP works with real remote source flows.
 - [ ] Confirm Downloads shows KOReader-local queue state
 - [ ] Confirm KOReader-local download does not call Suwayomi server download queue mutations
 - [ ] Confirm server-side downloaded state is not treated as KOReader-local availability
+- [ ] Confirm downloaded CBZ chapters can be opened from KOReader's normal file manager
+- [ ] Confirm plugin `Open` actions remain shortcuts into KOReader rather than custom reader flows
 - [ ] Confirm Settings exposes Connection, Library, Browse, and Downloads on device
 - [ ] Document any source-specific quirks in debug notes or README
 - [ ] Add regression tests for any live-server bug that can be reasonably reproduced in unit tests
@@ -331,9 +346,11 @@ Goal: keep public documentation aligned with the client MVP.
 - [ ] Document grouped Settings
 - [ ] Document source-scoped download layout
 - [ ] Document that KOReader downloads are device-local, not Suwayomi server downloads
+- [ ] Document that normal reading happens through KOReader's file manager/reader, not inside the plugin
 - [ ] Document unsupported/deferred features:
   - full source filters
   - source preferences
+  - custom in-plugin manga reader
   - extension management
   - server-side download queue management
   - server-side download settings
@@ -368,6 +385,9 @@ These are intentionally outside the client MVP:
 - Cover grid UI
 - Thumbnail caching
 - OPDS support
+- Custom in-plugin manga reader
+- Page streaming reader
+- ReaderUI end-of-book automation beyond lightweight read-state reconciliation
 - Backup/restore
 
 ## Recommended Order
