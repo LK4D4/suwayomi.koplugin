@@ -17,6 +17,9 @@ describe("suwayomi plugin", function()
     local shown_confirm
     local home_dialog_options
     local settings_menu_items
+    local downloads_menu_snapshot
+    local downloads_menu_callbacks
+    local downloads_menu_options
     local directory_chooser_callback
     local directory_chooser_start_dir
     local saved_download_directory
@@ -47,6 +50,9 @@ describe("suwayomi plugin", function()
         shown_confirm = nil
         home_dialog_options = nil
         settings_menu_items = nil
+        downloads_menu_snapshot = nil
+        downloads_menu_callbacks = nil
+        downloads_menu_options = nil
         directory_chooser_callback = nil
         directory_chooser_start_dir = nil
         saved_download_directory = nil
@@ -337,6 +343,12 @@ describe("suwayomi plugin", function()
                 end,
                 showSettingsMenu = function(items)
                     settings_menu_items = items
+                end,
+                showDownloadsMenu = function(snapshot, callbacks, options)
+                    downloads_menu_snapshot = snapshot
+                    downloads_menu_callbacks = callbacks
+                    downloads_menu_options = options
+                    return { name = "downloads-menu" }
                 end,
                 showSourcesMenu = function(sources, _, options)
                     shown_sources = sources
@@ -1051,7 +1063,30 @@ return {
         assert.is_true(#shown_chapter_menu_options.chapters > 0)
     end)
 
-    it("shows a placeholder for downloads top-level entry", function()
+    it("opens the downloads menu from the top-level entry", function()
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+
+        plugin:addToMainMenu(menu_items)
+        plugin:getDownloadQueue().items = {
+            {
+                key = "m-queued:192",
+                download_directory = "/books",
+                manga = { id = "m-queued", title = "Dandadan" },
+                chapter = { id = "192", name = "Ch. 192" },
+            },
+        }
+
+        triggerHomeAction(plugin, "downloads")
+
+        assert.are.equal(1, #downloads_menu_snapshot.queued)
+        assert.are.equal("m-queued:192", downloads_menu_snapshot.queued[1].key)
+        assert.are.equal("appbar.filebrowser", downloads_menu_options.title_bar_left_icon)
+        assert.is_function(downloads_menu_options.on_title_bar_left_tap)
+    end)
+
+    it("shows a friendly message when downloads are empty", function()
         local plugin_class = require("main")
         local menu_items = {}
         local plugin = plugin_class{}
@@ -1059,7 +1094,9 @@ return {
         plugin:addToMainMenu(menu_items)
 
         triggerHomeAction(plugin, "downloads")
-        assert.are.equal("Downloads are not implemented yet.", shown_messages[#shown_messages])
+
+        assert.are.equal("No active downloads.", shown_messages[#shown_messages])
+        assert.is_nil(downloads_menu_snapshot)
     end)
 
     it("opens the login dialog with persisted credentials", function()

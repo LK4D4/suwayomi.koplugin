@@ -264,6 +264,91 @@ function DownloadQueue:removePersistentJob(key)
     self:savePersistentJobs(remaining)
 end
 
+function DownloadQueue:copySnapshotJob(job, state)
+    local snapshot = {
+        key = job.key or self:getKey(job.manga or {}, job.chapter or {}),
+        state = state or job.state,
+        download_directory = job.download_directory,
+        manga = job.manga,
+        chapter = job.chapter,
+    }
+    local progress = self:normalizeProgress(job.progress)
+    if progress then
+        snapshot.progress = progress
+    elseif job.last_progress_current ~= nil or job.last_progress_total ~= nil or job.last_progress_state ~= nil then
+        snapshot.progress = {
+            state = job.last_progress_state or state or job.state,
+            current = job.last_progress_current or 0,
+            total = job.last_progress_total or 0,
+        }
+    end
+    return snapshot
+end
+
+function DownloadQueue:getSnapshot()
+    local snapshot = {
+        active = {},
+        queued = {},
+        failed = {},
+    }
+
+    for _, job in pairs(self.active_jobs or {}) do
+        table.insert(snapshot.active, self:copySnapshotJob(job, "downloading"))
+    end
+
+    for _, job in ipairs(self.items or {}) do
+        table.insert(snapshot.queued, self:copySnapshotJob(job, "queued"))
+    end
+
+    for _, job in ipairs(self:loadPersistentJobs()) do
+        if job.state == "failed" then
+            table.insert(snapshot.failed, self:copySnapshotJob(job, "failed"))
+        end
+    end
+
+    return snapshot
+end
+
+function DownloadQueue:findPersistentJob(key, state)
+    for _, job in ipairs(self:loadPersistentJobs()) do
+        if job.key == key and (state == nil or job.state == state) then
+            return job
+        end
+    end
+    return nil
+end
+
+function DownloadQueue:retryFailed(key)
+    local job = self:findPersistentJob(key, "failed")
+    if not job or not job.manga or not job.chapter or not job.download_directory then
+        return false, "missing"
+    end
+    return self:enqueue(job.manga, job.chapter, job.download_directory)
+end
+
+function DownloadQueue:clearFailed()
+    local remaining = {}
+    local cleared = 0
+    for _, job in ipairs(self:loadPersistentJobs()) do
+        if job.state == "failed" then
+            cleared = cleared + 1
+            if job.manga and job.chapter then
+                self.statuses[self:getKey(job.manga, job.chapter)] = nil
+            elseif job.key then
+                self.statuses[job.key] = nil
+            end
+        else
+            table.insert(remaining, job)
+        end
+    end
+
+    if cleared > 0 then
+        self:savePersistentJobs(remaining)
+        self.onStatusChanged()
+    end
+    return cleared
+end
+
 function DownloadQueue:getStatus(manga, chapter)
     return self.statuses[self:getKey(manga, chapter)]
 end

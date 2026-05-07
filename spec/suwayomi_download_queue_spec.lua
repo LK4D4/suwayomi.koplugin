@@ -680,6 +680,127 @@ describe("suwayomi_download_queue", function()
         assert.are.equal("downloaded", context.queue:getStatus(manga, chapter).state)
     end)
 
+    it("groups active queued and failed jobs in a download snapshot", function()
+        local failed_manga = { id = "m-failed", title = "Chainsaw Man" }
+        local failed_chapter = { id = "205", name = "Ch. 205" }
+        local active_manga = { id = "m-active", title = "Frieren" }
+        local active_chapter = { id = "144", name = "Ch. 144" }
+        local queued_manga = { id = "m-queued", title = "Dandadan" }
+        local queued_chapter = { id = "192", name = "Ch. 192" }
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m-failed:205",
+                    state = "failed",
+                    download_directory = "/books",
+                    manga = failed_manga,
+                    chapter = failed_chapter,
+                    progress = {
+                        state = "failed",
+                        current = 0,
+                        total = 1,
+                        error = "network timeout",
+                    },
+                },
+            },
+        })
+
+        context.queue:recover()
+        context.queue.items = {
+            {
+                key = "m-queued:192",
+                state = "queued",
+                download_directory = "/books",
+                manga = queued_manga,
+                chapter = queued_chapter,
+            },
+        }
+        context.queue:setActiveJob({
+            key = "m-active:144",
+            state = "downloading",
+            download_directory = "/books",
+            manga = active_manga,
+            chapter = active_chapter,
+            last_progress_current = 3,
+            last_progress_total = 24,
+            last_progress_state = "downloading",
+        })
+
+        local snapshot = context.queue:getSnapshot()
+
+        assert.are.equal(1, #snapshot.active)
+        assert.are.equal("m-active:144", snapshot.active[1].key)
+        assert.are.equal("downloading", snapshot.active[1].state)
+        assert.are.same({ state = "downloading", current = 3, total = 24 }, snapshot.active[1].progress)
+        assert.are.equal(1, #snapshot.queued)
+        assert.are.equal("m-queued:192", snapshot.queued[1].key)
+        assert.are.equal("queued", snapshot.queued[1].state)
+        assert.are.equal(1, #snapshot.failed)
+        assert.are.equal("m-failed:205", snapshot.failed[1].key)
+        assert.are.equal("network timeout", snapshot.failed[1].progress.error)
+    end)
+
+    it("retries a failed persistent job by key", function()
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m1:398",
+                    state = "failed",
+                    download_directory = "/books",
+                    manga = manga,
+                    chapter = chapter,
+                    progress = { state = "failed", error = "network timeout" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        local ok, state = context.queue:retryFailed("m1:398")
+
+        assert.is_true(ok)
+        assert.are.equal("retry", state)
+        assert.are.equal("queued", context.saved_queue()[1].state)
+        assert.are.equal("queued", context.queue:getStatus(manga, chapter).state)
+    end)
+
+    it("clears failed persistent jobs without clearing queued jobs", function()
+        local failed_manga = { id = "m-failed", title = "Chainsaw Man" }
+        local failed_chapter = { id = "205", name = "Ch. 205" }
+        local queued_manga = { id = "m-queued", title = "Dandadan" }
+        local queued_chapter = { id = "192", name = "Ch. 192" }
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m-failed:205",
+                    state = "failed",
+                    download_directory = "/books",
+                    manga = failed_manga,
+                    chapter = failed_chapter,
+                },
+                {
+                    key = "m-queued:192",
+                    state = "queued",
+                    download_directory = "/books",
+                    manga = queued_manga,
+                    chapter = queued_chapter,
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        local cleared = context.queue:clearFailed()
+
+        assert.are.equal(1, cleared)
+        assert.are.equal(1, #context.saved_queue())
+        assert.are.equal("m-queued:192", context.saved_queue()[1].key)
+        assert.is_nil(context.queue:getStatus(failed_manga, failed_chapter))
+        assert.are.equal("queued", context.queue:getStatus(queued_manga, queued_chapter).state)
+    end)
+
     it("does not cancel a failed download record", function()
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }

@@ -205,8 +205,44 @@ function SuwayomiPlugin:showLibrary()
     return self:getClient():showLibrary()
 end
 
+function SuwayomiPlugin:isDownloadsSnapshotEmpty(snapshot)
+    return #(snapshot.active or {}) == 0
+        and #(snapshot.queued or {}) == 0
+        and #(snapshot.failed or {}) == 0
+end
+
+function SuwayomiPlugin:closeMenu(menu)
+    if menu and UIManager.close then
+        UIManager:close(menu)
+    end
+end
+
 function SuwayomiPlugin:showDownloads()
-    self:showNotImplemented(_("Downloads are not implemented yet."))
+    local queue = self:getDownloadQueue()
+    local snapshot = queue:getSnapshot()
+    if self:isDownloadsSnapshotEmpty(snapshot) then
+        self:showMessage(_("No active downloads."))
+        return
+    end
+
+    return SuwayomiUI.showDownloadsMenu(snapshot, {
+        onRetryFailed = function(job, menu)
+            local ok = queue:retryFailed(job.key)
+            self:closeMenu(menu)
+            if ok then
+                self:showMessage(_("Download queued."), { timeout = 2 })
+            else
+                self:showMessage(_("Could not retry download."))
+            end
+            self:showDownloads()
+        end,
+        onClearFailed = function(menu)
+            local cleared = queue:clearFailed()
+            self:closeMenu(menu)
+            self:showMessage(T(_("Cleared %1 failed downloads."), cleared), { timeout = 2 })
+            self:showDownloads()
+        end,
+    }, self:getHomeMenuOptions())
 end
 
 function SuwayomiPlugin:showLibrarySettings(touchmenu_instance)

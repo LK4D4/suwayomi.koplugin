@@ -7,9 +7,9 @@ A KOReader plugin that allows you to browse your self-hosted [Suwayomi (Tachides
 This plugin is experimental and still under active development.
 
 - Expect rough edges and incomplete features.
-- The login flow, Suwayomi hub, Library entry point, source browsing, manga browsing, chapter browsing, chapter actions menu, single-chapter downloads, source-scoped download paths, cached source refresh, and read-state syncing are currently implemented and being tested.
+- The login flow, Suwayomi hub, Library entry point, source browsing, manga browsing, chapter browsing, chapter actions menu, single-chapter downloads, source-scoped download paths, cached source refresh, local queue inspection, and read-state syncing are currently implemented and being tested.
 - At the moment, the plugin is only considered usable with the Suwayomi **Local Source**.
-- The top-level Downloads screen is not implemented yet, although the local download queue and chapter-level bulk actions exist.
+- The top-level Downloads screen can inspect active, queued, and failed local downloads, although completed history is not implemented yet.
 
 ## Features
 - Native KOReader UI integration
@@ -35,7 +35,7 @@ This plugin is experimental and still under active development.
 
 Current limitation:
 - The practical, tested flow currently targets the Suwayomi **Local Source**. Other Suwayomi sources may browse correctly, but downloading and reading workflows outside Local Source are not yet considered supported.
-- `Downloads` is currently a placeholder hub action. Queue inspection and retry/clear actions are the next planned surface.
+- `Downloads` currently shows KOReader-local active, queued, and failed downloads. Completed history and server-side Suwayomi download queue management are not implemented.
 
 ## Installation
 

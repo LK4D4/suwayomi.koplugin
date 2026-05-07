@@ -203,13 +203,13 @@ Exit criteria:
 
 Goal: make the existing KOReader-local download queue inspectable and manageable from the top level.
 
-- [ ] Add top-level `Downloads` menu implementation
-- [ ] Read active and queued items from `suwayomi_download_queue.lua`
-- [ ] Surface failed items with last error where available
+- [x] Add top-level `Downloads` menu implementation
+- [x] Read active and queued items from `suwayomi_download_queue.lua`
+- [x] Surface failed items with last error where available
 - [ ] Surface completed history only if current state persists it or adding it is small
-- [ ] Add compact rows with status, manga title, and chapter name
-- [ ] Add retry for failed local downloads
-- [ ] Add clear failed
+- [x] Add compact rows with status, manga title, and chapter name
+- [x] Add retry for failed local downloads
+- [x] Add clear failed
 - [ ] Add cancel queued item when supported by the queue
 - [ ] Add clear completed history if completed history exists
 - [ ] Add open manga/chapter context for queue items when enough metadata exists
@@ -221,9 +221,9 @@ Goal: make the existing KOReader-local download queue inspectable and manageable
 
 Tests:
 
-- [ ] Downloads menu groups active, queued, failed, and completed items where state exists
-- [ ] Failed rows expose retry
-- [ ] Clear failed calls local queue cleanup only
+- [x] Downloads menu groups active, queued, and failed items where state exists
+- [x] Failed rows expose retry
+- [x] Clear failed calls local queue cleanup only
 - [ ] Cancel queued item calls local queue cancellation only
 - [ ] Downloads settings route to existing local directory and parallel-download settings
 - [ ] Suwayomi server `downloadCount` is not used as KOReader-local availability
@@ -385,4 +385,4 @@ These are intentionally outside the client MVP:
 
 ## Current Next Step
 
-Implement the Downloads surface. The hub, grouped Settings, cached Browse entry, source-scoped download paths, API foundation, and Library surface are now in place. The next slice should expose the existing KOReader-local queue from the `Downloads` hub action, starting with active/queued/failed rows and retry/clear failed actions where the queue already supports them.
+Continue the Downloads surface. The hub action now exposes the existing KOReader-local queue with active, queued, and failed rows plus retry and clear-failed actions. The next slice should add queued cancellation or completed history only if the queue state supports it without broad queue changes.

@@ -362,6 +362,60 @@ describe("suwayomi_ui", function()
         assert.are.same({ "browse" }, selected)
     end)
 
+    it("shows downloads menu rows for active queued and failed items", function()
+        local ui = require("suwayomi_ui")
+        local retried_key
+        local cleared = false
+
+        ui.showDownloadsMenu({
+            active = {
+                {
+                    key = "m-active:144",
+                    state = "downloading",
+                    manga = { title = "Frieren" },
+                    chapter = { name = "Ch. 144" },
+                    progress = { current = 3, total = 24 },
+                },
+            },
+            queued = {
+                {
+                    key = "m-queued:192",
+                    state = "queued",
+                    manga = { title = "Dandadan" },
+                    chapter = { name = "Ch. 192" },
+                },
+            },
+            failed = {
+                {
+                    key = "m-failed:205",
+                    state = "failed",
+                    manga = { title = "Chainsaw Man" },
+                    chapter = { name = "Ch. 205" },
+                    progress = { error = "network timeout" },
+                },
+            },
+        }, {
+            onRetryFailed = function(job)
+                retried_key = job.key
+            end,
+            onClearFailed = function()
+                cleared = true
+            end,
+        })
+
+        assert.are.equal("Suwayomi Downloads", shown_dialog.title)
+        assert.are.equal("Downloading 3/24  Frieren / Ch. 144", shown_dialog.item_table[1].text)
+        assert.are.equal("Queued  Dandadan / Ch. 192", shown_dialog.item_table[2].text)
+        assert.are.equal("Failed  Chainsaw Man / Ch. 205 - network timeout", shown_dialog.item_table[3].text)
+        assert.are.equal("Clear failed", shown_dialog.item_table[4].text)
+
+        shown_dialog.item_table[3].callback()
+        shown_dialog.item_table[4].callback()
+
+        assert.are.equal("m-failed:205", retried_key)
+        assert.is_true(cleared)
+    end)
+
     it("passes the native settings menu instance to setting callbacks", function()
         local ui = require("suwayomi_ui")
         local callback_menu
