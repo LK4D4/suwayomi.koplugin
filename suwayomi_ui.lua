@@ -243,6 +243,27 @@ function SuwayomiUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
     return menu
 end
 
+function SuwayomiUI.updateLibraryMangaMenu(menu, manga_list, onSelectCallback, options)
+    if not menu then
+        return
+    end
+
+    local menu_table = {}
+    for _, manga in ipairs(manga_list or {}) do
+        table.insert(menu_table, {
+            text = manga.menu_text or manga.title,
+            callback = function()
+                if onSelectCallback then onSelectCallback(manga) end
+            end,
+        })
+    end
+    menu.item_table = menu_table
+    applyTitleBarOptions(menu, options)
+    if menu.updateItems then
+        menu:updateItems()
+    end
+end
+
 function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallback)
     local options = {}
     if type(chapter_list) == "table" and chapter_list.chapters then
@@ -339,6 +360,12 @@ function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
     }
     UIManager:show(dialog)
     return dialog
+end
+
+function SuwayomiUI.showMangaActionsMenu(options, onSelectCallback)
+    options = options or {}
+    options.title = options.title or _("Manga actions")
+    return SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
 end
 
 function SuwayomiUI.showConfirm(options)

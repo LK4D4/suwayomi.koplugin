@@ -1012,9 +1012,11 @@ return {
         assert.is_true(opened_library)
     end)
 
-    it("opens chapters and actions for manga selected from library", function()
+    it("opens shared manga actions for manga selected from library and can open chapters", function()
         local shown_library_manga
         local shown_chapter_menu_options
+        local shown_manga_actions
+        local shown_manga_actions_callback
 
         package.preload.suwayomi_api = function()
             return {
@@ -1028,6 +1030,7 @@ return {
                             {
                                 id = "m1",
                                 title = "Sousou no Frieren",
+                                in_library = true,
                                 unread_count = 1,
                                 source = { displayName = "MangaDex EN" },
                                 categories = { { id = "1", name = "Default" } },
@@ -1055,6 +1058,11 @@ return {
                     shown_chapter_menu_options = options
                     return { name = "chapter-menu" }
                 end,
+                showMangaActionsMenu = function(options, onSelect)
+                    shown_manga_actions = options
+                    shown_manga_actions_callback = onSelect
+                    return { name = "manga-actions-menu" }
+                end,
                 showHomeDialog = function(options)
                     home_dialog_options = options
                 end,
@@ -1072,10 +1080,79 @@ return {
         triggerHomeAction(plugin, "library")
 
         assert.are.equal("Sousou no Frieren (1 unread / MangaDex EN)", shown_library_manga[1].menu_text)
+        assert.are.equal("Sousou no Frieren", shown_manga_actions.title)
+        assert.are.equal("Open chapters", shown_manga_actions.actions[1].text)
+        assert.are.equal("Refresh chapters", shown_manga_actions.actions[2].text)
+        assert.are.equal("Remove from library", shown_manga_actions.actions[3].text)
+        assert.are.equal("Download first unread", shown_manga_actions.actions[4].text)
+        assert.are.equal("Download next 10 unread", shown_manga_actions.actions[5].text)
+        assert.are.equal("More...", shown_manga_actions.actions[6].text)
+        assert.is_nil(shown_chapter_menu_options)
+
+        shown_manga_actions_callback(shown_manga_actions.actions[1])
+
         assert.are.equal("Sousou no Frieren", plugin.current_chapter_context.manga.title)
         assert.are.equal("Ch. 1", plugin.current_chapter_context.chapters[1].name)
         assert.are.equal("Sousou no Frieren", shown_chapter_menu_options.title)
         assert.is_true(#shown_chapter_menu_options.chapters > 0)
+    end)
+
+    it("adds a browsed manga to the library through manga actions", function()
+        local update_calls = {}
+
+        package.preload.suwayomi_api = function()
+            return {
+                updateMangaLibraryState = function(_, manga_id, in_library)
+                    table.insert(update_calls, { manga_id = manga_id, in_library = in_library })
+                    return { ok = true, manga = { id = manga_id, in_library = in_library } }
+                end,
+            }
+        end
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren", in_library = false }
+
+        assert.is_true(plugin:performMangaAction(manga, "add_to_library"))
+
+        assert.are.same({ { manga_id = "m1", in_library = true } }, update_calls)
+        assert.is_true(manga.in_library)
+        assert.are.equal("Added to library.", shown_messages[#shown_messages])
+    end)
+
+    it("confirms before removing a manga from the library through manga actions", function()
+        local update_calls = {}
+
+        package.preload.suwayomi_api = function()
+            return {
+                updateMangaLibraryState = function(_, manga_id, in_library)
+                    table.insert(update_calls, { manga_id = manga_id, in_library = in_library })
+                    return { ok = true, manga = { id = manga_id, in_library = in_library } }
+                end,
+            }
+        end
+        package.preload.suwayomi_ui = function()
+            return {
+                showConfirm = function(options)
+                    shown_confirm = options
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren", in_library = true }
+
+        assert.is_true(plugin:performMangaAction(manga, "remove_from_library"))
+        assert.are.equal("Remove Sousou no Frieren from your Suwayomi library?", shown_confirm.text)
+        assert.are.equal(0, #update_calls)
+
+        shown_confirm.ok_callback()
+
+        assert.are.same({ { manga_id = "m1", in_library = false } }, update_calls)
+        assert.is_false(manga.in_library)
+        assert.are.equal("Removed from library.", shown_messages[#shown_messages])
     end)
 
     it("opens the downloads menu from the top-level entry", function()

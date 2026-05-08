@@ -951,6 +951,229 @@ function SuwayomiPlugin:showChaptersForManga(manga)
     end)
 end
 
+function SuwayomiPlugin:canOpenFirstUnreadMangaChapter(manga)
+    local chapter = manga and manga.first_unread_chapter
+    return chapter
+        and (
+            chapter.local_path ~= nil
+            or chapter.download_path ~= nil
+            or chapter.path ~= nil
+        )
+end
+
+function SuwayomiPlugin:getMangaActions(manga)
+    local actions = {
+        { id = "open_chapters", text = _("Open chapters") },
+    }
+
+    if self:canOpenFirstUnreadMangaChapter(manga) then
+        table.insert(actions, { id = "open_first_unread", text = _("Open first unread") })
+    end
+
+    table.insert(actions, { id = "refresh_chapters", text = _("Refresh chapters") })
+    if manga and manga.in_library == true then
+        table.insert(actions, { id = "remove_from_library", text = _("Remove from library") })
+    else
+        table.insert(actions, { id = "add_to_library", text = _("Add to library") })
+    end
+    table.insert(actions, { id = "download_first_unread", text = _("Download first unread") })
+    table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
+    table.insert(actions, { id = "more", text = _("More...") })
+
+    return actions
+end
+
+function SuwayomiPlugin:getMoreMangaActions()
+    return {
+        { id = "download_next_5_unread", text = _("Download next 5 unread") },
+        { id = "download_next_50_unread", text = _("Download next 50 unread") },
+        { id = "download_all_unread", text = _("Download all unread") },
+        { id = "download_all_chapters", text = _("Download all chapters") },
+        { id = "keep_downloaded", text = _("Keep downloaded") },
+        { id = "delete_read_downloads", text = _("Delete read downloads") },
+    }
+end
+
+function SuwayomiPlugin:showMangaActions(manga, options)
+    options = options or {}
+    if not SuwayomiUI.showMangaActionsMenu then
+        return self:showChaptersForManga(manga)
+    end
+
+    return SuwayomiUI.showMangaActionsMenu({
+        title = manga and (manga.title or tostring(manga.id)) or _("Manga actions"),
+        actions = self:getMangaActions(manga),
+    }, function(action)
+        if action then
+            self:performMangaAction(manga, action.id, options)
+        end
+    end)
+end
+
+function SuwayomiPlugin:showMoreMangaActions(manga, options)
+    options = options or {}
+    if not SuwayomiUI.showMangaActionsMenu then
+        return false
+    end
+
+    SuwayomiUI.showMangaActionsMenu({
+        title = _("More manga actions"),
+        actions = self:getMoreMangaActions(manga),
+    }, function(action)
+        if action then
+            self:performMangaAction(manga, action.id, options)
+        end
+    end)
+    return true
+end
+
+function SuwayomiPlugin:updateMangaFromLibraryStateResponse(manga, updated_manga, in_library)
+    if type(manga) ~= "table" then
+        return
+    end
+    manga.in_library = in_library == true
+    if type(updated_manga) == "table" then
+        for key, value in pairs(updated_manga) do
+            manga[key] = value
+        end
+        manga.in_library = updated_manga.in_library
+        if manga.in_library == nil then
+            manga.in_library = in_library == true
+        end
+    end
+    if self.getClient then
+        local client = self:getClient()
+        if client and client.formatLibraryMangaRow then
+            manga.menu_text = client:formatLibraryMangaRow(manga)
+        end
+    end
+end
+
+function SuwayomiPlugin:setMangaLibraryState(manga, in_library, options)
+    options = options or {}
+    if not manga or not manga.id then
+        self:showMessage(_("This manga cannot be updated right now."))
+        return false
+    end
+
+    local credentials = SuwayomiSettings:load()
+    local loading_key = in_library and "add-manga-library" or "remove-manga-library"
+    local loading_message = in_library and _("Adding to library...") or _("Removing from library...")
+    local result = self:withLoadingMessage(loading_key, loading_message, function()
+        return SuwayomiAPI.updateMangaLibraryState(credentials, manga.id, in_library)
+    end)
+    if not result then
+        return false
+    end
+    if not result.ok then
+        self:showMessage(_(result.error))
+        return false
+    end
+
+    self:updateMangaFromLibraryStateResponse(manga, result.manga, in_library)
+    if options.onMangaUpdated then
+        options.onMangaUpdated(manga)
+    end
+    if in_library then
+        self:showMessage(_("Added to library."))
+    else
+        self:showMessage(_("Removed from library."))
+    end
+    return true
+end
+
+function SuwayomiPlugin:addMangaToLibrary(manga, options)
+    return self:setMangaLibraryState(manga, true, options)
+end
+
+function SuwayomiPlugin:confirmRemoveMangaFromLibrary(manga, options)
+    options = options or {}
+    if not manga or not manga.id then
+        self:showMessage(_("This manga cannot be updated right now."))
+        return false
+    end
+
+    local callback = function()
+        self:setMangaLibraryState(manga, false, options)
+    end
+    if SuwayomiUI.showConfirm then
+        SuwayomiUI.showConfirm({
+            text = T(_("Remove %1 from your Suwayomi library?"), manga.title or tostring(manga.id)),
+            ok_text = _("Remove"),
+            ok_callback = callback,
+            cancel_text = _("Cancel"),
+        })
+    else
+        callback()
+    end
+    return true
+end
+
+function SuwayomiPlugin:refreshMangaChapters(manga)
+    if not manga or not manga.id then
+        self:showMessage(_("This manga cannot be refreshed right now."))
+        return false
+    end
+
+    local credentials = SuwayomiSettings:load()
+    local result = self:withLoadingMessage("refresh-manga", _("Refreshing chapters..."), function()
+        return SuwayomiAPI.refreshManga(credentials, manga.id)
+    end)
+    if result and not result.ok then
+        self:showMessage(_(result.error))
+        return false
+    end
+    if result and type(result.manga) == "table" then
+        for key, value in pairs(result.manga) do
+            manga[key] = value
+        end
+    end
+    return self:showChaptersForManga(manga)
+end
+
+function SuwayomiPlugin:showPendingMangaDownloadAction()
+    self:showMessage(_("Manga download actions are not available yet."))
+    return true
+end
+
+function SuwayomiPlugin:performMangaAction(manga, action_id, options)
+    options = options or {}
+    if action_id == "open_chapters" then
+        self:showChaptersForManga(manga)
+        return true
+    end
+    if action_id == "open_first_unread" then
+        if manga and manga.first_unread_chapter then
+            return self:openChapter(manga, manga.first_unread_chapter)
+        end
+        return false
+    end
+    if action_id == "refresh_chapters" then
+        return self:refreshMangaChapters(manga)
+    end
+    if action_id == "add_to_library" then
+        return self:addMangaToLibrary(manga, options)
+    end
+    if action_id == "remove_from_library" then
+        return self:confirmRemoveMangaFromLibrary(manga, options)
+    end
+    if action_id == "more" then
+        return self:showMoreMangaActions(manga, options)
+    end
+    if action_id == "download_first_unread"
+        or action_id == "download_next_10_unread"
+        or action_id == "download_next_5_unread"
+        or action_id == "download_next_50_unread"
+        or action_id == "download_all_unread"
+        or action_id == "download_all_chapters"
+        or action_id == "keep_downloaded"
+        or action_id == "delete_read_downloads"
+    then
+        return self:showPendingMangaDownloadAction()
+    end
+    return false
+end
+
 function SuwayomiPlugin:getChapterDownloadKey(manga, chapter)
     return self:getDownloadQueue():getKey(manga, chapter)
 end

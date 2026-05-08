@@ -11,6 +11,7 @@ describe("suwayomi_client", function()
         local loading_messages = {}
         local shown_messages = {}
         local opened_manga
+        local shown_manga_actions
         local scheduled_sync_credentials
         local log_events = {}
         local client = Client:new{
@@ -43,6 +44,9 @@ describe("suwayomi_client", function()
                 showChaptersForManga = function(_, manga)
                     opened_manga = manga
                 end,
+                showMangaActions = function(_, manga)
+                    shown_manga_actions = manga
+                end,
                 schedulePendingReadSync = function(_, credentials)
                     scheduled_sync_credentials = credentials
                 end,
@@ -61,6 +65,9 @@ describe("suwayomi_client", function()
             log_events = log_events,
             opened_manga = function()
                 return opened_manga
+            end,
+            shown_manga_actions = function()
+                return shown_manga_actions
             end,
             scheduled_sync_credentials = function()
                 return scheduled_sync_credentials
@@ -94,9 +101,9 @@ describe("suwayomi_client", function()
         }, manga.source)
     end)
 
-    it("loads manga for a source and opens the selected manga through the plugin", function()
+    it("loads manga for a source and opens the selected manga actions through the plugin", function()
         local Client = require("suwayomi_client")
-        local opened_manga
+        local shown_manga_actions
         local loading_messages = {}
         local log_events = {}
         local client = Client:new{
@@ -143,8 +150,8 @@ describe("suwayomi_client", function()
                 showMessage = function(_, message)
                     error("unexpected message: " .. tostring(message))
                 end,
-                showChaptersForManga = function(_, manga)
-                    opened_manga = manga
+                showMangaActions = function(_, manga)
+                    shown_manga_actions = manga
                 end,
                 getHomeMenuOptions = function()
                     return { title_bar_left_icon = "appbar.filebrowser" }
@@ -168,7 +175,7 @@ describe("suwayomi_client", function()
             displayName = "MangaDex (EN)",
             name = "MangaDex",
             lang = "en",
-        }, opened_manga.source)
+        }, shown_manga_actions.source)
         assert.are.equal("manga_loaded", log_events[1].event)
         assert.are.equal(1, log_events[1].manga_count)
     end)
@@ -239,7 +246,7 @@ describe("suwayomi_client", function()
         assert.is_nil(state.scheduled_sync_credentials())
     end)
 
-    it("skips the category picker for a single category and opens selected library manga", function()
+    it("skips the category picker for a single category and opens selected library manga actions", function()
         local shown_manga
         local shown_menu_options
         local client, state = newClient({
@@ -281,8 +288,58 @@ describe("suwayomi_client", function()
 
         assert.are.equal("Sousou no Frieren (12 unread / MangaDex EN)", shown_manga[1].menu_text)
         assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, shown_menu_options)
-        assert.are.equal("m1", state.opened_manga().id)
+        assert.are.equal("m1", state.shown_manga_actions().id)
         assert.are.equal("library_manga_loaded", state.log_events[#state.log_events].event)
+    end)
+
+    it("lets manga actions refresh the visible library row after membership changes", function()
+        local updated_manga
+        local updated_menu
+        local client = newClient({
+            api = {
+                fetchCategories = function()
+                    return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
+                end,
+                fetchLibraryManga = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            {
+                                id = "m1",
+                                title = "Sousou no Frieren",
+                                in_library = true,
+                                unread_count = 12,
+                                source = { displayName = "MangaDex EN" },
+                                categories = { { id = "1", name = "Default" } },
+                            },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showLibraryCategoryMenu = function()
+                    error("unexpected category menu")
+                end,
+                showLibraryMangaMenu = function(manga, onSelect)
+                    onSelect(manga[1])
+                    return { name = "library-menu" }
+                end,
+                updateLibraryMangaMenu = function(menu, manga)
+                    updated_menu = menu
+                    updated_manga = manga
+                end,
+            },
+        })
+
+        client.plugin.showMangaActions = function(_, manga, options)
+            manga.unread_count = 0
+            options.onMangaUpdated(manga)
+        end
+
+        client:showLibrary()
+
+        assert.are.equal("library-menu", updated_menu.name)
+        assert.are.equal("Sousou no Frieren (0 unread / MangaDex EN)", updated_manga[1].menu_text)
     end)
 
     it("shows categories when multiple categories are present and filters selected category manga", function()

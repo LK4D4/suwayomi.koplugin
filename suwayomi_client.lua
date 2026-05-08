@@ -180,9 +180,41 @@ function SuwayomiClient:showLibraryManga(category, credentials)
         return
     end
 
-    self.ui.showLibraryMangaMenu(self:withLibraryMenuText(manga), function(selected_manga)
-        self.plugin:showChaptersForManga(selected_manga)
+    local library_manga = self:withLibraryMenuText(manga)
+    local library_menu
+    local pending_library_menu_refresh = false
+    local function refreshLibraryMangaMenu()
+        self:withLibraryMenuText(library_manga)
+        if not library_menu then
+            pending_library_menu_refresh = true
+            return
+        end
+        if self.ui.updateLibraryMangaMenu then
+            self.ui.updateLibraryMangaMenu(library_menu, library_manga, function(selected_manga)
+                if self.plugin.showMangaActions then
+                    self.plugin:showMangaActions(selected_manga, {
+                        onMangaUpdated = refreshLibraryMangaMenu,
+                    })
+                else
+                    self.plugin:showChaptersForManga(selected_manga)
+                end
+            end, self:getHomeMenuOptions())
+        end
+    end
+
+    library_menu = self.ui.showLibraryMangaMenu(library_manga, function(selected_manga)
+        if self.plugin.showMangaActions then
+            self.plugin:showMangaActions(selected_manga, {
+                onMangaUpdated = refreshLibraryMangaMenu,
+            })
+        else
+            self.plugin:showChaptersForManga(selected_manga)
+        end
     end, self:getHomeMenuOptions())
+    if pending_library_menu_refresh then
+        pending_library_menu_refresh = false
+        refreshLibraryMangaMenu()
+    end
 end
 
 function SuwayomiClient:showLibrary()
@@ -258,7 +290,11 @@ function SuwayomiClient:showMangaForSource(source)
 
         self.ui.showMangaMenu(result.manga, function(manga)
             self:attachSourceToManga(manga, source)
-            self.plugin:showChaptersForManga(manga)
+            if self.plugin.showMangaActions then
+                self.plugin:showMangaActions(manga)
+            else
+                self.plugin:showChaptersForManga(manga)
+            end
         end, self:getHomeMenuOptions())
     end)
 end
