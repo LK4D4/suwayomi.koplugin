@@ -368,6 +368,23 @@ function DownloadQueue:clearStatus(manga, chapter, options)
     end
 end
 
+function DownloadQueue:jobArchiveExists(job, progress)
+    if not self.downloader or not self.downloader.chapterExists then
+        return false
+    end
+
+    local path = progress and progress.path
+    if path and path ~= "" and self.downloader:chapterExists(path) then
+        return true
+    end
+
+    if not job or not job.download_directory or not job.manga or not job.chapter or not self.downloader.getTargetPath then
+        return false
+    end
+    local _, chapter_path = self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter)
+    return self.downloader:chapterExists(chapter_path) == true
+end
+
 function DownloadQueue:cancelPending(manga, chapter)
     local key = self:getKey(manga, chapter)
     if self:getActiveJob(key) then
@@ -682,8 +699,12 @@ function DownloadQueue:recover()
             self:setStatus(recovered.manga, recovered.chapter, { state = "queued" })
             should_process = true
         elseif job.manga and job.chapter and job.state == "failed" then
-            table.insert(recovered_jobs, job)
-            self:setStatus(job.manga, job.chapter, { state = "failed" })
+            if self:jobArchiveExists(job, job.progress) then
+                self.statuses[job.key or self:getKey(job.manga, job.chapter)] = nil
+            else
+                table.insert(recovered_jobs, job)
+                self:setStatus(job.manga, job.chapter, { state = "failed" })
+            end
         end
     end
 
@@ -1010,6 +1031,13 @@ function DownloadQueue:poll()
                 os.remove(active.progress_path)
                 if progress and (progress.state == "downloaded" or progress.state == "skipped") then
                     self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
+                elseif progress and progress.state == "failed" and self:jobArchiveExists(active, progress) then
+                    self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
+                    self:setStatus(active.manga, active.chapter, {
+                        state = "downloaded",
+                        current = progress.current,
+                        total = progress.total,
+                    })
                 elseif progress and progress.state == "failed" then
                     local message = self:formatFailureMessage(
                         active.manga,

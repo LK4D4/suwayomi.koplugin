@@ -176,11 +176,27 @@ function Downloader:finalizeChapterArchive(job)
         }
     end
 
-    if not os.rename(job.partial_path, job.chapter_path) then
+    local renamed, rename_error = os.rename(job.partial_path, job.chapter_path)
+    if not renamed then
+        if self:chapterExists(job.chapter_path) then
+            self:cleanupPartialFile(job.partial_path)
+            return {
+                ok = true,
+                done = true,
+                skipped = true,
+                current = job.current,
+                total = #job.pages,
+                path = job.chapter_path,
+            }
+        end
         self:cleanupPartialFile(job.partial_path)
+        local error_message = "Could not finalize chapter archive."
+        if rename_error and tostring(rename_error) ~= "" then
+            error_message = error_message .. " " .. tostring(rename_error)
+        end
         return {
             ok = false,
-            error = "Could not finalize chapter archive.",
+            error = error_message,
             current = job.current,
             total = #job.pages,
             path = job.chapter_path,
@@ -260,7 +276,7 @@ function Downloader:downloadChapter(credentials, download_directory, manga, chap
         end
     until result.done
 
-    return { ok = true, path = start_result.path }
+    return { ok = true, skipped = result and result.skipped, path = start_result.path }
 end
 
 function Downloader:downloadChapterWithProgress(credentials, download_directory, manga, chapter, progress_path)
@@ -286,7 +302,7 @@ function Downloader:downloadChapterWithProgress(credentials, download_directory,
         end
         self:writeProgress(
             progress_path,
-            result.done and "downloaded" or "downloading",
+            result.skipped and "skipped" or (result.done and "downloaded" or "downloading"),
             result.current,
             result.total,
             result.path

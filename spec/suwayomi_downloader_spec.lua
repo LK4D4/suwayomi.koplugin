@@ -711,6 +711,86 @@ describe("suwayomi_downloader", function()
         assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
     end)
 
+    it("treats finalize rename failure as skipped when the target cbz already exists", function()
+        local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
+        local chapter_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
+        local removed_path
+        local rename_attempted = false
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchChapterPages = function()
+                    return {
+                        ok = true,
+                        chapter = { id = "398", name = "Official_Vol. 1 Ch. 1", manga_title = "Sousou no Frieren" },
+                        pages = { "/page/0" },
+                    }
+                end,
+                downloadBinary = function()
+                    return { ok = true, body = "page-one", content_type = "image/jpeg" }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if path == chapter_path and attribute == "mode" and rename_attempted then
+                        return "file"
+                    end
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function() return true end,
+                            addFileFromMemory = function() return true end,
+                            close = function() end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_rename = os.rename
+        os.rename = function()
+            rename_attempted = true
+            return nil, "File exists"
+        end
+        local original_remove = os.remove
+        os.remove = function(path)
+            removed_path = path
+            return true
+        end
+
+        local downloader = require("suwayomi_downloader")
+        local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.rename = original_rename
+        os.remove = original_remove
+
+        assert.is_true(result.ok)
+        assert.is_true(result.skipped)
+        assert.are.equal(chapter_path, result.path)
+        assert.are.equal(partial_path, removed_path)
+    end)
+
     it("rejects empty downloaded page bodies", function()
         local removed_path
 
