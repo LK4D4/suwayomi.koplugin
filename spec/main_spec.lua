@@ -20,6 +20,8 @@ describe("suwayomi plugin", function()
     local downloads_menu_snapshot
     local downloads_menu_callbacks
     local downloads_menu_options
+    local downloads_actions_menu_options
+    local downloads_actions_menu_callback
     local directory_chooser_callback
     local directory_chooser_start_dir
     local saved_download_directory
@@ -53,6 +55,8 @@ describe("suwayomi plugin", function()
         downloads_menu_snapshot = nil
         downloads_menu_callbacks = nil
         downloads_menu_options = nil
+        downloads_actions_menu_options = nil
+        downloads_actions_menu_callback = nil
         directory_chooser_callback = nil
         directory_chooser_start_dir = nil
         saved_download_directory = nil
@@ -349,6 +353,11 @@ describe("suwayomi plugin", function()
                     downloads_menu_callbacks = callbacks
                     downloads_menu_options = options
                     return { name = "downloads-menu" }
+                end,
+                showChapterActionsMenu = function(options, onSelect)
+                    downloads_actions_menu_options = options
+                    downloads_actions_menu_callback = onSelect
+                    return { name = "downloads-actions-menu" }
                 end,
                 showSourcesMenu = function(sources, _, options)
                     shown_sources = sources
@@ -1082,8 +1091,54 @@ return {
 
         assert.are.equal(1, #downloads_menu_snapshot.queued)
         assert.are.equal("m-queued:192", downloads_menu_snapshot.queued[1].key)
-        assert.are.equal("appbar.filebrowser", downloads_menu_options.title_bar_left_icon)
+        assert.are.equal("appbar.menu", downloads_menu_options.title_bar_left_icon)
         assert.is_function(downloads_menu_options.on_title_bar_left_tap)
+
+        downloads_menu_options.on_title_bar_left_tap({ name = "downloads-menu" })
+
+        assert.are.equal("Suwayomi Downloads", downloads_actions_menu_options.title)
+        assert.are.equal("Suwayomi home", downloads_actions_menu_options.actions[1].text)
+        assert.are.equal("Cancel queued downloads", downloads_actions_menu_options.actions[2].text)
+        assert.is_nil(downloads_actions_menu_options.actions[3])
+
+        downloads_actions_menu_callback(downloads_actions_menu_options.actions[2])
+
+        assert.are.equal(0, #plugin:getDownloadQueue().items)
+        assert.are.equal("downloads-menu", closed_widgets[#closed_widgets].name)
+    end)
+
+    it("opens a queued download action button from a downloads row", function()
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+        local downloads_menu = { name = "downloads-menu" }
+
+        plugin:addToMainMenu(menu_items)
+        plugin:getDownloadQueue().items = {
+            {
+                key = "m-queued:192",
+                download_directory = "/books",
+                manga = { id = "m-queued", title = "Dandadan" },
+                chapter = { id = "192", name = "Ch. 192" },
+            },
+        }
+        plugin:getDownloadQueue():setStatus(
+            { id = "m-queued", title = "Dandadan" },
+            { id = "192", name = "Ch. 192" },
+            { state = "queued" }
+        )
+
+        triggerHomeAction(plugin, "downloads")
+        downloads_menu_callbacks.onSelectQueued(downloads_menu_snapshot.queued[1], downloads_menu)
+
+        assert.are.equal("Dandadan / Ch. 192", downloads_actions_menu_options.title)
+        assert.are.equal("Cancel queued download", downloads_actions_menu_options.actions[1].text)
+        assert.is_nil(downloads_actions_menu_options.actions[2])
+
+        downloads_actions_menu_callback(downloads_actions_menu_options.actions[1])
+
+        assert.are.equal(0, #plugin:getDownloadQueue().items)
+        assert.are.equal("downloads-menu", closed_widgets[#closed_widgets].name)
     end)
 
     it("shows a friendly message when downloads are empty", function()

@@ -400,6 +400,50 @@ function DownloadQueue:cancelPending(manga, chapter)
     return false, nil
 end
 
+function DownloadQueue:cancelQueued()
+    local canceled_keys = {}
+    local remaining_items = {}
+    local active_keys = {}
+
+    for key in pairs(self.active_jobs or {}) do
+        active_keys[key] = true
+    end
+
+    for _, item in ipairs(self.items or {}) do
+        local key = item.key or self:getKey(item.manga or {}, item.chapter or {})
+        if key and key ~= "" then
+            canceled_keys[key] = true
+        else
+            table.insert(remaining_items, item)
+        end
+    end
+    self.items = remaining_items
+
+    local remaining_jobs = {}
+    for _, job in ipairs(self:loadPersistentJobs()) do
+        local key = job.key or self:getKey(job.manga or {}, job.chapter or {})
+        if job.state == "queued" and not active_keys[key] then
+            if key and key ~= "" then
+                canceled_keys[key] = true
+            end
+        else
+            table.insert(remaining_jobs, job)
+        end
+    end
+
+    local canceled = 0
+    for key in pairs(canceled_keys) do
+        canceled = canceled + 1
+        self.statuses[key] = nil
+    end
+
+    if canceled > 0 then
+        self:savePersistentJobs(remaining_jobs)
+        self.onStatusChanged()
+    end
+    return canceled
+end
+
 function DownloadQueue:splitUtf8Chars(text)
     local chars = {}
     text = tostring(text or "")

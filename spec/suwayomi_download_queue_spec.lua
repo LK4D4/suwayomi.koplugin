@@ -825,6 +825,79 @@ describe("suwayomi_download_queue", function()
         assert.are.equal("failed", context.queue:getStatus(manga, chapter).state)
     end)
 
+    it("cancels all queued downloads without clearing active or failed jobs", function()
+        local active_manga = { id = "m-active", title = "Frieren" }
+        local active_chapter = { id = "144", name = "Ch. 144" }
+        local queued_manga = { id = "m-queued", title = "Dandadan" }
+        local queued_chapter = { id = "192", name = "Ch. 192" }
+        local failed_manga = { id = "m-failed", title = "Chainsaw Man" }
+        local failed_chapter = { id = "205", name = "Ch. 205" }
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m-active:144",
+                    state = "downloading",
+                    download_directory = "/books",
+                    manga = active_manga,
+                    chapter = active_chapter,
+                },
+                {
+                    key = "m-queued:192",
+                    state = "queued",
+                    download_directory = "/books",
+                    manga = queued_manga,
+                    chapter = queued_chapter,
+                },
+                {
+                    key = "m-failed:205",
+                    state = "failed",
+                    download_directory = "/books",
+                    manga = failed_manga,
+                    chapter = failed_chapter,
+                },
+            },
+        })
+        context.queue:recover()
+        context.queue.items = {
+            {
+                key = "m-queued:192",
+                state = "queued",
+                download_directory = "/books",
+                manga = queued_manga,
+                chapter = queued_chapter,
+            },
+        }
+        context.queue:setActiveJob({
+            key = "m-active:144",
+            state = "downloading",
+            download_directory = "/books",
+            manga = active_manga,
+            chapter = active_chapter,
+        })
+        context.queue:setStatus(active_manga, active_chapter, {
+            state = "downloading",
+            current = 7,
+            total = 24,
+            path = "/books/Frieren/Ch. 144.cbz.part",
+        })
+
+        local cancelled = context.queue:cancelQueued()
+
+        assert.are.equal(1, cancelled)
+        assert.are.equal(0, #context.queue.items)
+        assert.is_nil(context.queue:getStatus(queued_manga, queued_chapter))
+        assert.are.same({
+            state = "downloading",
+            current = 7,
+            total = 24,
+            path = "/books/Frieren/Ch. 144.cbz.part",
+        }, context.queue:getStatus(active_manga, active_chapter))
+        assert.are.equal("failed", context.queue:getStatus(failed_manga, failed_chapter).state)
+        assert.are.equal(2, #context.saved_queue())
+        assert.are.equal("m-active:144", context.saved_queue()[1].key)
+        assert.are.equal("m-failed:205", context.saved_queue()[2].key)
+    end)
+
     it("requeues interrupted persistent downloads on recovery", function()
         local context = build_queue({
             saved_queue = {

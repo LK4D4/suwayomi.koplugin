@@ -217,6 +217,74 @@ function SuwayomiPlugin:closeMenu(menu)
     end
 end
 
+function SuwayomiPlugin:getDownloadJobTitle(job)
+    local manga_title = job and job.manga and job.manga.title or nil
+    local chapter_name = job and job.chapter and job.chapter.name or nil
+    if manga_title and manga_title ~= "" and chapter_name and chapter_name ~= "" then
+        return manga_title .. " / " .. chapter_name
+    end
+    return manga_title or chapter_name or tostring(job and job.key or "")
+end
+
+function SuwayomiPlugin:showDownloadsActions(menu, snapshot)
+    if not SuwayomiUI.showChapterActionsMenu then
+        self:closeMenu(menu)
+        self:showHome()
+        return
+    end
+
+    local actions = {
+        { id = "home", text = _("Suwayomi home") },
+    }
+    if #(snapshot.queued or {}) > 0 then
+        table.insert(actions, { id = "cancel_queued", text = _("Cancel queued downloads") })
+    end
+    if #(snapshot.failed or {}) > 0 then
+        table.insert(actions, { id = "clear_failed", text = _("Clear failed") })
+    end
+
+    SuwayomiUI.showChapterActionsMenu({
+        title = _("Suwayomi Downloads"),
+        actions = actions,
+    }, function(action)
+        if not action then
+            return
+        end
+        local queue = self:getDownloadQueue()
+        if action.id == "home" then
+            self:closeMenu(menu)
+            self:showHome()
+        elseif action.id == "cancel_queued" then
+            queue:cancelQueued()
+            self:closeMenu(menu)
+            self:showDownloads()
+        elseif action.id == "clear_failed" then
+            queue:clearFailed()
+            self:closeMenu(menu)
+            self:showDownloads()
+        end
+    end)
+end
+
+function SuwayomiPlugin:showQueuedDownloadActions(job, menu)
+    if not SuwayomiUI.showChapterActionsMenu then
+        return
+    end
+
+    SuwayomiUI.showChapterActionsMenu({
+        title = self:getDownloadJobTitle(job),
+        actions = {
+            { id = "cancel_queued", text = _("Cancel queued download") },
+        },
+    }, function(action)
+        if action and action.id == "cancel_queued" then
+            self:getDownloadQueue():cancelPending(job.manga, job.chapter)
+            self:closeMenu(menu)
+            self:showDownloads()
+        end
+    end)
+end
+
 function SuwayomiPlugin:showDownloads()
     local queue = self:getDownloadQueue()
     local snapshot = queue:getSnapshot()
@@ -226,6 +294,9 @@ function SuwayomiPlugin:showDownloads()
     end
 
     return SuwayomiUI.showDownloadsMenu(snapshot, {
+        onSelectQueued = function(job, menu)
+            self:showQueuedDownloadActions(job, menu)
+        end,
         onRetryFailed = function(job, menu)
             local ok = queue:retryFailed(job.key)
             self:closeMenu(menu)
@@ -242,7 +313,13 @@ function SuwayomiPlugin:showDownloads()
             self:showMessage(T(_("Cleared %1 failed downloads."), cleared), { timeout = 2 })
             self:showDownloads()
         end,
-    }, self:getHomeMenuOptions())
+    }, {
+        title_bar_left_icon = "appbar.menu",
+        on_title_bar_left_tap = function(menu)
+            self:showDownloadsActions(menu, snapshot)
+            return true
+        end,
+    })
 end
 
 function SuwayomiPlugin:showLibrarySettings(touchmenu_instance)

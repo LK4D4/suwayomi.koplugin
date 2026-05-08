@@ -364,6 +364,7 @@ describe("suwayomi_ui", function()
 
     it("shows downloads menu rows for active queued and failed items", function()
         local ui = require("suwayomi_ui")
+        local cancelled_key
         local retried_key
         local cleared = false
 
@@ -395,6 +396,9 @@ describe("suwayomi_ui", function()
                 },
             },
         }, {
+            onSelectQueued = function(job)
+                cancelled_key = job.key
+            end,
             onRetryFailed = function(job)
                 retried_key = job.key
             end,
@@ -409,9 +413,11 @@ describe("suwayomi_ui", function()
         assert.are.equal("Failed  Chainsaw Man / Ch. 205 - network timeout", shown_dialog.item_table[3].text)
         assert.are.equal("Clear failed", shown_dialog.item_table[4].text)
 
+        shown_dialog.item_table[2].callback()
         shown_dialog.item_table[3].callback()
         shown_dialog.item_table[4].callback()
 
+        assert.are.equal("m-queued:192", cancelled_key)
         assert.are.equal("m-failed:205", retried_key)
         assert.is_true(cleared)
     end)

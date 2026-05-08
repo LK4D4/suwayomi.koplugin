@@ -516,6 +516,11 @@ function SuwayomiUI.buildDownloadsMenuTable(snapshot, callbacks)
     for _, job in ipairs(snapshot.queued or {}) do
         table.insert(menu_table, {
             text = shortenMenuText("Queued  " .. formatDownloadJobLabel(job)),
+            callback = function(menu)
+                if callbacks.onSelectQueued then
+                    callbacks.onSelectQueued(job, menu)
+                end
+            end,
         })
     end
 
