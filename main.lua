@@ -302,7 +302,11 @@ function SuwayomiPlugin:showQueuedDownloadActions(job, menu)
             self:showDownloads()
         elseif action and action.id == "open_chapter_list" then
             self:closeMenu(menu)
-            self:showChaptersForManga(job.manga)
+            self:showMangaActions(job.manga, {
+                onMangaUpdated = function()
+                    self:showDownloads()
+                end,
+            })
         end
     end)
 end
@@ -1434,7 +1438,7 @@ end
 
 function SuwayomiPlugin:getSelectedChapters(manga, chapters)
     local selected = {}
-    for _, chapter in ipairs(chapters or {}) do
+    for _, chapter in ipairs(self:getVisibleChapters(chapters)) do
         if self:isChapterSelected(manga, chapter) then
             table.insert(selected, chapter)
         end
@@ -2554,7 +2558,7 @@ function SuwayomiPlugin:getBulkChapterActions()
         return actions
     end
 
-    if self.current_chapter_context and #(self.current_chapter_context.chapters or {}) > 0 then
+    if self.current_chapter_context and #(self:getVisibleChapters(self.current_chapter_context.chapters or {})) > 0 then
         table.insert(actions, { id = "select_all", text = _("Select all") })
     end
 
@@ -2691,7 +2695,7 @@ end
 
 function SuwayomiPlugin:getNextUnreadChaptersForDownload(manga, limit)
     local chapters = {}
-    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+    for _, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
         if self:canQueueChapterDownload(manga, chapter) then
             table.insert(chapters, chapter)
             if #chapters >= limit then
@@ -2706,7 +2710,7 @@ function SuwayomiPlugin:getUnreadDownloadBufferCandidates(manga, limit)
     local missing = {}
     local unread_count = 0
 
-    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+    for _, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
         if chapter.is_read ~= true then
             unread_count = unread_count + 1
             if not self:isChapterDownloadAvailable(manga, chapter) then
@@ -2736,7 +2740,7 @@ end
 
 function SuwayomiPlugin:getReadChaptersFromCurrentContext()
     local read_chapters = {}
-    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+    for _, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
         if chapter.is_read == true then
             table.insert(read_chapters, chapter)
         end

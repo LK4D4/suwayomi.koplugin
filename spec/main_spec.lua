@@ -1294,6 +1294,54 @@ return {
         assert.is_true(#shown_chapter_menu_options.chapters > 0)
     end)
 
+    it("opens shared manga actions from a queued download chapter-list action", function()
+        local shown_download_actions
+        local shown_download_actions_callback
+        local shown_manga_actions
+        local closed_menu
+
+        package.preload.suwayomi_ui = function()
+            return {
+                showChapterActionsMenu = function(options, onSelect)
+                    shown_download_actions = options
+                    shown_download_actions_callback = onSelect
+                end,
+                showMangaActionsMenu = function(options)
+                    shown_manga_actions = options
+                end,
+                showChapterMenu = function() end,
+            }
+        end
+        package.preload.suwayomi_api = function()
+            return {
+                fetchChaptersForManga = function()
+                    return { ok = true, chapters = { { id = "398", name = "Ch. 1" } } }
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_ui = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local downloads_menu = { name = "downloads-menu" }
+        plugin.closeMenu = function(_, menu)
+            closed_menu = menu
+        end
+
+        plugin:showQueuedDownloadActions({
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapter = { id = "398", name = "Ch. 1" },
+        }, downloads_menu)
+        shown_download_actions_callback(shown_download_actions.actions[2])
+
+        assert.are.equal(downloads_menu, closed_menu)
+        assert.is_table(shown_manga_actions)
+        assert.are.equal("Sousou no Frieren", shown_manga_actions.title)
+        assert.are.equal("Open chapters", shown_manga_actions.actions[1].text)
+    end)
+
     it("adds a browsed manga to the library through manga actions", function()
         local update_calls = {}
 
@@ -3481,6 +3529,48 @@ return {
         assert.are.equal(4, #shown_chapter_menu.chapters)
     end)
 
+    it("queues next unread downloads only from the active scanlator filter", function()
+        local saved_queue = {}
+
+        install_bulk_downloader_stub()
+        install_bulk_confirmation_ui_stub()
+        install_bulk_download_settings(saved_queue)
+
+        local plugin = load_plugin_with_chapters({
+            { id = "398", name = "Ch. 1", scanlator = "Sense Scans", is_read = false },
+            { id = "399", name = "Ch. 2", scanlator = "Flame Scans", is_read = false },
+            { id = "400", name = "Ch. 3", scanlator = "Sense Scans", is_read = false },
+        })
+        plugin.current_scanlator_filter = "Sense Scans"
+
+        assert.is_true(plugin:performBulkChapterAction("download_next_5_unread"))
+
+        assert.are.equal(2, #saved_queue)
+        assert.are.equal("398", saved_queue[1].chapter.id)
+        assert.are.equal("400", saved_queue[2].chapter.id)
+    end)
+
+    it("keeps next unread downloads only from the active scanlator filter", function()
+        local saved_queue = {}
+
+        install_bulk_downloader_stub()
+        install_bulk_confirmation_ui_stub()
+        install_bulk_download_settings(saved_queue)
+
+        local plugin = load_plugin_with_chapters({
+            { id = "398", name = "Ch. 1", scanlator = "Sense Scans", is_read = false },
+            { id = "399", name = "Ch. 2", scanlator = "Flame Scans", is_read = false },
+            { id = "400", name = "Ch. 3", scanlator = "Sense Scans", is_read = false },
+        })
+        plugin.current_scanlator_filter = "Sense Scans"
+
+        assert.is_true(plugin:performBulkChapterAction("keep_next_5_unread"))
+
+        assert.are.equal(2, #saved_queue)
+        assert.are.equal("398", saved_queue[1].chapter.id)
+        assert.are.equal("400", saved_queue[2].chapter.id)
+    end)
+
     it("queues the next unread chapter downloads and skips unavailable chapters", function()
         local saved_queue = {}
 
@@ -4041,6 +4131,65 @@ return {
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", removed_paths[1])
     end)
 
+    it("deletes read downloads only from the active scanlator filter", function()
+        local removed_paths = {}
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "398",
+                chapter_name = "Ch. 1",
+                read = true,
+                path = "/books/Sousou no Frieren/Ch. 1.cbz",
+            },
+            ["m1:399"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "399",
+                chapter_name = "Ch. 2",
+                read = true,
+                path = "/books/Sousou no Frieren/Ch. 2.cbz",
+            },
+        }
+        local existing = {
+            ["/books/Sousou no Frieren/Ch. 1.cbz"] = true,
+            ["/books/Sousou no Frieren/Ch. 2.cbz"] = true,
+        }
+        local original_remove = os.remove
+
+        os.remove = function(path)
+            table.insert(removed_paths, path)
+            existing[path] = nil
+            return true
+        end
+
+        install_bulk_downloader_stub({
+            chapterExists = function(_, chapter_path)
+                return existing[chapter_path] == true
+            end,
+        })
+        install_bulk_confirmation_ui_stub()
+        install_bulk_download_settings({}, saved_ledger)
+
+        local plugin = load_plugin_with_chapters({
+            { id = "398", name = "Ch. 1", scanlator = "Sense Scans", is_read = true },
+            { id = "399", name = "Ch. 2", scanlator = "Flame Scans", is_read = true },
+        })
+        plugin.current_scanlator_filter = "Sense Scans"
+
+        assert.is_true(plugin:performBulkChapterAction("delete_read_downloaded"))
+        assert.are.equal("Delete downloaded files for 1 read chapter?", shown_confirm.text)
+
+        shown_confirm.ok_callback()
+        os.remove = original_remove
+
+        assert.are.equal("/books/Sousou no Frieren/Ch. 1.cbz", removed_paths[1])
+        assert.are.equal("/books/Sousou no Frieren/Ch. 1.sdr/metadata.cbz.lua", removed_paths[2])
+        assert.is_nil(removed_paths[5])
+        assert.is_nil(saved_ledger["m1:398"].path)
+        assert.are.equal("/books/Sousou no Frieren/Ch. 2.cbz", saved_ledger["m1:399"].path)
+    end)
+
     it("reports when there are no read chapters to delete", function()
         package.preload.suwayomi_settings = function()
             return {
@@ -4124,6 +4273,27 @@ return {
         assert.are.equal(2, #saved_queue)
         assert.is_false(plugin.selection_mode)
         assert.are.same({}, shown_messages)
+    end)
+
+    it("queues selected downloads only from the active scanlator filter", function()
+        local saved_queue = {}
+
+        install_bulk_downloader_stub()
+        install_bulk_confirmation_ui_stub()
+        install_bulk_download_settings(saved_queue)
+
+        local plugin = load_plugin_with_chapters({
+            { id = "398", name = "Ch. 1", scanlator = "Sense Scans", is_read = false },
+            { id = "399", name = "Ch. 2", scanlator = "Flame Scans", is_read = false },
+        })
+        plugin.current_scanlator_filter = "Sense Scans"
+        plugin.selected_chapters = { ["m1:398"] = true, ["m1:399"] = true }
+        plugin.selection_mode = true
+
+        assert.is_true(plugin:performBulkChapterAction("download_selected"))
+
+        assert.are.equal(1, #saved_queue)
+        assert.are.equal("398", saved_queue[1].chapter.id)
     end)
 
     it("shows a short-lived message when bulk download only skips chapters", function()
@@ -4479,6 +4649,62 @@ return {
         assert.is_false(plugin.selection_mode)
         assert.are.equal(1, menu_updates)
         assert.are.same({}, shown_messages)
+    end)
+
+    it("deletes selected downloads only from the active scanlator filter", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "398",
+                chapter_name = "Ch. 1",
+                path = "/books/Sousou no Frieren/Ch. 1.cbz",
+            },
+            ["m1:399"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "399",
+                chapter_name = "Ch. 2",
+                path = "/books/Sousou no Frieren/Ch. 2.cbz",
+            },
+        }
+        local existing = {
+            ["/books/Sousou no Frieren/Ch. 1.cbz"] = true,
+            ["/books/Sousou no Frieren/Ch. 2.cbz"] = true,
+        }
+        local removed_paths = {}
+        local original_remove = os.remove
+
+        os.remove = function(path)
+            table.insert(removed_paths, path)
+            existing[path] = nil
+            return true
+        end
+
+        install_bulk_downloader_stub({
+            chapterExists = function(_, chapter_path)
+                return existing[chapter_path] == true
+            end,
+        })
+        install_bulk_confirmation_ui_stub()
+        install_bulk_download_settings({}, saved_ledger)
+
+        local plugin = load_plugin_with_chapters({
+            { id = "398", name = "Ch. 1", scanlator = "Sense Scans" },
+            { id = "399", name = "Ch. 2", scanlator = "Flame Scans" },
+        })
+        plugin.current_scanlator_filter = "Sense Scans"
+        plugin.selected_chapters = { ["m1:398"] = true, ["m1:399"] = true }
+        plugin.selection_mode = true
+
+        assert.is_true(plugin:performBulkChapterAction("delete_selected"))
+        os.remove = original_remove
+
+        assert.are.equal("/books/Sousou no Frieren/Ch. 1.cbz", removed_paths[1])
+        assert.are.equal("/books/Sousou no Frieren/Ch. 1.sdr/metadata.cbz.lua", removed_paths[2])
+        assert.is_nil(removed_paths[5])
+        assert.is_nil(saved_ledger["m1:398"])
+        assert.are.equal("/books/Sousou no Frieren/Ch. 2.cbz", saved_ledger["m1:399"].path)
     end)
 
     it("cancels queued downloads and skips active downloads before bulk delete", function()
