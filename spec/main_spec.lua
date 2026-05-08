@@ -6619,6 +6619,210 @@ return {
         assert.is_nil(saved_ledger["m1:398"].pending_read_sync)
     end)
 
+    it("automatically deletes a read local download after KOReader closes it as finished when keep-next is enabled", function()
+        local saved_queue = {}
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "398",
+                chapter_name = "Ch. 1",
+                path = "/books/Sousou no Frieren/Ch. 1.cbz",
+                read = false,
+            },
+        }
+        local files = {
+            ["/books/Sousou no Frieren/Ch. 1.cbz"] = true,
+        }
+        local removed = {}
+        local original_remove = os.remove
+
+        os.remove = function(path)
+            table.insert(removed, path)
+            files[path] = nil
+            return true
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path)
+                    return chapter_path .. ".part"
+                end,
+                chapterExists = function(_, chapter_path)
+                    return files[chapter_path] == true
+                end,
+                downloadChapterWithProgress = function() end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadKeepNextUnreadDownloads = function() return 5 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{
+            ui = {
+                document = {
+                    file = "/books/Sousou no Frieren/Ch. 1.cbz",
+                },
+                doc_settings = {
+                    readSetting = function(_, key)
+                        if key == "summary" then
+                            return { status = "finished" }
+                        end
+                    end,
+                },
+            },
+        }
+        plugin.current_chapter_context = {
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapters = {
+                { id = "398", name = "Ch. 1", is_read = false },
+                { id = "399", name = "Ch. 2", is_read = false },
+            },
+        }
+
+        plugin:onCloseDocument()
+        os.remove = original_remove
+
+        assert.are.same({
+            "/books/Sousou no Frieren/Ch. 1.cbz",
+            "/books/Sousou no Frieren/Ch. 1.sdr/metadata.cbz.lua",
+            "/books/Sousou no Frieren/Ch. 1.sdr/metadata.cbz.lua.old",
+            "/books/Sousou no Frieren/Ch. 1.sdr",
+        }, removed)
+        assert.is_nil(files["/books/Sousou no Frieren/Ch. 1.cbz"])
+        assert.is_true(saved_ledger["m1:398"].read)
+        assert.is_nil(saved_ledger["m1:398"].path)
+        assert.is_true(plugin.current_chapter_context.chapters[1].is_read)
+        assert.are.equal("399", saved_queue[1].chapter.id)
+        assert.is_true(saved_ledger["m1:398"].pending_read_sync)
+    end)
+
+    it("keeps active downloads when KOReader closes the chapter as finished", function()
+        local saved_queue = {}
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "398",
+                chapter_name = "Ch. 1",
+                path = "/books/Sousou no Frieren/Ch. 1.cbz",
+                read = false,
+            },
+        }
+        local files = {
+            ["/books/Sousou no Frieren/Ch. 1.cbz"] = true,
+        }
+        local removed = {}
+        local original_remove = os.remove
+
+        os.remove = function(path)
+            table.insert(removed, path)
+            files[path] = nil
+            return true
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path)
+                    return chapter_path .. ".part"
+                end,
+                chapterExists = function(_, chapter_path)
+                    return files[chapter_path] == true
+                end,
+                downloadChapterWithProgress = function() end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadKeepNextUnreadDownloads = function() return 5 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{
+            ui = {
+                document = {
+                    file = "/books/Sousou no Frieren/Ch. 1.cbz",
+                },
+                doc_settings = {
+                    readSetting = function(_, key)
+                        if key == "summary" then
+                            return { status = "finished" }
+                        end
+                    end,
+                },
+            },
+        }
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Ch. 1", is_read = false }
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = { chapter },
+        }
+        plugin:getDownloadQueue():setStatus(manga, chapter, {
+            state = "downloading",
+            download_directory = "/books",
+        })
+
+        plugin:onCloseDocument()
+        os.remove = original_remove
+
+        assert.are.same({}, removed)
+        assert.is_true(files["/books/Sousou no Frieren/Ch. 1.cbz"])
+        assert.are.equal("/books/Sousou no Frieren/Ch. 1.cbz", saved_ledger["m1:398"].path)
+        assert.is_true(saved_ledger["m1:398"].read)
+        assert.are.equal("downloading", plugin:getDownloadQueue():getStatus(manga, chapter).state)
+    end)
+
     it("keeps a pending read sync when Suwayomi cannot be updated", function()
         local saved_ledger = {
             ["m1:398"] = {

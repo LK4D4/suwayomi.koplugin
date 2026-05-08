@@ -3496,16 +3496,20 @@ function SuwayomiPlugin:markLedgerEntryRead(entry)
 
     local ledger = self:loadChapterLedger()
     local key = tostring(entry.manga_id or "") .. ":" .. tostring(entry.chapter_id or "")
-    if not ledger[key] then
+    local ledger_entry = ledger[key]
+    if not ledger_entry or ledger_entry.read == true then
         return false
     end
 
-    ledger[key].read = true
-    ledger[key].pending_read_sync = true
-    ledger[key].pending_read_state = true
+    ledger_entry.read = true
+    ledger_entry.pending_read_sync = true
+    ledger_entry.pending_read_state = true
+    self:markCurrentContextChapterReadFromLedger(ledger_entry)
+    self:autoDeleteReadLocalDownloadFromLedgerEntry(ledger_entry, ledger)
     self:saveChapterLedger(ledger)
 
     self:schedulePendingReadSync()
+    self:applyKeepNextUnreadDownloadsPolicy()
     return true
 end
 
