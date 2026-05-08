@@ -905,6 +905,81 @@ return {
         assert.are.equal("400", saved_queue[2].chapter.id)
     end)
 
+    it("deletes source-scoped ledger paths directly after downloaded chapter reconciliation", function()
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "398",
+                chapter_name = "Ch. 1",
+                path = "/books/Local source/Sousou no Frieren/Ch. 1.cbz",
+                read = false,
+            },
+        }
+        local files = {
+            ["/books/Local source/Sousou no Frieren/Ch. 1.cbz"] = true,
+        }
+        local removed = {}
+        local original_remove = os.remove
+
+        os.remove = function(path)
+            table.insert(removed, path)
+            files[path] = nil
+            return true
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/Unknown source/" .. manga.title,
+                        download_directory .. "/Unknown source/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function(_, chapter_path)
+                    return files[chapter_path] == true
+                end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadKeepNextUnreadDownloads = function() return 5 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.isChapterPathFinishedInKoreader = function(_, path)
+            return path == "/books/Local source/Sousou no Frieren/Ch. 1.cbz"
+        end
+
+        plugin:reconcileDownloadedChapterLedger(saved_ledger)
+
+        os.remove = original_remove
+        assert.are.same({
+            "/books/Local source/Sousou no Frieren/Ch. 1.cbz",
+            "/books/Local source/Sousou no Frieren/Ch. 1.sdr/metadata.cbz.lua",
+            "/books/Local source/Sousou no Frieren/Ch. 1.sdr/metadata.cbz.lua.old",
+            "/books/Local source/Sousou no Frieren/Ch. 1.sdr",
+        }, removed)
+        assert.is_nil(files["/books/Local source/Sousou no Frieren/Ch. 1.cbz"])
+        assert.is_true(saved_ledger["m1:398"].read)
+        assert.is_nil(saved_ledger["m1:398"].path)
+    end)
+
     it("opens and saves the parallel downloads setting from the main menu", function()
         local saved_parallel_downloads
         package.preload.suwayomi_settings = function()

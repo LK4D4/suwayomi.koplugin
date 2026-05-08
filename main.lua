@@ -2298,7 +2298,6 @@ function SuwayomiPlugin:autoDeleteReadLocalDownloadFromLedgerEntry(entry, ledger
     if type(entry) ~= "table" or entry.read ~= true then
         return false, "unread"
     end
-
     local manga = {
         id = entry.manga_id,
         title = entry.manga_title,
@@ -2308,10 +2307,35 @@ function SuwayomiPlugin:autoDeleteReadLocalDownloadFromLedgerEntry(entry, ledger
         name = entry.chapter_name,
         is_read = true,
     }
-    return self:autoDeleteReadLocalDownload(manga, chapter, {
-        ledger = ledger,
-        skip_refresh = true,
-    })
+    local status = self:getDownloadQueue():getStatus(manga, chapter)
+    if status and status.state == "downloading" then
+        return false, "downloading"
+    end
+
+    local cancelled, queue_state = self:getDownloadQueue():cancelPending(manga, chapter)
+    if queue_state == "downloading" then
+        return false, "downloading"
+    end
+
+    local chapter_path = entry.path
+    if type(chapter_path) ~= "string" or chapter_path == "" then
+        return false, cancelled and "queued" or "missing"
+    end
+
+    local metadata_path = self:getKoreaderMetadataPathForDocument(chapter_path)
+    os.remove(chapter_path)
+    if metadata_path then
+        os.remove(metadata_path)
+        os.remove(metadata_path .. ".old")
+        local metadata_dir = metadata_path:match("^(.*)/[^/]+$")
+        if metadata_dir then
+            os.remove(metadata_dir)
+        end
+    end
+
+    entry.path = nil
+    self:getDownloadQueue():clearStatus(manga, chapter, { quiet = true })
+    return true, cancelled and "queued" or "deleted"
 end
 
 function SuwayomiPlugin:markChapterRead(manga, chapter, options)
