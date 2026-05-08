@@ -218,18 +218,18 @@ Goal: make the existing KOReader-local download queue inspectable and manageable
 - [x] Add top-level `Downloads` menu implementation
 - [x] Read active and queued items from `suwayomi_download_queue.lua`
 - [x] Surface failed items with last error where available
-- [ ] Surface completed history only if current state persists it or adding it is small
+- [x] Skip completed history because completed jobs are not persisted
 - [x] Add compact rows with status, manga title, and chapter name
 - [x] Add retry for failed local downloads
 - [x] Add clear failed
 - [x] Add cancel queued item when supported by the queue
-- [ ] Add clear completed history if completed history exists
+- [x] Skip clear completed history because completed history is not tracked
 - [x] Add open manga/chapter-list context for queue items when enough metadata exists
 - [x] Keep Suwayomi server downloader mutations out of this surface
-- [ ] Wire Downloads settings:
-  - KOReader download directory
-  - max parallel device downloads
-  - read-only source-scoped layout explanation
+- [x] Keep Downloads settings out of this surface by product choice:
+  - KOReader download directory remains under Settings -> Downloads
+  - max parallel device downloads remains under Settings -> Downloads
+  - source-scoped layout remains documented/read-only outside the queue screen
 
 Tests:
 
@@ -237,12 +237,12 @@ Tests:
 - [x] Failed rows expose retry
 - [x] Clear failed calls local queue cleanup only
 - [x] Cancel queued item calls local queue cancellation only
-- [ ] Downloads settings route to existing local directory and parallel-download settings
-- [ ] Suwayomi server `downloadCount` is not used as KOReader-local availability
+- [x] Skip Downloads settings routing because settings stay out of the queue screen
+- [x] Suwayomi server `downloadCount` is not used as KOReader-local availability
 
 Exit criteria:
 
-- A user can inspect the local queue, retry failed local downloads, and adjust local download settings without drilling into manga chapter lists first.
+- A user can inspect the local queue, retry failed local downloads, cancel queued local downloads, clear failed items, and jump from queued items back to manga context without drilling into manga chapter lists first. Download settings intentionally remain under Settings -> Downloads.
 
 ## Phase 6: Manga-Level Client Actions
 
