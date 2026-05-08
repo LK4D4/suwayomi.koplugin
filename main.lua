@@ -937,14 +937,60 @@ function SuwayomiPlugin:attachSourceToManga(manga, source)
     return self:getClient():attachSourceToManga(manga, source)
 end
 
+function SuwayomiPlugin:isMangaUninitialized(manga)
+    return manga and manga.initialized == false
+end
+
+function SuwayomiPlugin:applyMangaRefreshResult(manga, refreshed_manga)
+    if type(manga) ~= "table" or type(refreshed_manga) ~= "table" then
+        return manga
+    end
+    for key, value in pairs(refreshed_manga) do
+        manga[key] = value
+    end
+    return manga
+end
+
+function SuwayomiPlugin:refreshUninitializedMangaForChapters(manga)
+    if not self:isMangaUninitialized(manga) or not manga.id or not SuwayomiAPI.refreshManga then
+        return nil
+    end
+
+    local credentials = SuwayomiSettings:load()
+    local result = self:withLoadingMessage("refresh-manga", _("Refreshing chapters..."), function()
+        return SuwayomiAPI.refreshManga(credentials, manga.id)
+    end)
+    if not result then
+        return nil
+    end
+    if not result.ok then
+        self:showMessage(_(result.error))
+        return nil
+    end
+    if type(result.chapters) ~= "table" then
+        self:showMessage(_("Suwayomi server did not refresh manga."))
+        return nil
+    end
+
+    self:applyMangaRefreshResult(manga, result.manga)
+    return {
+        ok = true,
+        manga = manga,
+        chapters = result.chapters,
+    }
+end
+
 function SuwayomiPlugin:showChaptersForManga(manga)
     return SuwayomiDebug.time("showChaptersForManga", {
         manga_id = manga and manga.id,
     }, function()
-        local credentials = SuwayomiSettings:load()
-        local result = self:withLoadingMessage("chapters", _("Loading chapters..."), function()
-            return SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
-        end)
+        local result = self:refreshUninitializedMangaForChapters(manga)
+        if not result then
+            local credentials = SuwayomiSettings:load()
+            result = self:withLoadingMessage("chapters", _("Loading chapters..."), function()
+                return SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
+            end)
+        end
         if not result then
             return
         end
@@ -1160,10 +1206,13 @@ function SuwayomiPlugin:ensureMangaChapterContext(manga)
         return nil
     end
 
-    local credentials = SuwayomiSettings:load()
-    local result = self:withLoadingMessage("chapters", _("Loading chapters..."), function()
-        return SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
-    end)
+    local result = self:refreshUninitializedMangaForChapters(manga)
+    if not result then
+        local credentials = SuwayomiSettings:load()
+        result = self:withLoadingMessage("chapters", _("Loading chapters..."), function()
+            return SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
+        end)
+    end
     if not result then
         return nil
     end

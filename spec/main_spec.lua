@@ -1346,6 +1346,62 @@ return {
         assert.are.equal("m1", plugin.current_chapter_context.manga.id)
     end)
 
+    it("refreshes uninitialized manga before building manga action download context", function()
+        local saved_queue = {}
+        local refresh_calls = 0
+        local fetch_calls = 0
+        package.preload.suwayomi_api = function()
+            return {
+                refreshManga = function(_, manga_id)
+                    refresh_calls = refresh_calls + 1
+                    assert.are.equal("m1", manga_id)
+                    return {
+                        ok = true,
+                        manga = { id = "m1", title = "Sousou no Frieren refreshed", initialized = true },
+                        chapters = {
+                            { id = "398", name = "Ch. 1", is_read = true },
+                            { id = "399", name = "Ch. 2", is_read = false },
+                        },
+                    }
+                end,
+                fetchChaptersForManga = function()
+                    fetch_calls = fetch_calls + 1
+                    error("fetchChaptersForManga should not be used for uninitialized manga refresh")
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren", initialized = false }
+
+        assert.is_true(plugin:performMangaAction(manga, "download_first_unread"))
+
+        assert.are.equal(1, refresh_calls)
+        assert.are.equal(0, fetch_calls)
+        assert.are.equal("Sousou no Frieren refreshed", manga.title)
+        assert.are.equal("Sousou no Frieren refreshed", saved_queue[1].manga.title)
+        assert.are.equal("399", saved_queue[1].chapter.id)
+    end)
+
     it("opens the downloads menu from the top-level entry", function()
         local plugin_class = require("main")
         local menu_items = {}
@@ -2701,6 +2757,45 @@ return {
         assert.are.same({}, plugin.selected_chapters)
         assert.are.equal("Yotsuba&!", last_menu.title)
         assert.are.equal("Official_Vol. 1 Ch. 1", last_menu.chapters[1].menu_text)
+    end)
+
+    it("refreshes uninitialized manga before opening its chapter list", function()
+        local refresh_calls = 0
+        local fetch_calls = 0
+        package.preload.suwayomi_api = function()
+            return {
+                refreshManga = function(_, manga_id)
+                    refresh_calls = refresh_calls + 1
+                    assert.are.equal("m1", manga_id)
+                    return {
+                        ok = true,
+                        manga = { id = "m1", title = "Sousou no Frieren refreshed", initialized = true },
+                        chapters = {
+                            { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = false },
+                        },
+                    }
+                end,
+                fetchChaptersForManga = function()
+                    fetch_calls = fetch_calls + 1
+                    error("fetchChaptersForManga should not be used for uninitialized manga refresh")
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren", initialized = false }
+
+        plugin:showChaptersForManga(manga)
+
+        assert.are.equal(1, refresh_calls)
+        assert.are.equal(0, fetch_calls)
+        assert.are.equal("Sousou no Frieren refreshed", manga.title)
+        assert.are.equal("Sousou no Frieren refreshed", shown_chapter_menu_options.title)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu_options.chapters[1].menu_text)
     end)
 
     it("shows bulk actions for selected chapters and queues selected downloads", function()
