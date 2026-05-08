@@ -1114,6 +1114,22 @@ return {
     end)
 
     it("opens a queued download action button from a downloads row", function()
+        local server_api_called = false
+        package.preload.suwayomi_api = function()
+            return {
+                downloadChapter = function()
+                    server_api_called = true
+                    error("row-level queued cancel must not call server downloadChapter")
+                end,
+                mutateDownloadQueue = function()
+                    server_api_called = true
+                    error("row-level queued cancel must not call server mutateDownloadQueue")
+                end,
+            }
+        end
+        package.loaded.suwayomi_api = nil
+        package.loaded.main = nil
+
         local plugin_class = require("main")
         local menu_items = {}
         local plugin = plugin_class{}
@@ -1127,10 +1143,21 @@ return {
                 manga = { id = "m-queued", title = "Dandadan" },
                 chapter = { id = "192", name = "Ch. 192" },
             },
+            {
+                key = "m-queued:193",
+                download_directory = "/books",
+                manga = { id = "m-queued", title = "Dandadan" },
+                chapter = { id = "193", name = "Ch. 193" },
+            },
         }
         plugin:getDownloadQueue():setStatus(
             { id = "m-queued", title = "Dandadan" },
             { id = "192", name = "Ch. 192" },
+            { state = "queued" }
+        )
+        plugin:getDownloadQueue():setStatus(
+            { id = "m-queued", title = "Dandadan" },
+            { id = "193", name = "Ch. 193" },
             { state = "queued" }
         )
 
@@ -1143,8 +1170,55 @@ return {
 
         downloads_actions_menu_callback(downloads_actions_menu_options.actions[1])
 
-        assert.are.equal(0, #plugin:getDownloadQueue().items)
+        assert.is_false(server_api_called)
+        assert.are.equal(1, #plugin:getDownloadQueue().items)
+        assert.are.equal("m-queued:193", plugin:getDownloadQueue().items[1].key)
+        assert.is_nil(plugin:getDownloadQueue():getStatus(
+            { id = "m-queued", title = "Dandadan" },
+            { id = "192", name = "Ch. 192" }
+        ))
+        assert.are.equal("queued", plugin:getDownloadQueue():getStatus(
+            { id = "m-queued", title = "Dandadan" },
+            { id = "193", name = "Ch. 193" }
+        ).state)
         assert.are.equal("downloads-menu", closed_widgets[#closed_widgets].name)
+    end)
+
+    it("shows a message when a queued downloads row has already started", function()
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+        local downloads_menu = { name = "downloads-menu" }
+        local manga = { id = "m-queued", title = "Dandadan" }
+        local chapter = { id = "192", name = "Ch. 192" }
+
+        plugin:addToMainMenu(menu_items)
+        plugin:getDownloadQueue().items = {
+            {
+                key = "m-queued:192",
+                download_directory = "/books",
+                manga = manga,
+                chapter = chapter,
+            },
+        }
+        plugin:getDownloadQueue():setStatus(manga, chapter, { state = "queued" })
+
+        triggerHomeAction(plugin, "downloads")
+        downloads_menu_callbacks.onSelectQueued(downloads_menu_snapshot.queued[1], downloads_menu)
+
+        plugin:getDownloadQueue().items = {}
+        plugin:getDownloadQueue():setActiveJob({
+            key = "m-queued:192",
+            state = "downloading",
+            download_directory = "/books",
+            manga = manga,
+            chapter = chapter,
+        })
+        plugin:getDownloadQueue():setStatus(manga, chapter, { state = "downloading" })
+
+        downloads_actions_menu_callback(downloads_actions_menu_options.actions[1])
+
+        assert.are.equal("Download is already downloading.", shown_messages[#shown_messages])
     end)
 
     it("opens chapter list from queued download actions when manga metadata is available", function()

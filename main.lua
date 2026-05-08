@@ -230,6 +230,13 @@ function SuwayomiPlugin:canOpenDownloadJobChapterList(job)
     return job and job.manga and job.manga.id ~= nil and tostring(job.manga.id) ~= ""
 end
 
+function SuwayomiPlugin:formatCancelQueuedDownloadMessage(state)
+    if state == "downloading" then
+        return _("Download is already downloading.")
+    end
+    return _("Download is no longer queued.")
+end
+
 function SuwayomiPlugin:showDownloadsActions(menu, snapshot)
     if not SuwayomiUI.showChapterActionsMenu then
         self:closeMenu(menu)
@@ -287,8 +294,11 @@ function SuwayomiPlugin:showQueuedDownloadActions(job, menu)
         actions = actions,
     }, function(action)
         if action and action.id == "cancel_queued" then
-            self:getDownloadQueue():cancelPending(job.manga, job.chapter)
+            local cancelled, state = self:getDownloadQueue():cancelPending(job.manga, job.chapter)
             self:closeMenu(menu)
+            if not cancelled then
+                self:showMessage(self:formatCancelQueuedDownloadMessage(state), { timeout = 2 })
+            end
             self:showDownloads()
         elseif action and action.id == "open_chapter_list" then
             self:closeMenu(menu)

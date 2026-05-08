@@ -378,16 +378,21 @@ describe("suwayomi_download_queue", function()
         local context = build_queue({ subprocess_done = false })
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+        local other_chapter = { id = "399", name = "Official_Vol. 1 Ch. 2" }
 
         assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
+        assert.is_true(context.queue:enqueue(manga, other_chapter, "/books"))
 
         local cancelled, state = context.queue:cancelPending(manga, chapter)
 
         assert.is_true(cancelled)
         assert.are.equal("queued", state)
-        assert.are.same({}, context.saved_queue())
+        assert.are.equal(1, #context.saved_queue())
+        assert.are.equal("m1:399", context.saved_queue()[1].key)
         assert.is_nil(context.queue:getStatus(manga, chapter))
-        assert.are.equal(0, #context.queue.items)
+        assert.are.equal("queued", context.queue:getStatus(manga, other_chapter).state)
+        assert.are.equal(1, #context.queue.items)
+        assert.are.equal("m1:399", context.queue.items[1].key)
     end)
 
     it("batch enqueues multiple chapters with one persistence write and process schedule", function()

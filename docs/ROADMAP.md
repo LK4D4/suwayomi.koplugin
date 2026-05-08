@@ -222,10 +222,10 @@ Goal: make the existing KOReader-local download queue inspectable and manageable
 - [x] Add compact rows with status, manga title, and chapter name
 - [x] Add retry for failed local downloads
 - [x] Add clear failed
-- [ ] Add cancel queued item when supported by the queue
+- [x] Add cancel queued item when supported by the queue
 - [ ] Add clear completed history if completed history exists
 - [x] Add open manga/chapter-list context for queue items when enough metadata exists
-- [ ] Keep Suwayomi server downloader mutations out of this surface
+- [x] Keep Suwayomi server downloader mutations out of this surface
 - [ ] Wire Downloads settings:
   - KOReader download directory
   - max parallel device downloads
@@ -236,7 +236,7 @@ Tests:
 - [x] Downloads menu groups active, queued, and failed items where state exists
 - [x] Failed rows expose retry
 - [x] Clear failed calls local queue cleanup only
-- [ ] Cancel queued item calls local queue cancellation only
+- [x] Cancel queued item calls local queue cancellation only
 - [ ] Downloads settings route to existing local directory and parallel-download settings
 - [ ] Suwayomi server `downloadCount` is not used as KOReader-local availability
 
