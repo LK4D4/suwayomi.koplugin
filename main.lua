@@ -953,7 +953,7 @@ end
 
 function SuwayomiPlugin:refreshUninitializedMangaForChapters(manga)
     if not self:isMangaUninitialized(manga) or not manga.id or not SuwayomiAPI.refreshManga then
-        return nil
+        return nil, false
     end
 
     local credentials = SuwayomiSettings:load()
@@ -961,15 +961,15 @@ function SuwayomiPlugin:refreshUninitializedMangaForChapters(manga)
         return SuwayomiAPI.refreshManga(credentials, manga.id)
     end)
     if not result then
-        return nil
+        return nil, true
     end
     if not result.ok then
         self:showMessage(_(result.error))
-        return nil
+        return nil, true
     end
     if type(result.chapters) ~= "table" then
         self:showMessage(_("Suwayomi server did not refresh manga."))
-        return nil
+        return nil, true
     end
 
     self:applyMangaRefreshResult(manga, result.manga)
@@ -977,15 +977,18 @@ function SuwayomiPlugin:refreshUninitializedMangaForChapters(manga)
         ok = true,
         manga = manga,
         chapters = result.chapters,
-    }
+    }, true
 end
 
 function SuwayomiPlugin:showChaptersForManga(manga)
     return SuwayomiDebug.time("showChaptersForManga", {
         manga_id = manga and manga.id,
     }, function()
-        local result = self:refreshUninitializedMangaForChapters(manga)
-        if not result then
+        local result, refresh_attempted = self:refreshUninitializedMangaForChapters(manga)
+        if not result and refresh_attempted then
+            return
+        end
+        if not result and not refresh_attempted then
             local credentials = SuwayomiSettings:load()
             result = self:withLoadingMessage("chapters", _("Loading chapters..."), function()
                 return SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
@@ -1206,8 +1209,11 @@ function SuwayomiPlugin:ensureMangaChapterContext(manga)
         return nil
     end
 
-    local result = self:refreshUninitializedMangaForChapters(manga)
-    if not result then
+    local result, refresh_attempted = self:refreshUninitializedMangaForChapters(manga)
+    if not result and refresh_attempted then
+        return nil
+    end
+    if not result and not refresh_attempted then
         local credentials = SuwayomiSettings:load()
         result = self:withLoadingMessage("chapters", _("Loading chapters..."), function()
             return SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
@@ -1856,6 +1862,63 @@ function SuwayomiPlugin:loadKoreaderHistoryPaths()
     return paths
 end
 
+function SuwayomiPlugin:markCurrentContextChapterReadFromLedger(entry)
+    if not self.current_chapter_context or type(entry) ~= "table" or entry.read ~= true then
+        return false
+    end
+
+    local context = self.current_chapter_context
+    local manga = context.manga or {}
+    if entry.manga_id and tostring(manga.id or "") ~= tostring(entry.manga_id) then
+        return false
+    end
+
+    for _, chapter in ipairs(context.chapters or {}) do
+        local same_id = entry.chapter_id and tostring(chapter.id or "") == tostring(entry.chapter_id)
+        local same_name = entry.chapter_name and tostring(chapter.name or "") == tostring(entry.chapter_name)
+        if same_id or same_name then
+            chapter.is_read = true
+            return true
+        end
+    end
+    return false
+end
+
+function SuwayomiPlugin:getKeepNextUnreadDownloadsPolicyLimit()
+    if not SuwayomiSettings.loadKeepNextUnreadDownloads then
+        return 0
+    end
+    local limit = tonumber(SuwayomiSettings:loadKeepNextUnreadDownloads()) or 0
+    if limit == 5 or limit == 10 or limit == 50 then
+        return limit
+    end
+    return 0
+end
+
+function SuwayomiPlugin:applyKeepNextUnreadDownloadsPolicy()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local limit = self:getKeepNextUnreadDownloadsPolicyLimit()
+    if limit <= 0 then
+        return 0
+    end
+
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local chapters = self:getUnreadDownloadBufferCandidates(manga, limit)
+    if #chapters == 0 then
+        return 0
+    end
+
+    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+end
+
 function SuwayomiPlugin:reconcileDownloadedChapterLedger(ledger)
     ledger = ledger or self:loadChapterLedger()
     local history_paths = self:loadKoreaderHistoryPaths()
@@ -1872,12 +1935,14 @@ function SuwayomiPlugin:reconcileDownloadedChapterLedger(ledger)
                 entry.pending_read_state = true
                 changed = true
                 read_count = read_count + 1
+                self:markCurrentContextChapterReadFromLedger(entry)
             end
         end
     end
 
     if changed then
         self:saveChapterLedger(ledger)
+        self:applyKeepNextUnreadDownloadsPolicy()
     end
 
     return read_count
@@ -2223,6 +2288,9 @@ function SuwayomiPlugin:markChapterRead(manga, chapter, options)
     if not options.skip_schedule then
         self:schedulePendingReadSync()
     end
+    if not options.skip_keep_policy then
+        self:applyKeepNextUnreadDownloadsPolicy()
+    end
     if not options.skip_refresh or not options.skip_schedule then
         SuwayomiDebug.log({
             operation = "markChapterRead",
@@ -2330,12 +2398,14 @@ function SuwayomiPlugin:markChapterListRead(manga, chapters)
             ledger = ledger,
             skip_refresh = true,
             skip_schedule = true,
+            skip_keep_policy = true,
         })
     end
 
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
+    self:applyKeepNextUnreadDownloadsPolicy()
     SuwayomiDebug.log({
         operation = "markChapterListRead",
         event = "end",
@@ -2790,6 +2860,25 @@ function SuwayomiPlugin:keepNextUnreadChaptersForManga(manga, limit)
             self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
             return 0
         end
+
+        if saved_limit >= 50 then
+            return self:showBulkActionConfirmation(
+                T(
+                    self:pluralize(
+                        #chapters,
+                        _("Queue %1 missing download to keep the next %2 unread chapters available?"),
+                        _("Queue %1 missing downloads to keep the next %2 unread chapters available?")
+                    ),
+                    #chapters,
+                    saved_limit
+                ),
+                _("Queue"),
+                function()
+                    self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+                end
+            )
+        end
+
         return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
     end
 
@@ -3067,6 +3156,7 @@ function SuwayomiPlugin:markSelectedChaptersRead()
             ledger = ledger,
             skip_refresh = true,
             skip_schedule = true,
+            skip_keep_policy = true,
         })
     end
 
@@ -3074,6 +3164,7 @@ function SuwayomiPlugin:markSelectedChaptersRead()
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
+    self:applyKeepNextUnreadDownloadsPolicy()
     SuwayomiDebug.log({
         operation = "markSelectedChaptersRead",
         event = "end",

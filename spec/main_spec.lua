@@ -849,6 +849,62 @@ return {
         assert.is_nil(saved_ledger["m1:398"].pending_read_sync)
     end)
 
+    it("queues missing next unread downloads after downloaded chapter reconciliation when keep-next is enabled", function()
+        local saved_queue = {}
+        local saved_ledger = {
+            ["m1:398"] = {
+                manga_id = "m1",
+                manga_title = "Sousou no Frieren",
+                chapter_id = "398",
+                chapter_name = "Ch. 1",
+                path = "/books/Sousou no Frieren/Ch. 1.cbz",
+                read = false,
+            },
+        }
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadKeepNextUnreadDownloads = function() return 5 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.isChapterPathFinishedInKoreader = function(_, path)
+            return path == "/books/Sousou no Frieren/Ch. 1.cbz"
+        end
+        plugin.current_chapter_context = {
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapters = {
+                { id = "398", name = "Ch. 1", is_read = false },
+                { id = "399", name = "Ch. 2", is_read = false },
+                { id = "400", name = "Ch. 3", is_read = false },
+            },
+        }
+
+        plugin:reconcileDownloadedChapterLedger(saved_ledger)
+
+        assert.is_true(plugin.current_chapter_context.chapters[1].is_read)
+        assert.are.equal(2, #saved_queue)
+        assert.are.equal("399", saved_queue[1].chapter.id)
+        assert.are.equal("400", saved_queue[2].chapter.id)
+    end)
+
     it("opens and saves the parallel downloads setting from the main menu", function()
         local saved_parallel_downloads
         package.preload.suwayomi_settings = function()
@@ -1400,6 +1456,53 @@ return {
         assert.are.equal("Sousou no Frieren refreshed", manga.title)
         assert.are.equal("Sousou no Frieren refreshed", saved_queue[1].manga.title)
         assert.are.equal("399", saved_queue[1].chapter.id)
+    end)
+
+    it("stops manga action context building when uninitialized manga refresh fails", function()
+        local saved_queue = {}
+        local fetch_calls = 0
+        package.preload.suwayomi_api = function()
+            return {
+                refreshManga = function(_, manga_id)
+                    assert.are.equal("m1", manga_id)
+                    return { ok = false, error = "Refresh failed." }
+                end,
+                fetchChaptersForManga = function()
+                    fetch_calls = fetch_calls + 1
+                    error("fetchChaptersForManga should not be used after refresh failure")
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        assert.is_false(plugin:performMangaAction(
+            { id = "m1", title = "Sousou no Frieren", initialized = false },
+            "download_first_unread"
+        ))
+
+        assert.are.equal(0, fetch_calls)
+        assert.are.equal(0, #saved_queue)
+        assert.are.equal("Refresh failed.", shown_messages[#shown_messages])
     end)
 
     it("opens the downloads menu from the top-level entry", function()
@@ -4148,6 +4251,53 @@ return {
         assert.are.equal("399", saved_queue[2].chapter.id)
     end)
 
+    it("confirms manga-level keep next 50 unread before queueing missing downloads", function()
+        local saved_queue = {}
+        local saved_keep_next
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadKeepNextUnreadDownloads = function() return saved_keep_next or 0 end,
+                saveKeepNextUnreadDownloads = function(_, value)
+                    saved_keep_next = value
+                    return value
+                end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = {
+                { id = "398", name = "Ch. 1", is_read = false },
+                { id = "399", name = "Ch. 2", is_read = false },
+            },
+        }
+
+        assert.is_true(plugin:performMangaAction(manga, "keep_next_50_unread"))
+        assert.are.equal(50, saved_keep_next)
+        assert.are.equal("Queue 2 missing downloads to keep the next 50 unread chapters available?", shown_confirm.text)
+        assert.are.equal(0, #saved_queue)
+
+        shown_confirm.ok_callback()
+
+        assert.are.equal(2, #saved_queue)
+    end)
+
     it("deletes selected downloaded chapters from bulk actions", function()
         local saved_ledger = {
             ["m1:398"] = {
@@ -4921,6 +5071,91 @@ return {
 
         assert.are.equal("398", marked_chapter_id)
         assert.is_nil(saved_ledger["m1:398"].pending_read_sync)
+    end)
+
+    it("queues missing next unread downloads after manually marking a chapter read when keep-next is enabled", function()
+        local saved_queue = {}
+        local saved_ledger = {}
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadKeepNextUnreadDownloads = function() return 5 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = {
+                { id = "398", name = "Ch. 1", is_read = false },
+                { id = "399", name = "Ch. 2", is_read = false },
+                { id = "400", name = "Ch. 3", is_read = false },
+            },
+        }
+
+        plugin:markChapterRead(manga, plugin.current_chapter_context.chapters[1])
+
+        assert.are.equal(2, #saved_queue)
+        assert.are.equal("399", saved_queue[1].chapter.id)
+        assert.are.equal("400", saved_queue[2].chapter.id)
+    end)
+
+    it("does not queue keep-next downloads after mark-read when the setting is off", function()
+        local saved_queue = {}
+        local saved_ledger = {}
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadKeepNextUnreadDownloads = function() return 0 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = {
+                { id = "398", name = "Ch. 1", is_read = false },
+                { id = "399", name = "Ch. 2", is_read = false },
+            },
+        }
+
+        plugin:markChapterRead(manga, plugin.current_chapter_context.chapters[1])
+
+        assert.are.equal(0, #saved_queue)
     end)
 
     it("marks the chosen chapter and previous chapters read for a clean-state read boundary", function()
