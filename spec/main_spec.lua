@@ -4253,7 +4253,7 @@ return {
 
     it("confirms manga-level keep next 50 unread before queueing missing downloads", function()
         local saved_queue = {}
-        local saved_keep_next
+        local saved_keep_next = 0
         package.preload.suwayomi_settings = function()
             return {
                 load = function()
@@ -4265,7 +4265,7 @@ return {
                     saved_queue = jobs
                     return jobs
                 end,
-                loadKeepNextUnreadDownloads = function() return saved_keep_next or 0 end,
+                loadKeepNextUnreadDownloads = function() return saved_keep_next end,
                 saveKeepNextUnreadDownloads = function(_, value)
                     saved_keep_next = value
                     return value
@@ -4289,12 +4289,14 @@ return {
         }
 
         assert.is_true(plugin:performMangaAction(manga, "keep_next_50_unread"))
-        assert.are.equal(50, saved_keep_next)
         assert.are.equal("Queue 2 missing downloads to keep the next 50 unread chapters available?", shown_confirm.text)
+        assert.are.equal(0, saved_keep_next)
         assert.are.equal(0, #saved_queue)
+        assert.is_nil(shown_messages[#shown_messages])
 
         shown_confirm.ok_callback()
 
+        assert.are.equal(50, saved_keep_next)
         assert.are.equal(2, #saved_queue)
     end)
 

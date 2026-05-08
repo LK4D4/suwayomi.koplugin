@@ -2847,21 +2847,29 @@ function SuwayomiPlugin:keepNextUnreadChaptersForManga(manga, limit)
         return false
     end
 
-    local saved_limit = SuwayomiSettings:saveKeepNextUnreadDownloads(limit)
-    self:showMessage(T(_("Keep next unread downloaded: %1 chapters"), saved_limit))
+    local requested_limit = tonumber(limit) or 0
+    local saved_limit
 
-    if saved_limit <= 0 then
+    local function savePolicy()
+        saved_limit = SuwayomiSettings:saveKeepNextUnreadDownloads(requested_limit)
+        self:showMessage(T(_("Keep next unread downloaded: %1 chapters"), saved_limit))
+        return saved_limit
+    end
+
+    if requested_limit <= 0 then
+        savePolicy()
         return true
     end
 
     local function queue(download_directory)
-        local chapters = self:getUnreadDownloadBufferCandidates(manga, saved_limit)
+        local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
         if #chapters == 0 then
+            savePolicy()
             self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
             return 0
         end
 
-        if saved_limit >= 50 then
+        if requested_limit >= 50 then
             return self:showBulkActionConfirmation(
                 T(
                     self:pluralize(
@@ -2870,15 +2878,17 @@ function SuwayomiPlugin:keepNextUnreadChaptersForManga(manga, limit)
                         _("Queue %1 missing downloads to keep the next %2 unread chapters available?")
                     ),
                     #chapters,
-                    saved_limit
+                    requested_limit
                 ),
                 _("Queue"),
                 function()
+                    savePolicy()
                     self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
                 end
             )
         end
 
+        savePolicy()
         return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
     end
 
