@@ -298,14 +298,14 @@ describe("suwayomi_api", function()
 
     it("parses manga refresh responses", function()
         local response = [[
-            { "data": { "fetchManga": { "manga": { "id": 17, "title": "Frieren", "initialized": true } }, "fetchChapters": { "chapters": [ { "id": 398, "name": "Ch. 1", "isRead": false } ] } } }
+            { "data": { "fetchManga": { "manga": { "id": 17, "title": "Frieren", "initialized": true } }, "fetchChapters": { "chapters": [ { "id": 398, "name": "Ch. 1", "scanlator": "Sense Scans", "isRead": false } ] } } }
         ]]
 
         local result = api.parseRefreshMangaResponse(response)
 
         assert.are.same({
             manga = { id = "17", title = "Frieren", initialized = true },
-            chapters = { { id = "398", name = "Ch. 1", is_read = false } },
+            chapters = { { id = "398", name = "Ch. 1", scanlator = "Sense Scans", is_read = false } },
         }, result)
     end)
 
@@ -407,7 +407,7 @@ describe("suwayomi_api", function()
     end)
 
     it("refreshes manga and chapters", function()
-        local request = install_graphql_stub([[{"data":{"fetchManga":{"manga":{"id":17,"title":"Frieren","initialized":true}},"fetchChapters":{"chapters":[{"id":398,"name":"Ch. 1","isRead":false}]}}}]])
+        local request = install_graphql_stub([[{"data":{"fetchManga":{"manga":{"id":17,"title":"Frieren","initialized":true}},"fetchChapters":{"chapters":[{"id":398,"name":"Ch. 1","scanlator":"Sense Scans","isRead":false}]}}}]])
 
         local result = api.refreshManga(valid_credentials(), "17")
 
@@ -415,7 +415,7 @@ describe("suwayomi_api", function()
         assert.truthy(request.body:match("REFRESH_MANGA"))
         assert.truthy(request.body:match('"mangaId":17'))
         assert.are.same({ id = "17", title = "Frieren", initialized = true }, result.manga)
-        assert.are.same({ { id = "398", name = "Ch. 1", is_read = false } }, result.chapters)
+        assert.are.same({ { id = "398", name = "Ch. 1", scanlator = "Sense Scans", is_read = false } }, result.chapters)
     end)
 
     it("propagates credential errors from new client api helpers", function()
@@ -625,7 +625,7 @@ describe("suwayomi_api", function()
                 "data": {
                     "fetchChapters": {
                         "chapters": [
-                            { "id": 1, "name": "Chapter 1" },
+                            { "id": 1, "name": "Chapter 1", "scanlator": "Sense Scans" },
                             { "id": 2, "name": "", "chapterNumber": 7 },
                             { "id": 3, "chapterNumber": 8 },
                             { "id": 4, "name": "" }
@@ -638,7 +638,7 @@ describe("suwayomi_api", function()
         local chapters = api.parseChapterResponse(response)
 
         assert.are.same({
-            { id = "1", name = "Chapter 1", is_read = false },
+            { id = "1", name = "Chapter 1", scanlator = "Sense Scans", is_read = false },
             { id = "2", name = "Chapter 7", is_read = false },
             { id = "3", name = "Chapter 8", is_read = false },
             { id = "4", name = "4", is_read = false },
@@ -1052,7 +1052,7 @@ describe("suwayomi_api", function()
                 "data": {
                     "chapters": {
                         "nodes": [
-                            { "id": 1, "name": "Chapter 1", "isRead": true },
+                            { "id": 1, "name": "Chapter 1", "scanlator": "Sense Scans", "isRead": true },
                             { "id": 2, "name": "", "chapterNumber": 7, "isRead": false },
                             { "id": 3, "chapterNumber": 8 }
                         ]
@@ -1064,7 +1064,7 @@ describe("suwayomi_api", function()
         local chapters = api.parseStoredChapterResponse(response)
 
         assert.are.same({
-            { id = "1", name = "Chapter 1", is_read = true },
+            { id = "1", name = "Chapter 1", scanlator = "Sense Scans", is_read = true },
             { id = "2", name = "Chapter 7", is_read = false },
             { id = "3", name = "Chapter 8", is_read = false },
         }, chapters)

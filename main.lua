@@ -936,6 +936,7 @@ function SuwayomiPlugin:showChaptersForManga(manga)
         then
             self:clearChapterSelection(true)
         end
+        self.current_scanlator_filter = nil
         self.current_chapter_context = {
             manga = manga,
             chapters = chapters,
@@ -1019,6 +1020,57 @@ function SuwayomiPlugin:getSelectedChapters(manga, chapters)
     return selected
 end
 
+function SuwayomiPlugin:getChapterScanlator(chapter)
+    local scanlator = chapter and chapter.scanlator
+    if scanlator == nil then
+        return nil
+    end
+    scanlator = tostring(scanlator)
+    if scanlator == "" then
+        return nil
+    end
+    return scanlator
+end
+
+function SuwayomiPlugin:getChapterScanlatorChoices(chapters)
+    local choices = {}
+    local seen = {}
+    for _, chapter in ipairs(chapters or {}) do
+        local scanlator = self:getChapterScanlator(chapter)
+        if scanlator and not seen[scanlator] then
+            seen[scanlator] = true
+            table.insert(choices, scanlator)
+        end
+    end
+    return choices
+end
+
+function SuwayomiPlugin:getVisibleChapters(chapters)
+    if not self.current_scanlator_filter then
+        return chapters or {}
+    end
+
+    local visible = {}
+    for _, chapter in ipairs(chapters or {}) do
+        if self:getChapterScanlator(chapter) == self.current_scanlator_filter then
+            table.insert(visible, chapter)
+        end
+    end
+    return visible
+end
+
+function SuwayomiPlugin:formatChapterListTitle(manga)
+    local selected_count = self:getSelectedChapterCount()
+    local title = manga.title
+    if self.selection_mode then
+        title = T(_("%1 selected"), selected_count)
+    end
+    if self.current_scanlator_filter then
+        title = title .. " - " .. self.current_scanlator_filter
+    end
+    return title
+end
+
 function SuwayomiPlugin:clearChapterSelection(skip_refresh)
     self.selected_chapters = {}
     self.selection_mode = false
@@ -1030,7 +1082,7 @@ end
 function SuwayomiPlugin:selectAllChapters()
     local context = self.current_chapter_context
     local manga = context and context.manga
-    local chapters = context and context.chapters or {}
+    local chapters = self:getVisibleChapters(context and context.chapters or {})
 
     self.selected_chapters = {}
     for _, chapter in ipairs(chapters) do
@@ -1510,15 +1562,11 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
 end
 
 function SuwayomiPlugin:buildChapterMenuOptions(manga, chapters, ledger)
-    local selected_count = self:getSelectedChapterCount()
-    local title = manga.title
-    if self.selection_mode then
-        title = T(_("%1 selected"), selected_count)
-    end
+    local visible_chapters = self:getVisibleChapters(chapters)
 
     return {
-        title = title,
-        chapters = self:buildChapterMenuItems(manga, chapters, ledger),
+        title = self:formatChapterListTitle(manga),
+        chapters = self:buildChapterMenuItems(manga, visible_chapters, ledger),
         title_bar_left_icon = "appbar.menu",
         on_title_bar_left_tap = function()
             self:showBulkChapterActions(manga)
@@ -1579,15 +1627,11 @@ function SuwayomiPlugin:stripChapterSelectionMarker(menu_text)
 end
 
 function SuwayomiPlugin:buildQuickChapterMenuOptions(manga, chapters)
-    local selected_count = self:getSelectedChapterCount()
-    local title = manga.title
-    if self.selection_mode then
-        title = T(_("%1 selected"), selected_count)
-    end
+    local visible_chapters = self:getVisibleChapters(chapters)
 
     return {
-        title = title,
-        chapters = self:buildQuickChapterMenuItems(manga, chapters),
+        title = self:formatChapterListTitle(manga),
+        chapters = self:buildQuickChapterMenuItems(manga, visible_chapters),
         title_bar_left_icon = "appbar.menu",
         on_title_bar_left_tap = function()
             self:showBulkChapterActions(manga)
@@ -1929,6 +1973,9 @@ function SuwayomiPlugin:getBulkChapterActions()
         table.insert(actions, { id = "mark_unread_selected", text = _("Mark unread") })
         table.insert(actions, { id = "clear_selection", text = _("Clear selection") })
         table.insert(actions, { id = "delete_selected", text = _("Delete downloads") })
+        if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
+            table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter") })
+        end
         return actions
     end
 
@@ -1938,6 +1985,9 @@ function SuwayomiPlugin:getBulkChapterActions()
 
     table.insert(actions, { id = "bulk_downloads", text = _("Bulk downloads") })
     table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read downloads") })
+    if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
+        table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter") })
+    end
 
     return actions
 end
@@ -2516,6 +2566,10 @@ function SuwayomiPlugin:performBulkChapterAction(action_id)
         self:showBulkDownloadActions()
         return true
     end
+    if action_id == "scanlator_filter" then
+        self:showScanlatorFilterActions()
+        return true
+    end
     local next_unread_count = tostring(action_id or ""):match("^download_next_(%d+)_unread$")
     if next_unread_count then
         local limit = tonumber(next_unread_count)
@@ -2565,6 +2619,46 @@ function SuwayomiPlugin:performBulkChapterAction(action_id)
         return true
     end
     return false
+end
+
+function SuwayomiPlugin:setScanlatorFilter(scanlator)
+    self.current_scanlator_filter = scanlator
+    self:clearChapterSelection(true)
+    self:refreshChapterMenu()
+    return true
+end
+
+function SuwayomiPlugin:getScanlatorFilterActions()
+    local actions = {
+        { id = "scanlator_filter_all", text = _("All scanlators") },
+    }
+    local context = self.current_chapter_context
+    for _, scanlator in ipairs(self:getChapterScanlatorChoices(context and context.chapters or {})) do
+        table.insert(actions, {
+            id = "scanlator_filter_value",
+            text = scanlator,
+            scanlator = scanlator,
+        })
+    end
+    return actions
+end
+
+function SuwayomiPlugin:showScanlatorFilterActions()
+    if not SuwayomiUI.showChapterActionsMenu then
+        return false
+    end
+
+    SuwayomiUI.showChapterActionsMenu({
+        title = _("Scanlator filter"),
+        actions = self:getScanlatorFilterActions(),
+    }, function(action)
+        if action.id == "scanlator_filter_all" then
+            self:setScanlatorFilter(nil)
+        else
+            self:setScanlatorFilter(action.scanlator)
+        end
+    end)
+    return true
 end
 
 function SuwayomiPlugin:showBulkDownloadActions()

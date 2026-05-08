@@ -169,6 +169,7 @@ local function parseChapterNode(chapter)
         name = chapter_name,
         chapter_number = chapter.chapterNumber,
         source_order = chapter.sourceOrder,
+        scanlator = chapter.scanlator,
         is_read = chapter.isRead == true,
     }
 end
@@ -414,6 +415,7 @@ function SuwayomiAPI.parseRefreshMangaResponse(response_body)
         table.insert(chapters, {
             id = parsed_chapter.id,
             name = parsed_chapter.name,
+            scanlator = parsed_chapter.scanlator,
             is_read = parsed_chapter.is_read,
         })
     end
@@ -531,6 +533,7 @@ function SuwayomiAPI.parseChapterResponse(response_body)
         table.insert(chapters, {
             id = tostring(entry.id),
             name = chapter_name,
+            scanlator = entry.scanlator,
             is_read = entry.isRead == true,
         })
     end
@@ -698,6 +701,7 @@ function SuwayomiAPI.parseStoredChapterResponse(response_body)
         table.insert(chapters, {
             id = tostring(entry.id),
             name = chapter_name,
+            scanlator = entry.scanlator,
             is_read = entry.isRead == true,
         })
     end

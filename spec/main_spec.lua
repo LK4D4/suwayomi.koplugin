@@ -2804,6 +2804,142 @@ return {
         assert.are.equal("Sousou no Frieren", shown_chapter_menu.title)
     end)
 
+    it("filters the current chapter list by scanlator from the titlebar menu", function()
+        local shown_chapter_menu
+        local tap_bulk_actions
+        local shown_actions_menu
+        local shown_actions_callback
+
+        local function find_action(text)
+            for _, action in ipairs(shown_actions_menu.actions or {}) do
+                if action.text == text then
+                    return action
+                end
+            end
+            return nil
+        end
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
+                end,
+                fetchMangaForSource = function()
+                    return { ok = true, manga = { { id = "m1", title = "Sousou no Frieren" } } }
+                end,
+                fetchChaptersForManga = function()
+                    return {
+                        ok = true,
+                        chapters = {
+                            { id = "398", name = "Official_Vol. 1 Ch. 1", scanlator = "Sense Scans", is_read = false },
+                            { id = "399", name = "Official_Vol. 1 Ch. 2", scanlator = "Flame Scans", is_read = false },
+                            { id = "400", name = "Official_Vol. 1 Ch. 3", scanlator = "Sense Scans", is_read = false },
+                            { id = "401", name = "Official_Vol. 1 Ch. 4", is_read = false },
+                        },
+                    }
+                end,
+            }
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function()
+                    return false
+                end,
+            }
+        end
+
+        package.preload.suwayomi_ui = function()
+            return {
+                showSourcesMenu = function(sources, onSelect)
+                    onSelect(sources[1])
+                end,
+                showMangaMenu = function(manga, onSelect)
+                    onSelect(manga[1])
+                end,
+                showChapterMenu = function(options)
+                    shown_chapter_menu = options
+                    tap_bulk_actions = options.on_title_bar_left_tap
+                    return {}
+                end,
+                updateChapterMenu = function(_, options)
+                    shown_chapter_menu = options
+                    tap_bulk_actions = options.on_title_bar_left_tap
+                end,
+                showChapterActionsMenu = function(options, onSelect)
+                    shown_actions_menu = options
+                    shown_actions_callback = onSelect
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadSourceLanguages = function() return { "localsourcelang" } end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_ui = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin:browseSuwayomi()
+
+        assert.are.equal("Sousou no Frieren", shown_chapter_menu.title)
+        assert.are.equal(4, #shown_chapter_menu.chapters)
+
+        tap_bulk_actions()
+        shown_actions_callback(find_action("Scanlator filter"))
+
+        assert.are.equal("Scanlator filter", shown_actions_menu.title)
+        assert.are.equal("All scanlators", shown_actions_menu.actions[1].text)
+        assert.are.equal("Sense Scans", shown_actions_menu.actions[2].text)
+        assert.are.equal("Flame Scans", shown_actions_menu.actions[3].text)
+        assert.is_nil(shown_actions_menu.actions[4])
+
+        shown_actions_callback(shown_actions_menu.actions[2])
+
+        assert.are.equal("Sousou no Frieren - Sense Scans", shown_chapter_menu.title)
+        assert.are.equal(2, #shown_chapter_menu.chapters)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu.chapters[1].menu_text)
+        assert.are.equal("Official_Vol. 1 Ch. 3", shown_chapter_menu.chapters[2].menu_text)
+
+        tap_bulk_actions()
+        assert.is_truthy(find_action("Select all"))
+        assert.is_truthy(find_action("Bulk downloads"))
+        assert.is_truthy(find_action("Delete read downloads"))
+        plugin:performBulkChapterAction("select_all")
+
+        assert.are.equal(2, plugin:getSelectedChapterCount())
+        assert.are.equal("2 selected - Sense Scans", shown_chapter_menu.title)
+
+        tap_bulk_actions()
+        shown_actions_callback(find_action("Scanlator filter"))
+        shown_actions_callback(shown_actions_menu.actions[1])
+
+        assert.are.equal("Sousou no Frieren", shown_chapter_menu.title)
+        assert.are.equal(4, #shown_chapter_menu.chapters)
+    end)
+
     it("queues the next unread chapter downloads and skips unavailable chapters", function()
         local saved_queue = {}
 
