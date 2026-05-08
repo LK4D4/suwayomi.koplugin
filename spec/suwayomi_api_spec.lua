@@ -102,6 +102,8 @@ describe("suwayomi_api", function()
         assert.truthy(query:match('"offset":10'))
         assert.truthy(query:match("unreadCount"))
         assert.truthy(query:match("firstUnreadChapter"))
+        assert.truthy(query:match("firstUnreadChapter {%s*id name chapterNumber sourceOrder scanlator isRead"))
+        assert.truthy(query:match("latestFetchedChapter {%s*id name chapterNumber sourceOrder scanlator isRead"))
         assert.truthy(query:match("categories"))
     end)
 
@@ -231,8 +233,8 @@ describe("suwayomi_api", function()
                                 "thumbnailUrl": "/thumb/frieren.jpg",
                                 "source": { "id": "local", "displayName": "Local source", "name": "Local", "lang": "localsourcelang" },
                                 "categories": { "nodes": [ { "id": 1, "name": "Default", "order": 0 } ] },
-                                "firstUnreadChapter": { "id": 398, "name": "Ch. 1", "chapterNumber": 1, "sourceOrder": 1, "isRead": false },
-                                "latestFetchedChapter": { "id": 399, "name": "Ch. 2", "chapterNumber": 2, "sourceOrder": 2, "isRead": false }
+                                "firstUnreadChapter": { "id": 398, "name": "Ch. 1", "chapterNumber": 1, "sourceOrder": 1, "scanlator": "Sense Scans", "isRead": false },
+                                "latestFetchedChapter": { "id": 399, "name": "Ch. 2", "chapterNumber": 2, "sourceOrder": 2, "scanlator": "Flame Scans", "isRead": false }
                             }
                         ]
                     }
@@ -254,8 +256,8 @@ describe("suwayomi_api", function()
                 thumbnail_url = "/thumb/frieren.jpg",
                 source = { id = "local", displayName = "Local source", name = "Local", lang = "localsourcelang" },
                 categories = { { id = "1", name = "Default", order = 0 } },
-                first_unread_chapter = { id = "398", name = "Ch. 1", chapter_number = 1, source_order = 1, is_read = false },
-                latest_fetched_chapter = { id = "399", name = "Ch. 2", chapter_number = 2, source_order = 2, is_read = false },
+                first_unread_chapter = { id = "398", name = "Ch. 1", chapter_number = 1, source_order = 1, scanlator = "Sense Scans", is_read = false },
+                latest_fetched_chapter = { id = "399", name = "Ch. 2", chapter_number = 2, source_order = 2, scanlator = "Flame Scans", is_read = false },
             },
         }, result.manga)
     end)
