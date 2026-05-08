@@ -978,20 +978,8 @@ function SuwayomiPlugin:getMangaActions(manga)
     end
     table.insert(actions, { id = "download_first_unread", text = _("Download first unread") })
     table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
-    table.insert(actions, { id = "more", text = _("More...") })
 
     return actions
-end
-
-function SuwayomiPlugin:getMoreMangaActions()
-    return {
-        { id = "download_next_5_unread", text = _("Download next 5 unread") },
-        { id = "download_next_50_unread", text = _("Download next 50 unread") },
-        { id = "download_all_unread", text = _("Download all unread") },
-        { id = "download_all_chapters", text = _("Download all chapters") },
-        { id = "keep_downloaded", text = _("Keep downloaded") },
-        { id = "delete_read_downloads", text = _("Delete read downloads") },
-    }
 end
 
 function SuwayomiPlugin:showMangaActions(manga, options)
@@ -1008,23 +996,6 @@ function SuwayomiPlugin:showMangaActions(manga, options)
             self:performMangaAction(manga, action.id, options)
         end
     end)
-end
-
-function SuwayomiPlugin:showMoreMangaActions(manga, options)
-    options = options or {}
-    if not SuwayomiUI.showMangaActionsMenu then
-        return false
-    end
-
-    SuwayomiUI.showMangaActionsMenu({
-        title = _("More manga actions"),
-        actions = self:getMoreMangaActions(manga),
-    }, function(action)
-        if action then
-            self:performMangaAction(manga, action.id, options)
-        end
-    end)
-    return true
 end
 
 function SuwayomiPlugin:updateMangaFromLibraryStateResponse(manga, updated_manga, in_library)
@@ -1131,11 +1102,6 @@ function SuwayomiPlugin:refreshMangaChapters(manga)
     return self:showChaptersForManga(manga)
 end
 
-function SuwayomiPlugin:showPendingMangaDownloadAction()
-    self:showMessage(_("Manga download actions are not available yet."))
-    return true
-end
-
 function SuwayomiPlugin:performMangaAction(manga, action_id, options)
     options = options or {}
     if action_id == "open_chapters" then
@@ -1157,19 +1123,9 @@ function SuwayomiPlugin:performMangaAction(manga, action_id, options)
     if action_id == "remove_from_library" then
         return self:confirmRemoveMangaFromLibrary(manga, options)
     end
-    if action_id == "more" then
-        return self:showMoreMangaActions(manga, options)
-    end
-    if action_id == "download_first_unread"
-        or action_id == "download_next_10_unread"
-        or action_id == "download_next_5_unread"
-        or action_id == "download_next_50_unread"
-        or action_id == "download_all_unread"
-        or action_id == "download_all_chapters"
-        or action_id == "keep_downloaded"
-        or action_id == "delete_read_downloads"
-    then
-        return self:showPendingMangaDownloadAction()
+    if action_id == "download_first_unread" or action_id == "download_next_10_unread" then
+        self:showMessage(_("Manga download actions are not available yet."))
+        return true
     end
     return false
 end

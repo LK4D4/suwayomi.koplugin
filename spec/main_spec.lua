@@ -1086,7 +1086,7 @@ return {
         assert.are.equal("Remove from library", shown_manga_actions.actions[3].text)
         assert.are.equal("Download first unread", shown_manga_actions.actions[4].text)
         assert.are.equal("Download next 10 unread", shown_manga_actions.actions[5].text)
-        assert.are.equal("More...", shown_manga_actions.actions[6].text)
+        assert.is_nil(shown_manga_actions.actions[6])
         assert.is_nil(shown_chapter_menu_options)
 
         shown_manga_actions_callback(shown_manga_actions.actions[1])
