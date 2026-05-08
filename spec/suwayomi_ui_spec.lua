@@ -366,6 +366,9 @@ describe("suwayomi_ui", function()
         local ui = require("suwayomi_ui")
         local cancelled_key
         local retried_key
+        local queued_menu
+        local failed_menu
+        local clear_menu
         local cleared = false
 
         ui.showDownloadsMenu({
@@ -396,14 +399,17 @@ describe("suwayomi_ui", function()
                 },
             },
         }, {
-            onSelectQueued = function(job)
+            onSelectQueued = function(job, menu)
                 cancelled_key = job.key
+                queued_menu = menu
             end,
-            onRetryFailed = function(job)
+            onRetryFailed = function(job, menu)
                 retried_key = job.key
+                failed_menu = menu
             end,
-            onClearFailed = function()
+            onClearFailed = function(menu)
                 cleared = true
+                clear_menu = menu
             end,
         })
 
@@ -419,6 +425,9 @@ describe("suwayomi_ui", function()
 
         assert.are.equal("m-queued:192", cancelled_key)
         assert.are.equal("m-failed:205", retried_key)
+        assert.are.equal(shown_dialog, queued_menu)
+        assert.are.equal(shown_dialog, failed_menu)
+        assert.are.equal(shown_dialog, clear_menu)
         assert.is_true(cleared)
     end)
 

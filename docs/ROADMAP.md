@@ -224,7 +224,7 @@ Goal: make the existing KOReader-local download queue inspectable and manageable
 - [x] Add clear failed
 - [ ] Add cancel queued item when supported by the queue
 - [ ] Add clear completed history if completed history exists
-- [ ] Add open manga/chapter-list context for queue items when enough metadata exists
+- [x] Add open manga/chapter-list context for queue items when enough metadata exists
 - [ ] Keep Suwayomi server downloader mutations out of this surface
 - [ ] Wire Downloads settings:
   - KOReader download directory

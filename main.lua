@@ -226,6 +226,10 @@ function SuwayomiPlugin:getDownloadJobTitle(job)
     return manga_title or chapter_name or tostring(job and job.key or "")
 end
 
+function SuwayomiPlugin:canOpenDownloadJobChapterList(job)
+    return job and job.manga and job.manga.id ~= nil and tostring(job.manga.id) ~= ""
+end
+
 function SuwayomiPlugin:showDownloadsActions(menu, snapshot)
     if not SuwayomiUI.showChapterActionsMenu then
         self:closeMenu(menu)
@@ -271,16 +275,24 @@ function SuwayomiPlugin:showQueuedDownloadActions(job, menu)
         return
     end
 
+    local actions = {
+        { id = "cancel_queued", text = _("Cancel queued download") },
+    }
+    if self:canOpenDownloadJobChapterList(job) then
+        table.insert(actions, { id = "open_chapter_list", text = _("Open chapter list") })
+    end
+
     SuwayomiUI.showChapterActionsMenu({
         title = self:getDownloadJobTitle(job),
-        actions = {
-            { id = "cancel_queued", text = _("Cancel queued download") },
-        },
+        actions = actions,
     }, function(action)
         if action and action.id == "cancel_queued" then
             self:getDownloadQueue():cancelPending(job.manga, job.chapter)
             self:closeMenu(menu)
             self:showDownloads()
+        elseif action and action.id == "open_chapter_list" then
+            self:closeMenu(menu)
+            self:showChaptersForManga(job.manga)
         end
     end)
 end

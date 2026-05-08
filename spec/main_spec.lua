@@ -22,6 +22,7 @@ describe("suwayomi plugin", function()
     local downloads_menu_options
     local downloads_actions_menu_options
     local downloads_actions_menu_callback
+    local shown_chapter_menu_options
     local directory_chooser_callback
     local directory_chooser_start_dir
     local saved_download_directory
@@ -57,6 +58,7 @@ describe("suwayomi plugin", function()
         downloads_menu_options = nil
         downloads_actions_menu_options = nil
         downloads_actions_menu_callback = nil
+        shown_chapter_menu_options = nil
         directory_chooser_callback = nil
         directory_chooser_start_dir = nil
         saved_download_directory = nil
@@ -358,6 +360,10 @@ describe("suwayomi plugin", function()
                     downloads_actions_menu_options = options
                     downloads_actions_menu_callback = onSelect
                     return { name = "downloads-actions-menu" }
+                end,
+                showChapterMenu = function(options)
+                    shown_chapter_menu_options = options
+                    return { name = "chapter-menu" }
                 end,
                 showSourcesMenu = function(sources, _, options)
                     shown_sources = sources
@@ -1133,12 +1139,97 @@ return {
 
         assert.are.equal("Dandadan / Ch. 192", downloads_actions_menu_options.title)
         assert.are.equal("Cancel queued download", downloads_actions_menu_options.actions[1].text)
-        assert.is_nil(downloads_actions_menu_options.actions[2])
+        assert.are.equal("Open chapter list", downloads_actions_menu_options.actions[2].text)
 
         downloads_actions_menu_callback(downloads_actions_menu_options.actions[1])
 
         assert.are.equal(0, #plugin:getDownloadQueue().items)
         assert.are.equal("downloads-menu", closed_widgets[#closed_widgets].name)
+    end)
+
+    it("opens chapter list from queued download actions when manga metadata is available", function()
+        local fetched_manga_id
+        package.preload.suwayomi_api = function()
+            return {
+                fetchChaptersForManga = function(_, manga_id)
+                    fetched_manga_id = manga_id
+                    return { ok = true, chapters = { { id = "192", name = "Ch. 192" } } }
+                end,
+            }
+        end
+        package.loaded.suwayomi_api = nil
+        package.loaded.main = nil
+
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+        local downloads_menu = { name = "downloads-menu" }
+
+        plugin:addToMainMenu(menu_items)
+        plugin:getDownloadQueue().items = {
+            {
+                key = "m-queued:192",
+                download_directory = "/books",
+                manga = { id = "m-queued", title = "Dandadan" },
+                chapter = { id = "192", name = "Ch. 192" },
+            },
+        }
+        plugin:getDownloadQueue():setStatus(
+            { id = "m-queued", title = "Dandadan" },
+            { id = "192", name = "Ch. 192" },
+            { state = "queued" }
+        )
+
+        triggerHomeAction(plugin, "downloads")
+        downloads_menu_callbacks.onSelectQueued(downloads_menu_snapshot.queued[1], downloads_menu)
+
+        assert.are.equal("Dandadan / Ch. 192", downloads_actions_menu_options.title)
+        assert.are.equal("Cancel queued download", downloads_actions_menu_options.actions[1].text)
+        assert.are.equal(
+            "Open chapter list",
+            downloads_actions_menu_options.actions[2] and downloads_actions_menu_options.actions[2].text
+        )
+
+        downloads_actions_menu_callback(downloads_actions_menu_options.actions[2])
+
+        local closed_downloads_menu = false
+        for _, widget in ipairs(closed_widgets) do
+            if widget == downloads_menu then
+                closed_downloads_menu = true
+            end
+        end
+        assert.is_true(closed_downloads_menu)
+        assert.are.equal("m-queued", fetched_manga_id)
+        assert.are.equal("Dandadan", shown_chapter_menu_options.title)
+        assert.are.equal("Ch. 192", shown_chapter_menu_options.chapters[1].name)
+    end)
+
+    it("omits chapter list action for queued downloads without manga id", function()
+        local plugin_class = require("main")
+        local menu_items = {}
+        local plugin = plugin_class{}
+        local downloads_menu = { name = "downloads-menu" }
+
+        plugin:addToMainMenu(menu_items)
+        plugin:getDownloadQueue().items = {
+            {
+                key = "missing-manga:192",
+                download_directory = "/books",
+                manga = { title = "Dandadan" },
+                chapter = { id = "192", name = "Ch. 192" },
+            },
+        }
+        plugin:getDownloadQueue():setStatus(
+            { title = "Dandadan" },
+            { id = "192", name = "Ch. 192" },
+            { state = "queued" }
+        )
+
+        triggerHomeAction(plugin, "downloads")
+        downloads_menu_callbacks.onSelectQueued(downloads_menu_snapshot.queued[1], downloads_menu)
+
+        assert.are.equal("Cancel queued download", downloads_actions_menu_options.actions[1].text)
+        assert.is_nil(downloads_actions_menu_options.actions[2])
     end)
 
     it("shows a friendly message when downloads are empty", function()
