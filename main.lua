@@ -311,6 +311,32 @@ function SuwayomiPlugin:showQueuedDownloadActions(job, menu)
     end)
 end
 
+function SuwayomiPlugin:showActiveDownloadActions(job, menu)
+    if not SuwayomiUI.showChapterActionsMenu then
+        return
+    end
+    if not self:canOpenDownloadJobChapterList(job) then
+        self:showMessage(_("This download cannot be opened right now."), { timeout = 2 })
+        return
+    end
+
+    SuwayomiUI.showChapterActionsMenu({
+        title = self:getDownloadJobTitle(job),
+        actions = {
+            { id = "open_chapter_list", text = _("Open chapter list") },
+        },
+    }, function(action)
+        if action and action.id == "open_chapter_list" then
+            self:closeMenu(menu)
+            self:showMangaActions(job.manga, {
+                onMangaUpdated = function()
+                    self:showDownloads()
+                end,
+            })
+        end
+    end)
+end
+
 function SuwayomiPlugin:showDownloads()
     local queue = self:getDownloadQueue()
     local snapshot = queue:getSnapshot()
@@ -320,6 +346,9 @@ function SuwayomiPlugin:showDownloads()
     end
 
     return SuwayomiUI.showDownloadsMenu(snapshot, {
+        onSelectActive = function(job, menu)
+            self:showActiveDownloadActions(job, menu)
+        end,
         onSelectQueued = function(job, menu)
             self:showQueuedDownloadActions(job, menu)
         end,

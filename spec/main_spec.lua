@@ -1734,6 +1734,62 @@ return {
         assert.are.equal("downloads-menu", closed_widgets[#closed_widgets].name)
     end)
 
+    it("opens shared manga actions from an active download row", function()
+        local shown_manga_actions
+        package.preload.suwayomi_ui = function()
+            return {
+                showDownloadsMenu = function(snapshot, callbacks, options)
+                    downloads_menu_snapshot = snapshot
+                    downloads_menu_callbacks = callbacks
+                    downloads_menu_options = options
+                    return { name = "downloads-menu" }
+                end,
+                showChapterActionsMenu = function(options, onSelect)
+                    downloads_actions_menu_options = options
+                    downloads_actions_menu_callback = onSelect
+                    return { name = "downloads-actions-menu" }
+                end,
+                showMangaActionsMenu = function(options)
+                    shown_manga_actions = options
+                    return { name = "manga-actions-menu" }
+                end,
+            }
+        end
+        package.loaded.suwayomi_ui = nil
+        package.loaded.main = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local downloads_menu = { name = "downloads-menu" }
+        local manga = { id = "m-active", title = "Dandadan" }
+        local chapter = { id = "144", name = "Ch. 144" }
+
+        plugin:getDownloadQueue():setActiveJob({
+            key = "m-active:144",
+            state = "downloading",
+            download_directory = "/books",
+            manga = manga,
+            chapter = chapter,
+        })
+        plugin:getDownloadQueue():setStatus(manga, chapter, { state = "downloading" })
+
+        plugin:showDownloads()
+
+        assert.is_function(downloads_menu_callbacks.onSelectActive)
+        downloads_menu_callbacks.onSelectActive(downloads_menu_snapshot.active[1], downloads_menu)
+
+        assert.are.equal("Dandadan / Ch. 144", downloads_actions_menu_options.title)
+        assert.are.equal("Open chapter list", downloads_actions_menu_options.actions[1].text)
+        assert.is_nil(downloads_actions_menu_options.actions[2])
+
+        downloads_actions_menu_callback(downloads_actions_menu_options.actions[1])
+
+        assert.are.equal(downloads_menu, closed_widgets[#closed_widgets])
+        assert.is_table(shown_manga_actions)
+        assert.are.equal("Dandadan", shown_manga_actions.title)
+        assert.are.equal("Open chapters", shown_manga_actions.actions[1].text)
+    end)
+
     it("shows a message when a queued downloads row has already started", function()
         local plugin_class = require("main")
         local menu_items = {}

@@ -559,6 +559,9 @@ function SuwayomiUI.buildDownloadsMenuTable(snapshot, callbacks)
         local prefix = progress ~= "" and ("Downloading " .. progress) or "Downloading"
         table.insert(menu_table, {
             text = shortenMenuText(prefix .. "  " .. formatDownloadJobLabel(job)),
+            callback = callbacks.onSelectActive and function(menu)
+                callbacks.onSelectActive(job, menu)
+            end or nil,
         })
     end
 

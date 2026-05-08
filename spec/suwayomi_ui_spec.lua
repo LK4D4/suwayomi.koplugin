@@ -366,6 +366,8 @@ describe("suwayomi_ui", function()
         local ui = require("suwayomi_ui")
         local cancelled_key
         local retried_key
+        local selected_active_key
+        local active_menu
         local queued_menu
         local failed_menu
         local clear_menu
@@ -399,6 +401,10 @@ describe("suwayomi_ui", function()
                 },
             },
         }, {
+            onSelectActive = function(job, menu)
+                selected_active_key = job.key
+                active_menu = menu
+            end,
             onSelectQueued = function(job, menu)
                 cancelled_key = job.key
                 queued_menu = menu
@@ -419,12 +425,16 @@ describe("suwayomi_ui", function()
         assert.are.equal("Failed  Chainsaw Man / Ch. 205 - network timeout", shown_dialog.item_table[3].text)
         assert.are.equal("Clear failed", shown_dialog.item_table[4].text)
 
+        assert.is_function(shown_dialog.item_table[1].callback)
+        shown_dialog.item_table[1].callback()
         shown_dialog.item_table[2].callback()
         shown_dialog.item_table[3].callback()
         shown_dialog.item_table[4].callback()
 
+        assert.are.equal("m-active:144", selected_active_key)
         assert.are.equal("m-queued:192", cancelled_key)
         assert.are.equal("m-failed:205", retried_key)
+        assert.are.equal(shown_dialog, active_menu)
         assert.are.equal(shown_dialog, queued_menu)
         assert.are.equal(shown_dialog, failed_menu)
         assert.are.equal(shown_dialog, clear_menu)
