@@ -984,6 +984,38 @@ function SuwayomiPlugin:refreshUninitializedMangaForChapters(manga)
     }, true
 end
 
+function SuwayomiPlugin:showChapterResultForManga(manga, result)
+    if not result then
+        return
+    end
+    if not result.ok then
+        self:showMessage(_(result.error))
+        return
+    end
+
+    SuwayomiDebug.log({
+        operation = "showChaptersForManga",
+        event = "chapters_loaded",
+        manga_id = manga and manga.id,
+        chapter_count = #(result.chapters or {}),
+    })
+    if not result.chapters or #result.chapters == 0 then
+        self:showMessage(_("This manga has no chapters."))
+        return
+    end
+
+    local chapters = self:mergeChaptersWithReadLedger(manga, result.chapters)
+    self:setCurrentMangaChapterContext(manga, chapters)
+
+    self.current_chapter_options = self:buildChapterMenuOptions(manga, chapters)
+    self.current_chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, function(chapter)
+        self:handleChapterTap(manga, chapter)
+    end, function(chapter)
+        self:toggleChapterSelection(manga, chapter)
+    end)
+    return true
+end
+
 function SuwayomiPlugin:showChaptersForManga(manga)
     return SuwayomiDebug.time("showChaptersForManga", {
         manga_id = manga and manga.id,
@@ -1001,31 +1033,7 @@ function SuwayomiPlugin:showChaptersForManga(manga)
         if not result then
             return
         end
-        if not result.ok then
-            self:showMessage(_(result.error))
-            return
-        end
-
-        SuwayomiDebug.log({
-            operation = "showChaptersForManga",
-            event = "chapters_loaded",
-            manga_id = manga and manga.id,
-            chapter_count = #(result.chapters or {}),
-        })
-        if not result.chapters or #result.chapters == 0 then
-            self:showMessage(_("This manga has no chapters."))
-            return
-        end
-
-        local chapters = self:mergeChaptersWithReadLedger(manga, result.chapters)
-        self:setCurrentMangaChapterContext(manga, chapters)
-
-        self.current_chapter_options = self:buildChapterMenuOptions(manga, chapters)
-        self.current_chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, function(chapter)
-            self:handleChapterTap(manga, chapter)
-        end, function(chapter)
-            self:toggleChapterSelection(manga, chapter)
-        end)
+        return self:showChapterResultForManga(manga, result)
     end)
 end
 
@@ -1176,6 +1184,9 @@ function SuwayomiPlugin:refreshMangaChapters(manga)
         for key, value in pairs(result.manga) do
             manga[key] = value
         end
+    end
+    if result and type(result.chapters) == "table" then
+        return self:showChapterResultForManga(manga, result)
     end
     return self:showChaptersForManga(manga)
 end

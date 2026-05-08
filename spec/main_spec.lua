@@ -3024,6 +3024,46 @@ return {
         assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu_options.chapters[1].menu_text)
     end)
 
+    it("shows refreshed chapters from the refresh action without fetching chapters again", function()
+        local refresh_calls = 0
+        local fetch_calls = 0
+        package.preload.suwayomi_api = function()
+            return {
+                refreshManga = function(_, manga_id)
+                    refresh_calls = refresh_calls + 1
+                    assert.are.equal("m1", manga_id)
+                    return {
+                        ok = true,
+                        manga = { id = "m1", title = "Sousou no Frieren refreshed", initialized = true },
+                        chapters = {
+                            { id = "398", name = "Official_Vol. 1 Ch. 1", scanlator = "Sense Scans", is_read = false },
+                        },
+                    }
+                end,
+                fetchChaptersForManga = function()
+                    fetch_calls = fetch_calls + 1
+                    return { ok = false, error = "Second chapter fetch failed." }
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren", initialized = true }
+
+        plugin:performMangaAction(manga, "refresh_chapters")
+
+        assert.are.equal(1, refresh_calls)
+        assert.are.equal(0, fetch_calls)
+        assert.are.equal("Sousou no Frieren refreshed", manga.title)
+        assert.are.equal("Sousou no Frieren refreshed", shown_chapter_menu_options.title)
+        assert.are.equal("Official_Vol. 1 Ch. 1", shown_chapter_menu_options.chapters[1].menu_text)
+        assert.are.equal("Sense Scans", plugin.current_chapter_context.chapters[1].scanlator)
+    end)
+
     it("shows bulk actions for selected chapters and queues selected downloads", function()
         local shown_chapter_menu
         local tap_chapter

@@ -254,7 +254,7 @@ function SuwayomiAPI._buildLibraryMangaQuery(options)
     end
 
     return json.encode({
-        query = "query GET_LIBRARY_MANGAS($filter: MangaFilterInput, $first: Int, $offset: Int, $order: [MangaOrderInput!]) { mangas(filter: $filter, first: $first, offset: $offset, order: $order) { totalCount nodes { id title inLibrary unreadCount downloadCount initialized thumbnailUrl source { id displayName name lang } categories { nodes { id name order } } firstUnreadChapter { id name chapterNumber sourceOrder isRead } latestFetchedChapter { id name chapterNumber sourceOrder isRead } } } }",
+        query = "query GET_LIBRARY_MANGAS($filter: MangaFilterInput, $first: Int, $offset: Int, $order: [MangaOrderInput!]) { mangas(filter: $filter, first: $first, offset: $offset, order: $order) { totalCount nodes { id title inLibrary unreadCount downloadCount initialized thumbnailUrl source { id displayName name lang } categories { nodes { id name order } } firstUnreadChapter { id name chapterNumber sourceOrder scanlator isRead } latestFetchedChapter { id name chapterNumber sourceOrder scanlator isRead } } } }",
         variables = variables,
     })
 end
