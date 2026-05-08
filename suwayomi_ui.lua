@@ -193,6 +193,28 @@ function SuwayomiUI.showMangaMenu(manga_list, onSelectCallback, options)
     applyTitleBarOptions(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
+    return menu
+end
+
+function SuwayomiUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
+    if not menu then
+        return
+    end
+
+    local menu_table = {}
+    for _, manga in ipairs(manga_list or {}) do
+        table.insert(menu_table, {
+            text = manga.title,
+            callback = function()
+                if onSelectCallback then onSelectCallback(manga) end
+            end
+        })
+    end
+    menu.item_table = menu_table
+    applyTitleBarOptions(menu, options)
+    if menu.updateItems then
+        menu:updateItems()
+    end
 end
 
 function SuwayomiUI.showLibraryCategoryMenu(categories, onSelectCallback, options)

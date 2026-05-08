@@ -1155,6 +1155,43 @@ return {
         assert.are.equal("Removed from library.", shown_messages[#shown_messages])
     end)
 
+    it("shows open first unread when the first unread chapter is downloaded locally", function()
+        package.preload.suwayomi_settings = function()
+            return {
+                loadDownloadDirectory = function()
+                    return "/books"
+                end,
+            }
+        end
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function(_, path)
+                    return path == "/books/Sousou no Frieren/Ch. 1.cbz"
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+        package.loaded.suwayomi_downloader = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        local actions = plugin:getMangaActions({
+            id = "m1",
+            title = "Sousou no Frieren",
+            first_unread_chapter = { id = "c1", name = "Ch. 1" },
+        })
+
+        assert.are.equal("Open chapters", actions[1].text)
+        assert.are.equal("Open first unread", actions[2].text)
+        assert.are.equal("Refresh chapters", actions[3].text)
+    end)
+
     it("opens the downloads menu from the top-level entry", function()
         local plugin_class = require("main")
         local menu_items = {}

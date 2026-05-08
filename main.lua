@@ -953,12 +953,11 @@ end
 
 function SuwayomiPlugin:canOpenFirstUnreadMangaChapter(manga)
     local chapter = manga and manga.first_unread_chapter
-    return chapter
-        and (
-            chapter.local_path ~= nil
-            or chapter.download_path ~= nil
-            or chapter.path ~= nil
-        )
+    if not chapter then
+        return false
+    end
+
+    return self:isChapterDownloaded(manga, chapter) == true
 end
 
 function SuwayomiPlugin:getMangaActions(manga)

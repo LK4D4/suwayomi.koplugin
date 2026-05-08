@@ -342,6 +342,88 @@ describe("suwayomi_client", function()
         assert.are.equal("Sousou no Frieren (0 unread / MangaDex EN)", updated_manga[1].menu_text)
     end)
 
+    it("removes a manga from the visible library list after library removal", function()
+        local updated_manga
+        local client = newClient({
+            api = {
+                fetchCategories = function()
+                    return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
+                end,
+                fetchLibraryManga = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            {
+                                id = "m1",
+                                title = "Sousou no Frieren",
+                                in_library = true,
+                                unread_count = 12,
+                                source = { displayName = "MangaDex EN" },
+                                categories = { { id = "1", name = "Default" } },
+                            },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showLibraryCategoryMenu = function()
+                    error("unexpected category menu")
+                end,
+                showLibraryMangaMenu = function(manga, onSelect)
+                    onSelect(manga[1])
+                    return { name = "library-menu" }
+                end,
+                updateLibraryMangaMenu = function(_, manga)
+                    updated_manga = manga
+                end,
+            },
+        })
+
+        client.plugin.showMangaActions = function(_, manga, options)
+            manga.in_library = false
+            options.onMangaUpdated(manga)
+        end
+
+        client:showLibrary()
+
+        assert.are.equal(0, #updated_manga)
+    end)
+
+    it("keeps browsed manga visible and refreshes row state after library changes", function()
+        local updated_manga
+        local client = newClient({
+            api = {
+                fetchMangaForSource = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Sousou no Frieren", in_library = false },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function(manga, onSelect)
+                    onSelect(manga[1])
+                    return { name = "browse-menu" }
+                end,
+                updateMangaMenu = function(_, manga)
+                    updated_manga = manga
+                end,
+            },
+        })
+
+        client.plugin.showMangaActions = function(_, manga, options)
+            manga.in_library = true
+            options.onMangaUpdated(manga)
+        end
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" })
+
+        assert.are.equal(1, #updated_manga)
+        assert.is_true(updated_manga[1].in_library)
+    end)
+
     it("shows categories when multiple categories are present and filters selected category manga", function()
         local shown_categories
         local shown_category_menu_options

@@ -184,6 +184,11 @@ function SuwayomiClient:showLibraryManga(category, credentials)
     local library_menu
     local pending_library_menu_refresh = false
     local function refreshLibraryMangaMenu()
+        for index = #library_manga, 1, -1 do
+            if type(library_manga[index]) == "table" and library_manga[index].in_library == false then
+                table.remove(library_manga, index)
+            end
+        end
         self:withLibraryMenuText(library_manga)
         if not library_menu then
             pending_library_menu_refresh = true
@@ -288,14 +293,42 @@ function SuwayomiClient:showMangaForSource(source)
             return
         end
 
-        self.ui.showMangaMenu(result.manga, function(manga)
+        local manga_list = result.manga
+        local manga_menu
+        local pending_manga_menu_refresh = false
+        local function refreshMangaMenu()
+            if not manga_menu then
+                pending_manga_menu_refresh = true
+                return
+            end
+            if self.ui.updateMangaMenu then
+                self.ui.updateMangaMenu(manga_menu, manga_list, function(manga)
+                    self:attachSourceToManga(manga, source)
+                    if self.plugin.showMangaActions then
+                        self.plugin:showMangaActions(manga, {
+                            onMangaUpdated = refreshMangaMenu,
+                        })
+                    else
+                        self.plugin:showChaptersForManga(manga)
+                    end
+                end, self:getHomeMenuOptions())
+            end
+        end
+
+        manga_menu = self.ui.showMangaMenu(manga_list, function(manga)
             self:attachSourceToManga(manga, source)
             if self.plugin.showMangaActions then
-                self.plugin:showMangaActions(manga)
+                self.plugin:showMangaActions(manga, {
+                    onMangaUpdated = refreshMangaMenu,
+                })
             else
                 self.plugin:showChaptersForManga(manga)
             end
         end, self:getHomeMenuOptions())
+        if pending_manga_menu_refresh then
+            pending_manga_menu_refresh = false
+            refreshMangaMenu()
+        end
     end)
 end
 
