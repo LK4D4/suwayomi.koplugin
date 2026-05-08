@@ -1936,6 +1936,7 @@ function SuwayomiPlugin:reconcileDownloadedChapterLedger(ledger)
                 changed = true
                 read_count = read_count + 1
                 self:markCurrentContextChapterReadFromLedger(entry)
+                self:autoDeleteReadLocalDownloadFromLedgerEntry(entry, ledger)
             end
         end
     end
@@ -1994,6 +1995,29 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
             end
         end
 
+        if chapter_exists then
+            local updates = {
+                path = chapter_path,
+                read = item.is_read == true,
+                pending_read_sync = item.pending_read_sync == true or nil,
+            }
+            if ledger then
+                self:upsertChapterLedgerEntryInLedger(ledger, manga, item, updates)
+            else
+                self:upsertChapterLedgerEntry(manga, item, updates)
+            end
+            ledger_upsert_count = ledger_upsert_count + 1
+            if item.is_read == true then
+                local deleted = self:autoDeleteReadLocalDownload(manga, item, {
+                    ledger = ledger,
+                    skip_refresh = true,
+                })
+                if deleted then
+                    chapter_exists = false
+                end
+            end
+        end
+
         local status = self:getChapterDownloadStatus(manga, item)
         if not status then
             if chapter_exists then
@@ -2008,20 +2032,6 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
             if self:isChapterSelected(manga, item) then
                 item.menu_status = self:addChapterSelectionMarker(item.menu_status)
             end
-        end
-
-        if chapter_exists then
-            local updates = {
-                path = chapter_path,
-                read = item.is_read == true,
-                pending_read_sync = item.pending_read_sync == true or nil,
-            }
-            if ledger then
-                self:upsertChapterLedgerEntryInLedger(ledger, manga, item, updates)
-            else
-                self:upsertChapterLedgerEntry(manga, item, updates)
-            end
-            ledger_upsert_count = ledger_upsert_count + 1
         end
 
         table.insert(items, item)
@@ -2196,6 +2206,14 @@ end
 
 function SuwayomiPlugin:deleteChapterFromDeviceWithOptions(manga, chapter, options)
     options = options or {}
+    local status = self:getDownloadQueue():getStatus(manga, chapter)
+    if status and status.state == "downloading" then
+        if not options.quiet_active then
+            self:showMessage(_("This chapter is downloading. Wait for it to finish before deleting it."))
+        end
+        return false, "downloading"
+    end
+
     local cancelled, queue_state = self:getDownloadQueue():cancelPending(manga, chapter)
     if queue_state == "downloading" then
         if not options.quiet_active then
@@ -2223,7 +2241,7 @@ function SuwayomiPlugin:deleteChapterFromDeviceWithOptions(manga, chapter, optio
         end
     end
 
-    local ledger = self:loadChapterLedger()
+    local ledger = options.ledger or self:loadChapterLedger()
     local key = self:getChapterLedgerKey(manga, chapter)
     local entry = ledger[key]
     if not entry then
@@ -2244,7 +2262,9 @@ function SuwayomiPlugin:deleteChapterFromDeviceWithOptions(manga, chapter, optio
         else
             ledger[key] = entry
         end
-        self:saveChapterLedger(ledger)
+        if not options.ledger then
+            self:saveChapterLedger(ledger)
+        end
     end
     self:getDownloadQueue():clearStatus(manga, chapter, { quiet = true })
 
@@ -2252,6 +2272,46 @@ function SuwayomiPlugin:deleteChapterFromDeviceWithOptions(manga, chapter, optio
         self:refreshChapterMenu()
     end
     return true, cancelled and "queued" or "deleted"
+end
+
+function SuwayomiPlugin:autoDeleteReadLocalDownload(manga, chapter, options)
+    options = options or {}
+    if self:getKeepNextUnreadDownloadsPolicyLimit() <= 0 then
+        return false, "disabled"
+    end
+    if not chapter or (chapter.is_read ~= true and options.assume_read ~= true) then
+        return false, "unread"
+    end
+
+    return self:deleteChapterFromDeviceWithOptions(manga, chapter, {
+        ledger = options.ledger,
+        quiet_active = true,
+        quiet_missing = true,
+        skip_refresh = options.skip_refresh ~= false,
+    })
+end
+
+function SuwayomiPlugin:autoDeleteReadLocalDownloadFromLedgerEntry(entry, ledger)
+    if self:getKeepNextUnreadDownloadsPolicyLimit() <= 0 then
+        return false, "disabled"
+    end
+    if type(entry) ~= "table" or entry.read ~= true then
+        return false, "unread"
+    end
+
+    local manga = {
+        id = entry.manga_id,
+        title = entry.manga_title,
+    }
+    local chapter = {
+        id = entry.chapter_id,
+        name = entry.chapter_name,
+        is_read = true,
+    }
+    return self:autoDeleteReadLocalDownload(manga, chapter, {
+        ledger = ledger,
+        skip_refresh = true,
+    })
 end
 
 function SuwayomiPlugin:markChapterRead(manga, chapter, options)
@@ -2282,6 +2342,11 @@ function SuwayomiPlugin:markChapterRead(manga, chapter, options)
             end
         end
     end
+    self:autoDeleteReadLocalDownload(manga, chapter, {
+        assume_read = true,
+        ledger = options.ledger,
+        skip_refresh = true,
+    })
     if not options.skip_refresh then
         self:refreshChapterMenu()
     end

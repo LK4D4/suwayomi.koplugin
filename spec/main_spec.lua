@@ -5160,6 +5160,294 @@ return {
         assert.are.equal(0, #saved_queue)
     end)
 
+    it("automatically deletes a read local download after manual mark-read when keep-next is enabled", function()
+        local saved_queue = {}
+        local saved_ledger = {}
+        local files = {
+            ["/books/Sousou no Frieren/Ch. 1.cbz"] = true,
+        }
+        local removed = {}
+        local original_remove = os.remove
+
+        os.remove = function(path)
+            table.insert(removed, path)
+            files[path] = nil
+            return true
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function(_, chapter_path)
+                    return files[chapter_path] == true
+                end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadKeepNextUnreadDownloads = function() return 5 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = {
+                { id = "398", name = "Ch. 1", is_read = false },
+                { id = "399", name = "Ch. 2", is_read = false },
+            },
+        }
+
+        plugin:markChapterRead(manga, plugin.current_chapter_context.chapters[1])
+
+        os.remove = original_remove
+        assert.are.same({
+            "/books/Sousou no Frieren/Ch. 1.cbz",
+            "/books/Sousou no Frieren/Ch. 1.sdr/metadata.cbz.lua",
+            "/books/Sousou no Frieren/Ch. 1.sdr/metadata.cbz.lua.old",
+            "/books/Sousou no Frieren/Ch. 1.sdr",
+        }, removed)
+        assert.is_nil(files["/books/Sousou no Frieren/Ch. 1.cbz"])
+        assert.is_true(saved_ledger["m1:398"].read)
+        assert.is_nil(saved_ledger["m1:398"].path)
+        assert.are.equal("399", saved_queue[1].chapter.id)
+        assert.are.equal(0, #shown_messages)
+    end)
+
+    it("does not automatically delete read local downloads when keep-next is disabled", function()
+        local saved_ledger = {}
+        local files = {
+            ["/books/Sousou no Frieren/Ch. 1.cbz"] = true,
+        }
+        local removed = {}
+        local original_remove = os.remove
+
+        os.remove = function(path)
+            table.insert(removed, path)
+            files[path] = nil
+            return true
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function(_, chapter_path)
+                    return files[chapter_path] == true
+                end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadKeepNextUnreadDownloads = function() return 0 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+
+        plugin:markChapterRead(manga, { id = "398", name = "Ch. 1", is_read = false })
+
+        os.remove = original_remove
+        assert.are.same({}, removed)
+        assert.is_true(files["/books/Sousou no Frieren/Ch. 1.cbz"])
+        assert.are.equal("/books/Sousou no Frieren/Ch. 1.cbz", saved_ledger["m1:398"].path)
+    end)
+
+    it("automatically deletes a read local download after KOReader metadata reconciliation when keep-next is enabled", function()
+        local saved_ledger = {}
+        local files = {
+            ["/books/Sousou no Frieren/Ch. 1.cbz"] = true,
+        }
+        local removed = {}
+        local original_remove = os.remove
+        local original_open = io.open
+
+        os.remove = function(path)
+            table.insert(removed, path)
+            files[path] = nil
+            return true
+        end
+        io.open = function(path, mode)
+            if path == "/books/Sousou no Frieren/Ch. 1.sdr/metadata.cbz.lua" and mode == "r" then
+                return {
+                    read = function()
+                        return [[
+return {
+    ["percent_finished"] = 1,
+    ["summary"] = {
+        ["status"] = "complete",
+    },
+}
+]]
+                    end,
+                    close = function() end,
+                }
+            end
+            return original_open(path, mode)
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function(_, chapter_path)
+                    return files[chapter_path] == true
+                end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadKeepNextUnreadDownloads = function() return 5 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local options = plugin:buildChapterMenuOptions(manga, {
+            { id = "398", name = "Ch. 1", is_read = false },
+        })
+
+        os.remove = original_remove
+        io.open = original_open
+        assert.are.equal("Ch. 1", options.chapters[1].menu_text)
+        assert.are.equal("✓", options.chapters[1].menu_status)
+        assert.are.equal("/books/Sousou no Frieren/Ch. 1.cbz", removed[1])
+        assert.is_nil(files["/books/Sousou no Frieren/Ch. 1.cbz"])
+        assert.is_true(saved_ledger["m1:398"].read)
+        assert.is_nil(saved_ledger["m1:398"].path)
+        assert.are.equal(0, #shown_messages)
+    end)
+
+    it("skips automatic read cleanup for active downloads", function()
+        local saved_queue = {}
+        local saved_ledger = {}
+        local files = {
+            ["/books/Sousou no Frieren/Ch. 1.cbz"] = true,
+        }
+        local removed = {}
+        local original_remove = os.remove
+
+        os.remove = function(path)
+            table.insert(removed, path)
+            files[path] = nil
+            return true
+        end
+
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function(_, chapter_path)
+                    return files[chapter_path] == true
+                end,
+            }
+        end
+
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadKeepNextUnreadDownloads = function() return 5 end,
+                loadChapterLedger = function() return saved_ledger end,
+                saveChapterLedger = function(_, ledger)
+                    saved_ledger = ledger
+                    return ledger
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_downloader = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Ch. 1", is_read = false }
+
+        plugin:getDownloadQueue():enqueue(manga, chapter, "/books")
+        plugin:getDownloadQueue():setStatus(manga, chapter, {
+            state = "downloading",
+            download_directory = "/books",
+        })
+
+        plugin:markChapterRead(manga, chapter)
+
+        os.remove = original_remove
+        assert.are.same({}, removed)
+        assert.is_true(files["/books/Sousou no Frieren/Ch. 1.cbz"])
+        assert.are.equal("downloading", plugin:getDownloadQueue():getStatus(manga, chapter).state)
+        assert.are.equal(0, #shown_messages)
+    end)
+
     it("marks the chosen chapter and previous chapters read for a clean-state read boundary", function()
         local saved_ledger = {}
         local marked_ids = {}
