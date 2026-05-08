@@ -711,6 +711,46 @@ function SuwayomiUI.updateParallelDownloadsMenu(menu, options)
     end
 end
 
+local function formatKeepNextUnreadDownloadsLabel(value)
+    value = tonumber(value) or 0
+    if value == 0 then
+        return _("Off")
+    end
+    return tostring(value) .. " " .. _("chapters")
+end
+
+function SuwayomiUI.showKeepNextUnreadDownloadsMenu(options)
+    local UIManager = require("ui/uimanager")
+    local dialog
+    local buttons = {}
+    options = options or {}
+
+    for _, value in ipairs(options.choices or { 0, 5, 10, 50 }) do
+        table.insert(buttons, {
+            {
+                text = formatKeepNextUnreadDownloadsLabel(value),
+                callback = function()
+                    UIManager:close(dialog)
+                    if options.onSelect then
+                        options.onSelect(value)
+                    end
+                end,
+            },
+        })
+    end
+
+    dialog = ButtonDialog:new{
+        title = _("Keep next unread downloaded"),
+        buttons = buttons,
+    }
+    UIManager:show(dialog)
+    return dialog
+end
+
+function SuwayomiUI.updateKeepNextUnreadDownloadsMenu()
+    return nil
+end
+
 function SuwayomiUI.updateLanguageMenu(menu, options, onToggleCallback)
     if not menu then
         return

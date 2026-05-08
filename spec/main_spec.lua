@@ -7,6 +7,7 @@ describe("suwayomi plugin", function()
     local language_menu_options
     local library_category_picker_menu_options
     local parallel_downloads_menu_options
+    local keep_next_unread_downloads_menu_options
     local shown_messages
     local shown_loading_messages
     local closed_loading_messages
@@ -43,6 +44,7 @@ describe("suwayomi plugin", function()
         language_menu_options = nil
         library_category_picker_menu_options = nil
         parallel_downloads_menu_options = nil
+        keep_next_unread_downloads_menu_options = nil
         shown_messages = {}
         shown_loading_messages = {}
         closed_loading_messages = {}
@@ -344,6 +346,14 @@ describe("suwayomi plugin", function()
                     parallel_downloads_menu_options = options
                     parallel_downloads_menu_options.menu = menu
                 end,
+                showKeepNextUnreadDownloadsMenu = function(options)
+                    keep_next_unread_downloads_menu_options = options
+                    return { name = "keep-next-unread-downloads-menu" }
+                end,
+                updateKeepNextUnreadDownloadsMenu = function(menu, options)
+                    keep_next_unread_downloads_menu_options = options
+                    keep_next_unread_downloads_menu_options.menu = menu
+                end,
                 showHomeDialog = function(options)
                     home_dialog_options = options
                 end,
@@ -360,6 +370,10 @@ describe("suwayomi plugin", function()
                     downloads_actions_menu_options = options
                     downloads_actions_menu_callback = onSelect
                     return { name = "downloads-actions-menu" }
+                end,
+                showConfirm = function(options)
+                    shown_confirm = options
+                    return { name = "confirm" }
                 end,
                 showChapterMenu = function(options)
                     shown_chapter_menu_options = options
@@ -417,6 +431,12 @@ describe("suwayomi plugin", function()
                     return 2
                 end,
                 saveMaxParallelChapterDownloads = function(_, value)
+                    return value
+                end,
+                loadKeepNextUnreadDownloads = function()
+                    return 0
+                end,
+                saveKeepNextUnreadDownloads = function(_, value)
                     return value
                 end,
                 saveDownloadQueue = function(_, jobs)
@@ -897,6 +917,7 @@ return {
         assert.are.equal("Source languages: EN, RU", settings_menu[3].sub_item_table[1].text_func())
         assert.are.equal("Download directory: not set", settings_menu[4].sub_item_table[1].text_func())
         assert.are.equal("Parallel downloads: 2", settings_menu[4].sub_item_table[2].text_func())
+        assert.are.equal("Keep next unread downloaded: off", settings_menu[4].sub_item_table[3].text_func())
     end)
 
     it("keeps settings section menu items open while launching setting controls", function()
@@ -927,6 +948,50 @@ return {
 
         settings_menu[4].sub_item_table[2].callback()
         assert.are.equal(2, parallel_downloads_menu_options.current)
+
+        settings_menu[4].sub_item_table[3].callback()
+        assert.are.equal(0, keep_next_unread_downloads_menu_options.current)
+    end)
+
+    it("saves keep-next unread download settings from the downloads settings menu", function()
+        local saved_keep_next = 10
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
+                end,
+                loadSourceLanguages = function() return { "en", "ru" } end,
+                loadLibraryCategoryPickerBehavior = function() return "automatic" end,
+                loadDownloadDirectory = function() return "" end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadMaxParallelChapterDownloads = function() return 2 end,
+                loadKeepNextUnreadDownloads = function() return saved_keep_next end,
+                saveKeepNextUnreadDownloads = function(_, value)
+                    saved_keep_next = value
+                    return value
+                end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local downloads_settings_item = getSettingsMenu(plugin)[4].sub_item_table[3]
+
+        assert.are.equal("Keep next unread downloaded: 10 chapters", downloads_settings_item.text_func())
+
+        downloads_settings_item.callback()
+        assert.are.same({ 0, 5, 10, 50 }, keep_next_unread_downloads_menu_options.choices)
+        assert.are.equal(10, keep_next_unread_downloads_menu_options.current)
+
+        keep_next_unread_downloads_menu_options.onSelect(5)
+
+        assert.are.equal(5, saved_keep_next)
+        assert.are.equal("Keep next unread downloaded: 5 chapters", downloads_settings_item.text_func())
     end)
 
     it("saves library category picker behavior from settings", function()
@@ -1086,7 +1151,8 @@ return {
         assert.are.equal("Remove from library", shown_manga_actions.actions[3].text)
         assert.are.equal("Download first unread", shown_manga_actions.actions[4].text)
         assert.are.equal("Download next 10 unread", shown_manga_actions.actions[5].text)
-        assert.is_nil(shown_manga_actions.actions[6])
+        assert.are.equal("More...", shown_manga_actions.actions[6].text)
+        assert.is_nil(shown_manga_actions.actions[7])
         assert.is_nil(shown_chapter_menu_options)
 
         shown_manga_actions_callback(shown_manga_actions.actions[1])
@@ -1190,6 +1256,94 @@ return {
         assert.are.equal("Open chapters", actions[1].text)
         assert.are.equal("Open first unread", actions[2].text)
         assert.are.equal("Refresh chapters", actions[3].text)
+    end)
+
+    it("shows nested manga-level bulk and keep download actions", function()
+        local shown_manga_actions
+        local shown_manga_actions_callback
+        package.preload.suwayomi_ui = function()
+            return {
+                showMangaActionsMenu = function(options, onSelect)
+                    shown_manga_actions = options
+                    shown_manga_actions_callback = onSelect
+                end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_ui = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+
+        plugin:showMangaActions(manga)
+        shown_manga_actions_callback(shown_manga_actions.actions[6])
+
+        assert.are.equal("More...", shown_manga_actions.title)
+        assert.are.equal("Download next 5 unread", shown_manga_actions.actions[1].text)
+        assert.are.equal("Download next 50 unread", shown_manga_actions.actions[2].text)
+        assert.are.equal("Download all unread", shown_manga_actions.actions[3].text)
+        assert.are.equal("Download all chapters", shown_manga_actions.actions[4].text)
+        assert.are.equal("Keep downloaded", shown_manga_actions.actions[5].text)
+        assert.are.equal("Delete read downloads", shown_manga_actions.actions[6].text)
+
+        shown_manga_actions_callback(shown_manga_actions.actions[5])
+
+        assert.are.equal("Keep downloaded", shown_manga_actions.title)
+        assert.are.equal("Keep next 5 unread", shown_manga_actions.actions[1].text)
+        assert.are.equal("Keep next 10 unread", shown_manga_actions.actions[2].text)
+        assert.are.equal("Keep next 50 unread", shown_manga_actions.actions[3].text)
+        assert.are.equal("Stop keeping unread", shown_manga_actions.actions[4].text)
+    end)
+
+    it("downloads the first unread chapter for a manga after fetching its chapters", function()
+        local saved_queue = {}
+        package.preload.suwayomi_api = function()
+            return {
+                fetchChaptersForManga = function(_, manga_id)
+                    assert.are.equal("m1", manga_id)
+                    return {
+                        ok = true,
+                        chapters = {
+                            { id = "398", name = "Ch. 1", is_read = true },
+                            { id = "399", name = "Ch. 2", is_read = false },
+                            { id = "400", name = "Ch. 3", is_read = false },
+                        },
+                    }
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.current_chapter_context = {
+            manga = { id = "other", title = "Other" },
+            chapters = { { id = "1", name = "Other 1" } },
+        }
+
+        assert.is_true(plugin:performMangaAction({ id = "m1", title = "Sousou no Frieren" }, "download_first_unread"))
+
+        assert.are.equal(1, #saved_queue)
+        assert.are.equal("399", saved_queue[1].chapter.id)
+        assert.are.equal("m1", plugin.current_chapter_context.manga.id)
     end)
 
     it("opens the downloads menu from the top-level entry", function()
@@ -3807,6 +3961,96 @@ return {
         assert.are.equal("401", saved_queue[1].chapter.id)
         assert.are.equal("450", saved_queue[50].chapter.id)
         assert.are.equal("Queued first 50 downloads. Refine the chapter selection to queue more.", shown_messages[#shown_messages])
+    end)
+
+    it("confirms manga-level all unread downloads and reuses the 50 chapter cap", function()
+        local saved_queue = {}
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapters = {}
+        for index = 1, 55 do
+            table.insert(chapters, {
+                id = tostring(500 + index),
+                name = "Chapter " .. tostring(index),
+                is_read = false,
+            })
+        end
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = chapters,
+        }
+
+        assert.is_true(plugin:performMangaAction(manga, "download_all_unread"))
+        assert.are.equal("Queue downloads for all 55 unread chapters?", shown_confirm.text)
+        assert.are.equal("Queue", shown_confirm.ok_text)
+        assert.are.equal(0, #saved_queue)
+
+        shown_confirm.ok_callback()
+
+        assert.are.equal(50, #saved_queue)
+        assert.are.equal("501", saved_queue[1].chapter.id)
+        assert.are.equal("550", saved_queue[50].chapter.id)
+        assert.are.equal("Queued first 50 downloads. Refine the chapter selection to queue more.", shown_messages[#shown_messages])
+    end)
+
+    it("confirms manga-level all chapter downloads including read chapters", function()
+        local saved_queue = {}
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example" }
+                end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return saved_queue end,
+                saveDownloadQueue = function(_, jobs)
+                    saved_queue = jobs
+                    return jobs
+                end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = {
+                { id = "398", name = "Ch. 1", is_read = true },
+                { id = "399", name = "Ch. 2", is_read = false },
+            },
+        }
+
+        assert.is_true(plugin:performMangaAction(manga, "download_all_chapters"))
+        assert.are.equal("Queue downloads for all 2 chapters?", shown_confirm.text)
+
+        shown_confirm.ok_callback()
+
+        assert.are.equal(2, #saved_queue)
+        assert.are.equal("398", saved_queue[1].chapter.id)
+        assert.are.equal("399", saved_queue[2].chapter.id)
     end)
 
     it("deletes selected downloaded chapters from bulk actions", function()
