@@ -415,6 +415,8 @@ function SuwayomiAPI.parseRefreshMangaResponse(response_body)
         table.insert(chapters, {
             id = parsed_chapter.id,
             name = parsed_chapter.name,
+            chapter_number = parsed_chapter.chapter_number,
+            source_order = parsed_chapter.source_order,
             scanlator = parsed_chapter.scanlator,
             is_read = parsed_chapter.is_read,
         })
@@ -438,7 +440,7 @@ end
 
 function SuwayomiAPI._buildChapterPagesQuery(chapter_id)
     return json.encode({
-        query = "mutation Pages($input: FetchChapterPagesInput!) { fetchChapterPages(input: $input) { pages chapter { id name manga { title } } } }",
+        query = "mutation Pages($input: FetchChapterPagesInput!) { fetchChapterPages(input: $input) { pages chapter { id name chapterNumber sourceOrder manga { title } } } }",
         variables = {
             input = {
                 chapterId = tonumber(chapter_id) or chapter_id,
@@ -525,17 +527,7 @@ function SuwayomiAPI.parseChapterResponse(response_body)
 
     local chapters = {}
     for _, entry in ipairs(chapter_nodes) do
-        local chapter_name = entry.name
-        if not chapter_name or chapter_name == "" then
-            chapter_name = entry.chapterNumber and ("Chapter " .. tostring(entry.chapterNumber)) or tostring(entry.id)
-        end
-
-        table.insert(chapters, {
-            id = tostring(entry.id),
-            name = chapter_name,
-            scanlator = entry.scanlator,
-            is_read = entry.isRead == true,
-        })
+        table.insert(chapters, parseChapterNode(entry))
     end
 
     return chapters
@@ -565,6 +557,8 @@ function SuwayomiAPI.parseChapterPagesResponse(response_body)
         chapter = {
             id = tostring(chapter.id),
             name = chapter_name,
+            chapter_number = chapter.chapterNumber,
+            source_order = chapter.sourceOrder,
             manga_title = chapter.manga and chapter.manga.title or "",
         },
         pages = pages,
@@ -693,17 +687,7 @@ function SuwayomiAPI.parseStoredChapterResponse(response_body)
 
     local chapters = {}
     for _, entry in ipairs(chapter_nodes) do
-        local chapter_name = entry.name
-        if not chapter_name or chapter_name == "" then
-            chapter_name = entry.chapterNumber and ("Chapter " .. tostring(entry.chapterNumber)) or tostring(entry.id)
-        end
-
-        table.insert(chapters, {
-            id = tostring(entry.id),
-            name = chapter_name,
-            scanlator = entry.scanlator,
-            is_read = entry.isRead == true,
-        })
+        table.insert(chapters, parseChapterNode(entry))
     end
 
     return chapters

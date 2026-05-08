@@ -7926,7 +7926,7 @@ return {
         run_scheduled_callbacks()
 
         assert.are.equal(
-            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (chapter 398): Set up a download directory first.",
+            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): Set up a download directory first.",
             shown_messages[#shown_messages]
         )
     end)

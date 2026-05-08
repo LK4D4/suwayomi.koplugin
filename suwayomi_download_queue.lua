@@ -187,6 +187,19 @@ function DownloadQueue:copyMangaMetadata(manga)
     return copied
 end
 
+function DownloadQueue:copyChapterMetadata(chapter)
+    local copied = {
+        id = chapter.id,
+        name = chapter.name,
+    }
+    for _, key in ipairs({ "chapter_number", "source_order", "scanlator" }) do
+        if chapter[key] ~= nil then
+            copied[key] = chapter[key]
+        end
+    end
+    return copied
+end
+
 function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, state, details)
     details = details or {}
     local job = {
@@ -194,10 +207,7 @@ function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, st
         state = state or "queued",
         download_directory = download_directory,
         manga = self:copyMangaMetadata(manga),
-        chapter = {
-            id = chapter.id,
-            name = chapter.name,
-        },
+        chapter = self:copyChapterMetadata(chapter),
     }
     if details.started_at ~= nil then
         job.started_at = tonumber(details.started_at) or details.started_at
@@ -563,6 +573,17 @@ function DownloadQueue:formatChapterMenuText(chapter, status)
     return self:formatChapterStatusSymbols(chapter, symbols)
 end
 
+function DownloadQueue:formatChapterNumber(value)
+    local number = tonumber(value)
+    if not number then
+        return tostring(value)
+    end
+    if number == math.floor(number) then
+        return tostring(math.floor(number))
+    end
+    return tostring(number)
+end
+
 function DownloadQueue:formatFailureMessage(manga, chapter, detail)
     local label_parts = {}
     if manga and manga.title and manga.title ~= "" then
@@ -578,8 +599,10 @@ function DownloadQueue:formatFailureMessage(manga, chapter, detail)
     end
 
     local chapter_suffix = ""
-    if chapter and chapter.id and chapter.id ~= "" then
-        chapter_suffix = T(_(" (chapter %1)"), chapter.id)
+    if chapter and chapter.chapter_number ~= nil and tostring(chapter.chapter_number) ~= "" then
+        chapter_suffix = T(_(" (Ch. %1)"), self:formatChapterNumber(chapter.chapter_number))
+    elseif chapter and chapter.id and chapter.id ~= "" then
+        chapter_suffix = T(_(" (Suwayomi id %1)"), chapter.id)
     end
 
     local failure_detail = tostring(detail or "")

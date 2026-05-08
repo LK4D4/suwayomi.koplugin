@@ -630,7 +630,7 @@ describe("suwayomi_download_queue", function()
         context.run_scheduled()
 
         assert.are.equal("failed", context.saved_queue()[1].state)
-        local message = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (chapter 398): network timeout"
+        local message = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): network timeout"
         assert.are.same({
             state = "failed",
             current = 0,
@@ -640,6 +640,53 @@ describe("suwayomi_download_queue", function()
             updated_at = 100,
         }, context.saved_queue()[1].progress)
         assert.are.equal(message, context.messages[#context.messages])
+    end)
+
+    it("uses the human chapter number in failure messages when available", function()
+        local context = build_queue()
+
+        local message = context.queue:formatFailureMessage(
+            { id = "m1", title = "Sousou no Frieren" },
+            { id = "462", name = "Official_Vol. 7 Ch. 65", chapter_number = 65 },
+            "network timeout"
+        )
+
+        assert.are.equal(
+            "Could not download \"Sousou no Frieren / Official_Vol. 7 Ch. 65\" (Ch. 65): network timeout",
+            message
+        )
+    end)
+
+    it("labels fallback failure ids as Suwayomi ids", function()
+        local context = build_queue()
+
+        local message = context.queue:formatFailureMessage(
+            { id = "m1", title = "Sousou no Frieren" },
+            { id = "462", name = "Official_Vol. 7 Ch. 65" },
+            "network timeout"
+        )
+
+        assert.are.equal(
+            "Could not download \"Sousou no Frieren / Official_Vol. 7 Ch. 65\" (Suwayomi id 462): network timeout",
+            message
+        )
+    end)
+
+    it("persists chapter number metadata for queued downloads", function()
+        local context = build_queue()
+
+        context.queue:enqueue(
+            { id = "m1", title = "Sousou no Frieren" },
+            { id = "462", name = "Official_Vol. 7 Ch. 65", chapter_number = 65, source_order = 65 },
+            "/books"
+        )
+
+        assert.are.same({
+            id = "462",
+            name = "Official_Vol. 7 Ch. 65",
+            chapter_number = 65,
+            source_order = 65,
+        }, context.saved_queue()[1].chapter)
     end)
 
     it("reports retry state and clears failed artifacts before retrying", function()
@@ -1145,11 +1192,11 @@ describe("suwayomi_download_queue", function()
             state = "failed",
             current = 0,
             total = 0,
-            error = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (chapter 398): Chapter download timed out.",
+            error = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): Chapter download timed out.",
             updated_at = 1901,
         }, context.saved_queue()[1].progress)
         assert.are.equal(
-            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (chapter 398): Chapter download timed out.",
+            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): Chapter download timed out.",
             context.messages[#context.messages]
         )
     end)

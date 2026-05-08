@@ -593,6 +593,8 @@ describe("suwayomi_api", function()
         local query = api._buildChapterPagesQuery("398")
         assert.truthy(query:match("mutation Pages"))
         assert.truthy(query:match("fetchChapterPages"))
+        assert.truthy(query:match("chapterNumber"))
+        assert.truthy(query:match("sourceOrder"))
         assert.truthy(query:match('"chapterId":398'))
     end)
 
@@ -627,8 +629,8 @@ describe("suwayomi_api", function()
                 "data": {
                     "fetchChapters": {
                         "chapters": [
-                            { "id": 1, "name": "Chapter 1", "scanlator": "Sense Scans" },
-                            { "id": 2, "name": "", "chapterNumber": 7 },
+                            { "id": 1, "name": "Chapter 1", "chapterNumber": 1, "sourceOrder": 10, "scanlator": "Sense Scans" },
+                            { "id": 2, "name": "", "chapterNumber": 7, "sourceOrder": 20 },
                             { "id": 3, "chapterNumber": 8 },
                             { "id": 4, "name": "" }
                         ]
@@ -640,9 +642,9 @@ describe("suwayomi_api", function()
         local chapters = api.parseChapterResponse(response)
 
         assert.are.same({
-            { id = "1", name = "Chapter 1", scanlator = "Sense Scans", is_read = false },
-            { id = "2", name = "Chapter 7", is_read = false },
-            { id = "3", name = "Chapter 8", is_read = false },
+            { id = "1", name = "Chapter 1", chapter_number = 1, source_order = 10, scanlator = "Sense Scans", is_read = false },
+            { id = "2", name = "Chapter 7", chapter_number = 7, source_order = 20, is_read = false },
+            { id = "3", name = "Chapter 8", chapter_number = 8, is_read = false },
             { id = "4", name = "4", is_read = false },
         }, chapters)
     end)
@@ -659,6 +661,8 @@ describe("suwayomi_api", function()
                         "chapter": {
                             "id": 398,
                             "name": "Official_Vol. 1 Ch. 1",
+                            "chapterNumber": 1,
+                            "sourceOrder": 1,
                             "manga": { "title": "Sousou no Frieren" }
                         }
                     }
@@ -672,6 +676,8 @@ describe("suwayomi_api", function()
             chapter = {
                 id = "398",
                 name = "Official_Vol. 1 Ch. 1",
+                chapter_number = 1,
+                source_order = 1,
                 manga_title = "Sousou no Frieren",
             },
             pages = {
@@ -1054,8 +1060,8 @@ describe("suwayomi_api", function()
                 "data": {
                     "chapters": {
                         "nodes": [
-                            { "id": 1, "name": "Chapter 1", "scanlator": "Sense Scans", "isRead": true },
-                            { "id": 2, "name": "", "chapterNumber": 7, "isRead": false },
+                            { "id": 1, "name": "Chapter 1", "chapterNumber": 1, "sourceOrder": 10, "scanlator": "Sense Scans", "isRead": true },
+                            { "id": 2, "name": "", "chapterNumber": 7, "sourceOrder": 20, "isRead": false },
                             { "id": 3, "chapterNumber": 8 }
                         ]
                     }
@@ -1066,9 +1072,9 @@ describe("suwayomi_api", function()
         local chapters = api.parseStoredChapterResponse(response)
 
         assert.are.same({
-            { id = "1", name = "Chapter 1", scanlator = "Sense Scans", is_read = true },
-            { id = "2", name = "Chapter 7", is_read = false },
-            { id = "3", name = "Chapter 8", is_read = false },
+            { id = "1", name = "Chapter 1", chapter_number = 1, source_order = 10, scanlator = "Sense Scans", is_read = true },
+            { id = "2", name = "Chapter 7", chapter_number = 7, source_order = 20, is_read = false },
+            { id = "3", name = "Chapter 8", chapter_number = 8, is_read = false },
         }, chapters)
     end)
 
