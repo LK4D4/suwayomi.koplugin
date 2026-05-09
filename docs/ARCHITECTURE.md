@@ -1,6 +1,6 @@
 # Suwayomi KOReader Plugin Architecture
 
-This document describes the current runtime boundaries after the module refactor. It is the active architecture reference; older design specs under `docs/superpowers/specs/` describe historical implementation slices and may use pre-refactor module names.
+This document describes the current runtime boundaries after the module refactor. It is the active architecture reference for humans and AI agents working in the repo.
 
 ## Runtime Shape
 

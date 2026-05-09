@@ -2,10 +2,6 @@
 
 This roadmap tracks the next implementation path from the current downloader-oriented plugin to a small KOReader-native Suwayomi library, download, and sync client.
 
-The design source for this roadmap is:
-
-- `docs/superpowers/specs/2026-05-06-suwayomi-client-mvp-design.md`
-
 ## Direction
 
 The MVP should expose four first-class client surfaces:
