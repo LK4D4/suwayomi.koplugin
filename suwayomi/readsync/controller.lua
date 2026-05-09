@@ -7,6 +7,7 @@
 
 local UIManager = require("ui/uimanager")
 local SuwayomiReadSyncWorker = require("suwayomi/readsync/worker")
+local SubprocessJob = require("suwayomi/subprocess/job")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiDebug = require("suwayomi/debug")
 local _ = require("gettext")
@@ -27,26 +28,12 @@ end
 local Methods = {}
 
 function Methods:getReadSyncResultPath()
-    local settings_dir = SuwayomiSettings.getSettingsDir and SuwayomiSettings:getSettingsDir() or "."
-    self.pending_read_sync_result_counter = (self.pending_read_sync_result_counter or 0) + 1
-    return tostring(settings_dir or "."):gsub("/+$", "")
-        .. "/suwayomi_dl_read_sync_"
-        .. tostring(os.time())
-        .. "_"
-        .. tostring(self.pending_read_sync_result_counter)
-        .. ".json"
+    return SubprocessJob.buildResultPath("read_sync")
 end
 
 
 function Methods:schedulePendingReadSyncPoll()
-    if self.pending_read_sync_poll_scheduled or not self.pending_read_sync_active then
-        return
-    end
-
-    self.pending_read_sync_poll_scheduled = true
-    UIManager:scheduleIn(self.read_sync_poll_interval_seconds, function()
-        self:pollPendingReadSync()
-    end)
+    SubprocessJob.schedulePoll(self.pending_read_sync_active)
 end
 
 
@@ -66,26 +53,37 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
     end
 
     local result_path = self:getReadSyncResultPath()
-    os.remove(result_path)
-    os.remove(result_path .. ".tmp")
-
-    local pid, err = FFIUtil.runInSubProcess(function()
-        SuwayomiReadSyncWorker:run(credentials, batch, result_path)
-    end)
-
-    if not pid then
-        self:showMessage(T(_("Could not start read sync: %1"), err or _("unknown error")))
-        return false, #batch
-    end
-
-    self.pending_read_sync_active = {
-        pid = pid,
+    local active = {
         credentials = credentials,
         batch = batch,
         result_path = result_path,
-        started_at = os.time(),
     }
-    self:schedulePendingReadSyncPoll()
+
+    active = SubprocessJob.start({
+        active = active,
+        ffi_util = FFIUtil,
+        ui_manager = UIManager,
+        poll_interval_seconds = self.read_sync_poll_interval_seconds,
+        timeout_seconds = self.read_sync_watchdog_timeout_seconds,
+        run = function(path)
+            SuwayomiReadSyncWorker:run(credentials, batch, path)
+        end,
+        read_result = function(path)
+            return SuwayomiReadSyncWorker:readResult(path)
+        end,
+        on_finish = function(finished_active, result)
+            local synced, attempted = self:applyPendingReadSyncResult(finished_active, result)
+            self:finishPendingReadSync(finished_active, synced, attempted)
+        end,
+        on_error = function(err)
+            self.pending_read_sync_active = nil
+            self:showMessage(T(_("Could not start read sync: %1"), err or _("unknown error")))
+        end,
+    })
+    self.pending_read_sync_active = active and not active.cleaned and active or nil
+    if not active then
+        return false, #batch
+    end
     return true, #batch
 end
 
@@ -154,10 +152,6 @@ end
 
 function Methods:finishPendingReadSync(active, synced, attempted)
     self.pending_read_sync_active = nil
-    if active and active.result_path then
-        os.remove(active.result_path)
-        os.remove(active.result_path .. ".tmp")
-    end
 
     if self:hasPendingReadSync(self:loadChapterLedger()) then
         local next_delay = self.read_sync_delay_seconds
@@ -178,29 +172,7 @@ end
 
 
 function Methods:pollPendingReadSync()
-    self.pending_read_sync_poll_scheduled = false
-    local active = self.pending_read_sync_active
-    if not active then
-        return
-    end
-
-    local done = FFIUtil.isSubProcessDone(active.pid)
-    if not done then
-        if not active.terminating
-            and os.time() - (active.started_at or os.time()) > self.read_sync_watchdog_timeout_seconds
-        then
-            if FFIUtil.terminateSubProcess then
-                pcall(FFIUtil.terminateSubProcess, active.pid)
-            end
-            active.terminating = true
-        end
-        self:schedulePendingReadSyncPoll()
-        return
-    end
-
-    local result = SuwayomiReadSyncWorker:readResult(active.result_path)
-    local synced, attempted = self:applyPendingReadSyncResult(active, result)
-    self:finishPendingReadSync(active, synced, attempted)
+    SubprocessJob.poll(self.pending_read_sync_active)
 end
 
 

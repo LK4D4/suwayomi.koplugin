@@ -15,6 +15,7 @@ local MODULES_TO_CLEAR = {
     "ui/widget/infomessage",
     "ui/widget/container/widgetcontainer",
     "suwayomi/api",
+    "suwayomi/subprocess/job",
     "suwayomi/client",
     "suwayomi/downloads/queue",
     "suwayomi/downloads/downloader",

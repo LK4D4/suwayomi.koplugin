@@ -80,6 +80,9 @@ Shared support:
 - `suwayomi/settings.lua`: KOReader settings persistence.
 - `suwayomi/paths.lua`: source-scoped download path layout and path segment sanitization.
 - `suwayomi/debug.lua`: opt-in redacted debug logging.
+- `suwayomi/subprocess/job.lua`: shared helper for one-shot subprocess jobs that exchange compact JSON result files. Callers provide the worker body, result parser, poll/timeout values, and finish/error/cancel callbacks; the helper owns atomic `.tmp` writes, result path allocation, polling, timeout termination, and result-file cleanup.
+
+Long-running subprocess patterns are intentionally split by shape: one-shot JSON result workers use `suwayomi/subprocess/job.lua`, while active downloads stay in `suwayomi/downloads/active_jobs.lua` because they require progress files, persisted queue state, and replacement scheduling.
 
 ## Data And Packaging Boundaries
 

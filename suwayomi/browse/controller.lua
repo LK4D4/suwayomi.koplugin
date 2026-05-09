@@ -8,6 +8,7 @@
 local UIManager = require("ui/uimanager")
 local SuwayomiSourceCatalog = require("suwayomi/browse/source_catalog")
 local SuwayomiSourceFetchWorker = require("suwayomi/browse/source_fetch_worker")
+local SubprocessJob = require("suwayomi/subprocess/job")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiDebug = require("suwayomi/debug")
 local _ = require("gettext")
@@ -32,14 +33,7 @@ for name, method in pairs(SuwayomiSourceCatalog.methods) do
 end
 
 function Methods:getSourceFetchResultPath()
-    local settings_dir = SuwayomiSettings.getSettingsDir and SuwayomiSettings:getSettingsDir() or "."
-    self.source_fetch_result_counter = (self.source_fetch_result_counter or 0) + 1
-    return tostring(settings_dir or "."):gsub("/+$", "")
-        .. "/suwayomi_dl_source_fetch_"
-        .. tostring(os.time())
-        .. "_"
-        .. tostring(self.source_fetch_result_counter)
-        .. ".json"
+    return SubprocessJob.buildResultPath("source_fetch")
 end
 
 
@@ -60,14 +54,7 @@ end
 
 
 function Methods:scheduleSourceFetchPoll()
-    if self.source_fetch_poll_scheduled or not self.source_fetch_active then
-        return
-    end
-
-    self.source_fetch_poll_scheduled = true
-    UIManager:scheduleIn(self.source_fetch_poll_interval_seconds, function()
-        self:pollSourceFetch()
-    end)
+    SubprocessJob.schedulePoll(self.source_fetch_active)
 end
 
 
@@ -79,79 +66,52 @@ function Methods:startSourceFetchWorker(credentials, options)
     end
 
     local result_path = self:getSourceFetchResultPath()
-    os.remove(result_path)
-    os.remove(result_path .. ".tmp")
-
     local active = {
         credentials = credentials,
         options = options,
         result_path = result_path,
-        started_at = os.time(),
         loading_message = not options.silent
             and self:showLoadingMessage(options.loading_message or _("Loading sources..."))
             or nil,
     }
-    self.source_fetch_active = active
 
-    local pid, err = FFIUtil.runInSubProcess(function()
-        SuwayomiSourceFetchWorker:run(credentials, result_path)
-    end)
-
-    if not pid then
-        self.source_fetch_active = nil
-        self:closeLoadingMessage(active.loading_message)
-        os.remove(result_path)
-        os.remove(result_path .. ".tmp")
-        if not options.silent then
-            self:showMessage(T(_("Could not start source loading: %1"), err or _("unknown error")))
-        end
-        return false
-    end
-
-    active.pid = pid
-    if FFIUtil.isSubProcessDone(pid) then
-        self:pollSourceFetch()
-    else
-        self:scheduleSourceFetchPoll()
-    end
-    return true
+    active = SubprocessJob.start({
+        active = active,
+        ffi_util = FFIUtil,
+        ui_manager = UIManager,
+        poll_interval_seconds = self.source_fetch_poll_interval_seconds,
+        timeout_seconds = self.source_fetch_watchdog_timeout_seconds,
+        run = function(path)
+            SuwayomiSourceFetchWorker:run(credentials, path)
+        end,
+        read_result = function(path)
+            return SuwayomiSourceFetchWorker:readResult(path)
+        end,
+        on_finish = function(finished_active, result)
+            self:finishSourceFetch(finished_active, result)
+        end,
+        on_error = function(err)
+            self.source_fetch_active = nil
+            self:closeLoadingMessage(active.loading_message)
+            if not options.silent then
+                self:showMessage(T(_("Could not start source loading: %1"), err or _("unknown error")))
+            end
+        end,
+    })
+    self.source_fetch_active = active and not active.cleaned and active or nil
+    return active ~= nil
 end
 
 
 function Methods:finishSourceFetch(active, result)
     self.source_fetch_active = nil
     self:closeLoadingMessage(active and active.loading_message)
-    if active and active.result_path then
-        os.remove(active.result_path)
-        os.remove(active.result_path .. ".tmp")
-    end
     self:showFetchedSources(result, active and active.options or {})
 end
 
 
 function Methods:pollSourceFetch()
-    self.source_fetch_poll_scheduled = false
-    local active = self.source_fetch_active
-    if not active then
-        return
-    end
-
-    local done = FFIUtil.isSubProcessDone(active.pid)
-    if not done then
-        if not active.terminating
-            and os.time() - (active.started_at or os.time()) > self.source_fetch_watchdog_timeout_seconds
-        then
-            if FFIUtil.terminateSubProcess then
-                pcall(FFIUtil.terminateSubProcess, active.pid)
-            end
-            active.terminating = true
-        end
-        self:scheduleSourceFetchPoll()
-        return
-    end
-
-    local result = SuwayomiSourceFetchWorker:readResult(active.result_path)
-    self:finishSourceFetch(active, result)
+    SubprocessJob.poll(self.source_fetch_active)
 end
 
 

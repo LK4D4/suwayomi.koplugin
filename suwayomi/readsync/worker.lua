@@ -7,48 +7,22 @@
 -- External data: credentials, chapter IDs, result paths, and API responses are
 -- normalized into explicit success/failure records.
 
-local json = require("dkjson")
 local SuwayomiAPI = require("suwayomi/api")
+local SubprocessJob = require("suwayomi/subprocess/job")
 
 local ReadSyncWorker = {}
 
 function ReadSyncWorker:writeResult(result_path, result)
-    if not result_path or result_path == "" then
-        return false
-    end
-
-    local tmp_path = tostring(result_path) .. ".tmp"
-    local handle = io.open(tmp_path, "w")
-    if not handle then
-        return false
-    end
-
-    handle:write(json.encode(result or {}))
-    handle:close()
-    if not os.rename(tmp_path, result_path) then
-        os.remove(tmp_path)
-        return false
-    end
-    return true
+    return SubprocessJob.writeResult(result_path, result)
 end
 
 function ReadSyncWorker:readResult(result_path)
-    local handle = result_path and io.open(result_path, "r")
-    if not handle then
-        return nil
-    end
-
-    local content = handle:read("*a") or ""
-    handle:close()
-
-    local parsed = json.decode(content)
-    if type(parsed) ~= "table" then
-        return nil
-    end
-    parsed.successes = type(parsed.successes) == "table" and parsed.successes or {}
-    parsed.failures = type(parsed.failures) == "table" and parsed.failures or {}
-    parsed.attempted = tonumber(parsed.attempted) or (#parsed.successes + #parsed.failures)
-    return parsed
+    return SubprocessJob.readResult(result_path, function(parsed)
+        parsed.successes = type(parsed.successes) == "table" and parsed.successes or {}
+        parsed.failures = type(parsed.failures) == "table" and parsed.failures or {}
+        parsed.attempted = tonumber(parsed.attempted) or (#parsed.successes + #parsed.failures)
+        return parsed
+    end)
 end
 
 function ReadSyncWorker:validateItem(credentials, item)
