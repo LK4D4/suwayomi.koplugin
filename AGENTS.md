@@ -13,10 +13,21 @@
 ## Project Shape
 
 - This is a Lua 5.1 KOReader plugin, not a standalone Lua app; KOReader modules such as `ui/uimanager`, `dispatcher`, `datastorage`, `ffi/util`, and `ffi/archiver` exist at runtime and are usually stubbed in specs.
-- `main.lua` is the KOReader plugin lifecycle and top-level coordinator: action registration, hub/settings callbacks, chapter actions, queue/read-sync orchestration, and menu refresh behavior live there.
-- Keep API query building, HTTP, and response parsing in `suwayomi_api.lua`; keep KOReader menu/dialog construction in `suwayomi_ui.lua`; keep client Library/Browse orchestration in `suwayomi_client.lua`.
-- `suwayomi_download_queue.lua` owns persistent device-local queue state, subprocess launch, polling, recovery, and status text; `suwayomi_downloader.lua` owns one-chapter downloads, page validation, ordered CBZ writing, `.part` cleanup, and final rename.
-- Path layout is source-scoped through `suwayomi_paths.lua`: `<download_directory>/<source_label>/<manga_title>/<chapter_name>.cbz`. Do not add old unscoped path detection unless explicitly requested.
+- KOReader requires `_meta.lua` and `main.lua` at the top of the `suwayomi_dl.koplugin/` directory. Keep `main.lua` as a thin lifecycle/composition shell: action registration, KOReader plugin callbacks, dependency construction, and compatibility delegators only. Do not add new feature logic to `main.lua` unless it is truly KOReader lifecycle glue.
+- Put new runtime modules under the plugin-local `suwayomi/` namespace directory instead of adding more top-level `suwayomi_*.lua` files. Use slash-style Lua requires that work with KOReader's plugin loader package path, for example `require("suwayomi/api")` or `require("suwayomi/downloads/controller")`.
+- Preferred target layout for new/extracted code:
+  - `suwayomi/api.lua`: GraphQL query building, HTTP, and response parsing.
+  - `suwayomi/client.lua`: Library/Browse orchestration that is not KOReader lifecycle glue.
+  - `suwayomi/ui.lua`: KOReader menu/dialog construction helpers.
+  - `suwayomi/settings.lua`, `suwayomi/paths.lua`, `suwayomi/debug.lua`: settings, source-scoped path layout, and debug logging.
+  - `suwayomi/downloads/queue.lua`: persistent device-local queue state, subprocess launch, polling, recovery, and status text.
+  - `suwayomi/downloads/downloader.lua`: one-chapter downloads, page validation, ordered CBZ writing, `.part` cleanup, and final rename.
+  - `suwayomi/downloads/controller.lua`: top-level Downloads hub/menu orchestration.
+  - `suwayomi/browse/source_catalog.lua` and `suwayomi/browse/source_fetch_worker.lua`: source filtering/cache and source fetch worker lifecycle.
+  - `suwayomi/chapters/context.lua`, `suwayomi/chapters/menu.lua`, `suwayomi/chapters/actions.lua`: chapter context, menu construction, and chapter-level actions.
+  - `suwayomi/readsync/ledger.lua`, `suwayomi/readsync/koreader_metadata.lua`, `suwayomi/readsync/worker.lua`, `suwayomi/readsync/controller.lua`: read ledger, KOReader sidecar/history handling, worker code, and read-sync orchestration.
+- Existing top-level `suwayomi_*.lua` modules are legacy migration targets. When touching one substantially, prefer moving or extracting toward the `suwayomi/` layout, with a thin compatibility wrapper only when needed for a small safe step.
+- Path layout is source-scoped through the paths module: `<download_directory>/<source_label>/<manga_title>/<chapter_name>.cbz`. Do not add old unscoped path detection unless explicitly requested.
 - Downloads are KOReader-device-local CBZ downloads. Do not use Suwayomi server download mutations as a hidden side effect.
 
 ## Tests And Stubs
@@ -28,8 +39,8 @@
 
 ## Release/Runtime Packaging
 
-- Release zips are built from `_meta.lua`, `main.lua`, `suwayomi_*.lua`, and `README.md` into a top-level `suwayomi_dl.koplugin/` directory; specs, docs, CI files, and `AGENTS.md` are not runtime payload.
-- For Android manual QA, push only runtime plugin files to `/sdcard/koreader/plugins/suwayomi_dl.koplugin/`; avoid pushing `.git`, `spec`, docs, or CI files.
+- Release zips must include `_meta.lua`, `main.lua`, `README.md`, existing top-level runtime `suwayomi_*.lua` files while they remain, and the runtime `suwayomi/` directory once it exists. Specs, docs, CI files, and `AGENTS.md` are not runtime payload.
+- For Android manual QA, push only runtime plugin files to `/sdcard/koreader/plugins/suwayomi_dl.koplugin/`; include `suwayomi/` when present and avoid pushing `.git`, `spec`, docs, or CI files.
 
 ## Product Constraints
 
