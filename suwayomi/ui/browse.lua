@@ -1,3 +1,12 @@
+-- Boundary: Browse/library list and search UI.
+--
+-- Responsibility: build source, search, browse manga, and library category menus
+-- while preserving controller-owned callbacks.
+-- Owned state: none; menu refresh helpers mutate existing KOReader menu widgets.
+-- Dependencies: KOReader Menu/MultiInputDialog, gettext, and shared menu utils.
+-- External data: source and manga rows come from API/cache layers and are only
+-- formatted for display here.
+
 local Menu = require("ui/widget/menu")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local _ = require("gettext")

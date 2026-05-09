@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+-- Directory UI specs verify the PathChooser adapter. Directory persistence and
+-- retry flow are covered in suwayomi_downloads_directory_spec.lua.
 describe("suwayomi/ui/directory", function()
     local shown_dialog
 

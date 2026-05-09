@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+-- Downloads UI specs cover snapshot-to-menu rendering. Queue/controller specs
+-- own state transitions, retries, cancellation, and navigation callbacks.
 describe("suwayomi/ui/downloads", function()
     local shown_dialog
 

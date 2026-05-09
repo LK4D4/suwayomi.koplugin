@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+-- Pure query-builder coverage: these specs pin the JSON/GraphQL contracts
+-- without installing HTTP or parser stubs.
 describe("suwayomi/api/queries", function()
     local json = require("dkjson")
     local queries

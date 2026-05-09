@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+-- Transport coverage owns HTTP client selection, URL/header construction,
+-- status/error mapping, and binary streaming. Facade specs cover orchestration.
 describe("suwayomi/api/transport", function()
     local transport
 

@@ -1,3 +1,14 @@
+-- Boundary: active download subprocess lifecycle.
+--
+-- Responsibility: own in-memory active jobs, launch downloader workers, poll
+-- progress files, handle terminal states, and schedule follow-up polls.
+-- Owned state: active job table plus poll-scheduled flag; persisted state still
+-- flows through the queue facade and JobStore.
+-- Dependencies: queue facade callbacks, KOReader subprocess utilities, progress
+-- files, and gettext/template helpers.
+-- External data: worker progress files and subprocess status are treated as
+-- untrusted until normalized into queue status and persisted job records.
+
 local _ = require("gettext")
 local T = require("ffi/util").template
 local ProgressFile = require("suwayomi/downloads/progress_file")
@@ -41,6 +52,8 @@ function ActiveJobs:removeJob(job)
 end
 
 function ActiveJobs:appendSnapshotJobs(snapshot)
+    -- Snapshot construction stays here so queue.lua does not need to know the
+    -- active job table shape.
     for _, job in pairs(self.jobs or {}) do
         table.insert(snapshot.active, self.queue:copySnapshotJob(job, "downloading"))
     end

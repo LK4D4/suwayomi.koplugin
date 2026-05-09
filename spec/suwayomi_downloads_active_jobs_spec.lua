@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+-- Active job specs exercise subprocess lifecycle and progress polling behind
+-- the queue facade. Queue persistence/facade behavior stays in queue specs.
 describe("suwayomi/downloads/active_jobs", function()
     local original_io_open
     local original_os_remove

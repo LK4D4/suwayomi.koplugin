@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+-- Pure parser coverage: these specs keep malformed server responses and
+-- normalized plugin table shapes separate from transport/facade behavior.
 describe("suwayomi/api/parsers", function()
     local parsers
 

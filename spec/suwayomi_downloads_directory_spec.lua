@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+-- Directory-flow specs own the shared chooser, persistence, summary, and
+-- retry-callback behavior used by chapter, manga, downloads, and settings code.
 local helper = require("spec/support/controller_module_spec_helper")
 
 describe("suwayomi/downloads/directory", function()

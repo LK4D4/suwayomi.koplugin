@@ -1,3 +1,12 @@
+-- Boundary: Suwayomi GraphQL response parsers.
+--
+-- Responsibility: decode server JSON and normalize source, manga, category, and
+-- chapter records into the plugin's small local data shapes.
+-- Owned state: none.
+-- Dependencies: dkjson only.
+-- External data: every response body is treated as untrusted and converted into
+-- either a normalized value or a user-facing parse error.
+
 local Parsers = {}
 local json = require("dkjson")
 

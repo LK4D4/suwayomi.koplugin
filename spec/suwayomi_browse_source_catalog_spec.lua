@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+-- Source catalog specs cover filtering/cache/render delegation that used to
+-- live in the Browse controller. Worker scheduling stays in controller specs.
 local helper = require("spec/support/controller_module_spec_helper")
 
 local settings_calls

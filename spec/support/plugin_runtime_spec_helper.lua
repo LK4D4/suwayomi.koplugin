@@ -1,3 +1,9 @@
+-- Shared KOReader runtime harness for main.lua composition tests.
+--
+-- Keep this helper limited to plugin shell wiring. Domain controller behavior
+-- belongs in focused controller specs, while main_spec uses this harness to
+-- verify module installation, dispatcher registration, and lifecycle callbacks.
+
 local Helper = {}
 
 local MODULES_TO_CLEAR = {

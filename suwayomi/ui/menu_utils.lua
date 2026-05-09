@@ -1,3 +1,12 @@
+-- Boundary: shared KOReader menu utility helpers.
+--
+-- Responsibility: keep title-bar mutation, menu callback binding, and state-mark
+-- construction consistent across UI surface modules.
+-- Owned state: none.
+-- Dependencies: KOReader widgets are required lazily where needed by helpers.
+-- External data: menu tables are controller-built and mutated only to attach
+-- KOReader-compatible callbacks or state marks.
+
 local MenuUtils = {}
 
 function MenuUtils.applyTitleBarOptions(menu, options)

@@ -1,3 +1,12 @@
+-- Boundary: Downloads hub menu UI.
+--
+-- Responsibility: format active, queued, failed, and completed download rows and
+-- wire row callbacks to the downloads controller.
+-- Owned state: none.
+-- Dependencies: KOReader Menu widget, gettext, and shared menu utilities.
+-- External data: queue snapshots are display-only here; controller actions own
+-- retries, cancellation, deletion, and navigation.
+
 local Menu = require("ui/widget/menu")
 local _ = require("gettext")
 local menu_utils = require("suwayomi/ui/menu_utils")

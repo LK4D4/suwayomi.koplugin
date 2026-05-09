@@ -1,3 +1,14 @@
+-- Boundary: public Suwayomi GraphQL/API facade.
+--
+-- Responsibility: preserve the historical require("suwayomi/api") surface while
+-- delegating query building, response parsing, and transport concerns to focused
+-- internal modules.
+-- Owned state: optional debug logger only.
+-- Dependencies: suwayomi/api/* modules; callers should not need to require
+-- those internal modules directly.
+-- External data: server responses and credentials stay normalized by the
+-- delegated parser/transport boundaries before callers receive results.
+
 local SuwayomiAPI = {}
 
 local queries = require("suwayomi/api/queries")
@@ -6,6 +17,8 @@ local transport = require("suwayomi/api/transport")
 
 local debug_logger
 
+-- These lists intentionally define the compatibility surface exported by the
+-- facade. Add new helpers here only when they are meant to be public API.
 local query_exports = {
     "_buildSourcesQuery",
     "_buildLegacySourcesQuery",

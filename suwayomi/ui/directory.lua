@@ -1,3 +1,13 @@
+-- Boundary: directory chooser UI construction.
+--
+-- Responsibility: adapt KOReader's PathChooser into the plugin's
+-- "choose download directory" callback contract.
+-- Owned state: none.
+-- Dependencies: PathChooser and UIManager are required when the chooser opens so
+-- specs can stub them per example.
+-- External data: selected paths are returned to controller code for persistence
+-- and filesystem validation; this module only constructs the widget.
+
 local _ = require("gettext")
 
 local DirectoryUI = {}

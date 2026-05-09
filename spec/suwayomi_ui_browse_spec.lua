@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+-- Browse UI specs cover menu/widget construction only. Controller specs own the
+-- business decisions behind source selection, searches, and library navigation.
 describe("suwayomi/ui/browse", function()
     local shown_dialog
     local closed_dialog

@@ -1,8 +1,19 @@
+-- Boundary: HTTP transport for Suwayomi GraphQL and binary downloads.
+--
+-- Responsibility: build request headers/URLs, choose the right HTTP client, map
+-- transport failures to plugin errors, and stream downloaded bytes to files.
+-- Owned state: none.
+-- Dependencies: socket/http, ssl.https, ltn12, and Lua file IO at call time.
+-- External data: credentials, URLs, HTTP status codes, and downloaded bytes are
+-- normalized here before the API facade parses or returns them.
+
 local Transport = {}
 
 local BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local REQUEST_TIMEOUT_SECONDS = 15
 
+-- LuaJIT on KOReader does not guarantee a standalone base64 helper, so this
+-- tiny encoder keeps Basic Auth construction self-contained and testable.
 local function base64Encode(input)
     local result = {}
     local index = 1

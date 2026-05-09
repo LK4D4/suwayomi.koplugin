@@ -1,3 +1,12 @@
+-- Boundary: pure Suwayomi GraphQL request builders.
+--
+-- Responsibility: build JSON-encoded GraphQL queries and mutations without
+-- knowing how they are transported or parsed.
+-- Owned state: none.
+-- Dependencies: dkjson only.
+-- External data: caller-provided IDs, pagination, and filter values are coerced
+-- into query variables before leaving the plugin.
+
 local Queries = {}
 local json = require("dkjson")
 

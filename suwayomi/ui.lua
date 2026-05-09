@@ -1,3 +1,12 @@
+-- Boundary: public KOReader UI facade for the plugin.
+--
+-- Responsibility: preserve require("suwayomi/ui") while delegating browse,
+-- directory, and downloads surfaces to focused UI modules.
+-- Owned state: none; returned KOReader widgets own their runtime state.
+-- Dependencies: KOReader widget modules and suwayomi/ui/* helpers.
+-- External data: menu rows and callbacks come from controllers and are bound to
+-- KOReader widgets without changing business behavior.
+
 local Menu = require("ui/widget/menu")
 local ButtonDialog = require("ui/widget/buttondialog")
 local ConfirmBox = require("ui/widget/confirmbox")
