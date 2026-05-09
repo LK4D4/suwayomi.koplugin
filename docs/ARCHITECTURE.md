@@ -49,6 +49,7 @@ Browse and Library:
 - `suwayomi/browse/controller.lua`: Browse entry flow, source fetch worker lifecycle, polling, and source-cache refresh.
 - `suwayomi/browse/source_catalog.lua`: source filtering, source cache IO, and source-list rendering.
 - `suwayomi/browse/source_fetch_worker.lua`: subprocess worker for fetching sources into a result file.
+- `suwayomi/browse/global_search_worker.lua`: subprocess worker for fetching one source's first search page into a result file for partial global search.
 - `suwayomi/manga/controller.lua`: manga actions, refresh, library membership, first-unread helpers, and manga-level download/read actions.
 
 Downloads:

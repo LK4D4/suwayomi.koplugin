@@ -203,30 +203,40 @@ local function getSourceRowName(source)
         or tostring(source.id)
 end
 
-local function getMangaRowTitle(manga)
-    if type(manga) ~= "table" then
-        return ""
-    end
-    return manga.title or tostring(manga.id or "")
-end
-
 local function formatGlobalSearchSummary(summary)
     local source_name = getSourceRowName(summary and summary.source)
     if not summary or summary.status == "empty" then
         return source_name .. ": " .. _("No results")
     end
-    if summary.status == "pageable_empty" then
-        return source_name .. ": " .. _("More results")
+    if summary.status == "searching" then
+        return source_name .. ": " .. _("searching")
+    end
+    if summary.status == "timed_out" then
+        return source_name .. ": " .. _("timed out")
+    end
+    if summary.status == "canceled" then
+        return source_name .. ": " .. _("canceled")
     end
     if summary.status == "error" then
         return source_name .. ": " .. _("Error") .. " - " .. tostring(summary.error or _("Unknown error"))
     end
-    return source_name .. ": " .. getMangaRowTitle(summary.first_match)
+    local count = tonumber(summary.result_count) or #(summary.manga or {})
+    local suffix = summary.has_next_page and "+" or ""
+    if count == 1 and not summary.has_next_page then
+        return source_name .. ": " .. _("1 result")
+    end
+    return source_name .. ": " .. tostring(count) .. suffix .. " " .. _("results")
 end
 
-function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, options)
+local function buildGlobalSearchMenuTable(summaries, onSelectCallback, options)
     options = options or {}
     local menu_table = {}
+    if options.on_cancel_search then
+        table.insert(menu_table, {
+            text = _("Cancel search"),
+            callback = options.on_cancel_search,
+        })
+    end
     for _, summary in ipairs(summaries or {}) do
         table.insert(menu_table, {
             text = formatGlobalSearchSummary(summary),
@@ -237,17 +247,34 @@ function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, optio
             end,
         })
     end
+    return menu_table
+end
 
+function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, options)
+    options = options or {}
     local menu = Menu:new{
         title = _("Global search"),
         title_bar_left_icon = options and options.title_bar_left_icon,
-        item_table = menu_table,
+        item_table = buildGlobalSearchMenuTable(summaries, onSelectCallback, options),
     }
     menu_utils.applyTitleBarOptions(menu, options)
     menu_utils.applyCloseCallback(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
+end
+
+function BrowseUI.updateGlobalSearchResultsMenu(menu, summaries, onSelectCallback, options)
+    if not menu then
+        return
+    end
+
+    menu.item_table = buildGlobalSearchMenuTable(summaries, onSelectCallback, options)
+    menu_utils.applyTitleBarOptions(menu, options)
+    menu_utils.applyCloseCallback(menu, options)
+    if menu.updateItems then
+        menu:updateItems(nil, true)
+    end
 end
 
 local function formatBrowseMangaRow(manga)

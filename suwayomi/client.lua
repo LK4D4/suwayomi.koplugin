@@ -14,6 +14,10 @@ function SuwayomiClient:new(options)
     return setmetatable({
         api = options.api,
         ui = options.ui,
+        subprocess_job = options.subprocess_job,
+        global_search_worker = options.global_search_worker,
+        ffi_util = options.ffi_util,
+        ui_manager = options.ui_manager,
         settings = options.settings,
         debug = options.debug,
         plugin = options.plugin,
@@ -208,6 +212,66 @@ end
 
 function SuwayomiClient:isLocalSource(source)
     return source and source.lang == "localsourcelang"
+end
+
+function SuwayomiClient:getSubprocessJob()
+    if not self.subprocess_job then
+        self.subprocess_job = require("suwayomi/subprocess/job")
+    end
+    return self.subprocess_job
+end
+
+function SuwayomiClient:getGlobalSearchWorker()
+    if not self.global_search_worker then
+        self.global_search_worker = require("suwayomi/browse/global_search_worker")
+    end
+    return self.global_search_worker
+end
+
+function SuwayomiClient:getFFIUtil()
+    if not self.ffi_util then
+        self.ffi_util = require("ffi/util")
+    end
+    return self.ffi_util
+end
+
+function SuwayomiClient:getUIManager()
+    if not self.ui_manager then
+        self.ui_manager = require("ui/uimanager")
+    end
+    return self.ui_manager
+end
+
+function SuwayomiClient:getGlobalSearchMaxActiveSources()
+    local configured = self.plugin and tonumber(self.plugin.global_search_max_active_sources)
+    if configured and configured > 0 then
+        return configured
+    end
+    return 3
+end
+
+function SuwayomiClient:getGlobalSearchPollIntervalSeconds()
+    return (self.plugin and self.plugin.global_search_poll_interval_seconds) or 0.5
+end
+
+function SuwayomiClient:getGlobalSearchSourceTimeoutSeconds()
+    return (self.plugin and self.plugin.global_search_source_timeout_seconds) or 15
+end
+
+function SuwayomiClient:sortGlobalSearchSources(sources)
+    local local_sources = {}
+    local remote_sources = {}
+    for _, source in ipairs(sources or {}) do
+        if self:isLocalSource(source) then
+            table.insert(local_sources, source)
+        else
+            table.insert(remote_sources, source)
+        end
+    end
+    for _, source in ipairs(remote_sources) do
+        table.insert(local_sources, source)
+    end
+    return local_sources
 end
 
 local function trim(text)
@@ -445,6 +509,182 @@ function SuwayomiClient:searchSourceForSummary(credentials, source, query)
     }
 end
 
+function SuwayomiClient:isGlobalSearchComplete(search)
+    return search
+        and not search.canceled
+        and (search.active_count or 0) == 0
+        and (search.next_index or 1) > #(search.sources or {})
+end
+
+function SuwayomiClient:buildGlobalSearchMenuOptions(search)
+    local menu_options = {}
+    local home_options = self:getHomeMenuOptions() or {}
+    for key, value in pairs(home_options) do
+        menu_options[key] = value
+    end
+    if not search.finished and not search.canceled then
+        local cancel = function()
+            self:cancelGlobalSearch(search)
+        end
+        menu_options.close_callback = cancel
+        menu_options.on_cancel_search = cancel
+    end
+    return menu_options
+end
+
+function SuwayomiClient:updateGlobalSearchMenu(search)
+    if not search or not search.menu or not self.ui.updateGlobalSearchResultsMenu then
+        return
+    end
+    self.ui.updateGlobalSearchResultsMenu(search.menu, search.summaries, function(summary)
+        return self:openGlobalSearchSummary(summary, search.query)
+    end, self:buildGlobalSearchMenuOptions(search))
+end
+
+function SuwayomiClient:finishGlobalSearchIfComplete(search)
+    if self:isGlobalSearchComplete(search) then
+        search.finished = true
+        self:updateGlobalSearchMenu(search)
+    end
+end
+
+function SuwayomiClient:applyGlobalSearchResult(search, index, result)
+    local summary = search.summaries[index]
+    if not summary then
+        return
+    end
+    if not result or result.ok ~= true then
+        summary.status = "error"
+        summary.error = result and result.error or self:translate("Could not load manga.")
+        summary.manga = {}
+        summary.result_count = 0
+        return
+    end
+
+    local manga = self:filterBrowseManga(result.manga or {})
+    summary.manga = manga
+    summary.first_match = manga[1]
+    summary.result_count = #manga
+    summary.has_next_page = result.has_next_page == true
+    summary.query = result.query or search.query
+    if #manga == 0 then
+        summary.status = summary.has_next_page and "pageable_empty" or "empty"
+    else
+        summary.status = "ok"
+    end
+end
+
+function SuwayomiClient:openGlobalSearchSummary(summary, fallback_query)
+    if summary and (summary.status == "ok" or summary.status == "pageable_empty") then
+        return self:showMangaForSource(summary.source, {
+            type = "SEARCH",
+            query = summary.query or fallback_query,
+            page = 1,
+            skip_mode_menu = true,
+        })
+    end
+end
+
+function SuwayomiClient:markGlobalSearchCanceled(search)
+    for _, summary in ipairs(search.summaries or {}) do
+        if summary.status == "searching" then
+            summary.status = "canceled"
+        end
+    end
+end
+
+function SuwayomiClient:cancelGlobalSearch(search)
+    if not search or search.canceled or search.finished then
+        return
+    end
+    search.canceled = true
+    local job = self:getSubprocessJob()
+    for _, active in pairs(search.active_jobs or {}) do
+        job.cancel(active)
+    end
+    search.active_jobs = {}
+    search.active_count = 0
+    self:markGlobalSearchCanceled(search)
+    self:updateGlobalSearchMenu(search)
+end
+
+function SuwayomiClient:startNextGlobalSearchJobs(search)
+    if not search or search.canceled then
+        return
+    end
+    local max_active = self:getGlobalSearchMaxActiveSources()
+    while (search.active_count or 0) < max_active and search.next_index <= #(search.sources or {}) do
+        local index = search.next_index
+        search.next_index = search.next_index + 1
+        self:startGlobalSearchJob(search, index)
+    end
+    self:finishGlobalSearchIfComplete(search)
+end
+
+function SuwayomiClient:startGlobalSearchJob(search, index)
+    local source = search.sources[index]
+    if not source then
+        return
+    end
+
+    local job = self:getSubprocessJob()
+    local worker = self:getGlobalSearchWorker()
+    local active
+    active = job.start({
+        active = {
+            source = source,
+            summary_index = index,
+            result_path = job.buildResultPath and job.buildResultPath("global_search") or nil,
+        },
+        ffi_util = self:getFFIUtil(),
+        ui_manager = self:getUIManager(),
+        poll_interval_seconds = self:getGlobalSearchPollIntervalSeconds(),
+        timeout_seconds = self:getGlobalSearchSourceTimeoutSeconds(),
+        run = function(path)
+            worker:run(search.credentials, source, search.query, path)
+        end,
+        read_result = function(path)
+            return worker:readResult(path)
+        end,
+        on_finish = function(finished_active, result)
+            if search.canceled then
+                return
+            end
+            search.active_jobs[finished_active.summary_index] = nil
+            search.active_count = math.max((search.active_count or 1) - 1, 0)
+            self:applyGlobalSearchResult(search, finished_active.summary_index, result)
+            self:updateGlobalSearchMenu(search)
+            self:startNextGlobalSearchJobs(search)
+        end,
+        on_timeout = function(timed_out_active)
+            if search.canceled then
+                return
+            end
+            local summary = search.summaries[timed_out_active.summary_index]
+            if summary and summary.status == "searching" then
+                summary.status = "timed_out"
+                summary.result_count = 0
+                summary.manga = {}
+            end
+            search.active_jobs[timed_out_active.summary_index] = nil
+            search.active_count = math.max((search.active_count or 1) - 1, 0)
+            timed_out_active.canceled = true
+            self:updateGlobalSearchMenu(search)
+            self:startNextGlobalSearchJobs(search)
+        end,
+    })
+    if active then
+        search.active_jobs[index] = active
+        search.active_count = (search.active_count or 0) + 1
+    else
+        local summary = search.summaries[index]
+        if summary then
+            summary.status = "error"
+            summary.error = self:translate("Could not start search.")
+        end
+    end
+end
+
 function SuwayomiClient:showGlobalSearch(sources)
     if not self.ui.showGlobalSearchPrompt then
         return
@@ -458,36 +698,41 @@ function SuwayomiClient:showGlobalSearch(sources)
         end
 
         local credentials = self.settings:load()
-        local summaries = self.plugin:withLoadingMessage("global-search", self:translate("Searching sources..."), function()
-            local rows = {}
-            for _, source in ipairs(sources or {}) do
-                table.insert(rows, self:searchSourceForSummary(credentials, source, search_query))
-            end
-            return rows
-        end)
-        if not summaries then
-            return
+        local ordered_sources = self:sortGlobalSearchSources(sources)
+        local summaries = {}
+        for _, source in ipairs(ordered_sources) do
+            table.insert(summaries, {
+                source = source,
+                status = "searching",
+                manga = {},
+                result_count = 0,
+                query = search_query,
+            })
         end
 
         self:log({
             operation = "globalSearch",
-            event = "global_search_loaded",
-            source_count = #(sources or {}),
+            event = "global_search_started",
+            source_count = #ordered_sources,
             query = search_query,
         })
 
         if self.ui.showGlobalSearchResultsMenu then
+            local search = {
+                credentials = credentials,
+                query = search_query,
+                sources = ordered_sources,
+                summaries = summaries,
+                active_jobs = {},
+                active_count = 0,
+                next_index = 1,
+            }
             local results_menu = self.ui.showGlobalSearchResultsMenu(summaries, function(summary)
-                if summary and (summary.status == "ok" or summary.status == "pageable_empty") then
-                    return self:showMangaForSource(summary.source, {
-                        type = "SEARCH",
-                        query = summary.query or search_query,
-                        page = 1,
-                        skip_mode_menu = true,
-                    })
-                end
-            end, self:getHomeMenuOptions())
+                return self:openGlobalSearchSummary(summary, search_query)
+            end, self:buildGlobalSearchMenuOptions(search))
+            search.menu = results_menu
             self:trackScreen("browse-global-search", results_menu)
+            self:startNextGlobalSearchJobs(search)
         end
     end)
 end

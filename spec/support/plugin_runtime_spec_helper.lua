@@ -24,6 +24,7 @@ local MODULES_TO_CLEAR = {
     "suwayomi/downloads/progress_file",
     "suwayomi/downloads/status_formatter",
     "suwayomi/readsync/worker",
+    "suwayomi/browse/global_search_worker",
     "suwayomi/browse/source_fetch_worker",
     "suwayomi/ui",
     "suwayomi/navigation",

@@ -32,6 +32,7 @@ SuwayomiUI.showSourceSearchPrompt = BrowseUI.showSourceSearchPrompt
 SuwayomiUI.showGlobalSearchPrompt = BrowseUI.showGlobalSearchPrompt
 SuwayomiUI.updateSourcesMenu = BrowseUI.updateSourcesMenu
 SuwayomiUI.showGlobalSearchResultsMenu = BrowseUI.showGlobalSearchResultsMenu
+SuwayomiUI.updateGlobalSearchResultsMenu = BrowseUI.updateGlobalSearchResultsMenu
 SuwayomiUI.showMangaMenu = BrowseUI.showMangaMenu
 SuwayomiUI.updateMangaMenu = BrowseUI.updateMangaMenu
 SuwayomiUI.showLibraryCategoryMenu = BrowseUI.showLibraryCategoryMenu

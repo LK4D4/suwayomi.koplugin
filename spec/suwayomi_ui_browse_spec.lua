@@ -186,13 +186,22 @@ describe("suwayomi/ui/browse", function()
             {
                 source = { id = "s1", name = "MangaDex" },
                 status = "ok",
-                first_match = { title = "Frieren Beyond Journey's End" },
+                result_count = 1,
             },
             {
                 source = { id = "s4", name = "More Source" },
-                status = "pageable_empty",
+                status = "ok",
+                result_count = 2,
                 has_next_page = true,
                 query = "frieren",
+            },
+            {
+                source = { id = "s5", name = "Searching Source" },
+                status = "searching",
+            },
+            {
+                source = { id = "s6", name = "Slow Source" },
+                status = "timed_out",
             },
             {
                 source = { id = "s2", name = "ComicK" },
@@ -208,19 +217,60 @@ describe("suwayomi/ui/browse", function()
         end)
 
         assert.are.equal("Global search", shown_dialog.title)
-        assert.are.equal("MangaDex: Frieren Beyond Journey's End", shown_dialog.item_table[1].text)
-        assert.are.equal("More Source: More results", shown_dialog.item_table[2].text)
-        assert.are.equal("ComicK: No results", shown_dialog.item_table[3].text)
-        assert.are.equal("Some Source: Error - Timed out", shown_dialog.item_table[4].text)
+        assert.are.equal("MangaDex: 1 result", shown_dialog.item_table[1].text)
+        assert.are.equal("More Source: 2+ results", shown_dialog.item_table[2].text)
+        assert.are.equal("Searching Source: searching", shown_dialog.item_table[3].text)
+        assert.are.equal("Slow Source: timed out", shown_dialog.item_table[4].text)
+        assert.are.equal("ComicK: No results", shown_dialog.item_table[5].text)
+        assert.are.equal("Some Source: Error - Timed out", shown_dialog.item_table[6].text)
 
         shown_dialog.item_table[1].callback()
         shown_dialog.item_table[2].callback()
         shown_dialog.item_table[3].callback()
         shown_dialog.item_table[4].callback()
+        shown_dialog.item_table[5].callback()
+        shown_dialog.item_table[6].callback()
 
         assert.are.equal("s1", selected[1].source.id)
         assert.are.equal("s4", selected[2].source.id)
         assert.are.equal(2, #selected)
+    end)
+
+    it("updates global search summaries in place and exposes cancel", function()
+        local browse = require("suwayomi/ui/browse")
+        local canceled = false
+        local selected = {}
+
+        browse.showGlobalSearchResultsMenu({
+            { source = { id = "s1", name = "Local source" }, status = "searching" },
+        }, function(summary)
+            table.insert(selected, summary)
+        end, {
+            on_cancel_search = function()
+                canceled = true
+            end,
+        })
+
+        assert.are.equal("Cancel search", shown_dialog.item_table[1].text)
+        assert.are.equal("Local source: searching", shown_dialog.item_table[2].text)
+
+        browse.updateGlobalSearchResultsMenu(shown_dialog, {
+            { source = { id = "s1", name = "Local source" }, status = "ok", result_count = 1 },
+        }, function(summary)
+            table.insert(selected, summary)
+        end, {
+            on_cancel_search = function()
+                canceled = true
+            end,
+        })
+
+        assert.are.equal("Cancel search", shown_dialog.item_table[1].text)
+        assert.are.equal("Local source: 1 result", shown_dialog.item_table[2].text)
+        shown_dialog.item_table[1].callback()
+        shown_dialog.item_table[2].callback()
+
+        assert.is_true(canceled)
+        assert.are.equal("s1", selected[1].source.id)
     end)
 
     it("shows compact browse result markers, title, and paging rows", function()

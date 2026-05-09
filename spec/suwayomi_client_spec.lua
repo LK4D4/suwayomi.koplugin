@@ -32,6 +32,10 @@ describe("suwayomi/client", function()
             },
             api = options.api,
             ui = options.ui,
+            subprocess_job = options.subprocess_job,
+            global_search_worker = options.global_search_worker,
+            ffi_util = options.ffi_util,
+            ui_manager = options.ui_manager,
             debug = {
                 time = function(_, _, callback)
                     return callback()
@@ -66,6 +70,9 @@ describe("suwayomi/client", function()
                         options.trackSuwayomiScreen(route_id, widget)
                     end
                 end,
+                global_search_max_active_sources = options.global_search_max_active_sources,
+                global_search_poll_interval_seconds = options.global_search_poll_interval_seconds,
+                global_search_source_timeout_seconds = options.global_search_source_timeout_seconds,
             },
             gettext = function(text)
                 return text
@@ -322,43 +329,54 @@ describe("suwayomi/client", function()
         assert.are.same({ "Enter a search query." }, state.shown_messages)
     end)
 
-    it("shows one global search summary per visible source and isolates source errors", function()
-        local fetched_options = {}
+    local function buildGlobalSearchSubprocessFake()
+        local started = {}
+        local canceled = {}
+        local fake = {}
+
+        function fake.buildResultPath(prefix)
+            return "/settings/" .. tostring(prefix) .. "_" .. tostring(#started + 1) .. ".json"
+        end
+
+        function fake.start(options)
+            local active = options.active or {}
+            active.on_finish = options.on_finish
+            active.on_timeout = options.on_timeout
+            active.on_cancel = options.on_cancel
+            active.read_result = options.read_result
+            active.run = options.run
+            table.insert(started, active)
+            return active
+        end
+
+        function fake.cancel(active)
+            active.canceled = true
+            table.insert(canceled, active)
+            if active.on_cancel then
+                active.on_cancel(active)
+            end
+        end
+
+        return fake, started, canceled
+    end
+
+    it("shows global search immediately and starts local source first", function()
+        local subprocess_job, started = buildGlobalSearchSubprocessFake()
         local shown_summaries
-        local opened_options
+        local shown_options
         local client = newClient({
-            api = {
-                fetchMangaForSource = function(_, options)
-                    table.insert(fetched_options, options)
-                    if options.source_id == "s1" then
-                        return {
-                            ok = true,
-                            manga = {
-                                { id = "m1", title = "Frieren Beyond Journey's End" },
-                                { id = "m2", title = "Frieren Side Story" },
-                            },
-                            has_next_page = true,
-                        }
-                    end
-                    if options.source_id == "s2" then
-                        return { ok = true, manga = {} }
-                    end
-                    return { ok = false, error = "Timed out" }
-                end,
-            },
+            subprocess_job = subprocess_job,
+            global_search_worker = {},
+            ffi_util = {},
+            ui_manager = {},
             ui = {
                 showGlobalSearchPrompt = function(onSearch)
                     onSearch(" frieren ")
                 end,
-                showGlobalSearchResultsMenu = function(summaries, onSelect, menu_options)
+                showGlobalSearchResultsMenu = function(summaries, _, menu_options)
                     shown_summaries = summaries
-                    assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, menu_options)
-                    onSelect(summaries[1])
-                    onSelect(summaries[2])
-                    onSelect(summaries[3])
-                end,
-                showMangaMenu = function(_, _, options)
-                    opened_options = options
+                    shown_options = menu_options
+                    return { name = "global-search" }
                 end,
             },
             home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
@@ -366,41 +384,39 @@ describe("suwayomi/client", function()
 
         client:showGlobalSearch({
             { id = "s1", display_name = "MangaDex (EN)", name = "MangaDex", lang = "en" },
-            { id = "s2", display_name = "ComicK (EN)", name = "ComicK", lang = "en" },
-            { id = "s3", name = "Some Source", lang = "en" },
+            { id = "local", name = "Local source", lang = "localsourcelang" },
+            { id = "s2", name = "Comick", lang = "en" },
         })
 
-        assert.are.same({
-            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
-            { source_id = "s2", page = 1, type = "SEARCH", query = "frieren" },
-            { source_id = "s3", page = 1, type = "SEARCH", query = "frieren" },
-            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
-        }, fetched_options)
-        assert.are.equal("ok", shown_summaries[1].status)
-        assert.are.equal("Frieren Beyond Journey's End", shown_summaries[1].first_match.title)
-        assert.are.equal("empty", shown_summaries[2].status)
-        assert.are.equal("error", shown_summaries[3].status)
-        assert.are.equal("Timed out", shown_summaries[3].error)
-        assert.are.equal("MangaDex (EN) - Search: frieren - Page 1", opened_options.title)
-        assert.are.equal("appbar.filebrowser", opened_options.title_bar_left_icon)
-        assert.is_function(opened_options.on_next_page)
+        assert.are.equal("local", shown_summaries[1].source.id)
+        assert.are.equal("searching", shown_summaries[1].status)
+        assert.are.equal("s1", shown_summaries[2].source.id)
+        assert.are.equal("s2", shown_summaries[3].source.id)
+        assert.are.equal("local", started[1].source.id)
+        assert.are.equal("s1", started[2].source.id)
+        assert.are.equal("s2", started[3].source.id)
+        assert.are.equal("appbar.filebrowser", shown_options.title_bar_left_icon)
+        assert.is_function(shown_options.close_callback)
+        assert.is_function(shown_options.on_cancel_search)
     end)
 
-    it("lets global search drill into hidden first-page results when later pages exist", function()
-        local fetched_options = {}
-        local shown_summaries
+    it("updates partial global search results and opens successful rows", function()
+        local subprocess_job, started = buildGlobalSearchSubprocessFake()
+        local updated_summaries
+        local selected_callback
         local opened_options
         local client = newClient({
-            browse_settings = {
-                hide_in_library_results = true,
-            },
+            subprocess_job = subprocess_job,
+            global_search_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            global_search_max_active_sources = 1,
             api = {
-                fetchMangaForSource = function(_, options)
-                    table.insert(fetched_options, options)
+                fetchMangaForSource = function()
                     return {
                         ok = true,
                         manga = {
-                            { id = "m1", title = "Already Added", in_library = true },
+                            { id = "m1", title = "Frieren" },
                         },
                         has_next_page = true,
                     }
@@ -410,9 +426,13 @@ describe("suwayomi/client", function()
                 showGlobalSearchPrompt = function(onSearch)
                     onSearch(" frieren ")
                 end,
-                showGlobalSearchResultsMenu = function(summaries, onSelect)
-                    shown_summaries = summaries
-                    onSelect(summaries[1])
+                showGlobalSearchResultsMenu = function(_, onSelect)
+                    selected_callback = onSelect
+                    return { name = "global-search" }
+                end,
+                updateGlobalSearchResultsMenu = function(_, summaries, onSelect)
+                    updated_summaries = summaries
+                    selected_callback = onSelect
                 end,
                 showMangaMenu = function(_, _, options)
                     opened_options = options
@@ -421,18 +441,96 @@ describe("suwayomi/client", function()
         })
 
         client:showGlobalSearch({
+            { id = "local", name = "Local source", lang = "localsourcelang" },
             { id = "s1", display_name = "MangaDex (EN)", name = "MangaDex", lang = "en" },
         })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Frieren" },
+            },
+            has_next_page = true,
+            query = "frieren",
+        })
 
-        assert.are.same({
-            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
-            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
-        }, fetched_options)
-        assert.are.equal("pageable_empty", shown_summaries[1].status)
-        assert.is_true(shown_summaries[1].has_next_page)
-        assert.are.equal("frieren", shown_summaries[1].query)
-        assert.are.equal("MangaDex (EN) - Search: frieren - Page 1", opened_options.title)
+        assert.are.equal("ok", updated_summaries[1].status)
+        assert.are.equal(1, updated_summaries[1].result_count)
+        assert.is_true(updated_summaries[1].has_next_page)
+        assert.are.equal("searching", updated_summaries[2].status)
+        assert.are.equal("s1", started[2].source.id)
+
+        selected_callback(updated_summaries[1])
+        assert.are.equal("Local source - Search: frieren - Page 1", opened_options.title)
         assert.is_function(opened_options.on_next_page)
+    end)
+
+    it("marks timed out global search sources and starts queued work", function()
+        local subprocess_job, started = buildGlobalSearchSubprocessFake()
+        local updated_summaries
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            global_search_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            global_search_max_active_sources = 1,
+            ui = {
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch(" frieren ")
+                end,
+                showGlobalSearchResultsMenu = function()
+                    return { name = "global-search" }
+                end,
+                updateGlobalSearchResultsMenu = function(_, summaries)
+                    updated_summaries = summaries
+                end,
+            },
+        })
+
+        client:showGlobalSearch({
+            { id = "s1", name = "MangaDex", lang = "en" },
+            { id = "s2", name = "Comick", lang = "en" },
+        })
+        started[1].on_timeout(started[1])
+
+        assert.are.equal("timed_out", updated_summaries[1].status)
+        assert.are.equal("searching", updated_summaries[2].status)
+        assert.are.equal("s2", started[2].source.id)
+    end)
+
+    it("cancels active and pending global search work", function()
+        local subprocess_job, started, canceled = buildGlobalSearchSubprocessFake()
+        local shown_options
+        local updated_summaries
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            global_search_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            global_search_max_active_sources = 1,
+            ui = {
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch(" frieren ")
+                end,
+                showGlobalSearchResultsMenu = function(_, _, menu_options)
+                    shown_options = menu_options
+                    return { name = "global-search" }
+                end,
+                updateGlobalSearchResultsMenu = function(_, summaries)
+                    updated_summaries = summaries
+                end,
+            },
+        })
+
+        client:showGlobalSearch({
+            { id = "s1", name = "MangaDex", lang = "en" },
+            { id = "s2", name = "Comick", lang = "en" },
+        })
+        shown_options.close_callback()
+
+        assert.are.equal(started[1], canceled[1])
+        assert.are.equal("canceled", updated_summaries[1].status)
+        assert.are.equal("canceled", updated_summaries[2].status)
+        assert.are.equal(1, #started)
     end)
 
     it("shows a friendly latest message when unknown support is rejected as unsupported", function()

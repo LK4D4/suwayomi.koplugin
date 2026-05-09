@@ -338,7 +338,7 @@ Goal: make remote source discovery usable enough to find manga, add it, and open
   - search sources allowed by Browse settings
   - show per-source result groups, or per-source rows with first results and error/empty state
   - allow opening a source-specific result page for more matches
-- [ ] Keep global search requests cancellable or bounded so slow sources do not freeze the device
+- [x] Keep global search requests cancellable or bounded so slow sources do not freeze the device
 - [x] Selecting a source opens a mode menu:
   - Popular
   - Latest, only when supported
