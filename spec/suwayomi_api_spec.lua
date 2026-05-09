@@ -47,6 +47,49 @@ describe("suwayomi_api", function()
         return request
     end
 
+    local function install_graphql_sequence_stub(responses)
+        local request = {
+            bodies = {},
+            count = 0,
+        }
+        package.loaded["ssl.https"] = nil
+        package.loaded.ltn12 = nil
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    request.count = request.count + 1
+                    table.insert(request.bodies, options.source)
+                    local response = responses[request.count] or responses[#responses] or {}
+                    if options.sink and response.body then
+                        options.sink("ignored")
+                    end
+                    return response.ok or 1, response.code or 200
+                end,
+            }
+        end
+
+        package.preload.ltn12 = function()
+            return {
+                source = {
+                    string = function(value)
+                        return value
+                    end,
+                },
+                sink = {
+                    table = function(target)
+                        return function(_chunk)
+                            local response = responses[request.count] or responses[#responses] or {}
+                            table.insert(target, response.body or "")
+                        end
+                    end,
+                },
+            }
+        end
+
+        return request
+    end
+
     local function valid_credentials()
         return {
             server_url = "https://suwayomi.example",
@@ -59,7 +102,15 @@ describe("suwayomi_api", function()
     it("should build correct GraphQL query for sources", function()
         local query = api._buildSourcesQuery()
         assert.truthy(query:match("query getSources"))
+        assert.truthy(query:match("sources { nodes { id name displayName lang isNsfw supportsLatest } }"))
+    end)
+
+    it("builds a legacy GraphQL query for source schema fallback", function()
+        local query = api._buildLegacySourcesQuery()
+        assert.truthy(query:match("query getSources"))
         assert.truthy(query:match("sources { nodes { id name displayName lang } }"))
+        assert.is_nil(query:match("isNsfw"))
+        assert.is_nil(query:match("supportsLatest"))
     end)
 
     it("builds the manga query for a source", function()
@@ -176,6 +227,41 @@ describe("suwayomi_api", function()
             { id = "1", name = "MangaDex (EN)", display_name = "MangaDex (EN)", raw_name = "MangaDex", lang = "en" },
             { id = "2", name = "ComicK (FR)", raw_name = "ComicK", lang = "fr" },
         }, sources)
+    end)
+
+    it("parses optional source metadata when present", function()
+        local response = [[
+            {
+                "data": {
+                    "sources": {
+                        "nodes": [
+                            {
+                                "id": "1",
+                                "name": "MangaDex",
+                                "displayName": "MangaDex (EN)",
+                                "lang": "en",
+                                "isNsfw": false,
+                                "supportsLatest": true
+                            },
+                            {
+                                "id": "2",
+                                "name": "Adult Source",
+                                "lang": "en",
+                                "isNsfw": true,
+                                "supportsLatest": false
+                            }
+                        ]
+                    }
+                }
+            }
+        ]]
+
+        local sources = api.parseSourcesResponse(response)
+
+        assert.are.equal(false, sources[1].is_nsfw)
+        assert.are.equal(true, sources[1].supports_latest)
+        assert.are.equal(true, sources[2].is_nsfw)
+        assert.are.equal(false, sources[2].supports_latest)
     end)
 
     it("parses manga from a source response body", function()
@@ -1533,6 +1619,48 @@ describe("suwayomi_api", function()
 
         assert.is_true(result.ok)
         assert.are.equal("https://suwayomi.example/api/graphql", requested_url)
+    end)
+
+    it("retries source loading with the legacy query when optional source metadata fields are rejected", function()
+        local request = install_graphql_sequence_stub({
+            {
+                body = [[{"errors":[{"message":"Cannot query field \"isNsfw\" on type \"Source\"."}]}]],
+            },
+            {
+                body = [[{"data":{"sources":{"nodes":[{"id":"1","name":"MangaDex","displayName":"MangaDex (EN)","lang":"en"}]}}}]],
+            },
+        })
+
+        local result = api.fetchSources(valid_credentials())
+
+        assert.is_true(result.ok)
+        assert.are.equal(2, request.count)
+        assert.truthy(request.bodies[1]:match("isNsfw"))
+        assert.truthy(request.bodies[1]:match("supportsLatest"))
+        assert.is_nil(request.bodies[2]:match("isNsfw"))
+        assert.is_nil(request.bodies[2]:match("supportsLatest"))
+        assert.are.same({
+            { id = "1", name = "MangaDex (EN)", display_name = "MangaDex (EN)", raw_name = "MangaDex", lang = "en" },
+        }, result.sources)
+    end)
+
+    it("does not retry source loading for authentication failures", function()
+        local request = install_graphql_sequence_stub({
+            {
+                ok = 1,
+                code = 401,
+                body = [[{"errors":[{"message":"Authentication failed"}]}]],
+            },
+            {
+                body = [[{"data":{"sources":{"nodes":[]}}}]],
+            },
+        })
+
+        local result = api.fetchSources(valid_credentials())
+
+        assert.is_false(result.ok)
+        assert.are.equal("Authentication failed.", result.error)
+        assert.are.equal(1, request.count)
     end)
 
     it("returns a missing URL error when source browse credentials omit server_url", function()

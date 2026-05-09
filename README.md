@@ -7,18 +7,19 @@ A KOReader plugin that allows you to browse your self-hosted [Suwayomi (Tachides
 This plugin is experimental and still under active development.
 
 - Expect rough edges and incomplete features.
-- The login flow, Suwayomi hub, Library entry point, source browsing, manga browsing, chapter browsing, chapter actions menu, single-chapter downloads, source-scoped download paths, cached source refresh, local queue inspection, and read-state syncing are currently implemented and being tested.
-- At the moment, the plugin is only considered usable with the Suwayomi **Local Source**.
+- The login flow, Suwayomi hub, Library entry point, source browsing/search, global search, manga browsing, manga actions, chapter browsing, chapter actions menu, single-chapter downloads, source-scoped download paths, cached source refresh, local queue inspection, and read-state syncing are currently implemented and being tested.
+- At the moment, the plugin is only considered fully verified with the Suwayomi **Local Source**. Remote source verification remains planned for Phase 8.
 - The top-level Downloads screen can inspect active, queued, and failed local downloads, although completed history is not implemented yet.
 
 ## Features
 - Native KOReader UI integration
 - Native Suwayomi hub with Library, Browse, Downloads, Sync, Settings, and Close actions
 - Library entry point with category picker behavior settings
-- Browse sources, manga, and chapters directly from the server
+- Browse sources, search across visible sources, search within a source, page source results, and open manga/chapter actions directly from the server
 - Cached source list with silent background refresh
 - Basic auth login against a self-hosted Suwayomi server
 - Filter sources by language
+- Browse settings for source languages, NSFW source visibility, and optionally hiding in-library source results
 - Select a custom download directory
 - Source-scoped download layout: `<download directory>/<source>/<manga>/<chapter>.cbz`
 - Download individual chapters as `.cbz`
@@ -34,7 +35,8 @@ This plugin is experimental and still under active development.
 - Manual `Sync` action for flushing pending read/unread changes immediately
 
 Current limitation:
-- The practical, tested flow currently targets the Suwayomi **Local Source**. Other Suwayomi sources may browse correctly, but downloading and reading workflows outside Local Source are not yet considered supported.
+- The practical, verified flow currently targets the Suwayomi **Local Source**. Other Suwayomi sources may browse and search correctly, but full remote source download/read workflow verification remains Phase 8 work.
+- Full source filter editing is still deferred; source-specific search currently uses text search without dynamic source filters.
 - `Downloads` currently shows KOReader-local active, queued, and failed downloads. Completed history and server-side Suwayomi download queue management are not implemented.
 
 ## Installation
@@ -62,13 +64,15 @@ Manual installation:
 2. Tap **Suwayomi** to open the hub.
 3. First time use: Tap **Settings** > **Connection** > **Login information** to enter your Suwayomi server URL, username, and password.
 4. Optionally tap **Sync** to flush any pending local read/unread changes.
-5. Optionally tap **Settings** > **Browse** > **Source languages** to filter the source list.
+5. Optionally tap **Settings** > **Browse** to filter source languages, show/hide NSFW sources, or hide in-library source results.
 6. Tap **Settings** > **Downloads** > **Download directory** to choose where manga will be downloaded.
 7. Tap **Library** to open manga already in your Suwayomi library, or **Browse** to explore sources.
-8. Use the title-bar home button on Suwayomi Library/Browse screens to return to the hub.
-9. Tap a chapter to open the chapter actions dialog.
-10. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
-11. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to download or keep the next unread chapters.
+8. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, or **Search**.
+9. Use **Next page** and **Previous page** on source result pages when available.
+10. Use the title-bar home button on Suwayomi Library/Browse/Search screens to return to the hub.
+11. Tap a manga result to open manga actions, or tap a chapter to open the chapter actions dialog.
+12. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
+13. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to download or keep the next unread chapters.
 
 ## Testing Locally
 

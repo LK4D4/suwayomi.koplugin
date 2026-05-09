@@ -66,12 +66,14 @@ Already implemented:
 Current limitations:
 
 - Downloads is first-class for active, queued, and failed KOReader-local jobs, but it does not persist completed history.
-- Source manga browsing only fetches the first popular page.
-- Remote source search, global search, latest, and pagination are missing.
-- Library membership cannot be managed from KOReader.
-- Manga-level actions are missing; existing download/read helpers live in the chapter list bulk menu.
-- Chapter API requests include scanlator data, but parsed chapter nodes do not preserve it yet, so translation/scanlator filtering is not exposed.
-- Automatic local cleanup after reading is not a configurable policy yet; only manual read-download deletion exists.
+- Source manga browsing supports Popular, Latest where available, Search, and result pagination.
+- Global search and source search are implemented for visible Browse sources.
+- Library membership can be managed from KOReader through manga actions.
+- Manga-level actions expose chapter-list, refresh, library membership, and existing download/read helpers.
+- Chapter API requests preserve scanlator data, and chapter lists can be filtered by scanlator/translation group.
+- Automatic read-download cleanup is tied to the local keep-next-unread policy rather than a separate delete-while-reading toggle.
+- Full dynamic source filter editing is deferred.
+- Remote source workflow verification remains Phase 8 work.
 - `main.lua` owns too much orchestration for the next client features to remain comfortable.
 
 ## Suwayomi-WebUI Alignment Review
@@ -273,111 +275,116 @@ Exit criteria:
 
 Goal: add WebUI-inspired manga and chapter actions that fit the Library, Browse, and KOReader-local reading workflow.
 
-- [ ] Add manga action menu
-- [ ] Reuse the same manga action menu from Library rows, Browse results, Downloads context jumps, and manga detail/chapter-list entry points
-- [ ] Group actions with short labels that resemble WebUI where they fit:
+- [x] Add manga action menu
+- [x] Reuse the same manga action menu from Library rows, Browse results, Downloads context jumps, and manga detail/chapter-list entry points
+- [x] Group actions with short labels that resemble WebUI where they fit:
   - Open
   - Refresh
   - Library
   - Read state
   - Downloads
   - Device cleanup
-- [ ] Add `Open chapter list`
-- [ ] Add `Refresh manga and chapters`
-- [ ] Refresh uninitialized manga before opening chapters when possible
-- [ ] Add `Add to library`
-- [ ] Add `Remove from library` with confirmation
-- [ ] Add `Open first unread in KOReader` when the first unread chapter is locally available
-- [ ] Add `Download first unread`
-- [ ] Add `Download next 5/10/50 unread`, preserving the existing queue cap behavior
-- [ ] Add `Download all unread` with confirmation and queue cap/chunking feedback
-- [ ] Add `Download all chapters` / whole manga with confirmation and queue cap/chunking feedback
-- [ ] Add `Keep next 5/10/50 unread downloaded`
-- [ ] Add a configurable `Keep next unread downloaded` setting under Settings -> Downloads so the policy can be maintained after read-state sync
-- [ ] Add `Delete read downloaded chapters from device`
-- [ ] Add best-effort automatic removal of read local downloads when enabled:
+- [x] Add `Open chapter list`
+- [x] Add `Refresh manga and chapters`
+- [x] Refresh uninitialized manga before opening chapters when possible
+- [x] Add `Add to library`
+- [x] Add `Remove from library` with confirmation
+- [x] Add `Open first unread in KOReader` when the first unread chapter is locally available
+- [x] Add `Download first unread`
+- [x] Add `Download next 5/10/50 unread`, preserving the existing queue cap behavior
+- [x] Add `Download all unread` with confirmation and queue cap/chunking feedback
+- [x] Add `Download all chapters` / whole manga with confirmation and queue cap/chunking feedback
+- [x] Add `Keep next 5/10/50 unread downloaded`
+- [x] Add a configurable `Keep next unread downloaded` setting under Settings -> Downloads so the policy can be maintained after read-state sync
+- [x] Add `Delete read downloaded chapters from device`
+- [x] Add best-effort automatic removal of read local downloads when enabled:
   - after manual mark-read actions
   - after KOReader metadata/history reconciliation marks chapters read
   - without deleting active downloads
-- [ ] Preserve scanlator on parsed chapter nodes
-- [ ] Add chapter-list filter by scanlator/translation group
-- [ ] Keep existing selected-chapter and mark previous/through-here actions available because they cover the "already read this far" setup flow
+- [x] Preserve scanlator on parsed chapter nodes
+- [x] Add chapter-list filter by scanlator/translation group
+- [x] Keep existing selected-chapter and mark previous/through-here actions available because they cover the "already read this far" setup flow
 - [ ] Consider manga-level `Mark all read` / `Mark all unread` only if it can share existing selected/bulk read-state helpers safely
-- [ ] Refresh visible row state after add/remove/refresh when possible
+- [x] Refresh visible row state after add/remove/refresh when possible
 
 Tests:
 
-- [ ] Manga action menu construction
-- [ ] Remove-from-library confirmation
-- [ ] Add/remove library calls the mutation helper
-- [ ] Uninitialized manga refreshes before chapter open
-- [ ] First-unread actions select the expected chapter
-- [ ] Existing bulk policies can be triggered from manga-level actions
-- [ ] `Download all unread` and whole-manga downloads respect confirmation and queue cap/chunking behavior
-- [ ] `Keep next unread downloaded` setting persists and is applied after read-state reconciliation
-- [ ] Best-effort automatic removal deletes only read KOReader-local files and skips active downloads
-- [ ] Chapter parser preserves scanlator
-- [ ] Chapter-list scanlator filter hides only matching translation groups
+- [x] Manga action menu construction
+- [x] Remove-from-library confirmation
+- [x] Add/remove library calls the mutation helper
+- [x] Uninitialized manga refreshes before chapter open
+- [x] First-unread actions select the expected chapter
+- [x] Existing bulk policies can be triggered from manga-level actions
+- [x] `Download all unread` and whole-manga downloads respect confirmation and queue cap/chunking behavior
+- [x] `Keep next unread downloaded` setting persists and is applied after read-state reconciliation
+- [x] Best-effort automatic removal deletes only read KOReader-local files and skips active downloads
+- [x] Chapter parser preserves scanlator
+- [x] Chapter-list scanlator filter hides only matching translation groups
 
 Exit criteria:
 
-- Library and Browse entries are useful without drilling into individual chapters first.
-- Library membership can be managed from KOReader.
-- The basic release flow can set read state, filter duplicate translations, queue offline reading, keep the next unread chapters available, and clean up read local files.
-- Reader-like behavior remains limited to opening already-downloaded local files in KOReader.
+- [x] Library and Browse entries are useful without drilling into individual chapters first.
+- [x] Library membership can be managed from KOReader.
+- [x] The basic release flow can set read state, filter duplicate translations, queue offline reading, keep the next unread chapters available, and clean up read local files.
+- [x] Reader-like behavior remains limited to opening already-downloaded local files in KOReader.
 
 ## Phase 7: Browse And Search Surface
 
 Goal: make remote source discovery usable enough to find manga, add it, and open its chapter list without leaving KOReader.
 
-- [ ] Selecting Browse opens enabled sources grouped or filtered by language
-- [ ] Apply Browse settings:
+- [x] Selecting Browse opens enabled sources grouped or filtered by language
+- [x] Apply Browse settings:
   - source languages
   - show/hide NSFW sources when metadata exists
   - hide in-library manga from source results, optional
-- [ ] Add global search across enabled visible sources:
+- [x] Add global search across enabled visible sources:
   - ask for one query
   - search sources allowed by Browse settings
   - show per-source result groups, or per-source rows with first results and error/empty state
   - allow opening a source-specific result page for more matches
-  - keep requests cancellable or bounded so slow sources do not freeze the device
-- [ ] Selecting a source opens a mode menu:
+- [ ] Keep global search requests cancellable or bounded so slow sources do not freeze the device
+- [x] Selecting a source opens a mode menu:
   - Popular
   - Latest, only when supported
   - Search
-- [ ] Keep direct Local source listing if it remains clearer
-- [ ] Add text input for global search and source search
-- [ ] Fetch source manga with selected mode and page
-- [ ] Add result rows with library markers
-- [ ] Add `Next page` when `hasNextPage` is true
-- [ ] Add `Previous page` when page is greater than 1
-- [ ] Preserve current source/mode/query/page context while paging
-- [ ] Selecting a result opens manga actions:
+- [x] Keep direct Local source listing if it remains clearer
+- [x] Add text input for global search and source search
+- [x] Fetch source manga with selected mode and page
+- [x] Add result rows with library markers
+- [x] Add `Next page` when `hasNextPage` is true
+- [x] Add `Previous page` when page is greater than 1
+- [x] Preserve current source/mode/query/page context while paging
+- [x] Selecting a result opens manga actions:
   - Open chapter list
   - Add to library
   - Remove from library
   - Refresh details/chapters
   - Download/read-state actions through the shared manga action menu when chapter data is available
-- [ ] Keep full source filter editing deferred; source-specific search may pass no filters until a small KOReader-friendly filter subset is designed
+- [x] Keep title-bar home behavior on Browse source menu, source mode menu, source result pages, and global search result pages
+- [x] Keep chapter/list/download/read-state actions unchanged once manga actions open
+- [x] Keep full source filter editing deferred; source-specific search may pass no filters until a small KOReader-friendly filter subset is designed
+- [ ] Add a KOReader-friendly source filter subset after remote-source behavior is verified
 
 Tests:
 
-- [ ] Browse source list respects language settings
-- [ ] Global search respects language, enabled-source, and NSFW visibility settings
-- [ ] Global search keeps per-source errors isolated
-- [ ] Global search result opens source-specific results or manga actions
-- [ ] Source mode menu construction
-- [ ] Search prompt calls `SEARCH`
-- [ ] Popular and latest call the correct modes
-- [ ] Latest is hidden or rejected when unsupported
-- [ ] Next/previous page update result context
-- [ ] Search results show library state
-- [ ] Optional hide-in-library setting filters visible results only where intended
-- [ ] Add/remove from source results updates visible state
+- [x] Browse source list respects language settings
+- [x] Global search respects language, enabled-source, and NSFW visibility settings
+- [x] Global search keeps per-source errors isolated
+- [x] Global search result opens source-specific results or manga actions
+- [x] Source mode menu construction
+- [x] Search prompt calls `SEARCH`
+- [x] Popular and latest call the correct modes
+- [x] Latest is hidden or rejected when unsupported
+- [x] Next/previous page update result context
+- [x] Search results show library state
+- [x] Optional hide-in-library setting filters visible results only where intended
+- [x] Add/remove from source results updates visible state
+- [x] Title-bar home behavior remains available on Browse source, source mode, source result, and global search result menus
+- [x] Manga actions continue to own chapter/list/download/read-state behavior after opening from Browse results
 
 Exit criteria:
 
-- A user can search across sources or within one source, page results, add a manga to the library, and open its chapter list.
+- A user can search across sources or within one source, page results, add a manga to the library, and open its chapter list in unit-covered flows. Live remote-source verification remains Phase 8.
 
 ## Phase 8: Remote Source Verification
 
@@ -484,4 +491,4 @@ These are intentionally outside the client MVP:
 
 ## Current Next Step
 
-Start Phase 6. The Downloads surface now exposes the existing KOReader-local queue with active, queued, and failed rows plus retry, cancel queued, clear failed, and manga-context jumps. The next slice should preserve chapter scanlator data, add chapter-list scanlator filtering, and introduce the shared manga action menu that promotes the existing read/download policies to Library and Browse rows.
+Start Phase 8 remote-source verification for the Browse/Search flows that are now unit-covered. Keep full source filters deferred until the tested remote-source behavior is stable.

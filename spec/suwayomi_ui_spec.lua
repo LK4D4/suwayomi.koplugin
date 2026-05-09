@@ -231,8 +231,8 @@ describe("suwayomi_ui", function()
         end)
 
         assert.are.equal("Suwayomi Manga", shown_dialog.title)
-        assert.are.equal("One Piece", shown_dialog.item_table[1].text)
-        assert.are.equal("Frieren", shown_dialog.item_table[2].text)
+        assert.are.equal("[ ] One Piece", shown_dialog.item_table[1].text)
+        assert.are.equal("[ ] Frieren", shown_dialog.item_table[2].text)
 
         shown_dialog.item_table[1].callback()
         shown_dialog.item_table[2].callback()
@@ -241,6 +241,42 @@ describe("suwayomi_ui", function()
             { id = "m1", title = "One Piece" },
             { id = "m2", title = "Frieren" },
         }, selected)
+    end)
+
+    it("shows compact browse result markers, title, and paging rows", function()
+        local ui = require("suwayomi_ui")
+        local selected = {}
+        local paging = {}
+
+        ui.showMangaMenu({
+            { id = "m1", title = "Already Added", in_library = true },
+            { id = "m2", title = "New Find", in_library = false },
+            { id = "m3", title = "Unknown State" },
+        }, function(manga)
+            table.insert(selected, manga.id)
+        end, {
+            title = "MangaDex (EN) - Search: frieren - Page 2",
+            on_previous_page = function()
+                table.insert(paging, "previous")
+            end,
+            on_next_page = function()
+                table.insert(paging, "next")
+            end,
+        })
+
+        assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_dialog.title)
+        assert.are.equal("Previous page", shown_dialog.item_table[1].text)
+        assert.are.equal("[+] Already Added", shown_dialog.item_table[2].text)
+        assert.are.equal("[ ] New Find", shown_dialog.item_table[3].text)
+        assert.are.equal("[ ] Unknown State", shown_dialog.item_table[4].text)
+        assert.are.equal("Next page", shown_dialog.item_table[5].text)
+
+        shown_dialog.item_table[1].callback()
+        shown_dialog.item_table[2].callback()
+        shown_dialog.item_table[5].callback()
+
+        assert.are.same({ "previous", "next" }, paging)
+        assert.are.same({ "m1" }, selected)
     end)
 
     it("shows a chapter menu", function()
@@ -487,6 +523,7 @@ describe("suwayomi_ui", function()
     it("shows a sources menu", function()
         local ui = require("suwayomi_ui")
         local selected = {}
+        local global_search_started = false
 
         ui.showSourcesMenu({
             { id = "s1", name = "MangaDex" },
@@ -494,22 +531,74 @@ describe("suwayomi_ui", function()
             { id = "s3", name = "Local source" },
         }, function(source)
             table.insert(selected, source)
-        end)
+        end, {
+            on_global_search = function()
+                global_search_started = true
+            end,
+        })
 
         assert.are.equal("Suwayomi Sources", shown_dialog.title)
-        assert.are.equal("MangaDex", shown_dialog.item_table[1].text)
-        assert.are.equal("ComicK", shown_dialog.item_table[2].text)
-        assert.are.equal("Local source", shown_dialog.item_table[3].text)
+        assert.are.equal("Global search", shown_dialog.item_table[1].text)
+        assert.are.equal("MangaDex", shown_dialog.item_table[2].text)
+        assert.are.equal("ComicK", shown_dialog.item_table[3].text)
+        assert.are.equal("Local source", shown_dialog.item_table[4].text)
 
         shown_dialog.item_table[1].callback()
         shown_dialog.item_table[2].callback()
         shown_dialog.item_table[3].callback()
+        shown_dialog.item_table[4].callback()
 
+        assert.is_true(global_search_started)
         assert.are.same({
             { id = "s1", name = "MangaDex" },
             { id = "s2", name = "ComicK" },
             { id = "s3", name = "Local source" },
         }, selected)
+    end)
+
+    it("shows global search summaries and opens only successful or pageable source rows", function()
+        local ui = require("suwayomi_ui")
+        local selected = {}
+
+        ui.showGlobalSearchResultsMenu({
+            {
+                source = { id = "s1", name = "MangaDex" },
+                status = "ok",
+                first_match = { title = "Frieren Beyond Journey's End" },
+            },
+            {
+                source = { id = "s4", name = "More Source" },
+                status = "pageable_empty",
+                has_next_page = true,
+                query = "frieren",
+            },
+            {
+                source = { id = "s2", name = "ComicK" },
+                status = "empty",
+            },
+            {
+                source = { id = "s3", name = "Some Source" },
+                status = "error",
+                error = "Timed out",
+            },
+        }, function(summary)
+            table.insert(selected, summary)
+        end)
+
+        assert.are.equal("Global search", shown_dialog.title)
+        assert.are.equal("MangaDex: Frieren Beyond Journey's End", shown_dialog.item_table[1].text)
+        assert.are.equal("More Source: More results", shown_dialog.item_table[2].text)
+        assert.are.equal("ComicK: No results", shown_dialog.item_table[3].text)
+        assert.are.equal("Some Source: Error - Timed out", shown_dialog.item_table[4].text)
+
+        shown_dialog.item_table[1].callback()
+        shown_dialog.item_table[2].callback()
+        assert.are.equal("s1", selected[1].source.id)
+        assert.are.equal("s4", selected[2].source.id)
+
+        shown_dialog.item_table[3].callback()
+        shown_dialog.item_table[4].callback()
+        assert.are.equal(2, #selected)
     end)
 
     it("adds a home title-bar action to sources menus when requested", function()
@@ -518,6 +607,76 @@ describe("suwayomi_ui", function()
 
         ui.showSourcesMenu({
             { id = "s1", name = "MangaDex" },
+        }, nil, {
+            title_bar_left_icon = "appbar.filebrowser",
+            on_title_bar_left_tap = function()
+                tapped_home = true
+                return true
+            end,
+        })
+
+        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
+
+        shown_dialog.onLeftButtonTap()
+
+        assert.is_true(tapped_home)
+    end)
+
+    it("adds a home title-bar action to source mode menus when requested", function()
+        local ui = require("suwayomi_ui")
+        local tapped_home = false
+
+        ui.showSourceModeMenu({
+            id = "s1",
+            name = "MangaDex",
+        }, nil, {
+            title_bar_left_icon = "appbar.filebrowser",
+            on_title_bar_left_tap = function()
+                tapped_home = true
+                return true
+            end,
+        })
+
+        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
+
+        shown_dialog.onLeftButtonTap()
+
+        assert.is_true(tapped_home)
+    end)
+
+    it("adds a home title-bar action to source result pages when requested", function()
+        local ui = require("suwayomi_ui")
+        local tapped_home = false
+
+        ui.showMangaMenu({
+            { id = "m1", title = "Sousou no Frieren" },
+        }, nil, {
+            title = "MangaDex - Popular - Page 1",
+            title_bar_left_icon = "appbar.filebrowser",
+            on_title_bar_left_tap = function()
+                tapped_home = true
+                return true
+            end,
+        })
+
+        assert.are.equal("MangaDex - Popular - Page 1", shown_dialog.title)
+        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
+
+        shown_dialog.onLeftButtonTap()
+
+        assert.is_true(tapped_home)
+    end)
+
+    it("adds a home title-bar action to global search result pages when requested", function()
+        local ui = require("suwayomi_ui")
+        local tapped_home = false
+
+        ui.showGlobalSearchResultsMenu({
+            {
+                source = { id = "s1", name = "MangaDex" },
+                status = "ok",
+                first_match = { title = "Sousou no Frieren" },
+            },
         }, nil, {
             title_bar_left_icon = "appbar.filebrowser",
             on_title_bar_left_tap = function()
@@ -554,6 +713,62 @@ describe("suwayomi_ui", function()
         assert.is_true(tapped_home)
     end)
 
+    it("shows a source mode menu and hides latest when unsupported", function()
+        local ui = require("suwayomi_ui")
+        local selected = {}
+
+        ui.showSourceModeMenu({
+            id = "s1",
+            name = "MangaDex",
+            supports_latest = false,
+        }, function(mode)
+            table.insert(selected, mode)
+        end)
+
+        assert.are.equal("MangaDex", shown_dialog.title)
+        assert.are.equal("Popular", shown_dialog.item_table[1].text)
+        assert.are.equal("Search", shown_dialog.item_table[2].text)
+        assert.is_nil(shown_dialog.item_table[3])
+
+        shown_dialog.item_table[1].callback()
+        shown_dialog.item_table[2].callback()
+
+        assert.are.same({ "POPULAR", "SEARCH" }, selected)
+    end)
+
+    it("shows latest for unknown source support and collects a search query", function()
+        local ui = require("suwayomi_ui")
+        local selected_mode
+        local searched_query
+
+        ui.showSourceModeMenu({
+            id = "s1",
+            name = "MangaDex",
+        }, function(mode)
+            selected_mode = mode
+        end)
+
+        assert.are.equal("Latest", shown_dialog.item_table[2].text)
+        shown_dialog.item_table[2].callback()
+        assert.are.equal("LATEST", selected_mode)
+
+        ui.showSourceSearchPrompt({
+            id = "s1",
+            name = "MangaDex",
+        }, function(query)
+            searched_query = query
+        end)
+
+        assert.are.equal("Search MangaDex", shown_dialog.title)
+        shown_dialog.getFields = function()
+            return { " frieren " }
+        end
+        shown_dialog.buttons[1][2].callback()
+
+        assert.are.equal(" frieren ", searched_query)
+        assert.are.equal(shown_dialog, closed_dialog)
+    end)
+
     it("updates a sources menu in place", function()
         local ui = require("suwayomi_ui")
         local selected
@@ -575,6 +790,38 @@ describe("suwayomi_ui", function()
         menu.item_table[1].callback()
 
         assert.are.same({ id = "s4", name = "Local source" }, selected)
+    end)
+
+    it("updates a manga menu title bar in place", function()
+        local ui = require("suwayomi_ui")
+        local title_bar_title
+        local left_icon
+        local menu = {
+            title = "MangaDex - Popular - Page 1",
+            title_bar = {
+                setTitle = function(_, title, refresh)
+                    title_bar_title = { title = title, refresh = refresh }
+                end,
+            },
+            setTitleBarLeftIcon = function(_, icon)
+                left_icon = icon
+            end,
+            updateItems = function(self)
+                self.updated = true
+            end,
+        }
+
+        ui.updateMangaMenu(menu, {
+            { id = "m2", title = "Page 2" },
+        }, function() end, {
+            title = "MangaDex - Popular - Page 2",
+            title_bar_left_icon = "appbar.filebrowser",
+        })
+
+        assert.are.equal("MangaDex - Popular - Page 2", menu.title)
+        assert.are.same({ title = "MangaDex - Popular - Page 2", refresh = true }, title_bar_title)
+        assert.are.equal("appbar.filebrowser", left_icon)
+        assert.is_true(menu.updated)
     end)
 
     it("uses KOReader path chooser to choose a directory", function()
