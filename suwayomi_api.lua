@@ -83,6 +83,13 @@ function SuwayomiAPI.buildRequestURL(server_url, path)
     return (server_url or ""):gsub("/+$", "") .. "/" .. tostring(path):gsub("^/+", "")
 end
 
+function SuwayomiAPI.buildChapterArchiveDownloadURL(server_url, chapter_id)
+    return SuwayomiAPI.buildRequestURL(
+        server_url,
+        "/api/v1/chapter/" .. tostring(chapter_id) .. "/download?markAsRead=false"
+    )
+end
+
 local function parseOrigin(url)
     local scheme, host, port = tostring(url or ""):match("^(https?)://([^/%?#:]+):?(%d*)")
     if not scheme or not host then
@@ -693,6 +700,117 @@ function SuwayomiAPI.downloadBinary(credentials, page_url)
     return {
         ok = false,
         error = error_message[code] or "Could not download chapter page.",
+    }
+end
+
+function SuwayomiAPI.downloadChapterArchive(credentials, chapter_id, target_path)
+    local server_url = credentials and credentials.server_url
+    if not server_url or server_url == "" then
+        return {
+            ok = false,
+            error = "Missing Suwayomi server URL.",
+        }
+    end
+    if not target_path or target_path == "" then
+        return {
+            ok = false,
+            error = "Missing chapter archive target path.",
+        }
+    end
+
+    local handle, open_error = io.open(target_path, "wb")
+    if not handle then
+        return {
+            ok = false,
+            error = "Could not create chapter archive.",
+            detail = open_error,
+        }
+    end
+
+    local request_url = SuwayomiAPI.buildChapterArchiveDownloadURL(server_url, chapter_id)
+    local client = request_url:match("^https://") and require("ssl.https") or require("socket.http")
+    local headers = SuwayomiAPI.buildRequestHeaders(credentials)
+    local response_bytes = 0
+    local write_error
+
+    local started_at = os.time()
+    local ok_socket, socket = pcall(require, "socket")
+    if ok_socket and socket and socket.gettime then
+        started_at = socket.gettime()
+    end
+    local ok, code, response_headers = client.request{
+        url = request_url,
+        method = "GET",
+        headers = headers,
+        sink = function(chunk)
+            if chunk then
+                local written, err = handle:write(chunk)
+                if not written then
+                    write_error = err or "write failed"
+                    return nil, write_error
+                end
+                response_bytes = response_bytes + #chunk
+            end
+            return 1
+        end,
+        timeout = REQUEST_TIMEOUT_SECONDS,
+    }
+    handle:close()
+
+    response_headers = response_headers or {}
+    local finished_at = os.time()
+    if ok_socket and socket and socket.gettime then
+        finished_at = socket.gettime()
+    end
+    logDebugEvent({
+        operation = "downloadChapterArchive",
+        event = "response",
+        ok = ok,
+        code = code,
+        code_type = type(code),
+        elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
+        response_bytes = response_bytes,
+    })
+
+    if code == 200 and not write_error then
+        return {
+            ok = true,
+            path = target_path,
+            bytes = response_bytes,
+            content_type = response_headers["content-type"] or response_headers["Content-Type"],
+            content_length = tonumber(response_headers["content-length"] or response_headers["Content-Length"]),
+        }
+    end
+
+    os.remove(target_path)
+    if write_error then
+        return {
+            ok = false,
+            error = "Could not write chapter archive.",
+            detail = write_error,
+        }
+    end
+    if not ok then
+        return {
+            ok = false,
+            error = "Could not reach the Suwayomi server: " .. tostring(code),
+        }
+    end
+    if type(code) ~= "number" then
+        return {
+            ok = false,
+            error = "Could not reach the Suwayomi server: " .. tostring(code),
+        }
+    end
+
+    local error_message = {
+        [401] = "Authentication failed.",
+        [403] = "Authentication failed.",
+        [404] = "Chapter archive not found.",
+    }
+    return {
+        ok = false,
+        error = error_message[code] or "Could not download chapter archive.",
     }
 end
 

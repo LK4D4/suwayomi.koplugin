@@ -163,6 +163,244 @@ describe("suwayomi_downloader", function()
         }, added_files)
     end)
 
+    it("prefers the direct chapter archive endpoint when it returns a CBZ", function()
+        local renamed_from
+        local renamed_to
+
+        package.preload.suwayomi_api = function()
+            return {
+                downloadChapterArchive = function(_, chapter_id, target_path)
+                    assert.are.equal("398", chapter_id)
+                    assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.direct.part", target_path)
+                    return {
+                        ok = true,
+                        content_type = "application/vnd.comicbook+zip",
+                        bytes = 13,
+                    }
+                end,
+                fetchChapterPages = function()
+                    error("page fallback should not run after a direct CBZ download")
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if path == "/books" and attribute == "mode" then
+                        return "directory"
+                    end
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        error("direct CBZ download should not open an archive writer")
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_rename = os.rename
+        os.rename = function(from, to)
+            renamed_from = from
+            renamed_to = to
+            return true
+        end
+
+        local downloader = require("suwayomi_downloader")
+        local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.rename = original_rename
+
+        assert.is_true(result.ok)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", result.path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.direct.part", renamed_from)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", renamed_to)
+    end)
+
+    it("falls back to page downloads when the direct archive endpoint is unavailable", function()
+        local direct_attempted = false
+        local fetched_pages = false
+        local added_files = {}
+        local renamed_to
+
+        package.preload.suwayomi_api = function()
+            return {
+                downloadChapterArchive = function(_, _, target_path)
+                    direct_attempted = true
+                    assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.direct.part", target_path)
+                    return { ok = false, error = "Chapter archive not found." }
+                end,
+                fetchChapterPages = function()
+                    fetched_pages = true
+                    return {
+                        ok = true,
+                        pages = { "/page/0" },
+                    }
+                end,
+                downloadBinary = function()
+                    return {
+                        ok = true,
+                        body = "page-one",
+                        content_type = "image/jpeg",
+                    }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function()
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function() return true end,
+                            addFileFromMemory = function(_, entry_path, content)
+                                table.insert(added_files, { path = entry_path, content = content })
+                                return true
+                            end,
+                            close = function() end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_rename = os.rename
+        os.rename = function(_from, to)
+            renamed_to = to
+            return true
+        end
+
+        local downloader = require("suwayomi_downloader")
+        local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.rename = original_rename
+
+        assert.is_true(result.ok)
+        assert.is_true(direct_attempted)
+        assert.is_true(fetched_pages)
+        assert.are.same({ { path = "0001.jpg", content = "page-one" } }, added_files)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", renamed_to)
+    end)
+
+    it("keeps direct archive scratch cleanup failures from blocking page fallback", function()
+        local direct_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.direct.part"
+        local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
+        local opened_path
+
+        package.preload.suwayomi_api = function()
+            return {
+                downloadChapterArchive = function(_, _, target_path)
+                    assert.are.equal(direct_partial_path, target_path)
+                    return { ok = false, error = "Chapter archive not found." }
+                end,
+                fetchChapterPages = function()
+                    return { ok = true, pages = { "/page/0" } }
+                end,
+                downloadBinary = function()
+                    return { ok = true, body = "page-one", content_type = "image/jpeg" }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if path == direct_partial_path and attribute == "mode" then
+                        return "file"
+                    end
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function(_, path)
+                                opened_path = path
+                                return true
+                            end,
+                            addFileFromMemory = function()
+                                return true
+                            end,
+                            close = function() end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_remove = os.remove
+        os.remove = function(path)
+            if path == direct_partial_path then
+                return nil, "permission denied"
+            end
+            return true
+        end
+        local original_rename = os.rename
+        os.rename = function()
+            return true
+        end
+
+        local downloader = require("suwayomi_downloader")
+        local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.remove = original_remove
+        os.rename = original_rename
+
+        assert.is_true(result.ok)
+        assert.are.equal(page_partial_path, opened_path)
+    end)
+
     it("builds target paths with source metadata", function()
         package.preload.suwayomi_api = function()
             return {}
@@ -440,14 +678,18 @@ describe("suwayomi_downloader", function()
         assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
     end)
 
-    it("does not open a new archive when stale partial cleanup fails", function()
+    it("tries to overwrite stale partial files when cleanup fails", function()
         local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
         local removed_path
+        local opened_path
 
         package.preload.suwayomi_api = function()
             return {
                 fetchChapterPages = function()
                     return { ok = true, pages = { "/page/0" } }
+                end,
+                downloadBinary = function()
+                    return { ok = true, body = "page-one", content_type = "image/jpeg" }
                 end,
             }
         end
@@ -468,9 +710,12 @@ describe("suwayomi_downloader", function()
                 Writer = {
                     new = function()
                         return {
-                            open = function()
-                                error("archive should not open when stale partial cleanup fails")
+                            open = function(_, path)
+                                opened_path = path
+                                return true
                             end,
+                            addFileFromMemory = function() return true end,
+                            close = function() end,
                         }
                     end,
                 }
@@ -492,15 +737,20 @@ describe("suwayomi_downloader", function()
             removed_path = path
             return nil, "permission denied"
         end
+        local original_rename = os.rename
+        os.rename = function()
+            return true
+        end
 
         local downloader = require("suwayomi_downloader")
         local result = downloader:startChapterDownload({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.remove = original_remove
+        os.rename = original_rename
 
-        assert.is_false(result.ok)
+        assert.is_true(result.ok)
         assert.are.equal(partial_path, removed_path)
-        assert.are.equal("Could not remove partial chapter archive.", result.error)
+        assert.are.equal(partial_path, opened_path)
     end)
 
     it("reports cleanup errors when a failed download leaves the partial archive behind", function()

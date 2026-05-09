@@ -1254,4 +1254,32 @@ describe("suwayomi_download_queue", function()
         assert.are.equal("downloaded", context.queue:getStatus(manga, chapter).state)
         assert.are.same({}, context.messages)
     end)
+
+    it("treats a finished subprocess as downloaded when progress is missing but the archive exists locally", function()
+        local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
+        local context = build_queue({
+            subprocess_done = true,
+            skip_subprocess_callback = true,
+            downloader = {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                chapterExists = function(_, chapter_path)
+                    return chapter_path == target_path
+                end,
+            },
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        table.remove(context.scheduled, 1).callback()
+        table.remove(context.scheduled, 1).callback()
+
+        assert.are.same({}, context.saved_queue())
+        assert.are.equal("downloaded", context.queue:getStatus(manga, chapter).state)
+        assert.are.same({}, context.messages)
+    end)
 end)

@@ -2108,6 +2108,10 @@ function SuwayomiPlugin:buildChapterMenuItems(manga, chapters, ledger)
         end
 
         local status = self:getChapterDownloadStatus(manga, item)
+        if chapter_exists and status and status.state == "failed" then
+            self:getDownloadQueue():clearStatus(manga, item, { quiet = true })
+            status = { state = "downloaded" }
+        end
         if not status then
             if chapter_exists then
                 status = { state = "downloaded" }

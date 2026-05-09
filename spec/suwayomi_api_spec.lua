@@ -911,6 +911,49 @@ describe("suwayomi_api", function()
         assert.are.equal("image/jpeg", result.content_type)
     end)
 
+    it("streams a chapter archive from the direct CBZ endpoint", function()
+        local requested_url
+        local requested_timeout
+        local requested_headers
+        local archive_path = os.tmpname()
+        os.remove(archive_path)
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    requested_url = options.url
+                    requested_timeout = options.timeout
+                    requested_headers = options.headers
+                    options.sink("PK\003\004cbz-bytes")
+                    return 1, 200, {
+                        ["content-type"] = "application/vnd.comicbook+zip",
+                        ["content-length"] = "13",
+                    }
+                end,
+            }
+        end
+
+        local result = api.downloadChapterArchive({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }, "398", archive_path)
+
+        local handle = assert(io.open(archive_path, "rb"))
+        local content = handle:read("*a")
+        handle:close()
+        os.remove(archive_path)
+
+        assert.is_true(result.ok)
+        assert.are.equal("https://suwayomi.example/api/v1/chapter/398/download?markAsRead=false", requested_url)
+        assert.are.equal(15, requested_timeout)
+        assert.are.equal(api.buildBasicAuthHeader("alice", "secret"), requested_headers.Authorization)
+        assert.are.equal("application/vnd.comicbook+zip", result.content_type)
+        assert.are.equal(13, result.bytes)
+        assert.are.equal("PK\003\004cbz-bytes", content)
+    end)
+
     it("uses socket.http for absolute http page URLs without rewriting them", function()
         local requested_url
         local selected_client

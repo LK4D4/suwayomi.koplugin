@@ -644,6 +644,9 @@ function DownloadQueue:cleanupInterruptedDownload(job)
     local _, chapter_path = self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter)
     local partial_path = self.downloader.getPartialPath and self.downloader:getPartialPath(chapter_path) or (chapter_path .. ".part")
     os.remove(partial_path)
+    if self.downloader.getDirectPartialPath then
+        os.remove(self.downloader:getDirectPartialPath(chapter_path))
+    end
     return true
 end
 
@@ -1060,6 +1063,13 @@ function DownloadQueue:poll()
                         state = "downloaded",
                         current = progress.current,
                         total = progress.total,
+                    })
+                elseif self:jobArchiveExists(active, progress) then
+                    self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
+                    self:setStatus(active.manga, active.chapter, {
+                        state = "downloaded",
+                        current = progress and progress.current or active.last_progress_current,
+                        total = progress and progress.total or active.last_progress_total,
                     })
                 elseif progress and progress.state == "failed" then
                     local message = self:formatFailureMessage(

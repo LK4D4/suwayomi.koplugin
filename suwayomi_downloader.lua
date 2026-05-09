@@ -17,6 +17,10 @@ function Downloader:getPartialPath(chapter_path)
     return tostring(chapter_path or "") .. ".part"
 end
 
+function Downloader:getDirectPartialPath(chapter_path)
+    return tostring(chapter_path or "") .. ".direct.part"
+end
+
 function Downloader:chapterExists(chapter_path)
     return lfs.attributes(chapter_path, "mode") == "file"
 end
@@ -73,6 +77,78 @@ function Downloader:failAndCleanup(message, chapter_path, writer)
     return result
 end
 
+function Downloader:isArchiveContentType(content_type)
+    content_type = tostring(content_type or ""):lower()
+    return content_type:match("comicbook") ~= nil
+        or content_type:match("cbz") ~= nil
+        or content_type:match("zip") ~= nil
+end
+
+function Downloader:finalizePartialArchive(partial_path, chapter_path)
+    local renamed, rename_error = os.rename(partial_path, chapter_path)
+    if renamed then
+        return {
+            ok = true,
+            path = chapter_path,
+        }
+    end
+
+    if self:chapterExists(chapter_path) then
+        self:cleanupPartialFile(partial_path)
+        return {
+            ok = true,
+            skipped = true,
+            path = chapter_path,
+        }
+    end
+
+    self:cleanupPartialFile(partial_path)
+    local error_message = "Could not finalize chapter archive."
+    if rename_error and tostring(rename_error) ~= "" then
+        error_message = error_message .. " " .. tostring(rename_error)
+    end
+    return {
+        ok = false,
+        error = error_message,
+        path = chapter_path,
+    }
+end
+
+function Downloader:downloadDirectChapterArchive(credentials, download_directory, manga, chapter)
+    if not SuwayomiAPI.downloadChapterArchive or not chapter or chapter.id == nil then
+        return nil
+    end
+
+    if not download_directory or download_directory == "" then
+        return { ok = false, error = "Set up a download directory first." }
+    end
+
+    local manga_dir, chapter_path = self:getTargetPath(download_directory, manga, chapter)
+    if self:chapterExists(chapter_path) then
+        return { ok = true, skipped = true, path = chapter_path }
+    end
+
+    local directory_ok, directory_error = self:ensureDirectory(manga_dir)
+    if not directory_ok then
+        return { ok = false, error = directory_error }
+    end
+
+    local partial_path = self.getDirectPartialPath and self:getDirectPartialPath(chapter_path) or self:getPartialPath(chapter_path)
+    self:cleanupPartialFile(partial_path)
+
+    local archive_result = SuwayomiAPI.downloadChapterArchive(credentials, chapter.id, partial_path)
+    if not archive_result.ok then
+        self:cleanupPartialFile(partial_path)
+        return nil
+    end
+    if (archive_result.bytes or 0) <= 0 or not self:isArchiveContentType(archive_result.content_type) then
+        self:cleanupPartialFile(partial_path)
+        return nil
+    end
+
+    return self:finalizePartialArchive(partial_path, chapter_path)
+end
+
 function Downloader:writeProgress(progress_path, state, current, total, path, error_message)
     if not progress_path or progress_path == "" then
         return
@@ -121,10 +197,7 @@ function Downloader:startChapterDownload(credentials, download_directory, manga,
         return { ok = false, error = directory_error }
     end
 
-    local cleanup_ok, cleanup_error = self:cleanupPartialFile(partial_path)
-    if not cleanup_ok then
-        return { ok = false, error = cleanup_error }
-    end
+    self:cleanupPartialFile(partial_path)
     local writer = Archiver.Writer:new()
     if not writer:open(partial_path, "zip") then
         return { ok = false, error = writer.err or "Could not create chapter archive." }
@@ -263,6 +336,11 @@ function Downloader:downloadNextPage(job)
 end
 
 function Downloader:downloadChapter(credentials, download_directory, manga, chapter)
+    local direct_result = self:downloadDirectChapterArchive(credentials, download_directory, manga, chapter)
+    if direct_result then
+        return direct_result
+    end
+
     local start_result = self:startChapterDownload(credentials, download_directory, manga, chapter)
     if not start_result.ok or start_result.skipped then
         return start_result
@@ -280,6 +358,19 @@ function Downloader:downloadChapter(credentials, download_directory, manga, chap
 end
 
 function Downloader:downloadChapterWithProgress(credentials, download_directory, manga, chapter, progress_path)
+    local direct_result = self:downloadDirectChapterArchive(credentials, download_directory, manga, chapter)
+    if direct_result then
+        self:writeProgress(
+            progress_path,
+            direct_result.skipped and "skipped" or (direct_result.ok and "downloaded" or "failed"),
+            direct_result.ok and 1 or 0,
+            direct_result.ok and 1 or 0,
+            direct_result.path,
+            direct_result.error
+        )
+        return direct_result
+    end
+
     local start_result = self:startChapterDownload(credentials, download_directory, manga, chapter)
     if not start_result.ok or start_result.skipped then
         self:writeProgress(

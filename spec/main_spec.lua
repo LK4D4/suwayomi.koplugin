@@ -3225,6 +3225,50 @@ return {
         assert.is_nil(quick_items[2].menu_status)
     end)
 
+    it("clears stale failed download status when the chapter archive exists", function()
+        local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function() return { server_url = "https://suwayomi.example" } end,
+                loadDownloadDirectory = function() return "/books" end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadMaxParallelChapterDownloads = function() return 2 end,
+                loadKeepNextUnreadDownloads = function() return 0 end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+        package.preload.suwayomi_downloader = function()
+            return {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                chapterExists = function(_, chapter_path)
+                    return chapter_path == target_path
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_settings = nil
+        package.loaded.suwayomi_downloader = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        plugin.loadKoreaderHistoryPaths = function() return {} end
+        plugin.isChapterPathFinishedInKoreader = function() return false end
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = false }
+
+        plugin:getDownloadQueue():setStatus(manga, chapter, { state = "failed" })
+        local items = plugin:buildChapterMenuItems(manga, { chapter })
+
+        assert.are.equal("↓", items[1].menu_status)
+        assert.is_nil(plugin:getDownloadQueue():getStatus(manga, chapter))
+    end)
+
     it("clears stale selection when opening chapters for another manga", function()
         package.preload.suwayomi_api = function()
             return {
