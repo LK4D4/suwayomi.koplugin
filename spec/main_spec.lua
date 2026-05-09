@@ -171,6 +171,9 @@ describe("suwayomi plugin", function()
         package.loaded["suwayomi/chapters/context"] = nil
         package.loaded["suwayomi/chapters/menu"] = nil
         package.loaded["suwayomi/chapters/actions"] = nil
+        package.loaded["suwayomi/chapters/local_downloads"] = nil
+        package.loaded["suwayomi/chapters/delete_actions"] = nil
+        package.loaded["suwayomi/chapters/read_actions"] = nil
         package.loaded["suwayomi/downloads/controller"] = nil
         package.loaded["suwayomi/readsync/ledger"] = nil
         package.loaded["suwayomi/readsync/koreader_metadata"] = nil

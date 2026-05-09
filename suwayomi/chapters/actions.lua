@@ -1,16 +1,15 @@
 --[[
 ChapterActions
-Responsibility: Owns chapter tap/hold actions, downloads, deletes, and bulk mark/read flows.
-Owned state: All filesystem and queue mutations stay explicit and continue to use the existing downloader/queue modules.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
+Responsibility: Public chapter action facade composed from focused action modules plus remaining download/bulk orchestration.
+Owned state: State stays on the plugin instance so KOReader callbacks keep stable method names and return values.
+Dependencies: Focused chapter action modules, KOReader UI helpers, settings, debug timing, and gettext.
+External data: API responses, settings values, queue status, worker files, and filesystem paths remain untrusted at module boundaries.
 ]]
 
 local UIManager = require("ui/uimanager")
-local InfoMessage = require("ui/widget/infomessage")
-local SuwayomiAPI = require("suwayomi/api")
-local SuwayomiReadSyncWorker = require("suwayomi/readsync/worker")
-local SuwayomiSourceFetchWorker = require("suwayomi/browse/source_fetch_worker")
+local ChapterDeleteActions = require("suwayomi/chapters/delete_actions")
+local ChapterLocalDownloads = require("suwayomi/chapters/local_downloads")
+local ChapterReadActions = require("suwayomi/chapters/read_actions")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
@@ -31,28 +30,20 @@ end
 
 local Methods = {}
 
-function Methods:getChapterPath(manga, chapter)
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        return nil
+local function mergeMethods(target, ...)
+    for _, method_table in ipairs({...}) do
+        for name, method in pairs(method_table or {}) do
+            target[name] = method
+        end
     end
-
-    local SuwayomiDownloader = require("suwayomi/downloads/downloader")
-    local _, chapter_path = SuwayomiDownloader:getTargetPath(download_directory, manga, chapter)
-    return chapter_path
 end
 
-
-function Methods:isChapterDownloaded(manga, chapter)
-    local chapter_path = self:getChapterPath(manga, chapter)
-    if not chapter_path then
-        return false, nil
-    end
-
-    local SuwayomiDownloader = require("suwayomi/downloads/downloader")
-    return SuwayomiDownloader:chapterExists(chapter_path), chapter_path
-end
-
+mergeMethods(
+    Methods,
+    ChapterLocalDownloads.methods,
+    ChapterDeleteActions.methods,
+    ChapterReadActions.methods
+)
 
 function Methods:openChapter(manga, chapter)
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
@@ -77,300 +68,6 @@ function Methods:openChapter(manga, chapter)
     end
 
     return true
-end
-
-
-function Methods:deleteChapterFromDevice(manga, chapter)
-    return self:deleteChapterFromDeviceWithOptions(manga, chapter)
-end
-
-
-function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
-    options = options or {}
-    local status = self:getDownloadQueue():getStatus(manga, chapter)
-    if status and status.state == "downloading" then
-        if not options.quiet_active then
-            self:showMessage(_("This chapter is downloading. Wait for it to finish before deleting it."))
-        end
-        return false, "downloading"
-    end
-
-    local cancelled, queue_state = self:getDownloadQueue():cancelPending(manga, chapter)
-    if queue_state == "downloading" then
-        if not options.quiet_active then
-            self:showMessage(_("This chapter is downloading. Wait for it to finish before deleting it."))
-        end
-        return false, "downloading"
-    end
-
-    local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
-    if not downloaded or not chapter_path then
-        if not options.quiet_missing then
-            self:showMessage(_("This chapter is not downloaded."))
-        end
-        return false, cancelled and "queued" or "missing"
-    end
-
-    local metadata_path = self:getKoreaderMetadataPathForDocument(chapter_path)
-    os.remove(chapter_path)
-    if metadata_path then
-        os.remove(metadata_path)
-        os.remove(metadata_path .. ".old")
-        local metadata_dir = metadata_path:match("^(.*)/[^/]+$")
-        if metadata_dir then
-            os.remove(metadata_dir)
-        end
-    end
-
-    local ledger = options.ledger or self:loadChapterLedger()
-    local key = self:getChapterLedgerKey(manga, chapter)
-    local entry = ledger[key]
-    if not entry then
-        for existing_key, existing in pairs(ledger) do
-            if tostring(existing.manga_id or "") == tostring(manga.id or "")
-                and tostring(existing.chapter_id or "") == tostring(chapter.id or "")
-            then
-                key = existing_key
-                entry = existing
-                break
-            end
-        end
-    end
-    if entry then
-        entry.path = nil
-        if entry.read ~= true and entry.pending_read_sync ~= true then
-            ledger[key] = nil
-        else
-            ledger[key] = entry
-        end
-        if not options.ledger then
-            self:saveChapterLedger(ledger)
-        end
-    end
-    self:getDownloadQueue():clearStatus(manga, chapter, { quiet = true })
-
-    if not options.skip_refresh then
-        self:refreshChapterMenu()
-    end
-    return true, cancelled and "queued" or "deleted"
-end
-
-
-function Methods:autoDeleteReadLocalDownload(manga, chapter, options)
-    options = options or {}
-    if self:getKeepNextUnreadDownloadsPolicyLimit() <= 0 then
-        return false, "disabled"
-    end
-    if not chapter or (chapter.is_read ~= true and options.assume_read ~= true) then
-        return false, "unread"
-    end
-
-    return self:deleteChapterFromDeviceWithOptions(manga, chapter, {
-        ledger = options.ledger,
-        quiet_active = true,
-        quiet_missing = true,
-        skip_refresh = options.skip_refresh ~= false,
-    })
-end
-
-
-function Methods:autoDeleteReadLocalDownloadFromLedgerEntry(entry, ledger)
-    if self:getKeepNextUnreadDownloadsPolicyLimit() <= 0 then
-        return false, "disabled"
-    end
-    if type(entry) ~= "table" or entry.read ~= true then
-        return false, "unread"
-    end
-    local manga = {
-        id = entry.manga_id,
-        title = entry.manga_title,
-    }
-    local chapter = {
-        id = entry.chapter_id,
-        name = entry.chapter_name,
-        is_read = true,
-    }
-    local status = self:getDownloadQueue():getStatus(manga, chapter)
-    if status and status.state == "downloading" then
-        return false, "downloading"
-    end
-
-    local cancelled, queue_state = self:getDownloadQueue():cancelPending(manga, chapter)
-    if queue_state == "downloading" then
-        return false, "downloading"
-    end
-
-    local chapter_path = entry.path
-    if type(chapter_path) ~= "string" or chapter_path == "" then
-        return false, cancelled and "queued" or "missing"
-    end
-
-    local metadata_path = self:getKoreaderMetadataPathForDocument(chapter_path)
-    os.remove(chapter_path)
-    if metadata_path then
-        os.remove(metadata_path)
-        os.remove(metadata_path .. ".old")
-        local metadata_dir = metadata_path:match("^(.*)/[^/]+$")
-        if metadata_dir then
-            os.remove(metadata_dir)
-        end
-    end
-
-    entry.path = nil
-    self:getDownloadQueue():clearStatus(manga, chapter, { quiet = true })
-    return true, cancelled and "queued" or "deleted"
-end
-
-
-function Methods:markChapterRead(manga, chapter, options)
-    local started_at = SuwayomiDebug.now()
-    options = options or {}
-    local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
-    local metadata_updated = false
-    if downloaded and chapter_path then
-        metadata_updated = self:setKoreaderChapterReadState(chapter_path, true)
-    end
-    local updates = {
-        path = chapter_path,
-        read = true,
-        pending_read_sync = true,
-        pending_read_state = true,
-    }
-    if options.ledger then
-        self:upsertChapterLedgerEntryInLedger(options.ledger, manga, chapter, updates)
-    else
-        self:upsertChapterLedgerEntry(manga, chapter, updates)
-    end
-
-    if self.current_chapter_context and self.current_chapter_context.chapters then
-        for _, current in ipairs(self.current_chapter_context.chapters) do
-            if tostring(current.id or "") == tostring(chapter.id or "") then
-                current.is_read = true
-                break
-            end
-        end
-    end
-    self:autoDeleteReadLocalDownload(manga, chapter, {
-        assume_read = true,
-        ledger = options.ledger,
-        skip_refresh = true,
-    })
-    if not options.skip_refresh then
-        self:refreshChapterMenu()
-    end
-    if not options.skip_schedule then
-        self:schedulePendingReadSync()
-    end
-    if not options.skip_keep_policy then
-        self:applyKeepNextUnreadDownloadsPolicy()
-    end
-    if not options.skip_refresh or not options.skip_schedule then
-        SuwayomiDebug.log({
-            operation = "markChapterRead",
-            event = "end",
-            manga_id = manga and manga.id,
-            chapter_id = chapter and chapter.id,
-            downloaded = downloaded == true,
-            metadata_updated = metadata_updated == true,
-            skip_refresh = options.skip_refresh == true,
-            skip_schedule = options.skip_schedule == true,
-            elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
-        })
-    end
-    return true
-end
-
-
-function Methods:markChapterUnread(manga, chapter, options)
-    local started_at = SuwayomiDebug.now()
-    options = options or {}
-    local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
-    local metadata_updated = false
-    if downloaded and chapter_path then
-        metadata_updated = self:setKoreaderChapterReadState(chapter_path, false)
-    end
-    local updates = {
-        path = chapter_path,
-        read = false,
-        pending_read_sync = true,
-        pending_read_state = false,
-    }
-    if options.ledger then
-        self:upsertChapterLedgerEntryInLedger(options.ledger, manga, chapter, updates)
-    else
-        self:upsertChapterLedgerEntry(manga, chapter, updates)
-    end
-
-    if self.current_chapter_context and self.current_chapter_context.chapters then
-        for _, current in ipairs(self.current_chapter_context.chapters) do
-            if tostring(current.id or "") == tostring(chapter.id or "") then
-                current.is_read = false
-                break
-            end
-        end
-    end
-
-    if not options.skip_refresh then
-        self:refreshChapterMenu()
-    end
-    if not options.skip_schedule then
-        self:schedulePendingReadSync()
-    end
-    if not options.skip_refresh or not options.skip_schedule then
-        SuwayomiDebug.log({
-            operation = "markChapterUnread",
-            event = "end",
-            manga_id = manga and manga.id,
-            chapter_id = chapter and chapter.id,
-            downloaded = downloaded == true,
-            metadata_updated = metadata_updated == true,
-            skip_refresh = options.skip_refresh == true,
-            skip_schedule = options.skip_schedule == true,
-            elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
-        })
-    end
-    return true
-end
-
-
-function Methods:markChapterListRead(manga, chapters)
-    local started_at = SuwayomiDebug.now()
-    if #chapters == 0 then
-        return 0
-    end
-
-    local ledger = self:loadChapterLedger()
-    for _, current in ipairs(chapters) do
-        self:markChapterRead(manga, current, {
-            ledger = ledger,
-            skip_refresh = true,
-            skip_schedule = true,
-            skip_keep_policy = true,
-        })
-    end
-
-    self:refreshChapterMenu({ ledger = ledger })
-    self:saveChapterLedger(ledger)
-    self:schedulePendingReadSync()
-    self:applyKeepNextUnreadDownloadsPolicy()
-    SuwayomiDebug.log({
-        operation = "markChapterListRead",
-        event = "end",
-        manga_id = manga and manga.id,
-        chapter_count = #chapters,
-        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
-    })
-    return #chapters
-end
-
-
-function Methods:markChaptersBeforeRead(manga, chapter)
-    return self:markChapterListRead(manga, self:getChaptersBefore(chapter))
-end
-
-
-function Methods:markChaptersReadThrough(manga, chapter)
-    return self:markChapterListRead(manga, self:getChaptersThrough(chapter))
 end
 
 
