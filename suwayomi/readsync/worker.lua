@@ -1,5 +1,5 @@
 local json = require("dkjson")
-local SuwayomiAPI = require("suwayomi_api")
+local SuwayomiAPI = require("suwayomi/api")
 
 local ReadSyncWorker = {}
 

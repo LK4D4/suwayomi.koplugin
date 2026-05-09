@@ -1,0 +1,476 @@
+package.path = "?.lua;" .. package.path
+
+local helper = require("spec/support/controller_module_spec_helper")
+
+describe("suwayomi/chapters/actions", function()
+    local original_os_remove
+    local removed_paths
+    local settings
+    local downloader
+    local debug_events
+
+    local manga = { id = "m1", title = "Manga" }
+    local chapter = { id = "c1", name = "Chapter 1" }
+
+    local function reset_modules()
+        for _, name in ipairs({
+            "suwayomi/chapters/actions",
+            "suwayomi/chapters/local_downloads",
+            "suwayomi/chapters/delete_actions",
+            "suwayomi/chapters/read_actions",
+            "suwayomi/settings",
+            "suwayomi/downloads/downloader",
+            "suwayomi/ui",
+            "suwayomi/debug",
+            "suwayomi/api",
+            "suwayomi/readsync/worker",
+            "suwayomi/browse/source_fetch_worker",
+        }) do
+            package.loaded[name] = nil
+        end
+    end
+
+    local function install_runtime_stubs(options)
+        options = options or {}
+        helper.stubControllerDependencies()
+        reset_modules()
+
+        removed_paths = {}
+        debug_events = {}
+        original_os_remove = os.remove
+        os.remove = function(path)
+            table.insert(removed_paths, path)
+            return true
+        end
+
+        settings = {
+            download_directory = options.download_directory == nil and "/downloads" or options.download_directory,
+            loadDownloadDirectory = function(self)
+                return self.download_directory
+            end,
+            saveDownloadDirectory = function(self, path)
+                self.download_directory = path
+                return path
+            end,
+        }
+        downloader = {
+            existing = options.existing or {},
+            getTargetPath = function(_, download_directory, target_manga, target_chapter)
+                return download_directory .. "/" .. target_manga.title,
+                    download_directory .. "/" .. target_manga.title .. "/" .. target_chapter.name .. ".cbz"
+            end,
+            chapterExists = function(self, path)
+                return self.existing[path] == true
+            end,
+        }
+
+        package.preload["suwayomi/settings"] = function()
+            return settings
+        end
+        package.preload["suwayomi/downloads/downloader"] = function()
+            return downloader
+        end
+        package.preload["suwayomi/debug"] = function()
+            return {
+                now = function()
+                    return 100
+                end,
+                elapsedMs = function()
+                    return 0
+                end,
+                log = function(event)
+                    table.insert(debug_events, event)
+                end,
+            }
+        end
+        package.preload["suwayomi/ui"] = function()
+            return {
+                showDirectoryChooser = function(callback)
+                    if callback then
+                        callback("/chosen")
+                    end
+                end,
+            }
+        end
+        package.preload["suwayomi/api"] = function()
+            return {}
+        end
+        package.preload["suwayomi/readsync/worker"] = function()
+            return {}
+        end
+        package.preload["suwayomi/browse/source_fetch_worker"] = function()
+            return {}
+        end
+    end
+
+    local function build_plugin(options)
+        options = options or {}
+        install_runtime_stubs(options)
+
+        local queue = options.queue or {}
+        queue.status = queue.status or {}
+        queue.cleared = {}
+        queue.getStatus = queue.getStatus or function(_, target_manga, target_chapter)
+            return queue.status[tostring(target_manga.id) .. ":" .. tostring(target_chapter.id)]
+        end
+        queue.cancelPending = queue.cancelPending or function()
+            return options.cancelled == true, options.queue_state
+        end
+        queue.clearStatus = queue.clearStatus or function(_, target_manga, target_chapter, clear_options)
+            table.insert(queue.cleared, { manga = target_manga, chapter = target_chapter, options = clear_options })
+        end
+
+        local ledger = options.ledger or {}
+        local plugin = {
+            current_chapter_context = options.current_chapter_context,
+            queue = queue,
+            ledger = ledger,
+            messages = {},
+            refreshes = {},
+            saved_ledgers = {},
+            metadata_updates = {},
+            scheduled_count = 0,
+            keep_policy_count = 0,
+            getDownloadQueue = function(self)
+                return self.queue
+            end,
+            getKoreaderMetadataPathForDocument = function(_, chapter_path)
+                return chapter_path .. ".sdr/metadata.lua"
+            end,
+            loadChapterLedger = function(self)
+                return self.ledger
+            end,
+            saveChapterLedger = function(self, saved)
+                table.insert(self.saved_ledgers, saved)
+                self.ledger = saved
+            end,
+            getChapterLedgerKey = function(_, target_manga, target_chapter)
+                return tostring(target_manga.id or "") .. ":" .. tostring(target_chapter.id or "")
+            end,
+            upsertChapterLedgerEntryInLedger = function(self, target_ledger, target_manga, target_chapter, updates)
+                local key = self:getChapterLedgerKey(target_manga, target_chapter)
+                target_ledger[key] = target_ledger[key] or {
+                    manga_id = target_manga.id,
+                    manga_title = target_manga.title,
+                    chapter_id = target_chapter.id,
+                    chapter_name = target_chapter.name,
+                }
+                for update_key, value in pairs(updates or {}) do
+                    target_ledger[key][update_key] = value
+                end
+            end,
+            upsertChapterLedgerEntry = function(self, target_manga, target_chapter, updates)
+                self:upsertChapterLedgerEntryInLedger(self.ledger, target_manga, target_chapter, updates)
+            end,
+            setKoreaderChapterReadState = function(self, chapter_path, read_state)
+                table.insert(self.metadata_updates, { path = chapter_path, read = read_state })
+                return true
+            end,
+            getKeepNextUnreadDownloadsPolicyLimit = function()
+                return options.keep_limit or 0
+            end,
+            showMessage = function(self, message)
+                table.insert(self.messages, message)
+            end,
+            refreshChapterMenu = function(self, refresh_options)
+                table.insert(self.refreshes, refresh_options or true)
+            end,
+            schedulePendingReadSync = function(self)
+                self.scheduled_count = self.scheduled_count + 1
+            end,
+            applyKeepNextUnreadDownloadsPolicy = function(self)
+                self.keep_policy_count = self.keep_policy_count + 1
+            end,
+            getChaptersBefore = function(_, selected)
+                return options.chapters_before or { selected }
+            end,
+            getChaptersThrough = function(_, selected)
+                return options.chapters_through or { selected }
+            end,
+        }
+
+        local Actions = require("suwayomi/chapters/actions")
+        for name, method in pairs(Actions.methods) do
+            plugin[name] = method
+        end
+        return plugin, queue
+    end
+
+    after_each(function()
+        if original_os_remove then
+            os.remove = original_os_remove
+        end
+        reset_modules()
+        package.preload["suwayomi/settings"] = nil
+        package.preload["suwayomi/downloads/downloader"] = nil
+        package.preload["suwayomi/debug"] = nil
+        package.preload["suwayomi/ui"] = nil
+        package.preload["suwayomi/api"] = nil
+        package.preload["suwayomi/readsync/worker"] = nil
+        package.preload["suwayomi/browse/source_fetch_worker"] = nil
+    end)
+
+    it("exports chapter and bulk action methods", function()
+        helper.assertControllerModule("suwayomi/chapters/actions", {
+            "openChapter",
+            "markChapterRead",
+            "downloadSelectedChapters",
+            "performBulkChapterAction",
+        })
+    end)
+
+    it("resolves local chapter paths through the saved download directory", function()
+        local plugin = build_plugin()
+
+        assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin:getChapterPath(manga, chapter))
+
+        settings.download_directory = ""
+        assert.is_nil(plugin:getChapterPath(manga, chapter))
+    end)
+
+    it("reports downloaded chapters only when the target archive exists", function()
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+        })
+
+        local downloaded, chapter_path = plugin:isChapterDownloaded(manga, chapter)
+
+        assert.is_true(downloaded)
+        assert.are.equal("/downloads/Manga/Chapter 1.cbz", chapter_path)
+    end)
+
+    it("removes a chapter archive and KOReader sidecars in the current order", function()
+        local plugin = build_plugin()
+
+        plugin:removeChapterArchiveAndSidecars(
+            "/downloads/Manga/Chapter 1.cbz",
+            "/downloads/Manga/Chapter 1.sdr/metadata.lua"
+        )
+
+        assert.are.same({
+            "/downloads/Manga/Chapter 1.cbz",
+            "/downloads/Manga/Chapter 1.sdr/metadata.lua",
+            "/downloads/Manga/Chapter 1.sdr/metadata.lua.old",
+            "/downloads/Manga/Chapter 1.sdr",
+        }, removed_paths)
+    end)
+
+    it("refuses to delete a chapter that is currently downloading", function()
+        local plugin = build_plugin({
+            queue = {
+                status = {
+                    ["m1:c1"] = { state = "downloading" },
+                },
+            },
+        })
+
+        local ok, state = plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+
+        assert.is_false(ok)
+        assert.are.equal("downloading", state)
+        assert.are.same({ "This chapter is downloading. Wait for it to finish before deleting it." }, plugin.messages)
+        assert.are.same({}, removed_paths)
+    end)
+
+    it("cancels a pending queue entry before reporting a missing archive", function()
+        local plugin = build_plugin({ cancelled = true })
+
+        local ok, state = plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+
+        assert.is_false(ok)
+        assert.are.equal("queued", state)
+        assert.are.same({ "This chapter is not downloaded." }, plugin.messages)
+    end)
+
+    it("deletes archives, clears queue status, and removes unread ledger entries", function()
+        local plugin, queue = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+            ledger = {
+                ["m1:c1"] = {
+                    manga_id = "m1",
+                    chapter_id = "c1",
+                    path = "/downloads/Manga/Chapter 1.cbz",
+                    read = false,
+                    pending_read_sync = false,
+                },
+            },
+        })
+
+        local ok, state = plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+
+        assert.is_true(ok)
+        assert.are.equal("deleted", state)
+        assert.is_nil(plugin.ledger["m1:c1"])
+        assert.are.equal(1, #plugin.saved_ledgers)
+        assert.are.equal(1, #queue.cleared)
+        assert.are.same({
+            "/downloads/Manga/Chapter 1.cbz",
+            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
+            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
+            "/downloads/Manga/Chapter 1.cbz.sdr",
+        }, removed_paths)
+    end)
+
+    it("preserves read ledger entries while clearing their local path", function()
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+            ledger = {
+                ["m1:c1"] = {
+                    manga_id = "m1",
+                    chapter_id = "c1",
+                    path = "/downloads/Manga/Chapter 1.cbz",
+                    read = true,
+                    pending_read_sync = false,
+                },
+            },
+        })
+
+        local ok, state = plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+
+        assert.is_true(ok)
+        assert.are.equal("deleted", state)
+        assert.is_nil(plugin.ledger["m1:c1"].path)
+        assert.is_true(plugin.ledger["m1:c1"].read)
+    end)
+
+    it("uses legacy manga/chapter id lookup when deleting ledger paths", function()
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+            ledger = {
+                legacy = {
+                    manga_id = "m1",
+                    chapter_id = "c1",
+                    path = "/downloads/Manga/Chapter 1.cbz",
+                    read = false,
+                },
+            },
+        })
+
+        local ok = plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+
+        assert.is_true(ok)
+        assert.is_nil(plugin.ledger.legacy)
+    end)
+
+    it("auto-deletes read local downloads from ledger entries without loading settings ledger", function()
+        local plugin, queue = build_plugin({ keep_limit = 5 })
+        local entry = {
+            manga_id = "m1",
+            manga_title = "Manga",
+            chapter_id = "c1",
+            chapter_name = "Chapter 1",
+            read = true,
+            path = "/downloads/Manga/Chapter 1.cbz",
+        }
+
+        local ok, state = plugin:autoDeleteReadLocalDownloadFromLedgerEntry(entry, {})
+
+        assert.is_true(ok)
+        assert.are.equal("deleted", state)
+        assert.is_nil(entry.path)
+        assert.are.equal(1, #queue.cleared)
+        assert.are.same({
+            "/downloads/Manga/Chapter 1.cbz",
+            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
+            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
+            "/downloads/Manga/Chapter 1.cbz.sdr",
+        }, removed_paths)
+    end)
+
+    it("marks a downloaded chapter read and schedules sync by default", function()
+        local plugin = build_plugin({
+            keep_limit = 0,
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+            current_chapter_context = {
+                chapters = {
+                    { id = "c1", name = "Chapter 1", is_read = false },
+                },
+            },
+        })
+
+        assert.is_true(plugin:markChapterRead(manga, chapter))
+
+        assert.are.same({ { path = "/downloads/Manga/Chapter 1.cbz", read = true } }, plugin.metadata_updates)
+        assert.is_true(plugin.ledger["m1:c1"].read)
+        assert.is_true(plugin.ledger["m1:c1"].pending_read_sync)
+        assert.is_true(plugin.ledger["m1:c1"].pending_read_state)
+        assert.is_true(plugin.current_chapter_context.chapters[1].is_read)
+        assert.are.equal(1, #plugin.refreshes)
+        assert.are.equal(1, plugin.scheduled_count)
+        assert.are.equal(1, plugin.keep_policy_count)
+    end)
+
+    it("honors mark-read skip flags", function()
+        local plugin = build_plugin({
+            keep_limit = 0,
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+        })
+
+        assert.is_true(plugin:markChapterRead(manga, chapter, {
+            skip_refresh = true,
+            skip_schedule = true,
+            skip_keep_policy = true,
+        }))
+
+        assert.are.equal(0, #plugin.refreshes)
+        assert.are.equal(0, plugin.scheduled_count)
+        assert.are.equal(0, plugin.keep_policy_count)
+    end)
+
+    it("marks a chapter unread and schedules sync by default", function()
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+            current_chapter_context = {
+                chapters = {
+                    { id = "c1", name = "Chapter 1", is_read = true },
+                },
+            },
+        })
+
+        assert.is_true(plugin:markChapterUnread(manga, chapter))
+
+        assert.are.same({ { path = "/downloads/Manga/Chapter 1.cbz", read = false } }, plugin.metadata_updates)
+        assert.is_false(plugin.ledger["m1:c1"].read)
+        assert.is_true(plugin.ledger["m1:c1"].pending_read_sync)
+        assert.is_false(plugin.ledger["m1:c1"].pending_read_state)
+        assert.is_false(plugin.current_chapter_context.chapters[1].is_read)
+        assert.are.equal(1, #plugin.refreshes)
+        assert.are.equal(1, plugin.scheduled_count)
+    end)
+
+    it("marks a chapter list read with a shared ledger save", function()
+        local chapters = {
+            { id = "c1", name = "Chapter 1" },
+            { id = "c2", name = "Chapter 2" },
+        }
+        local plugin = build_plugin({
+            keep_limit = 0,
+            current_chapter_context = {
+                chapters = chapters,
+            },
+        })
+
+        assert.are.equal(2, plugin:markChapterListRead(manga, chapters))
+
+        assert.is_true(plugin.ledger["m1:c1"].read)
+        assert.is_true(plugin.ledger["m1:c2"].read)
+        assert.are.equal(1, #plugin.saved_ledgers)
+        assert.are.equal(1, #plugin.refreshes)
+        assert.are.equal(1, plugin.scheduled_count)
+        assert.are.equal(1, plugin.keep_policy_count)
+    end)
+end)

@@ -1,6 +1,6 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_ui", function()
+describe("suwayomi/ui", function()
     local shown_dialog
     local closed_dialog
     local events
@@ -10,7 +10,7 @@ describe("suwayomi_ui", function()
         closed_dialog = nil
         events = {}
 
-        package.loaded.suwayomi_ui = nil
+        package.loaded["suwayomi/ui"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
         package.loaded["ui/widget/buttondialog"] = nil
@@ -201,7 +201,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("closes the dialog before running the save callback", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
 
         ui.showLoginDialog({
             onSave = function(credentials)
@@ -220,7 +220,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows a manga menu", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected = {}
 
         ui.showMangaMenu({
@@ -244,7 +244,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows compact browse result markers, title, and paging rows", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected = {}
         local paging = {}
 
@@ -280,7 +280,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows a chapter menu", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected = {}
         local held = {}
 
@@ -316,7 +316,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows a chapter actions menu", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected = {}
 
         ui.showChapterActionsMenu({
@@ -345,7 +345,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("closes the chapter actions dialog before running the action callback", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected
 
         ui.showChapterActionsMenu({
@@ -366,7 +366,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows the Suwayomi home hub as two-column buttons", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected = {}
 
         ui.showHomeDialog({
@@ -399,7 +399,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows downloads menu rows for active queued and failed items", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local cancelled_key
         local retried_key
         local selected_active_key
@@ -478,7 +478,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("passes the native settings menu instance to setting callbacks", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local callback_menu
 
         ui.showSettingsMenu({
@@ -501,7 +501,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows a confirmation dialog", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local confirmed = false
 
         ui.showConfirm({
@@ -521,7 +521,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows a sources menu", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected = {}
         local global_search_started = false
 
@@ -557,7 +557,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows global search summaries and opens only successful or pageable source rows", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected = {}
 
         ui.showGlobalSearchResultsMenu({
@@ -602,7 +602,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("adds a home title-bar action to sources menus when requested", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local tapped_home = false
 
         ui.showSourcesMenu({
@@ -623,7 +623,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("adds a home title-bar action to source mode menus when requested", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local tapped_home = false
 
         ui.showSourceModeMenu({
@@ -645,7 +645,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("adds a home title-bar action to source result pages when requested", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local tapped_home = false
 
         ui.showMangaMenu({
@@ -668,7 +668,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("adds a home title-bar action to global search result pages when requested", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local tapped_home = false
 
         ui.showGlobalSearchResultsMenu({
@@ -693,7 +693,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("adds a home title-bar action to library manga menus when requested", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local tapped_home = false
 
         ui.showLibraryMangaMenu({
@@ -714,7 +714,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows a source mode menu and hides latest when unsupported", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected = {}
 
         ui.showSourceModeMenu({
@@ -737,7 +737,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows latest for unknown source support and collects a search query", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected_mode
         local searched_query
 
@@ -770,7 +770,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("updates a sources menu in place", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected
         local menu = {
             updateItems = function(self)
@@ -793,7 +793,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("updates a manga menu title bar in place", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local title_bar_title
         local left_icon
         local menu = {
@@ -825,7 +825,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("uses KOReader path chooser to choose a directory", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local chosen_path
 
         ui.showDirectoryChooser(function(path)
@@ -841,7 +841,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("starts the directory chooser in the provided directory", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
 
         ui.showDirectoryChooser(function() end, "/storage/emulated/0/Books/Manga")
 
@@ -849,7 +849,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("keeps KOReader-style current path visibility in the directory chooser", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
 
         ui.showDirectoryChooser(function() end, "/storage/emulated/0/Books/Manga")
 
@@ -857,7 +857,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows a visible use-this-folder action for the current directory", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local chosen_path
 
         ui.showDirectoryChooser(function(path)
@@ -876,7 +876,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("keeps current folder selection under KOReader path chooser hold handling", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local chosen_path
         local instance_hold_called = false
 
@@ -898,7 +898,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("keeps child folder taps under KOReader path chooser navigation handling", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local chosen_path
 
         ui.showDirectoryChooser(function(path)
@@ -915,7 +915,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("shows a parallel chapter downloads menu", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local selected
 
         ui.showParallelDownloadsMenu({
@@ -949,7 +949,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("closes the language menu from Done before running the close callback", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
 
         ui.showLanguageMenu({
             languages = {
@@ -974,7 +974,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("runs the language menu close callback when KOReader closes the menu natively", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
 
         ui.showLanguageMenu({
             languages = {
@@ -993,7 +993,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("does not run the language close callback after toggling a checkbox row", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local toggled
 
         ui.showLanguageMenu({
@@ -1017,7 +1017,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("updates an existing language menu instead of requiring a new menu", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local update_count = 0
         local summary_count = 0
         local menu = {
@@ -1053,7 +1053,7 @@ describe("suwayomi_ui", function()
     end)
 
     it("does not run the language close callback during an in-place menu refresh", function()
-        local ui = require("suwayomi_ui")
+        local ui = require("suwayomi/ui")
         local summary_count = 0
         local menu = {
             close_callback = function()

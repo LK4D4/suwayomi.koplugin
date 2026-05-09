@@ -1,28 +1,28 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_downloader", function()
+describe("suwayomi/downloads/downloader", function()
     after_each(function()
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_paths = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/paths"] = nil
+        package.loaded["suwayomi/api"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
 
-        package.preload.suwayomi_paths = nil
-        package.preload.suwayomi_api = nil
+        package.preload["suwayomi/paths"] = nil
+        package.preload["suwayomi/api"] = nil
         package.preload.lfs = nil
         package.preload["ffi/archiver"] = nil
         package.preload["ffi/util"] = nil
     end)
 
     it("skips downloading when the target cbz already exists", function()
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/api"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     error("should not fetch pages for an existing file")
@@ -52,7 +52,7 @@ describe("suwayomi_downloader", function()
             }
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         assert.is_true(result.ok)
@@ -66,12 +66,12 @@ describe("suwayomi_downloader", function()
         local renamed_to
         local created_paths = {}
 
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/api"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -144,7 +144,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.rename = original_rename
@@ -167,7 +167,7 @@ describe("suwayomi_downloader", function()
         local renamed_from
         local renamed_to
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 downloadChapterArchive = function(_, chapter_id, target_path)
                     assert.are.equal("398", chapter_id)
@@ -223,7 +223,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.rename = original_rename
@@ -240,7 +240,7 @@ describe("suwayomi_downloader", function()
         local added_files = {}
         local renamed_to
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 downloadChapterArchive = function(_, _, target_path)
                     direct_attempted = true
@@ -306,7 +306,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.rename = original_rename
@@ -323,7 +323,7 @@ describe("suwayomi_downloader", function()
         local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
         local opened_path
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 downloadChapterArchive = function(_, _, target_path)
                     assert.are.equal(direct_partial_path, target_path)
@@ -391,7 +391,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.remove = original_remove
@@ -402,7 +402,7 @@ describe("suwayomi_downloader", function()
     end)
 
     it("builds target paths with source metadata", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {}
         end
         package.preload.lfs = function()
@@ -422,7 +422,7 @@ describe("suwayomi_downloader", function()
             }
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local manga_dir, chapter_path = downloader:getTargetPath("/books", {
             title = "Frieren: Beyond Journey's End",
             source = {
@@ -445,7 +445,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -502,7 +502,7 @@ describe("suwayomi_downloader", function()
             }
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local start_result = downloader:startChapterDownload({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         assert.is_true(start_result.ok)
@@ -542,7 +542,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -596,7 +596,7 @@ describe("suwayomi_downloader", function()
             }
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapterWithProgress({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, progress_path)
 
         local progress_file = assert(io.open(progress_path, "r"))
@@ -612,7 +612,7 @@ describe("suwayomi_downloader", function()
     it("removes a partial cbz when a page download fails", function()
         local removed_path
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -669,7 +669,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.remove = original_remove
@@ -683,7 +683,7 @@ describe("suwayomi_downloader", function()
         local removed_path
         local opened_path
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return { ok = true, pages = { "/page/0" } }
@@ -742,7 +742,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:startChapterDownload({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.remove = original_remove
@@ -756,7 +756,7 @@ describe("suwayomi_downloader", function()
     it("reports cleanup errors when a failed download leaves the partial archive behind", function()
         local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return { ok = true, pages = { "/page/0" } }
@@ -811,7 +811,7 @@ describe("suwayomi_downloader", function()
             return nil, "permission denied"
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.remove = original_remove
@@ -824,7 +824,7 @@ describe("suwayomi_downloader", function()
     it("removes a partial cbz when archive writing fails", function()
         local removed_path
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -879,7 +879,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.remove = original_remove
@@ -892,7 +892,7 @@ describe("suwayomi_downloader", function()
     it("reports a failure when finalizing the completed cbz fails", function()
         local removed_path
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -950,7 +950,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.rename = original_rename
@@ -967,7 +967,7 @@ describe("suwayomi_downloader", function()
         local removed_path
         local rename_attempted = false
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -1029,7 +1029,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.rename = original_rename
@@ -1044,7 +1044,7 @@ describe("suwayomi_downloader", function()
     it("rejects empty downloaded page bodies", function()
         local removed_path
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -1099,7 +1099,7 @@ describe("suwayomi_downloader", function()
             return true
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         os.remove = original_remove
@@ -1110,7 +1110,7 @@ describe("suwayomi_downloader", function()
     end)
 
     it("rejects non-image downloaded page content", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -1159,7 +1159,7 @@ describe("suwayomi_downloader", function()
             }
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         assert.is_false(result.ok)
@@ -1174,7 +1174,7 @@ describe("suwayomi_downloader", function()
             close = function() end,
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {}
         end
         package.preload.lfs = function()
@@ -1194,7 +1194,7 @@ describe("suwayomi_downloader", function()
             }
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local original_rename = os.rename
         os.rename = function()
             renamed = true
@@ -1217,7 +1217,7 @@ describe("suwayomi_downloader", function()
     end)
 
     it("reports a manga directory creation failure before opening the archive", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChapterPages = function()
                     return {
@@ -1262,7 +1262,7 @@ describe("suwayomi_downloader", function()
             }
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
 
         assert.is_false(result.ok)
@@ -1270,9 +1270,9 @@ describe("suwayomi_downloader", function()
     end)
 
     it("neutralizes traversal-only manga and chapter names", function()
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_paths = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/paths"] = nil
+        package.loaded["suwayomi/api"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
@@ -1292,11 +1292,11 @@ describe("suwayomi_downloader", function()
                 end,
             }
         end
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {}
         end
 
-        local downloader = require("suwayomi_downloader")
+        local downloader = require("suwayomi/downloads/downloader")
         local manga_dir, chapter_path = downloader:getTargetPath("/books", { title = ".." }, { name = ".." })
 
         assert.are.equal("/books/Unknown source/untitled", manga_dir)

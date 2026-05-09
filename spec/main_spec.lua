@@ -155,18 +155,32 @@ describe("suwayomi plugin", function()
         package.loaded["ui/uimanager"] = nil
         package.loaded["ui/widget/infomessage"] = nil
         package.loaded["ui/widget/container/widgetcontainer"] = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_client = nil
-        package.loaded.suwayomi_download_queue = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_read_sync_worker = nil
-        package.loaded.suwayomi_source_fetch_worker = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
-        package.loaded.suwayomi_debug = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/client"] = nil
+        package.loaded["suwayomi/downloads/queue"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/readsync/worker"] = nil
+        package.loaded["suwayomi/browse/source_fetch_worker"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
+        package.loaded["suwayomi/debug"] = nil
+        package.loaded["suwayomi/plugin/home"] = nil
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+        package.loaded["suwayomi/browse/controller"] = nil
+        package.loaded["suwayomi/manga/controller"] = nil
+        package.loaded["suwayomi/chapters/context"] = nil
+        package.loaded["suwayomi/chapters/menu"] = nil
+        package.loaded["suwayomi/chapters/actions"] = nil
+        package.loaded["suwayomi/chapters/local_downloads"] = nil
+        package.loaded["suwayomi/chapters/delete_actions"] = nil
+        package.loaded["suwayomi/chapters/read_actions"] = nil
+        package.loaded["suwayomi/downloads/controller"] = nil
+        package.loaded["suwayomi/readsync/ledger"] = nil
+        package.loaded["suwayomi/readsync/koreader_metadata"] = nil
+        package.loaded["suwayomi/readsync/controller"] = nil
         package.loaded.lfs = nil
         package.loaded.device = nil
-        package.preload.suwayomi_client = nil
+        package.preload["suwayomi/client"] = nil
 
         package.preload.dispatcher = function()
             return {
@@ -272,7 +286,7 @@ describe("suwayomi plugin", function()
             return WidgetContainer
         end
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return {
@@ -288,7 +302,7 @@ describe("suwayomi plugin", function()
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -320,7 +334,7 @@ describe("suwayomi plugin", function()
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showDirectoryChooser = function(callback, start_dir)
                     directory_chooser_callback = callback
@@ -388,7 +402,7 @@ describe("suwayomi plugin", function()
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function()
                     return "/settings"
@@ -511,7 +525,7 @@ describe("suwayomi plugin", function()
 
     local function install_bulk_confirmation_ui_stub(options)
         options = options or {}
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showConfirm = function(confirm_options)
                     shown_confirm = confirm_options
@@ -525,11 +539,11 @@ describe("suwayomi plugin", function()
                 showLanguageMenu = function() end,
             }
         end
-        package.loaded.suwayomi_ui = nil
+        package.loaded["suwayomi/ui"] = nil
     end
 
     local function install_bulk_download_settings(saved_queue, saved_ledger)
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -553,12 +567,12 @@ describe("suwayomi plugin", function()
                 end,
             }
         end
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
     end
 
     local function install_bulk_downloader_stub(options)
         options = options or {}
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -573,7 +587,7 @@ describe("suwayomi plugin", function()
                 downloadChapterWithProgress = function() end,
             }
         end
-        package.loaded.suwayomi_downloader = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
     end
 
     local function load_plugin_with_chapters(chapters, manga)
@@ -607,16 +621,16 @@ describe("suwayomi plugin", function()
         package.preload["ui/uimanager"] = nil
         package.preload["ui/widget/infomessage"] = nil
         package.preload["ui/widget/container/widgetcontainer"] = nil
-        package.preload.suwayomi_api = nil
-        package.preload.suwayomi_download_queue = nil
-        package.preload.suwayomi_downloader = nil
-        package.preload.suwayomi_read_sync_worker = nil
-        package.preload.suwayomi_ui = nil
-        package.preload.suwayomi_settings = nil
-        package.preload.suwayomi_debug = nil
+        package.preload["suwayomi/api"] = nil
+        package.preload["suwayomi/downloads/queue"] = nil
+        package.preload["suwayomi/downloads/downloader"] = nil
+        package.preload["suwayomi/readsync/worker"] = nil
+        package.preload["suwayomi/ui"] = nil
+        package.preload["suwayomi/settings"] = nil
+        package.preload["suwayomi/debug"] = nil
         package.preload.lfs = nil
         package.preload.device = nil
-        package.loaded.suwayomi_debug = nil
+        package.loaded["suwayomi/debug"] = nil
         _G.G_reader_settings = original_reader_settings
         if original_io_open then
             io.open = original_io_open
@@ -695,7 +709,7 @@ describe("suwayomi plugin", function()
     end)
 
     it("configures the download queue with the saved parallel chapter limit", function()
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example" }
@@ -706,7 +720,7 @@ describe("suwayomi plugin", function()
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -734,12 +748,12 @@ describe("suwayomi plugin", function()
         }
         local marked_ids = {}
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -755,8 +769,8 @@ describe("suwayomi plugin", function()
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local menu_items = {}
@@ -820,12 +834,12 @@ return {
             return original_open(path, mode)
         end
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -840,8 +854,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local menu_items = {}
@@ -873,7 +887,7 @@ return {
                 read = false,
             },
         }
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -893,7 +907,7 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -940,7 +954,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/Unknown source/" .. manga.title,
@@ -952,7 +966,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -969,8 +983,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -994,7 +1008,7 @@ return {
 
     it("opens and saves the parallel downloads setting from the main menu", function()
         local saved_parallel_downloads
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 loadMaxParallelChapterDownloads = function()
                     return 2
@@ -1006,7 +1020,7 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local menu_items = {}
@@ -1098,7 +1112,7 @@ return {
 
     it("saves keep-next unread download settings from the downloads settings menu", function()
         local saved_keep_next = 10
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -1119,7 +1133,7 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -1162,7 +1176,7 @@ return {
     end)
 
     it("keeps library settings renderable when category picker persistence is unavailable", function()
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example" }
@@ -1178,7 +1192,7 @@ return {
                 end,
             }
         end
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
         package.loaded.main = nil
 
         local plugin_class = require("main")
@@ -1197,7 +1211,7 @@ return {
 
     it("opens library from the top-level entry", function()
         local opened_library = false
-        package.preload.suwayomi_client = function()
+        package.preload["suwayomi/client"] = function()
             return {
                 new = function()
                     return {
@@ -1226,7 +1240,7 @@ return {
         local shown_manga_actions
         local shown_manga_actions_callback
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchCategories = function()
                     return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
@@ -1253,7 +1267,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showLibraryMangaMenu = function(manga, onSelect)
                     shown_library_manga = manga
@@ -1312,7 +1326,7 @@ return {
         local shown_manga_actions
         local closed_menu
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showChapterActionsMenu = function(options, onSelect)
                     shown_download_actions = options
@@ -1324,7 +1338,7 @@ return {
                 showChapterMenu = function() end,
             }
         end
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChaptersForManga = function()
                     return { ok = true, chapters = { { id = "398", name = "Ch. 1" } } }
@@ -1333,8 +1347,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local downloads_menu = { name = "downloads-menu" }
@@ -1357,7 +1371,7 @@ return {
     it("adds a browsed manga to the library through manga actions", function()
         local update_calls = {}
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 updateMangaLibraryState = function(_, manga_id, in_library)
                     table.insert(update_calls, { manga_id = manga_id, in_library = in_library })
@@ -1380,7 +1394,7 @@ return {
     it("confirms before removing a manga from the library through manga actions", function()
         local update_calls = {}
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 updateMangaLibraryState = function(_, manga_id, in_library)
                     table.insert(update_calls, { manga_id = manga_id, in_library = in_library })
@@ -1388,7 +1402,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showConfirm = function(options)
                     shown_confirm = options
@@ -1413,14 +1427,14 @@ return {
     end)
 
     it("shows open first unread when the first unread chapter is downloaded locally", function()
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 loadDownloadDirectory = function()
                     return "/books"
                 end,
             }
         end
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -1433,8 +1447,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
-        package.loaded.suwayomi_downloader = nil
+        package.loaded["suwayomi/settings"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
 
@@ -1452,7 +1466,7 @@ return {
     it("shows nested manga-level bulk and keep download actions", function()
         local shown_manga_actions
         local shown_manga_actions_callback
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showMangaActionsMenu = function(options, onSelect)
                     shown_manga_actions = options
@@ -1462,7 +1476,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_ui = nil
+        package.loaded["suwayomi/ui"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -1489,7 +1503,7 @@ return {
 
     it("downloads the first unread chapter for a manga after fetching its chapters", function()
         local saved_queue = {}
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChaptersForManga = function(_, manga_id)
                     assert.are.equal("m1", manga_id)
@@ -1504,7 +1518,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example" }
@@ -1521,8 +1535,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         plugin.current_chapter_context = {
@@ -1541,7 +1555,7 @@ return {
         local saved_queue = {}
         local refresh_calls = 0
         local fetch_calls = 0
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 refreshManga = function(_, manga_id)
                     refresh_calls = refresh_calls + 1
@@ -1561,7 +1575,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example" }
@@ -1578,8 +1592,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren", initialized = false }
@@ -1596,7 +1610,7 @@ return {
     it("stops manga action context building when uninitialized manga refresh fails", function()
         local saved_queue = {}
         local fetch_calls = 0
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 refreshManga = function(_, manga_id)
                     assert.are.equal("m1", manga_id)
@@ -1608,7 +1622,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example" }
@@ -1625,8 +1639,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
 
@@ -1677,7 +1691,7 @@ return {
 
     it("opens a queued download action button from a downloads row", function()
         local server_api_called = false
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 downloadChapter = function()
                     server_api_called = true
@@ -1689,7 +1703,7 @@ return {
                 end,
             }
         end
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/api"] = nil
         package.loaded.main = nil
 
         local plugin_class = require("main")
@@ -1748,7 +1762,7 @@ return {
 
     it("opens shared manga actions from an active download row", function()
         local shown_manga_actions
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showDownloadsMenu = function(snapshot, callbacks, options)
                     downloads_menu_snapshot = snapshot
@@ -1767,7 +1781,7 @@ return {
                 end,
             }
         end
-        package.loaded.suwayomi_ui = nil
+        package.loaded["suwayomi/ui"] = nil
         package.loaded.main = nil
 
         local plugin_class = require("main")
@@ -1841,7 +1855,7 @@ return {
 
     it("opens chapter list from queued download actions when manga metadata is available", function()
         local fetched_manga_id
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChaptersForManga = function(_, manga_id)
                     fetched_manga_id = manga_id
@@ -1849,7 +1863,7 @@ return {
                 end,
             }
         end
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/api"] = nil
         package.loaded.main = nil
 
         local plugin_class = require("main")
@@ -1993,7 +2007,7 @@ return {
     end)
 
     it("hides explicit NSFW sources by default while keeping unknown source metadata visible", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return {
@@ -2008,7 +2022,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -2025,8 +2039,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2040,7 +2054,7 @@ return {
     end)
 
     it("shows explicit NSFW sources when browse settings allow them", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return {
@@ -2053,7 +2067,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -2070,8 +2084,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2105,7 +2119,7 @@ return {
     it("opens the source mode menu when a non-local source is selected", function()
         local mode_source
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return {
@@ -2120,7 +2134,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -2136,8 +2150,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2151,7 +2165,7 @@ return {
         local fetched_options = {}
         local shown_summaries
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return {
@@ -2174,7 +2188,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, _, options)
                     shown_sources = sources
@@ -2193,7 +2207,7 @@ return {
                 showHomeDialog = function() end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example" }
@@ -2208,9 +2222,9 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2230,7 +2244,7 @@ return {
     it("shows loading feedback around source, manga, and chapter fetches", function()
         local shown_chapter_menu
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
@@ -2244,7 +2258,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -2261,8 +2275,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2282,7 +2296,7 @@ return {
     it("attaches selected source metadata to manga opened from browse", function()
         local fetched_manga
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchMangaForSource = function(_, options)
                     assert.are.same({ source_id = "s1", page = 1, type = "POPULAR" }, options)
@@ -2296,7 +2310,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showMangaMenu = function(manga, onSelect)
                     onSelect(manga[1])
@@ -2308,8 +2322,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2334,7 +2348,7 @@ return {
         local plugin
         local fetch_source_calls = 0
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     fetch_source_calls = fetch_source_calls + 1
@@ -2346,7 +2360,7 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/api"] = nil
 
         local plugin_class = require("main")
         plugin = plugin_class{}
@@ -2362,7 +2376,7 @@ return {
         local child_callback
         local http_calls = 0
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     http_calls = http_calls + 1
@@ -2391,8 +2405,8 @@ return {
         end
         package.loaded.main = nil
         package.loaded["ffi/util"] = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_source_fetch_worker = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/browse/source_fetch_worker"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2415,7 +2429,7 @@ return {
             updateItems = function() end,
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return {
@@ -2446,7 +2460,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources)
                     shown_sources = sources
@@ -2461,7 +2475,7 @@ return {
                 showLanguageMenu = function() end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -2493,10 +2507,10 @@ return {
         end
         package.loaded.main = nil
         package.loaded["ffi/util"] = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
-        package.loaded.suwayomi_source_fetch_worker = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
+        package.loaded["suwayomi/browse/source_fetch_worker"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2532,7 +2546,7 @@ return {
             updateItems = function() end,
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = false, error = "Could not reach the Suwayomi server." }
@@ -2558,7 +2572,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources)
                     shown_sources = sources
@@ -2572,7 +2586,7 @@ return {
                 showLanguageMenu = function() end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -2599,10 +2613,10 @@ return {
         end
         package.loaded.main = nil
         package.loaded["ffi/util"] = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
-        package.loaded.suwayomi_source_fetch_worker = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
+        package.loaded["suwayomi/browse/source_fetch_worker"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2626,7 +2640,7 @@ return {
         local update_calls = 0
         local show_calls = 0
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources)
                     show_calls = show_calls + 1
@@ -2641,7 +2655,7 @@ return {
                 showLanguageMenu = function() end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -2664,8 +2678,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2688,7 +2702,7 @@ return {
             updateItems = function() end,
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -2710,7 +2724,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title, download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
@@ -2738,7 +2752,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -2757,7 +2771,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -2771,10 +2785,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2804,7 +2818,7 @@ return {
             end,
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -2818,7 +2832,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             local steps = 0
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
@@ -2848,7 +2862,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -2867,7 +2881,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -2881,10 +2895,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2905,7 +2919,7 @@ return {
         local shown_chapter_menu
         local saved_ledger
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -2925,7 +2939,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -2942,7 +2956,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -2960,9 +2974,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -2978,7 +2992,7 @@ return {
     it("shows chapter actions on tap instead of downloading immediately", function()
         local shown_actions_menu
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -2992,7 +3006,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -3004,7 +3018,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -3024,7 +3038,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -3039,10 +3053,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3067,7 +3081,7 @@ return {
             end,
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -3087,7 +3101,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -3099,7 +3113,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -3128,7 +3142,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -3143,10 +3157,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3227,7 +3241,7 @@ return {
 
     it("clears stale failed download status when the chapter archive exists", function()
         local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function() return { server_url = "https://suwayomi.example" } end,
                 loadDownloadDirectory = function() return "/books" end,
@@ -3239,7 +3253,7 @@ return {
                 saveChapterLedger = function(_, ledger) return ledger end,
             }
         end
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -3252,8 +3266,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
-        package.loaded.suwayomi_downloader = nil
+        package.loaded["suwayomi/settings"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3270,7 +3284,7 @@ return {
     end)
 
     it("clears stale selection when opening chapters for another manga", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchChaptersForManga = function(_, manga_id)
                     return {
@@ -3284,7 +3298,7 @@ return {
         end
 
         local last_menu
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showChapterMenu = function(options)
                     last_menu = options
@@ -3294,8 +3308,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3317,7 +3331,7 @@ return {
     it("refreshes uninitialized manga before opening its chapter list", function()
         local refresh_calls = 0
         local fetch_calls = 0
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 refreshManga = function(_, manga_id)
                     refresh_calls = refresh_calls + 1
@@ -3338,7 +3352,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/api"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3356,7 +3370,7 @@ return {
     it("shows refreshed chapters from the refresh action without fetching chapters again", function()
         local refresh_calls = 0
         local fetch_calls = 0
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 refreshManga = function(_, manga_id)
                     refresh_calls = refresh_calls + 1
@@ -3377,7 +3391,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/api"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3407,7 +3421,7 @@ return {
             end,
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
@@ -3428,7 +3442,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -3455,7 +3469,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -3486,7 +3500,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -3501,10 +3515,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3560,7 +3574,7 @@ return {
             end,
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
@@ -3581,7 +3595,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -3593,7 +3607,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -3620,7 +3634,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -3635,10 +3649,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3669,7 +3683,7 @@ return {
         local shown_actions_menu
         local shown_actions_callback
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
@@ -3683,7 +3697,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -3695,7 +3709,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -3717,7 +3731,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -3732,10 +3746,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3777,7 +3791,7 @@ return {
             return nil
         end
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
@@ -3799,7 +3813,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -3811,7 +3825,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -3838,7 +3852,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -3853,10 +3867,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -3943,7 +3957,7 @@ return {
     it("queues the next unread chapter downloads and skips unavailable chapters", function()
         local saved_queue = {}
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -3959,7 +3973,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -3976,8 +3990,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4015,7 +4029,7 @@ return {
         local saved_queue = {}
         local menu_updates = 0
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -4031,7 +4045,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 updateChapterMenu = function()
                     menu_updates = menu_updates + 1
@@ -4042,7 +4056,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -4059,9 +4073,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4097,7 +4111,7 @@ return {
             })
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -4114,7 +4128,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 updateChapterMenu = function(_, options)
                     refreshed_chapter_menu = options
@@ -4125,7 +4139,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -4142,9 +4156,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4172,7 +4186,7 @@ return {
     it("keeps the next unread chapter buffer downloaded or queued", function()
         local saved_queue = {}
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -4188,7 +4202,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -4205,8 +4219,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4299,7 +4313,7 @@ return {
     end)
 
     it("reports when the unread download buffer is already satisfied", function()
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -4311,7 +4325,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -4325,8 +4339,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4371,7 +4385,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -4389,7 +4403,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 updateChapterMenu = function(_, options)
                     refreshed_chapter_menu = options
@@ -4400,7 +4414,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -4417,9 +4431,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4560,7 +4574,7 @@ return {
     end)
 
     it("reports when there are no read chapters to delete", function()
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 loadDownloadQueue = function() return {} end,
                 saveDownloadQueue = function(_, jobs) return jobs end,
@@ -4568,7 +4582,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4587,7 +4601,7 @@ return {
     it("reports queued and skipped counts for selected downloads", function()
         local saved_queue = {}
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -4603,7 +4617,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -4620,8 +4634,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4666,7 +4680,7 @@ return {
     end)
 
     it("shows a short-lived message when bulk download only skips chapters", function()
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -4678,7 +4692,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -4692,8 +4706,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4714,7 +4728,7 @@ return {
     it("limits excessive selected bulk download requests", function()
         local saved_queue = {}
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -4730,7 +4744,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -4747,8 +4761,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -4777,7 +4791,7 @@ return {
 
     it("confirms manga-level all unread downloads and reuses the 50 chapter cap", function()
         local saved_queue = {}
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example" }
@@ -4794,7 +4808,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -4826,7 +4840,7 @@ return {
 
     it("confirms manga-level all chapter downloads including read chapters", function()
         local saved_queue = {}
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example" }
@@ -4843,7 +4857,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -4868,7 +4882,7 @@ return {
     it("confirms manga-level keep next 50 unread before queueing missing downloads", function()
         local saved_queue = {}
         local saved_keep_next = 0
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example" }
@@ -4890,7 +4904,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -4946,7 +4960,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -4958,7 +4972,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -4975,8 +4989,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5090,7 +5104,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5107,7 +5121,7 @@ return {
         end
 
         local saved_queue = {}
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5124,8 +5138,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5179,7 +5193,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5195,7 +5209,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5209,8 +5223,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5253,13 +5267,13 @@ return {
         local ledger_loads = 0
         local ledger_saves = 0
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5271,7 +5285,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5292,9 +5306,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5361,13 +5375,13 @@ return {
         local ledger_loads = 0
         local ledger_saves = 0
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5379,7 +5393,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5400,9 +5414,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5452,7 +5466,7 @@ return {
     it("opens a downloaded chapter from the chapter actions menu", function()
         local opened_path
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -5466,7 +5480,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5486,7 +5500,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5501,9 +5515,9 @@ return {
 
         package.loaded.main = nil
         package.loaded["apps/reader/readerui"] = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5540,7 +5554,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5552,7 +5566,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5569,8 +5583,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5600,7 +5614,7 @@ return {
     it("shows mark as unread for chapters already marked read", function()
         local actions
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5612,7 +5626,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5626,8 +5640,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5641,7 +5655,7 @@ return {
     end)
 
     it("places downloaded chapter deletion after non-destructive actions", function()
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5653,15 +5667,15 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 loadDownloadDirectory = function() return "/books" end,
             }
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5673,14 +5687,14 @@ return {
         assert.are.equal("Open", actions[1].text)
         assert.are.equal("Mark as unread", actions[2].text)
         assert.are.equal("Delete from device", actions[3].text)
-        package.preload.suwayomi_downloader = nil
+        package.preload["suwayomi/downloads/downloader"] = nil
     end)
 
     it("marks a chapter read locally before syncing it in the background", function()
         local saved_ledger = {}
         local marked_chapter_id
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function(_, chapter_ids, desired_read_state)
                     marked_chapter_id = chapter_ids[1]
@@ -5689,7 +5703,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5701,7 +5715,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5718,9 +5732,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -5748,7 +5762,7 @@ return {
     it("queues missing next unread downloads after manually marking a chapter read when keep-next is enabled", function()
         local saved_queue = {}
         local saved_ledger = {}
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5769,7 +5783,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -5792,7 +5806,7 @@ return {
     it("does not queue keep-next downloads after mark-read when the setting is off", function()
         local saved_queue = {}
         local saved_ledger = {}
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5813,7 +5827,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -5845,7 +5859,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5857,7 +5871,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5878,8 +5892,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -5921,7 +5935,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -5933,7 +5947,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -5951,8 +5965,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -5998,7 +6012,7 @@ return {
             return original_open(path, mode)
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -6010,7 +6024,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6028,8 +6042,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -6063,7 +6077,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -6075,7 +6089,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6096,8 +6110,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
         local plugin_class = require("main")
         local plugin = plugin_class{}
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -6125,13 +6139,13 @@ return {
         local ledger_loads = 0
         local ledger_saves = 0
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -6143,7 +6157,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6164,9 +6178,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -6211,13 +6225,13 @@ return {
         local saved_ledger = {}
         local marked_ids = {}
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -6229,7 +6243,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6246,9 +6260,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -6287,7 +6301,7 @@ return {
             },
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -6301,7 +6315,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -6318,7 +6332,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6336,9 +6350,9 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -6382,7 +6396,7 @@ return {
             return original_open(path, mode)
         end
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -6396,7 +6410,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -6408,7 +6422,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -6425,7 +6439,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6443,10 +6457,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -6494,7 +6508,7 @@ return {
             return original_open(path, mode)
         end
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "Local source", lang = "localsourcelang" } } }
@@ -6508,7 +6522,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -6520,7 +6534,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -6537,7 +6551,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -6556,10 +6570,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -6629,7 +6643,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -6641,7 +6655,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6658,8 +6672,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
         package.loaded.lfs = nil
 
         local plugin_class = require("main")
@@ -6722,7 +6736,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -6736,7 +6750,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -6748,7 +6762,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -6765,7 +6779,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6783,10 +6797,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
         package.loaded.lfs = nil
 
         local plugin_class = require("main")
@@ -6870,7 +6884,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -6882,7 +6896,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6899,8 +6913,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
         package.loaded.lfs = nil
 
         local plugin_class = require("main")
@@ -6931,7 +6945,7 @@ return {
         }
         local marked_chapter_id
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function(credentials, chapter_ids, desired_read_state)
                     marked_chapter_id = chapter_ids[1]
@@ -6941,7 +6955,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -6957,8 +6971,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{
@@ -7012,7 +7026,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -7028,7 +7042,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -7049,8 +7063,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{
@@ -7116,7 +7130,7 @@ return {
             return true
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -7132,7 +7146,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -7153,8 +7167,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{
@@ -7204,7 +7218,7 @@ return {
             },
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function()
                     return { ok = false, error = "offline" }
@@ -7212,7 +7226,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -7228,8 +7242,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{
@@ -7267,7 +7281,7 @@ return {
         }
         local marked_chapter_id
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function(credentials, chapter_ids, desired_read_state)
                     marked_chapter_id = chapter_ids[1]
@@ -7277,7 +7291,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -7293,8 +7307,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7324,7 +7338,7 @@ return {
         local child_callback
         local http_calls = 0
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function()
                     http_calls = http_calls + 1
@@ -7351,7 +7365,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -7369,8 +7383,8 @@ return {
 
         package.loaded.main = nil
         package.loaded["ffi/util"] = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7384,7 +7398,7 @@ return {
     end)
 
     it("uses a unique result path for each read sync worker", function()
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function() return { server_url = "https://suwayomi.example" } end,
@@ -7396,7 +7410,7 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7417,7 +7431,7 @@ return {
         local child_callback
         local subprocess_done = false
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function(_, chapter_ids, desired_read_state)
                     return { ok = true, chapters = { { id = chapter_ids[1], is_read = desired_read_state == true } } }
@@ -7443,7 +7457,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -7461,8 +7475,8 @@ return {
 
         package.loaded.main = nil
         package.loaded["ffi/util"] = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7496,7 +7510,7 @@ return {
         }
         local debug_events = {}
 
-        package.preload.suwayomi_debug = function()
+        package.preload["suwayomi/debug"] = function()
             return {
                 log = function(event)
                     table.insert(debug_events, event)
@@ -7511,7 +7525,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 loadDownloadQueue = function() return {} end,
                 saveDownloadQueue = function(_, jobs) return jobs end,
@@ -7524,8 +7538,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_debug = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/debug"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7574,7 +7588,7 @@ return {
         }
         local debug_events = {}
 
-        package.preload.suwayomi_debug = function()
+        package.preload["suwayomi/debug"] = function()
             return {
                 log = function(event)
                     table.insert(debug_events, event)
@@ -7589,7 +7603,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 loadDownloadQueue = function() return {} end,
                 saveDownloadQueue = function(_, jobs) return jobs end,
@@ -7602,8 +7616,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_debug = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/debug"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7665,7 +7679,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -7683,7 +7697,7 @@ return {
 
         package.loaded.main = nil
         package.loaded["ffi/util"] = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7727,7 +7741,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -7761,7 +7775,7 @@ return {
         package.loaded.main = nil
         package.loaded["ffi/util"] = nil
         package.loaded["ui/uimanager"] = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7811,7 +7825,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 getSettingsDir = function() return "/settings" end,
                 load = function()
@@ -7829,7 +7843,7 @@ return {
 
         package.loaded.main = nil
         package.loaded["ffi/util"] = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7888,13 +7902,13 @@ return {
         }
         local marked_ids = {}
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = successful_batch_read_sync(marked_ids),
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -7909,8 +7923,8 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -7968,7 +7982,7 @@ return {
         }
         local attempts = 0
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function(_, chapter_ids)
                     attempts = attempts + 1
@@ -7978,7 +7992,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -8009,8 +8023,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
         package.loaded["ui/uimanager"] = nil
 
         local plugin_class = require("main")
@@ -8047,7 +8061,7 @@ return {
             },
         }
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function()
                     return { ok = false, error = "offline" }
@@ -8064,7 +8078,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
@@ -8076,7 +8090,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -8093,7 +8107,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -8111,10 +8125,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -8126,7 +8140,7 @@ return {
     end)
 
     it("shows the downloader error when chapter download fails", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -8142,7 +8156,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title, download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
@@ -8156,7 +8170,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -8173,7 +8187,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -8187,10 +8201,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -8205,7 +8219,7 @@ return {
     end)
 
     it("shows a neutral message when the chapter already exists locally", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -8219,7 +8233,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title, download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
@@ -8233,7 +8247,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -8250,7 +8264,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -8264,10 +8278,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -8281,7 +8295,7 @@ return {
     it("opens the directory chooser and retries the chapter when no download directory is set", function()
         local downloader_calls = 0
 
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -8295,7 +8309,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title, download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
@@ -8325,7 +8339,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -8345,7 +8359,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -8382,10 +8396,10 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
         package.loaded.lfs = nil
         package.loaded.device = nil
 
@@ -8405,7 +8419,7 @@ return {
     end)
 
     it("does not enqueue the same chapter twice while it is already queued", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return { ok = true, sources = { { id = "s1", name = "MangaDex", lang = "en" } } }
@@ -8419,7 +8433,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             local start_calls = 0
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
@@ -8439,7 +8453,7 @@ return {
         end
 
         local select_chapter
-        package.preload.suwayomi_ui = function()
+        package.preload["suwayomi/ui"] = function()
             return {
                 showSourcesMenu = function(sources, onSelect)
                     onSelect(sources[1])
@@ -8458,7 +8472,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -8473,10 +8487,10 @@ return {
 
         package.loaded.main = nil
         package.loaded["ui/trapper"] = nil
-        package.loaded.suwayomi_api = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_ui = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -8491,7 +8505,7 @@ return {
     it("persists queued chapter downloads and removes them after success", function()
         local saved_queue
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title, download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
@@ -8519,7 +8533,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -8534,8 +8548,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{}
@@ -8566,7 +8580,7 @@ return {
         local removed_paths = {}
         local start_calls = 0
 
-        package.preload.suwayomi_downloader = function()
+        package.preload["suwayomi/downloads/downloader"] = function()
             return {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title, download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
@@ -8598,7 +8612,7 @@ return {
             }
         end
 
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
                     return { server_url = "https://suwayomi.example", username = "alice", password = "secret", auth_method = "basic_auth" }
@@ -8618,8 +8632,8 @@ return {
         end
 
         package.loaded.main = nil
-        package.loaded.suwayomi_downloader = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/settings"] = nil
 
         local plugin_class = require("main")
         local plugin = plugin_class{
@@ -8645,7 +8659,7 @@ return {
     end)
 
     it("shows a message when browse fails", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function()
                     return {
@@ -8656,7 +8670,7 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/api"] = nil
 
         local plugin_class = require("main")
         local menu_items = {}
@@ -8768,7 +8782,7 @@ return {
                 end,
             }
         end
-        package.preload.suwayomi_settings = function()
+        package.preload["suwayomi/settings"] = function()
             return {
                 loadDownloadDirectory = function()
                     return "/storage/emulated/0/Books/Manga"
@@ -8780,7 +8794,7 @@ return {
             }
         end
         package.loaded.main = nil
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
         package.loaded.lfs = nil
 
         local plugin_class = require("main")

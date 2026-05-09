@@ -1,14 +1,14 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_api", function()
+describe("suwayomi/api", function()
     local api
 
     before_each(function()
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/api"] = nil
         package.loaded["socket.http"] = nil
         package.loaded["ssl.https"] = nil
         package.loaded.ltn12 = nil
-        api = require("suwayomi_api")
+        api = require("suwayomi/api")
     end)
 
     local function install_graphql_stub(response_body)

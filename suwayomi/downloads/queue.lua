@@ -1,8 +1,26 @@
 local _ = require("gettext")
 local T = require("ffi/util").template
+local JobStore = require("suwayomi/downloads/job_store")
+local ProgressFile = require("suwayomi/downloads/progress_file")
+local StatusFormatter = require("suwayomi/downloads/status_formatter")
 
 local DownloadQueue = {}
 DownloadQueue.__index = DownloadQueue
+
+-- Boundary: public device-local download queue facade.
+--
+-- Queue states are persisted as "queued", "downloading", "downloaded",
+-- "skipped", or "failed". Persisted jobs keep only serializable manga/chapter
+-- metadata plus progress/recovery details; runtime-only downloader credentials,
+-- callbacks, process ids, and active worker objects stay in memory.
+--
+-- Active jobs are launched from queued persisted jobs, polled through hidden
+-- progress files, then reconciled back into settings so KOReader restarts can
+-- recover interrupted work without server-side Suwayomi download mutations.
+--
+-- Dependencies are injected by the plugin shell: settings, downloader,
+-- ui_manager, ffi_util subprocess helpers, credentials callback, clock, and
+-- debug/message/status callbacks.
 
 DownloadQueue.POLL_INTERVAL_SECONDS = 0.5
 DownloadQueue.WATCHDOG_TIMEOUT_SECONDS = 30 * 60
@@ -41,7 +59,14 @@ function DownloadQueue:new(options)
         poll_scheduled = false,
         max_active_chapters = self:normalizeActiveChapterLimit(options.max_active_chapters),
     }
-    return setmetatable(queue, self)
+    setmetatable(queue, self)
+    queue.job_store = options.job_store or JobStore:new{
+        settings = queue.settings,
+        getKey = function(manga, chapter)
+            return queue:getKey(manga, chapter)
+        end,
+    }
+    return queue
 end
 
 function DownloadQueue:logDebug(event)
@@ -90,209 +115,55 @@ function DownloadQueue:getKey(manga, chapter)
 end
 
 function DownloadQueue:buildProgressPath(manga, chapter, download_directory)
-    local key = self:getKey(manga, chapter):gsub("[^%w%-_%.]", "_")
-    return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_dl_progress_" .. key .. ".txt"
+    return ProgressFile.buildPath(self:getKey(manga, chapter), download_directory)
 end
 
 function DownloadQueue:loadPersistentJobs()
-    if not self.settings or not self.settings.loadDownloadQueue then
-        return {}
-    end
-    return self.settings:loadDownloadQueue() or {}
+    return self.job_store:load()
 end
 
 function DownloadQueue:savePersistentJobs(jobs)
-    if not self.settings or not self.settings.saveDownloadQueue then
-        return jobs or {}
-    end
-    return self.settings:saveDownloadQueue(jobs or {})
+    return self.job_store:save(jobs)
 end
 
 function DownloadQueue:normalizeProgress(progress)
-    if type(progress) ~= "table" then
-        return nil
-    end
-
-    local normalized = {}
-    if progress.state ~= nil then
-        normalized.state = tostring(progress.state)
-    end
-    if progress.current ~= nil then
-        normalized.current = tonumber(progress.current) or 0
-    end
-    if progress.total ~= nil then
-        normalized.total = tonumber(progress.total) or 0
-    end
-    if progress.path ~= nil then
-        normalized.path = tostring(progress.path)
-    end
-    if progress.error ~= nil then
-        normalized.error = tostring(progress.error)
-    end
-    if progress.updated_at ~= nil then
-        normalized.updated_at = tonumber(progress.updated_at) or progress.updated_at
-    end
-
-    return normalized
+    return self.job_store:normalizeProgress(progress)
 end
 
 function DownloadQueue:normalizeRecovery(recovery)
-    if type(recovery) ~= "table" then
-        return nil
-    end
-
-    local normalized = {}
-    if recovery.reason ~= nil then
-        normalized.reason = tostring(recovery.reason)
-    end
-    if recovery.recovered_at ~= nil then
-        normalized.recovered_at = tonumber(recovery.recovered_at) or recovery.recovered_at
-    end
-    if recovery.previous_state ~= nil then
-        normalized.previous_state = tostring(recovery.previous_state)
-    end
-    local progress = self:normalizeProgress(recovery.progress)
-    if progress then
-        normalized.progress = progress
-    end
-    return normalized
+    return self.job_store:normalizeRecovery(recovery)
 end
 
 function DownloadQueue:copySourceMetadata(source)
-    if type(source) ~= "table" then
-        return nil
-    end
-
-    local copied = {}
-    for _, key in ipairs({ "id", "displayName", "display_name", "name", "raw_name", "lang" }) do
-        if source[key] ~= nil then
-            copied[key] = source[key]
-        end
-    end
-    if next(copied) then
-        return copied
-    end
-    return nil
+    return self.job_store:copySourceMetadata(source)
 end
 
 function DownloadQueue:copyMangaMetadata(manga)
-    local copied = {
-        id = manga.id,
-        title = manga.title,
-    }
-    local source = self:copySourceMetadata(manga.source)
-    if source then
-        copied.source = source
-    end
-    return copied
+    return self.job_store:copyMangaMetadata(manga)
 end
 
 function DownloadQueue:copyChapterMetadata(chapter)
-    local copied = {
-        id = chapter.id,
-        name = chapter.name,
-    }
-    for _, key in ipairs({ "chapter_number", "source_order", "scanlator" }) do
-        if chapter[key] ~= nil then
-            copied[key] = chapter[key]
-        end
-    end
-    return copied
+    return self.job_store:copyChapterMetadata(chapter)
 end
 
 function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, state, details)
-    details = details or {}
-    local job = {
-        key = self:getKey(manga, chapter),
-        state = state or "queued",
-        download_directory = download_directory,
-        manga = self:copyMangaMetadata(manga),
-        chapter = self:copyChapterMetadata(chapter),
-    }
-    if details.started_at ~= nil then
-        job.started_at = tonumber(details.started_at) or details.started_at
-    end
-    if details.last_progress_at ~= nil then
-        job.last_progress_at = tonumber(details.last_progress_at) or details.last_progress_at
-    end
-    local progress = self:normalizeProgress(details.progress)
-    if progress then
-        job.progress = progress
-    end
-    local recovery = self:normalizeRecovery(details.recovery)
-    if recovery then
-        job.recovery = recovery
-    end
-    return job
+    return self.job_store:buildJob(manga, chapter, download_directory, state, details)
 end
 
 function DownloadQueue:upsertPersistentJob(job)
-    local jobs = self:loadPersistentJobs()
-    local replaced = false
-    for index, existing in ipairs(jobs) do
-        if existing.key == job.key then
-            jobs[index] = job
-            replaced = true
-            break
-        end
-    end
-
-    if not replaced then
-        table.insert(jobs, job)
-    end
-
-    self:savePersistentJobs(jobs)
+    self.job_store:upsert(job)
 end
 
 function DownloadQueue:upsertPersistentJobs(new_jobs)
-    local jobs = self:loadPersistentJobs()
-    local indexes_by_key = {}
-    for index, existing in ipairs(jobs) do
-        indexes_by_key[existing.key] = index
-    end
-
-    for _, job in ipairs(new_jobs or {}) do
-        local existing_index = indexes_by_key[job.key]
-        if existing_index then
-            jobs[existing_index] = job
-        else
-            table.insert(jobs, job)
-            indexes_by_key[job.key] = #jobs
-        end
-    end
-
-    self:savePersistentJobs(jobs)
+    self.job_store:upsertMany(new_jobs)
 end
 
 function DownloadQueue:removePersistentJob(key)
-    local remaining = {}
-    for _, job in ipairs(self:loadPersistentJobs()) do
-        if job.key ~= key then
-            table.insert(remaining, job)
-        end
-    end
-    self:savePersistentJobs(remaining)
+    self.job_store:remove(key)
 end
 
 function DownloadQueue:copySnapshotJob(job, state)
-    local snapshot = {
-        key = job.key or self:getKey(job.manga or {}, job.chapter or {}),
-        state = state or job.state,
-        download_directory = job.download_directory,
-        manga = job.manga,
-        chapter = job.chapter,
-    }
-    local progress = self:normalizeProgress(job.progress)
-    if progress then
-        snapshot.progress = progress
-    elseif job.last_progress_current ~= nil or job.last_progress_total ~= nil or job.last_progress_state ~= nil then
-        snapshot.progress = {
-            state = job.last_progress_state or state or job.state,
-            current = job.last_progress_current or 0,
-            total = job.last_progress_total or 0,
-        }
-    end
-    return snapshot
+    return self.job_store:copySnapshotJob(job, state)
 end
 
 function DownloadQueue:getSnapshot()
@@ -320,12 +191,7 @@ function DownloadQueue:getSnapshot()
 end
 
 function DownloadQueue:findPersistentJob(key, state)
-    for _, job in ipairs(self:loadPersistentJobs()) do
-        if job.key == key and (state == nil or job.state == state) then
-            return job
-        end
-    end
-    return nil
+    return self.job_store:find(key, state)
 end
 
 function DownloadQueue:retryFailed(key)
@@ -472,169 +338,43 @@ function DownloadQueue:cancelQueued()
 end
 
 function DownloadQueue:splitUtf8Chars(text)
-    local chars = {}
-    text = tostring(text or "")
-    local index = 1
-    while index <= #text do
-        local byte = text:byte(index)
-        local length = 1
-        if byte and byte >= 0xF0 then
-            length = 4
-        elseif byte and byte >= 0xE0 then
-            length = 3
-        elseif byte and byte >= 0xC0 then
-            length = 2
-        end
-        table.insert(chars, text:sub(index, index + length - 1))
-        index = index + length
-    end
-    return chars
+    return StatusFormatter.splitUtf8Chars(text)
 end
 
 function DownloadQueue:shortenChapterTitle(title, reserved_chars)
-    local max_chars = self.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS - (reserved_chars or 0)
-    if max_chars < 12 then
-        max_chars = 12
-    end
-
-    local chars = self:splitUtf8Chars(title)
-    if #chars <= max_chars then
-        return title
-    end
-
-    local shortened = {}
-    for index = 1, max_chars - 1 do
-        table.insert(shortened, chars[index])
-    end
-    table.insert(shortened, "…")
-    return table.concat(shortened)
+    return StatusFormatter.shortenChapterTitle(title, reserved_chars, self.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS)
 end
 
 function DownloadQueue:joinChapterStatusSymbols(symbols)
-    if not symbols or #symbols == 0 then
-        return nil
-    end
-    return table.concat(symbols, "")
+    return StatusFormatter.joinChapterStatusSymbols(symbols)
 end
 
 function DownloadQueue:formatChapterStatusSymbols(chapter, symbols)
-    if not symbols or #symbols == 0 then
-        return chapter.name
-    end
-    local suffix = table.concat(symbols, " ")
-    local title = self:shortenChapterTitle(chapter.name, #self:splitUtf8Chars(suffix) + 2)
-    return title .. "  " .. suffix
+    return StatusFormatter.formatChapterStatusSymbols(chapter, symbols, self.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS)
 end
 
 function DownloadQueue:buildChapterStatusSymbols(chapter, status)
-    local symbols = {}
-    if chapter and chapter.is_read == true then
-        table.insert(symbols, "✓")
-    end
-
-    if not status then
-        return symbols
-    end
-    if status.state == "queued" then
-        table.insert(symbols, "⌛")
-        return symbols
-    end
-    if status.state == "downloading" then
-        if status.total and status.total > 0 and status.current then
-            table.insert(symbols, T(_("↓ %1/%2"), status.current, status.total))
-            return symbols
-        end
-        table.insert(symbols, "⌛")
-        return symbols
-    end
-    if status.state == "downloaded" or status.state == "skipped" then
-        table.insert(symbols, "↓")
-        return symbols
-    end
-    if status.state == "read" then
-        if #symbols == 0 then
-            table.insert(symbols, "✓")
-        end
-        return symbols
-    end
-    if status.state == "failed" then
-        table.insert(symbols, "⚠")
-        return symbols
-    end
-    return symbols
+    return StatusFormatter.buildChapterStatusSymbols(chapter, status)
 end
 
 function DownloadQueue:formatChapterMenuStatus(chapter, status)
-    return self:joinChapterStatusSymbols(self:buildChapterStatusSymbols(chapter, status))
+    return StatusFormatter.formatChapterMenuStatus(chapter, status)
 end
 
 function DownloadQueue:formatChapterMenuText(chapter, status)
-    local symbols = self:buildChapterStatusSymbols(chapter, status)
-    return self:formatChapterStatusSymbols(chapter, symbols)
+    return StatusFormatter.formatChapterMenuText(chapter, status, self.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS)
 end
 
 function DownloadQueue:formatChapterNumber(value)
-    local number = tonumber(value)
-    if not number then
-        return tostring(value)
-    end
-    if number == math.floor(number) then
-        return tostring(math.floor(number))
-    end
-    return tostring(number)
+    return StatusFormatter.formatChapterNumber(value)
 end
 
 function DownloadQueue:formatFailureMessage(manga, chapter, detail)
-    local label_parts = {}
-    if manga and manga.title and manga.title ~= "" then
-        table.insert(label_parts, manga.title)
-    end
-    if chapter and chapter.name and chapter.name ~= "" then
-        table.insert(label_parts, chapter.name)
-    end
-
-    local label = table.concat(label_parts, " / ")
-    if label == "" then
-        label = self:getKey(manga or {}, chapter or {})
-    end
-
-    local chapter_suffix = ""
-    if chapter and chapter.chapter_number ~= nil and tostring(chapter.chapter_number) ~= "" then
-        chapter_suffix = T(_(" (Ch. %1)"), self:formatChapterNumber(chapter.chapter_number))
-    elseif chapter and chapter.id and chapter.id ~= "" then
-        chapter_suffix = T(_(" (Suwayomi id %1)"), chapter.id)
-    end
-
-    local failure_detail = tostring(detail or "")
-    if failure_detail == "" then
-        failure_detail = _("Chapter download failed.")
-    end
-
-    return T(_("Could not download \"%1\"%2: %3"), label, chapter_suffix, failure_detail)
+    return StatusFormatter.formatFailureMessage(manga, chapter, detail, self:getKey(manga or {}, chapter or {}))
 end
 
 function DownloadQueue:readProgress(progress_path)
-    local handle = io.open(progress_path, "r")
-    if not handle then
-        return nil
-    end
-
-    local status = {}
-    for line in handle:lines() do
-        local key, value = line:match("^([^=]+)=(.*)$")
-        if key then
-            status[key] = value
-        end
-    end
-    handle:close()
-
-    if status.current then
-        status.current = tonumber(status.current)
-    end
-    if status.total then
-        status.total = tonumber(status.total)
-    end
-    return status
+    return ProgressFile.read(progress_path)
 end
 
 function DownloadQueue:cleanupInterruptedDownload(job)
@@ -849,22 +589,7 @@ function DownloadQueue:getCredentialsForJob()
 end
 
 function DownloadQueue:writeProgressFallback(progress_path, state, current, total, path, error_message)
-    local tmp_path = tostring(progress_path or "") .. ".tmp"
-    local handle = io.open(tmp_path, "w")
-    if not handle then
-        return
-    end
-    handle:write("state=", tostring(state or ""), "\n")
-    handle:write("current=", tostring(current or 0), "\n")
-    handle:write("total=", tostring(total or 0), "\n")
-    handle:write("path=", tostring(path or ""), "\n")
-    if error_message then
-        handle:write("error=", tostring(error_message), "\n")
-    end
-    handle:close()
-    if not os.rename(tmp_path, progress_path) then
-        os.remove(tmp_path)
-    end
+    return ProgressFile.writeFallback(progress_path, state, current, total, path, error_message)
 end
 
 function DownloadQueue:runDownloaderJob(queued)
@@ -899,6 +624,61 @@ function DownloadQueue:runDownloaderJob(queued)
     until not result.ok or result.done
 end
 
+local function startQueuedJob(self, queued)
+    queued.started_at = self.now()
+    queued.last_progress_at = queued.started_at
+    queued.last_progress_current = nil
+    queued.last_progress_state = nil
+    queued.progress_path = self:buildProgressPath(queued.manga, queued.chapter, queued.download_directory)
+    os.remove(queued.progress_path)
+    queued.credentials = queued.credentials or self:getCredentialsForJob()
+    self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading", {
+        started_at = queued.started_at,
+        last_progress_at = queued.last_progress_at,
+        progress = {
+            state = "downloading",
+            current = 0,
+            total = 0,
+            updated_at = queued.last_progress_at,
+        },
+    }))
+
+    local pid, err = self.ffi_util.runInSubProcess(function()
+        self:runDownloaderJob(queued)
+    end)
+
+    if not pid then
+        self:setStatus(queued.manga, queued.chapter, { state = "failed" })
+        local message = self:formatFailureMessage(
+            queued.manga,
+            queued.chapter,
+            T(_("Could not start chapter download: %1"), err or _("unknown error"))
+        )
+        self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "failed", {
+            started_at = queued.started_at,
+            last_progress_at = self.now(),
+            progress = {
+                state = "failed",
+                current = 0,
+                total = 0,
+                error = message,
+                updated_at = self.now(),
+            },
+        }))
+        self.onMessage(message)
+        return false
+    end
+
+    queued.pid = pid
+    self:setActiveJob(queued)
+    self:setStatus(queued.manga, queued.chapter, {
+        state = "downloading",
+        current = 0,
+        total = 0,
+    })
+    return true
+end
+
 function DownloadQueue:process()
     local started_at = os.time()
     local ok_socket, socket = pcall(require, "socket")
@@ -912,55 +692,7 @@ function DownloadQueue:process()
             break
         end
 
-        queued.started_at = self.now()
-        queued.last_progress_at = queued.started_at
-        queued.last_progress_current = nil
-        queued.last_progress_state = nil
-        queued.progress_path = self:buildProgressPath(queued.manga, queued.chapter, queued.download_directory)
-        os.remove(queued.progress_path)
-        queued.credentials = queued.credentials or self:getCredentialsForJob()
-        self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading", {
-            started_at = queued.started_at,
-            last_progress_at = queued.last_progress_at,
-            progress = {
-                state = "downloading",
-                current = 0,
-                total = 0,
-                updated_at = queued.last_progress_at,
-            },
-        }))
-
-        local pid, err = self.ffi_util.runInSubProcess(function()
-            self:runDownloaderJob(queued)
-        end)
-
-        if not pid then
-            self:setStatus(queued.manga, queued.chapter, { state = "failed" })
-            local message = self:formatFailureMessage(
-                queued.manga,
-                queued.chapter,
-                T(_("Could not start chapter download: %1"), err or _("unknown error"))
-            )
-            self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "failed", {
-                started_at = queued.started_at,
-                last_progress_at = self.now(),
-                progress = {
-                    state = "failed",
-                    current = 0,
-                    total = 0,
-                    error = message,
-                    updated_at = self.now(),
-                },
-            }))
-            self.onMessage(message)
-        else
-            queued.pid = pid
-            self:setActiveJob(queued)
-            self:setStatus(queued.manga, queued.chapter, {
-                state = "downloading",
-                current = 0,
-                total = 0,
-            })
+        if startQueuedJob(self, queued) then
             started_count = started_count + 1
         end
     end
@@ -1000,6 +732,104 @@ function DownloadQueue:finishActiveWithFailure(active, message)
     self.onMessage(failure_message)
 end
 
+local function recordActiveProgress(self, active, progress)
+    if not progress or not progress.state then
+        return
+    end
+
+    if progress.current ~= active.last_progress_current or progress.state ~= active.last_progress_state then
+        active.last_progress_at = self.now()
+        active.last_progress_current = progress.current
+        active.last_progress_total = progress.total
+        active.last_progress_path = progress.path
+        active.last_progress_error = progress.error
+        active.last_progress_state = progress.state
+        self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, progress.state, {
+            started_at = active.started_at,
+            last_progress_at = active.last_progress_at,
+            progress = {
+                state = progress.state,
+                current = progress.current,
+                total = progress.total,
+                path = progress.path,
+                error = progress.error,
+                updated_at = active.last_progress_at,
+            },
+        }))
+    end
+    self:setStatus(active.manga, active.chapter, {
+        state = progress.state,
+        current = progress.current,
+        total = progress.total,
+    })
+end
+
+local function finishActiveFromProgress(self, active, progress)
+    self:removeActiveJob(active)
+    os.remove(active.progress_path)
+    if progress and (progress.state == "downloaded" or progress.state == "skipped") then
+        self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
+    elseif progress and progress.state == "failed" and self:jobArchiveExists(active, progress) then
+        -- A downloader may report failure after writing a valid CBZ. Keep the
+        -- user-facing state aligned with the archive that now exists on disk.
+        self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
+        self:setStatus(active.manga, active.chapter, {
+            state = "downloaded",
+            current = progress.current,
+            total = progress.total,
+        })
+    elseif progress and progress.state == "failed" then
+        local message = self:formatFailureMessage(
+            active.manga,
+            active.chapter,
+            progress.error or _("Chapter download failed.")
+        )
+        self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
+            started_at = active.started_at,
+            last_progress_at = active.last_progress_at or self.now(),
+            progress = {
+                state = "failed",
+                current = progress.current,
+                total = progress.total,
+                path = progress.path,
+                error = message,
+                updated_at = active.last_progress_at or self.now(),
+            },
+        }))
+        self.onMessage(message)
+    end
+end
+
+local function finishActiveWithoutProgress(self, active)
+    self:removeActiveJob(active)
+    os.remove(active.progress_path)
+    if self:jobArchiveExists(active) then
+        self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
+        self:setStatus(active.manga, active.chapter, {
+            state = "downloaded",
+            current = active.last_progress_current,
+            total = active.last_progress_total,
+        })
+        return
+    end
+
+    self:setStatus(active.manga, active.chapter, { state = "failed" })
+    local message = self:formatFailureMessage(active.manga, active.chapter, _("Chapter download failed."))
+    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
+        started_at = active.started_at,
+        last_progress_at = self.now(),
+        progress = {
+            state = "failed",
+            current = active.last_progress_current or 0,
+            total = active.last_progress_total or 0,
+            path = active.last_progress_path,
+            error = message,
+            updated_at = self.now(),
+        },
+    }))
+    self.onMessage(message)
+end
+
 function DownloadQueue:poll()
     local started_at = os.time()
     local ok_socket, socket = pcall(require, "socket")
@@ -1019,93 +849,21 @@ function DownloadQueue:poll()
     for index = 1, #active_jobs do
         local active = active_jobs[index]
         local progress = self:readProgress(active.progress_path)
-        if progress and progress.state then
-            if progress.current ~= active.last_progress_current or progress.state ~= active.last_progress_state then
-                active.last_progress_at = self.now()
-                active.last_progress_current = progress.current
-                active.last_progress_total = progress.total
-                active.last_progress_path = progress.path
-                active.last_progress_error = progress.error
-                active.last_progress_state = progress.state
-                self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, progress.state, {
-                    started_at = active.started_at,
-                    last_progress_at = active.last_progress_at,
-                    progress = {
-                        state = progress.state,
-                        current = progress.current,
-                        total = progress.total,
-                        path = progress.path,
-                        error = progress.error,
-                        updated_at = active.last_progress_at,
-                    },
-                }))
-            end
-            self:setStatus(active.manga, active.chapter, {
-                state = progress.state,
-                current = progress.current,
-                total = progress.total,
-            })
-        end
+        recordActiveProgress(self, active, progress)
 
         if self.now() - (active.last_progress_at or active.started_at or self.now()) > self.WATCHDOG_TIMEOUT_SECONDS then
+            -- The worker may have died without writing terminal progress. The
+            -- watchdog converts that silent active state into a recoverable
+            -- failed job instead of leaving a permanent "downloading" row.
             self:finishActiveWithFailure(active, _("Chapter download timed out."))
         else
             local done = self.ffi_util.isSubProcessDone(active.pid)
             local terminal = progress and (progress.state == "downloaded" or progress.state == "skipped" or progress.state == "failed")
             if terminal or done then
-                self:removeActiveJob(active)
-                os.remove(active.progress_path)
-                if progress and (progress.state == "downloaded" or progress.state == "skipped") then
-                    self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
-                elseif progress and progress.state == "failed" and self:jobArchiveExists(active, progress) then
-                    self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
-                    self:setStatus(active.manga, active.chapter, {
-                        state = "downloaded",
-                        current = progress.current,
-                        total = progress.total,
-                    })
-                elseif self:jobArchiveExists(active, progress) then
-                    self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
-                    self:setStatus(active.manga, active.chapter, {
-                        state = "downloaded",
-                        current = progress and progress.current or active.last_progress_current,
-                        total = progress and progress.total or active.last_progress_total,
-                    })
-                elseif progress and progress.state == "failed" then
-                    local message = self:formatFailureMessage(
-                        active.manga,
-                        active.chapter,
-                        progress.error or _("Chapter download failed.")
-                    )
-                    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
-                        started_at = active.started_at,
-                        last_progress_at = active.last_progress_at or self.now(),
-                        progress = {
-                            state = "failed",
-                            current = progress.current,
-                            total = progress.total,
-                            path = progress.path,
-                            error = message,
-                            updated_at = active.last_progress_at or self.now(),
-                        },
-                    }))
-                    self.onMessage(message)
+                if terminal then
+                    finishActiveFromProgress(self, active, progress)
                 else
-                    self:setStatus(active.manga, active.chapter, { state = "failed" })
-                    local message = self:formatFailureMessage(active.manga, active.chapter, _("Chapter download failed."))
-                    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
-                        started_at = active.started_at,
-                        last_progress_at = self.now(),
-                        progress = {
-                            state = "failed",
-                            current = active.last_progress_current or 0,
-                            total = active.last_progress_total or 0,
-                            path = active.last_progress_path,
-                            error = message,
-                            updated_at = self.now(),
-                        },
-                    }))
-                    self.onMessage(message)
+                    finishActiveWithoutProgress(self, active)
                 end
             end
         end
