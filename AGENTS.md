@@ -7,7 +7,7 @@
 - `luarocks --local` puts executables in `$HOME/.luarocks/bin`; use `PATH="$HOME/.luarocks/bin:$PATH" busted ...` unless that path is already exported.
 - Run the full test suite from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" busted spec`.
 - Run one spec file from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" busted spec/suwayomi_api_spec.lua`.
-- Match CI syntax checking with Lua 5.1: `luac5.1 -p main.lua suwayomi_api.lua suwayomi_client.lua suwayomi_debug.lua suwayomi_download_queue.lua suwayomi_downloader.lua suwayomi_paths.lua suwayomi_read_sync_worker.lua suwayomi_settings.lua suwayomi_source_fetch_worker.lua suwayomi_ui.lua _meta.lua`.
+- Match CI syntax checking with a Lua 5.1-compatible compiler: `luac -p main.lua suwayomi_api.lua suwayomi_client.lua suwayomi_debug.lua suwayomi_download_queue.lua suwayomi_downloader.lua suwayomi_paths.lua suwayomi_read_sync_worker.lua suwayomi_settings.lua suwayomi_source_fetch_worker.lua suwayomi_ui.lua _meta.lua`.
 - Specs set `package.path = "?.lua;" .. package.path`; run `busted` from the plugin root or local module requires will not resolve.
 
 ## Project Shape
