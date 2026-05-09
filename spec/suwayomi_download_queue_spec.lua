@@ -190,14 +190,10 @@ describe("suwayomi/downloads/queue", function()
                 subprocess_done[pid] = done
             end,
             active_count = function()
-                local count = 0
-                for _ in pairs(context.queue.active_jobs or {}) do
-                    count = count + 1
-                end
-                return count
+                return context.queue:getActiveCount()
             end,
             active_job = function(manga, chapter)
-                return context.queue.active_jobs[context.queue:getKey(manga, chapter)]
+                return context.queue:getActiveJob(context.queue:getKey(manga, chapter))
             end,
             write_progress = function(manga, chapter, state, current, total, path, error_message)
                 local progress_path = context.queue:buildProgressPath(manga, chapter, "/books")
@@ -454,20 +450,21 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal(3, build_queue({ max_active_chapters = "3" }).queue.max_active_chapters)
     end)
 
-    it("uses atomic progress writes so polling sees complete updates", function()
+    it("keeps active job state and lifecycle internals behind the active facade", function()
         local context = build_queue()
-        local progress_path = context.queue:buildProgressPath(
-            { id = "m1", title = "Sousou no Frieren" },
-            { id = "398", name = "Official_Vol. 1 Ch. 1" },
-            "/books"
-        )
 
-        context.queue:writeProgressFallback(progress_path, "failed", 0, 1, "", "network timeout")
-
-        assert.are.equal(progress_path .. ".tmp", context.renamed_paths[#context.renamed_paths].from)
-        assert.are.equal(progress_path, context.renamed_paths[#context.renamed_paths].to)
-        assert.are.equal("state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n", context.progress_files[progress_path])
-        assert.is_nil(context.progress_files[progress_path .. ".tmp"])
+        assert.is_nil(rawget(context.queue, "active_jobs"))
+        assert.is_function(context.queue.getActiveCount)
+        assert.is_function(context.queue.getActiveJob)
+        assert.is_function(context.queue.setActiveJob)
+        assert.is_function(context.queue.removeActiveJob)
+        assert.is_function(context.queue.schedulePoll)
+        assert.is_function(context.queue.process)
+        assert.is_function(context.queue.poll)
+        assert.is_nil(context.queue.writeProgressFallback)
+        assert.is_nil(context.queue.runDownloaderJob)
+        assert.is_nil(context.queue.finishActiveWithFailure)
+        assert.is_nil(context.queue.readProgress)
     end)
 
     it("uses the human chapter number in failure messages when available", function()

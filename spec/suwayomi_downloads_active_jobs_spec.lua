@@ -299,6 +299,22 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.equal(1, #context.scheduled)
     end)
 
+    it("uses atomic progress writes so polling sees complete updates", function()
+        local context = build_queue()
+        local progress_path = context.queue:buildProgressPath(
+            { id = "m1", title = "Sousou no Frieren" },
+            { id = "398", name = "Official_Vol. 1 Ch. 1" },
+            "/books"
+        )
+
+        context.queue.active_job_lifecycle:writeProgressFallback(progress_path, "failed", 0, 1, "", "network timeout")
+
+        assert.are.equal(progress_path .. ".tmp", context.renamed_paths[#context.renamed_paths].from)
+        assert.are.equal(progress_path, context.renamed_paths[#context.renamed_paths].to)
+        assert.are.equal("state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n", context.progress_files[progress_path])
+        assert.is_nil(context.progress_files[progress_path .. ".tmp"])
+    end)
+
     it("persists initial progress without runtime-only fields when a queued job becomes active", function()
         local context = build_queue({
             subprocess_done = false,

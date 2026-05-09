@@ -55,13 +55,11 @@ function DownloadQueue:new(options)
         getCredentials = options.getCredentials,
         items = {},
         statuses = {},
-        active_jobs = {},
         max_active_chapters = self:normalizeActiveChapterLimit(options.max_active_chapters),
     }
     setmetatable(queue, self)
     queue.active_job_lifecycle = options.active_job_lifecycle or ActiveJobs:new{
         queue = queue,
-        jobs = queue.active_jobs,
     }
     queue.job_store = options.job_store or JobStore:new{
         settings = queue.settings,
@@ -161,9 +159,7 @@ function DownloadQueue:getSnapshot()
         failed = {},
     }
 
-    for _, job in pairs(self.active_jobs or {}) do
-        table.insert(snapshot.active, self:copySnapshotJob(job, "downloading"))
-    end
+    self.active_job_lifecycle:appendSnapshotJobs(snapshot)
 
     for _, job in ipairs(self.items or {}) do
         table.insert(snapshot.queued, self:copySnapshotJob(job, "queued"))
@@ -284,11 +280,6 @@ end
 function DownloadQueue:cancelQueued()
     local canceled_keys = {}
     local remaining_items = {}
-    local active_keys = {}
-
-    for key in pairs(self.active_jobs or {}) do
-        active_keys[key] = true
-    end
 
     for _, item in ipairs(self.items or {}) do
         local key = item.key or self:getKey(item.manga or {}, item.chapter or {})
@@ -303,7 +294,7 @@ function DownloadQueue:cancelQueued()
     local remaining_jobs = {}
     for _, job in ipairs(self:loadPersistentJobs()) do
         local key = job.key or self:getKey(job.manga or {}, job.chapter or {})
-        if job.state == "queued" and not active_keys[key] then
+        if job.state == "queued" and not self:getActiveJob(key) then
             if key and key ~= "" then
                 canceled_keys[key] = true
             end
@@ -359,10 +350,6 @@ end
 
 function DownloadQueue:formatFailureMessage(manga, chapter, detail)
     return StatusFormatter.formatFailureMessage(manga, chapter, detail, self:getKey(manga or {}, chapter or {}))
-end
-
-function DownloadQueue:readProgress(progress_path)
-    return ProgressFile.read(progress_path)
 end
 
 function DownloadQueue:cleanupInterruptedDownload(job)
@@ -576,20 +563,8 @@ function DownloadQueue:getCredentialsForJob()
     return self.settings and self.settings.load and self.settings:load() or {}
 end
 
-function DownloadQueue:writeProgressFallback(progress_path, state, current, total, path, error_message)
-    return self.active_job_lifecycle:writeProgressFallback(progress_path, state, current, total, path, error_message)
-end
-
-function DownloadQueue:runDownloaderJob(queued)
-    return self.active_job_lifecycle:runDownloaderJob(queued)
-end
-
 function DownloadQueue:process()
     return self.active_job_lifecycle:process()
-end
-
-function DownloadQueue:finishActiveWithFailure(active, message)
-    return self.active_job_lifecycle:finishWithFailure(active, message)
 end
 
 function DownloadQueue:poll()

@@ -40,6 +40,12 @@ function ActiveJobs:removeJob(job)
     self.jobs[job.key or self.queue:getKey(job.manga, job.chapter)] = nil
 end
 
+function ActiveJobs:appendSnapshotJobs(snapshot)
+    for _, job in pairs(self.jobs or {}) do
+        table.insert(snapshot.active, self.queue:copySnapshotJob(job, "downloading"))
+    end
+end
+
 function ActiveJobs:schedulePoll()
     if self.poll_scheduled or self:getCount() == 0 then
         return
