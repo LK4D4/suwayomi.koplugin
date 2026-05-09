@@ -1,15 +1,15 @@
 --[[
 BrowseController
-Responsibility: Owns source filtering/cache, source fetch worker polling, and Browse entry flow.
+Responsibility: Composes source catalog methods, owns source fetch worker polling, and coordinates Browse entry flow.
 Owned state: Accepts source data from Suwayomi API and worker result files, so boundary code validates table shapes before rendering.
 Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
 External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 ]]
 
 local UIManager = require("ui/uimanager")
+local SuwayomiSourceCatalog = require("suwayomi/browse/source_catalog")
 local SuwayomiSourceFetchWorker = require("suwayomi/browse/source_fetch_worker")
 local SuwayomiSettings = require("suwayomi/settings")
-local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
@@ -28,6 +28,10 @@ end
 
 local Methods = {}
 
+for name, method in pairs(SuwayomiSourceCatalog.methods) do
+    Methods[name] = method
+end
+
 function Methods:getSourceFetchResultPath()
     local settings_dir = SuwayomiSettings.getSettingsDir and SuwayomiSettings:getSettingsDir() or "."
     self.source_fetch_result_counter = (self.source_fetch_result_counter or 0) + 1
@@ -37,124 +41,6 @@ function Methods:getSourceFetchResultPath()
         .. "_"
         .. tostring(self.source_fetch_result_counter)
         .. ".json"
-end
-
-
-function Methods:sourceMatchesBrowseSettings(source, selected_languages, browse_settings)
-    if source.lang ~= "localsourcelang" and not selected_languages[source.lang] then
-        return false
-    end
-    if source.is_nsfw == true and not browse_settings.show_nsfw_sources then
-        return false
-    end
-    return true
-end
-
-
-function Methods:filterSourcesByLanguage(sources)
-    local selected = self:buildSourceLanguageSet(SuwayomiSettings:loadSourceLanguages())
-    local browse_settings = self:loadBrowseSettings()
-    local filtered = {}
-
-    for _, source in ipairs(sources or {}) do
-        if self:sourceMatchesBrowseSettings(source, selected, browse_settings) then
-            table.insert(filtered, source)
-        end
-    end
-
-    return filtered
-end
-
-
-function Methods:loadSourceCache(credentials)
-    if not SuwayomiSettings.loadSourceCache then
-        return nil
-    end
-    return SuwayomiSettings:loadSourceCache(credentials and credentials.server_url or "")
-end
-
-
-function Methods:saveSourceCache(credentials, sources)
-    if not SuwayomiSettings.saveSourceCache then
-        return nil
-    end
-    return SuwayomiSettings:saveSourceCache(credentials and credentials.server_url or "", sources or {}, os.time())
-end
-
-
-function Methods:showSourceList(sources, options)
-    options = options or {}
-    local function buildSourceMenuOptions()
-        local menu_options = self:getHomeMenuOptions() or {}
-        menu_options.on_global_search = function()
-            return self:getClient():showGlobalSearch(sources)
-        end
-        return menu_options
-    end
-
-    if not options.force_new and self.current_sources_menu and SuwayomiUI.updateSourcesMenu then
-        SuwayomiUI.updateSourcesMenu(self.current_sources_menu, sources, function(source)
-            self:showMangaForSource(source)
-        end, buildSourceMenuOptions())
-        return self.current_sources_menu
-    end
-
-    self.current_sources_menu = SuwayomiUI.showSourcesMenu(sources, function(source)
-        self:showMangaForSource(source)
-    end, buildSourceMenuOptions())
-    return self.current_sources_menu
-end
-
-
-function Methods:showFetchedSources(result, options)
-    options = options or {}
-    if not result then
-        if not options.silent then
-            self:showMessage(_("Could not load Suwayomi sources."))
-        end
-        return
-    end
-    if not result.ok then
-        if not options.silent then
-            self:showMessage(_(result.error or "Could not load Suwayomi sources."))
-        end
-        return
-    end
-
-    self:saveSourceCache(options.credentials, result.sources)
-    local filtered_sources = self:filterSourcesByLanguage(result.sources)
-    SuwayomiDebug.log({
-        operation = "browseSuwayomi",
-        event = options.refresh and "sources_refreshed" or "sources_loaded",
-        source_count = #(result.sources or {}),
-        filtered_source_count = #filtered_sources,
-    })
-    if #filtered_sources == 0 then
-        if not options.silent then
-            self:showMessage(_("No Suwayomi sources match the selected languages."))
-        end
-        return
-    end
-
-    self:showSourceList(filtered_sources)
-end
-
-
-function Methods:showCachedSources(cache)
-    local filtered_sources = self:filterSourcesByLanguage(cache and cache.sources or {})
-    SuwayomiDebug.log({
-        operation = "browseSuwayomi",
-        event = "source_cache_hit",
-        source_count = #(cache and cache.sources or {}),
-        filtered_source_count = #filtered_sources,
-        cache_age_seconds = math.max(0, os.time() - (tonumber(cache and cache.updated_at) or os.time())),
-    })
-    if #filtered_sources == 0 then
-        return false
-    end
-
-    self:showSourceList(filtered_sources, { force_new = true })
-    return true
 end
 
 
@@ -288,11 +174,6 @@ function Methods:browseSuwayomi()
 
         self:startSourceFetchWorker(credentials, { credentials = credentials })
     end)
-end
-
-
-function Methods:showMangaForSource(source)
-    return self:getClient():showMangaForSource(source)
 end
 
 
