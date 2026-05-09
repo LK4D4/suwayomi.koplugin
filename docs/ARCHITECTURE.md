@@ -112,5 +112,8 @@ Use the same checks as CI:
 
 ```bash
 PATH="$HOME/.luarocks/bin:$PATH" busted spec
-PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes .
+PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes spec suwayomi main.lua _meta.lua
 ```
+
+The Luacheck command covers project Lua parsing/linting while avoiding generated
+dependency directories such as `.lua` and `.luarocks`.
