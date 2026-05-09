@@ -10,6 +10,7 @@ local SuwayomiDebug = require("suwayomi/debug")
 local HomeController = require("suwayomi/plugin/home")
 local SettingsController = require("suwayomi/plugin/settings_controller")
 local BrowseController = require("suwayomi/browse/controller")
+local DownloadsDirectory = require("suwayomi/downloads/directory")
 local MangaController = require("suwayomi/manga/controller")
 local ChapterContext = require("suwayomi/chapters/context")
 local ChapterMenu = require("suwayomi/chapters/menu")
@@ -133,6 +134,7 @@ local CONTROLLER_MODULES = {
     HomeController,
     SettingsController,
     BrowseController,
+    DownloadsDirectory,
     MangaController,
     ChapterContext,
     ChapterMenu,

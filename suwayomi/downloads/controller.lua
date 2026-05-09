@@ -331,13 +331,10 @@ function Methods:keepNextUnreadChaptersDownloaded(limit)
     end
 
     local manga = self.current_chapter_context.manga
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        SuwayomiUI.showDirectoryChooser(function(path)
-            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+    local download_directory = self:getDownloadDirectoryOrChoose(function()
             self:keepNextUnreadChaptersDownloaded(limit)
-        end, self:getDownloadDirectoryChooserStartDir())
+    end)
+    if not download_directory then
         return 0
     end
 

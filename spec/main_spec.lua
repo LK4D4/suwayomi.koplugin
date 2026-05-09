@@ -167,6 +167,7 @@ describe("suwayomi plugin", function()
         package.loaded["suwayomi/plugin/home"] = nil
         package.loaded["suwayomi/plugin/settings_controller"] = nil
         package.loaded["suwayomi/browse/controller"] = nil
+        package.loaded["suwayomi/downloads/directory"] = nil
         package.loaded["suwayomi/manga/controller"] = nil
         package.loaded["suwayomi/chapters/context"] = nil
         package.loaded["suwayomi/chapters/menu"] = nil
