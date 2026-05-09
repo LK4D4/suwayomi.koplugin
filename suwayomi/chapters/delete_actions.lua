@@ -1,10 +1,9 @@
---[[
-ChapterDeleteActions
-Responsibility: Delete device-local chapter archives and coordinate queue/ledger cleanup.
-Owned state: Mutates plugin queue status and settings-backed read ledger through injected plugin methods.
-Dependencies: Plugin mixin methods, local download helpers, and gettext.
-External data: Queue state, ledger entries, and filesystem paths are checked before destructive cleanup.
-]]
+-- Boundary: ChapterDeleteActions.
+--
+-- Responsibility: Delete device-local chapter archives and coordinate queue/ledger cleanup.
+-- Owned state: Mutates plugin queue status and settings-backed read ledger through injected plugin methods.
+-- Dependencies: Plugin mixin methods, local download helpers, and gettext.
+-- External data: Queue state, ledger entries, and filesystem paths are checked before destructive cleanup.
 
 local _ = require("gettext")
 

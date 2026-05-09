@@ -1,10 +1,9 @@
---[[
-ChapterMenu
-Responsibility: Owns chapter row, action, bulk action, and quick-refresh menu construction.
-Owned state: Builds UI data structures and callbacks; destructive actions remain in suwayomi/chapters/actions.lua.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: ChapterMenu.
+--
+-- Responsibility: Owns chapter row, action, bulk action, and quick-refresh menu construction.
+-- Owned state: Builds UI data structures and callbacks; destructive actions remain in suwayomi/chapters/actions.lua.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")

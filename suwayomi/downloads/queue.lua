@@ -1,3 +1,14 @@
+-- Boundary: public device-local download queue facade.
+--
+-- Responsibility: enqueue, retry, cancel, recover, snapshot, and format status
+-- while delegating persistence and active worker lifecycle to focused modules.
+-- Owned state: pending queue items, chapter status map, active lifecycle
+-- controller, and settings-backed job store.
+-- Dependencies: settings, downloader, UI manager, subprocess helpers, progress
+-- files, status formatter, clock, credentials callback, and optional callbacks.
+-- External data: queue settings, manga/chapter tables, progress files, and
+-- worker results are normalized before callers see snapshots.
+
 local _ = require("gettext")
 local ActiveJobs = require("suwayomi/downloads/active_jobs")
 local JobStore = require("suwayomi/downloads/job_store")
@@ -6,21 +17,6 @@ local StatusFormatter = require("suwayomi/downloads/status_formatter")
 
 local DownloadQueue = {}
 DownloadQueue.__index = DownloadQueue
-
--- Boundary: public device-local download queue facade.
---
--- Queue states are persisted as "queued", "downloading", "downloaded",
--- "skipped", or "failed". Persisted jobs keep only serializable manga/chapter
--- metadata plus progress/recovery details; runtime-only downloader credentials,
--- callbacks, process ids, and active worker objects stay in memory.
---
--- Active jobs are launched from queued persisted jobs, polled through hidden
--- progress files, then reconciled back into settings so KOReader restarts can
--- recover interrupted work without server-side Suwayomi download mutations.
---
--- Dependencies are injected by the plugin shell: settings, downloader,
--- ui_manager, ffi_util subprocess helpers, credentials callback, clock, and
--- debug/message/status callbacks.
 
 DownloadQueue.POLL_INTERVAL_SECONDS = 0.5
 DownloadQueue.WATCHDOG_TIMEOUT_SECONDS = 30 * 60

@@ -1,10 +1,9 @@
---[[
-MangaController
-Responsibility: Owns manga-level actions, library add/remove, chapter refresh, and first-unread selection.
-Owned state: Coordinates API/client calls but leaves chapter row/menu state to chapter modules.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: MangaController.
+--
+-- Responsibility: Owns manga-level actions, library add/remove, chapter refresh, and first-unread selection.
+-- Owned state: Coordinates API/client calls but leaves chapter row/menu state to chapter modules.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local SuwayomiAPI = require("suwayomi/api")
 local SuwayomiSettings = require("suwayomi/settings")

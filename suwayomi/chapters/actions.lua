@@ -1,10 +1,9 @@
---[[
-ChapterActions
-Responsibility: Public chapter action facade composed from focused action modules plus remaining download/bulk orchestration.
-Owned state: State stays on the plugin instance so KOReader callbacks keep stable method names and return values.
-Dependencies: Focused chapter action modules, KOReader UI helpers, settings, debug timing, and gettext.
-External data: API responses, settings values, queue status, worker files, and filesystem paths remain untrusted at module boundaries.
-]]
+-- Boundary: ChapterActions.
+--
+-- Responsibility: Public chapter action facade composed from focused action modules plus remaining download/bulk orchestration.
+-- Owned state: State stays on the plugin instance so KOReader callbacks keep stable method names and return values.
+-- Dependencies: Focused chapter action modules, KOReader UI helpers, settings, debug timing, and gettext.
+-- External data: API responses, settings values, queue status, worker files, and filesystem paths remain untrusted at module boundaries.
 
 local ChapterDeleteActions = require("suwayomi/chapters/delete_actions")
 local ChapterLocalDownloads = require("suwayomi/chapters/local_downloads")

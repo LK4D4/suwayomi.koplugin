@@ -1,10 +1,9 @@
---[[
-ChapterLocalDownloads
-Responsibility: Resolve device-local chapter archive paths and remove local archive sidecars.
-Owned state: None; settings and downloader modules remain the source of truth.
-Dependencies: Suwayomi settings and downloader path helpers.
-External data: Download directory, manga/chapter metadata, and filesystem paths are treated as untrusted boundary inputs.
-]]
+-- Boundary: ChapterLocalDownloads.
+--
+-- Responsibility: Resolve device-local chapter archive paths and remove local archive sidecars.
+-- Owned state: None; settings and downloader modules remain the source of truth.
+-- Dependencies: Suwayomi settings and downloader path helpers.
+-- External data: Download directory, manga/chapter metadata, and filesystem paths are treated as untrusted boundary inputs.
 
 local SuwayomiSettings = require("suwayomi/settings")
 

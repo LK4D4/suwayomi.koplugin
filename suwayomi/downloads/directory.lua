@@ -1,10 +1,9 @@
---[[
-DownloadsDirectory
-Responsibility: Owns the shared download-directory chooser, persistence, summary, and retry callback flow.
-Owned state: Persists only through suwayomi/settings.lua; callbacks execute on plugin instances.
-Dependencies: KOReader UI helpers, settings, filesystem probing, and gettext.
-External data: Settings values, selected paths, and filesystem paths remain untrusted until checked locally.
-]]
+-- Boundary: DownloadsDirectory.
+--
+-- Responsibility: Owns the shared download-directory chooser, persistence, summary, and retry callback flow.
+-- Owned state: Persists only through suwayomi/settings.lua; callbacks execute on plugin instances.
+-- Dependencies: KOReader UI helpers, settings, filesystem probing, and gettext.
+-- External data: Settings values, selected paths, and filesystem paths remain untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
 local SuwayomiSettings = require("suwayomi/settings")

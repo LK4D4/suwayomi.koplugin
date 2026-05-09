@@ -1,10 +1,9 @@
---[[
-ChapterContext
-Responsibility: Owns chapter context, selection, filtering, status formatting, and ledger merge helpers.
-Owned state: State lives on the plugin instance so KOReader callbacks keep the same behavior during the extraction.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: ChapterContext.
+--
+-- Responsibility: Owns chapter context, selection, filtering, status formatting, and ledger merge helpers.
+-- Owned state: State lives on the plugin instance so KOReader callbacks keep the same behavior during the extraction.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local SuwayomiAPI = require("suwayomi/api")
 local SuwayomiSettings = require("suwayomi/settings")

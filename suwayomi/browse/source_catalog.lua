@@ -1,10 +1,9 @@
---[[
-SourceCatalog
-Responsibility: Owns Browse source filtering, source cache IO, and source list rendering.
-Owned state: Reuses plugin-bound controller state such as current_sources_menu.
-Dependencies: KOReader UI helpers, Suwayomi settings/debug modules, and gettext are resolved when methods run so tests can swap runtime stubs.
-External data: API responses, cached source tables, and settings values are treated as untrusted until filtered locally.
-]]
+-- Boundary: SourceCatalog.
+--
+-- Responsibility: Owns Browse source filtering, source cache IO, and source list rendering.
+-- Owned state: Reuses plugin-bound controller state such as current_sources_menu.
+-- Dependencies: KOReader UI helpers, Suwayomi settings/debug modules, and gettext are resolved when methods run so tests can swap runtime stubs.
+-- External data: API responses, cached source tables, and settings values are treated as untrusted until filtered locally.
 
 local SourceCatalog = {}
 local Methods = {}

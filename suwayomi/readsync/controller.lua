@@ -1,10 +1,9 @@
---[[
-ReadSyncController
-Responsibility: Owns read-sync worker scheduling, result application, manual sync, and document-close sync.
-Owned state: Coordinates ledger, KOReader metadata, downloads cleanup, and subprocess result files.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: ReadSyncController.
+--
+-- Responsibility: Owns read-sync worker scheduling, result application, manual sync, and document-close sync.
+-- Owned state: Coordinates ledger, KOReader metadata, downloads cleanup, and subprocess result files.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
 local SuwayomiReadSyncWorker = require("suwayomi/readsync/worker")

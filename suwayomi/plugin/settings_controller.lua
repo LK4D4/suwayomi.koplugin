@@ -1,10 +1,9 @@
---[[
-SettingsController
-Responsibility: Owns settings menu orchestration and settings dialogs.
-Owned state: Accepts persisted settings values and user-selected filesystem paths; values stay normalized through suwayomi/settings.lua.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: SettingsController.
+--
+-- Responsibility: Owns settings menu orchestration and settings dialogs.
+-- Owned state: Accepts persisted settings values and user-selected filesystem paths; values stay normalized through suwayomi/settings.lua.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
 local SuwayomiSettings = require("suwayomi/settings")

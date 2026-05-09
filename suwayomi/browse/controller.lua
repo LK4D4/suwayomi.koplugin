@@ -1,10 +1,9 @@
---[[
-BrowseController
-Responsibility: Composes source catalog methods, owns source fetch worker polling, and coordinates Browse entry flow.
-Owned state: Accepts source data from Suwayomi API and worker result files, so boundary code validates table shapes before rendering.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: BrowseController.
+--
+-- Responsibility: Composes source catalog methods, owns source fetch worker polling, and coordinates Browse entry flow.
+-- Owned state: Accepts source data from Suwayomi API and worker result files, so boundary code validates table shapes before rendering.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
 local SuwayomiSourceCatalog = require("suwayomi/browse/source_catalog")

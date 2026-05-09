@@ -1,10 +1,9 @@
---[[
-HomeController
-Responsibility: Owns the plugin home dialog, main-menu entry, and generic KOReader message/loading helpers.
-Owned state: Plugin UI state only; it does not own persisted settings or network state.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: HomeController.
+--
+-- Responsibility: Owns the plugin home dialog, main-menu entry, and generic KOReader message/loading helpers.
+-- Owned state: Plugin UI state only; it does not own persisted settings or network state.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
