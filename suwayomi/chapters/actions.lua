@@ -54,6 +54,10 @@ function Methods:openChapter(manga, chapter)
         return false
     end
 
+    if self.saveReaderReturnContext then
+        self:saveReaderReturnContext(manga, chapter, chapter_path)
+    end
+
     if ReaderUI.instance and ReaderUI.instance.switchDocument then
         ReaderUI.instance:switchDocument(chapter_path)
     elseif ReaderUI.showReader then

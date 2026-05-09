@@ -286,4 +286,24 @@ describe("suwayomi/settings", function()
         assert.is_true(flushed)
         assert.are.same(ledger, stored_data.chapter_ledger)
     end)
+
+    it("loads and saves reader return contexts by chapter path", function()
+        local settings = require("suwayomi/settings")
+        local contexts = {
+            ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                path = "/downloads/Local/Manga/Chapter 1.cbz",
+                manga_id = "m1",
+                manga_title = "Manga",
+                chapter_id = "c1",
+                chapter_name = "Chapter 1",
+                source = { id = "local", name = "Local source" },
+            },
+        }
+
+        settings:saveReaderReturnContexts(contexts)
+
+        assert.is_true(flushed)
+        assert.are.same(contexts, stored_data.reader_return_contexts)
+        assert.are.same(contexts, settings:loadReaderReturnContexts())
+    end)
 end)

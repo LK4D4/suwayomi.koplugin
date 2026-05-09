@@ -12,6 +12,7 @@ local _ = require("gettext")
 
 local HomeController = {}
 HomeController.__index = HomeController
+local READER_RETURN_MENU_ID = "suwayomi_reader_return"
 
 -- Controllers expose new(deps) for a consistent boundary; methods remain plugin-bound mixins so this refactor can move code without changing callback behavior.
 function HomeController:new(deps)
@@ -22,6 +23,20 @@ function HomeController:new(deps)
 end
 
 local Methods = {}
+
+local function ensureReaderReturnMenuOrder()
+    local ok, reader_menu_order = pcall(require, "ui/elements/reader_menu_order")
+    local main_order = ok and reader_menu_order and reader_menu_order.main or nil
+    if type(main_order) ~= "table" then
+        return
+    end
+    for _, item_id in ipairs(main_order) do
+        if item_id == READER_RETURN_MENU_ID then
+            return
+        end
+    end
+    table.insert(main_order, 1, READER_RETURN_MENU_ID)
+end
 
 function Methods:showNotImplemented(message)
     self:showMessage(message)
@@ -204,6 +219,21 @@ end
 
 
 function Methods:addToMainMenu(menu_items)
+    if self:isBookMode() then
+        local context = self.getCurrentReaderReturnContext and self:getCurrentReaderReturnContext() or nil
+        if context then
+            ensureReaderReturnMenuOrder()
+            menu_items[READER_RETURN_MENU_ID] = {
+                text = _("Back to Suwayomi chapters"),
+                sorting_hint = "main",
+                callback = function()
+                    self:returnToSuwayomiChapters()
+                end,
+            }
+        end
+        return
+    end
+
     menu_items.suwayomi_dl = {
         text = _("Suwayomi"),
         sorting_hint = "search",

@@ -39,22 +39,22 @@ describe("suwayomi plugin", function()
         assert.is_nil(runtime.registered_actions[1].definition.general)
     end)
 
-    it("does not register a main-menu entry when initialized in book mode", function()
+    it("registers a conditional reader-menu entry when initialized in book mode", function()
         local plugin = build_plugin({
             ui = {
-                document = {},
+                document = { file = "/downloads/Local/Manga/Chapter 1.cbz" },
                 menu = {
                     registerToMainMenu = function(_, instance)
                         runtime.registered_menu_plugin = instance
                     end,
                 },
             },
-            document = {},
+            document = { file = "/downloads/Local/Manga/Chapter 1.cbz" },
         })
 
         plugin:init()
 
-        assert.is_nil(runtime.registered_menu_plugin)
+        assert.are.equal(plugin, runtime.registered_menu_plugin)
     end)
 
     it("adds the plugin under the search menu section and opens the Suwayomi hub", function()
@@ -78,6 +78,86 @@ describe("suwayomi plugin", function()
         assert.are.equal("Sync", runtime.shown_home_dialog.actions[4].text)
         assert.are.equal("Settings", runtime.shown_home_dialog.actions[5].text)
         assert.are.equal("Close plugin", runtime.shown_home_dialog.actions[6].text)
+    end)
+
+    it("adds only the reader return action in book mode when the document is from Suwayomi", function()
+        runtime_helper.teardown()
+        runtime = runtime_helper.install({
+            reader_return_contexts = {
+                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Manga",
+                    chapter_id = "c1",
+                    chapter_name = "Chapter 1",
+                },
+            },
+        })
+        local menu_items = {}
+        local plugin = build_plugin({
+            ui = {
+                document = { file = "/downloads/Local/Manga/Chapter 1.cbz" },
+            },
+            document = { file = "/downloads/Local/Manga/Chapter 1.cbz" },
+            returnToSuwayomiChapters = function(self)
+                self.returned_to_chapters = true
+            end,
+        })
+
+        plugin:addToMainMenu(menu_items)
+
+        assert.is_nil(menu_items.suwayomi_dl)
+        assert.is_table(menu_items.suwayomi_reader_return)
+        assert.are.equal("Back to Suwayomi chapters", menu_items.suwayomi_reader_return.text)
+        assert.are.equal("main", menu_items.suwayomi_reader_return.sorting_hint)
+        assert.are.equal("suwayomi_reader_return", runtime.reader_menu_order.main[1])
+        assert.are.equal("history", runtime.reader_menu_order.main[2])
+
+        menu_items.suwayomi_reader_return.callback()
+
+        assert.is_true(plugin.returned_to_chapters)
+    end)
+
+    it("does not duplicate the reader return action in the reader menu order", function()
+        runtime_helper.teardown()
+        runtime = runtime_helper.install({
+            reader_return_contexts = {
+                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                },
+            },
+            reader_menu_order = {
+                main = { "suwayomi_reader_return", "history" },
+            },
+        })
+        local plugin = build_plugin({
+            ui = {
+                document = { file = "/downloads/Local/Manga/Chapter 1.cbz" },
+            },
+            document = { file = "/downloads/Local/Manga/Chapter 1.cbz" },
+        })
+
+        plugin:addToMainMenu({})
+
+        assert.are.equal("suwayomi_reader_return", runtime.reader_menu_order.main[1])
+        assert.are.equal("history", runtime.reader_menu_order.main[2])
+        assert.is_nil(runtime.reader_menu_order.main[3])
+    end)
+
+    it("does not add a reader menu item for non-Suwayomi books", function()
+        local menu_items = {}
+        local plugin = build_plugin({
+            ui = {
+                document = { file = "/books/Other.cbz" },
+            },
+            document = { file = "/books/Other.cbz" },
+        })
+
+        plugin:addToMainMenu(menu_items)
+
+        assert.is_nil(menu_items.suwayomi_dl)
+        assert.is_nil(menu_items.suwayomi_reader_return)
     end)
 
     it("constructs the client lazily and reuses it", function()
@@ -163,6 +243,7 @@ describe("suwayomi plugin", function()
         local controllers = {
             require("suwayomi/plugin/home"),
             require("suwayomi/plugin/settings_controller"),
+            require("suwayomi/reader_return"),
             require("suwayomi/browse/controller"),
             require("suwayomi/downloads/directory"),
             require("suwayomi/manga/controller"),

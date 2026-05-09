@@ -14,6 +14,7 @@ local MODULES_TO_CLEAR = {
     "ui/uimanager",
     "ui/widget/infomessage",
     "ui/widget/container/widgetcontainer",
+    "ui/elements/reader_menu_order",
     "suwayomi/api",
     "suwayomi/client",
     "suwayomi/downloads/queue",
@@ -30,6 +31,7 @@ local MODULES_TO_CLEAR = {
     "suwayomi/debug",
     "suwayomi/plugin/home",
     "suwayomi/plugin/settings_controller",
+    "suwayomi/reader_return",
     "suwayomi/browse/source_catalog",
     "suwayomi/browse/controller",
     "suwayomi/downloads/directory",
@@ -80,6 +82,9 @@ function Helper.install(options)
         debug_events = {},
         api_debug_logger = nil,
         closed_widgets = {},
+        reader_menu_order = options.reader_menu_order or {
+            main = { "history", "open_previous_document" },
+        },
     }
 
     package.preload.dispatcher = function()
@@ -250,6 +255,13 @@ function Helper.install(options)
             saveChapterLedger = function(_, ledger)
                 return ledger
             end,
+            loadReaderReturnContexts = function()
+                return options.reader_return_contexts or {}
+            end,
+            saveReaderReturnContexts = function(_, contexts)
+                options.reader_return_contexts = contexts
+                return contexts
+            end,
         }
     end
 
@@ -259,6 +271,10 @@ function Helper.install(options)
                 table.insert(state.debug_events, event)
             end,
         }
+    end
+
+    package.preload["ui/elements/reader_menu_order"] = function()
+        return state.reader_menu_order
     end
 
     package.preload.datastorage = function()
