@@ -125,6 +125,7 @@ describe("suwayomi/chapters/actions", function()
             current_chapter_context = options.current_chapter_context,
             queue = queue,
             ledger = ledger,
+            reader_return_contexts = {},
             messages = {},
             refreshes = {},
             saved_ledgers = {},
@@ -180,6 +181,13 @@ describe("suwayomi/chapters/actions", function()
             end,
             applyKeepNextUnreadDownloadsPolicy = function(self)
                 self.keep_policy_count = self.keep_policy_count + 1
+            end,
+            saveReaderReturnContext = function(self, target_manga, target_chapter, chapter_path)
+                table.insert(self.reader_return_contexts, {
+                    manga = target_manga,
+                    chapter = target_chapter,
+                    path = chapter_path,
+                })
             end,
             getChaptersBefore = function(_, selected)
                 return options.chapters_before or { selected }
@@ -282,6 +290,32 @@ describe("suwayomi/chapters/actions", function()
         assert.is_false(ok)
         assert.are.equal("queued", state)
         assert.are.same({ "This chapter is not downloaded." }, plugin.messages)
+    end)
+
+    it("saves reader return context before opening a downloaded chapter", function()
+        local opened_paths = {}
+        package.preload["apps/reader/readerui"] = function()
+            return {
+                showReader = function(_, path)
+                    table.insert(opened_paths, path)
+                end,
+            }
+        end
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+        })
+
+        assert.is_true(plugin:openChapter(manga, chapter))
+
+        assert.are.same({ "/downloads/Manga/Chapter 1.cbz" }, opened_paths)
+        assert.are.equal(1, #plugin.reader_return_contexts)
+        assert.are.equal(manga, plugin.reader_return_contexts[1].manga)
+        assert.are.equal(chapter, plugin.reader_return_contexts[1].chapter)
+        assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.reader_return_contexts[1].path)
+        package.preload["apps/reader/readerui"] = nil
+        package.loaded["apps/reader/readerui"] = nil
     end)
 
     it("deletes archives, clears queue status, and removes unread ledger entries", function()

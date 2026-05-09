@@ -251,4 +251,13 @@ function SuwayomiSettings:saveChapterLedger(ledger)
     return ledger or {}
 end
 
+function SuwayomiSettings:loadReaderReturnContexts()
+    return self:open():readSetting("reader_return_contexts", {})
+end
+
+function SuwayomiSettings:saveReaderReturnContexts(contexts)
+    self:open():saveSetting("reader_return_contexts", contexts or {}):flush()
+    return contexts or {}
+end
+
 return SuwayomiSettings

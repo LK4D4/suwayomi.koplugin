@@ -18,6 +18,7 @@ local SuwayomiNavigation = require("suwayomi/navigation")
 local SuwayomiDebug = require("suwayomi/debug")
 local HomeController = require("suwayomi/plugin/home")
 local SettingsController = require("suwayomi/plugin/settings_controller")
+local ReaderReturn = require("suwayomi/reader_return")
 local BrowseController = require("suwayomi/browse/controller")
 local DownloadsDirectory = require("suwayomi/downloads/directory")
 local MangaController = require("suwayomi/manga/controller")
@@ -171,7 +172,7 @@ function SuwayomiPlugin:init()
     self.selected_chapters = self.selected_chapters or {}
     self.selection_mode = self.selection_mode == true
     self:getDownloadQueue():recover()
-    if not self:isBookMode() then
+    if self.ui and self.ui.menu then
         self.ui.menu:registerToMainMenu(self)
     end
     SuwayomiDebug.log({ operation = "plugin_init", event = "end" })
@@ -181,6 +182,7 @@ end
 local CONTROLLER_MODULES = {
     HomeController,
     SettingsController,
+    ReaderReturn,
     BrowseController,
     DownloadsDirectory,
     MangaController,
