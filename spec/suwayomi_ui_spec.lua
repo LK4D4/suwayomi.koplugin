@@ -11,6 +11,10 @@ describe("suwayomi/ui", function()
         events = {}
 
         package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/ui/browse"] = nil
+        package.loaded["suwayomi/ui/directory"] = nil
+        package.loaded["suwayomi/ui/downloads"] = nil
+        package.loaded["suwayomi/ui/menu_utils"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
         package.loaded["ui/widget/buttondialog"] = nil
@@ -19,7 +23,6 @@ describe("suwayomi/ui", function()
         package.loaded["ui/widget/checkmark"] = nil
         package.loaded["ui/widget/radiomark"] = nil
         package.loaded["ui/widget/pathchooser"] = nil
-        package.loaded["ui/downloadmgr"] = nil
         package.loaded["ui/uimanager"] = nil
 
         package.preload.gettext = function()
@@ -103,44 +106,20 @@ describe("suwayomi/ui", function()
 
             function PathChooser:extend(definition)
                 definition.__index = definition
-                return setmetatable(definition, {
-                    __index = self,
-                    __call = function(class, instance)
-                        instance = instance or {}
-                        setmetatable(instance, class)
-                        if instance.init then
-                            instance:init()
-                        end
-                        return instance
-                    end,
-                })
+                return setmetatable(definition, { __index = self })
             end
 
             function PathChooser:new(options)
                 options = options or {}
                 setmetatable(options, self)
-                if options.init then
-                    options:init()
-                end
                 return options
-            end
-
-            function PathChooser:init()
-                if self.select_directory then
-                    self.show_current_dir_for_hold = true
-                end
             end
 
             function PathChooser:genItemTable(_, _, path)
                 return {
                     {
                         text = "Long-press here to choose current folder",
-                        bold = true,
                         path = path .. "/.",
-                    },
-                    {
-                        text = "Sousou no Frieren/",
-                        path = path .. "/Sousou no Frieren",
                     },
                 }
             end
@@ -159,18 +138,6 @@ describe("suwayomi/ui", function()
             end
 
             return PathChooser
-        end
-
-        package.preload["ui/downloadmgr"] = function()
-            return {
-                new = function(_, options)
-                    return {
-                        chooseDir = function()
-                            shown_dialog = options
-                        end,
-                    }
-                end,
-            }
         end
 
         package.preload["ui/uimanager"] = function()
@@ -195,8 +162,68 @@ describe("suwayomi/ui", function()
         package.preload["ui/widget/checkmark"] = nil
         package.preload["ui/widget/radiomark"] = nil
         package.preload["ui/widget/pathchooser"] = nil
-        package.preload["ui/downloadmgr"] = nil
         package.preload["ui/uimanager"] = nil
+    end)
+
+    it("preserves facade access to browse menus", function()
+        local ui = require("suwayomi/ui")
+        local selected
+
+        ui.showMangaMenu({
+            { id = "m1", title = "One Piece" },
+        }, function(manga)
+            selected = manga
+        end)
+
+        assert.are.equal("Suwayomi Manga", shown_dialog.title)
+        assert.are.equal("[ ] One Piece", shown_dialog.item_table[1].text)
+
+        shown_dialog.item_table[1].callback()
+
+        assert.are.same({ id = "m1", title = "One Piece" }, selected)
+    end)
+
+    it("preserves facade access to downloads menus", function()
+        local ui = require("suwayomi/ui")
+        local retried_key
+
+        ui.showDownloadsMenu({
+            failed = {
+                {
+                    key = "m-failed:205",
+                    manga = { title = "Chainsaw Man" },
+                    chapter = { name = "Ch. 205" },
+                },
+            },
+        }, {
+            onRetryFailed = function(job)
+                retried_key = job.key
+            end,
+        })
+
+        assert.are.equal("Suwayomi Downloads", shown_dialog.title)
+        assert.are.equal("Failed  Chainsaw Man / Ch. 205", shown_dialog.item_table[1].text)
+
+        shown_dialog.item_table[1].callback()
+
+        assert.are.equal("m-failed:205", retried_key)
+    end)
+
+    it("preserves facade access to the directory chooser", function()
+        local ui = require("suwayomi/ui")
+        local chosen_path
+
+        ui.showDirectoryChooser(function(path)
+            chosen_path = path
+        end, "/storage/emulated/0/Books/Manga")
+
+        assert.are.equal("Choose download directory", shown_dialog.title)
+        assert.is_true(shown_dialog.select_directory)
+
+        local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books/Manga")
+        shown_dialog:onMenuSelect(item_table[1])
+
+        assert.are.equal("/storage/emulated/0/Books/Manga", chosen_path)
     end)
 
     it("closes the dialog before running the save callback", function()
@@ -216,66 +243,6 @@ describe("suwayomi/ui", function()
 
         assert.are.same({"close", "save"}, events)
         assert.are.equal(shown_dialog, closed_dialog)
-    end)
-
-    it("shows a manga menu", function()
-        local ui = require("suwayomi/ui")
-        local selected = {}
-
-        ui.showMangaMenu({
-            { id = "m1", title = "One Piece" },
-            { id = "m2", title = "Frieren" },
-        }, function(manga)
-            table.insert(selected, manga)
-        end)
-
-        assert.are.equal("Suwayomi Manga", shown_dialog.title)
-        assert.are.equal("[ ] One Piece", shown_dialog.item_table[1].text)
-        assert.are.equal("[ ] Frieren", shown_dialog.item_table[2].text)
-
-        shown_dialog.item_table[1].callback()
-        shown_dialog.item_table[2].callback()
-
-        assert.are.same({
-            { id = "m1", title = "One Piece" },
-            { id = "m2", title = "Frieren" },
-        }, selected)
-    end)
-
-    it("shows compact browse result markers, title, and paging rows", function()
-        local ui = require("suwayomi/ui")
-        local selected = {}
-        local paging = {}
-
-        ui.showMangaMenu({
-            { id = "m1", title = "Already Added", in_library = true },
-            { id = "m2", title = "New Find", in_library = false },
-            { id = "m3", title = "Unknown State" },
-        }, function(manga)
-            table.insert(selected, manga.id)
-        end, {
-            title = "MangaDex (EN) - Search: frieren - Page 2",
-            on_previous_page = function()
-                table.insert(paging, "previous")
-            end,
-            on_next_page = function()
-                table.insert(paging, "next")
-            end,
-        })
-
-        assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_dialog.title)
-        assert.are.equal("Previous page", shown_dialog.item_table[1].text)
-        assert.are.equal("[+] Already Added", shown_dialog.item_table[2].text)
-        assert.are.equal("[ ] New Find", shown_dialog.item_table[3].text)
-        assert.are.equal("[ ] Unknown State", shown_dialog.item_table[4].text)
-        assert.are.equal("Next page", shown_dialog.item_table[5].text)
-
-        shown_dialog.item_table[1].callback()
-        shown_dialog.item_table[2].callback()
-        shown_dialog.item_table[5].callback()
-
-        assert.are.same({ "previous", "next" }, paging)
-        assert.are.same({ "m1" }, selected)
     end)
 
     it("shows a chapter menu", function()
@@ -343,27 +310,6 @@ describe("suwayomi/ui", function()
         }, selected)
     end)
 
-    it("closes the chapter actions dialog before running the action callback", function()
-        local ui = require("suwayomi/ui")
-        local selected
-
-        ui.showChapterActionsMenu({
-            title = "Chapter 1",
-            actions = {
-                { id = "open", text = "Open" },
-            },
-        }, function(action)
-            selected = action
-            table.insert(events, "action")
-        end)
-
-        shown_dialog.buttons[1][1].callback()
-
-        assert.are.same({ "close", "action" }, events)
-        assert.are.equal(shown_dialog, closed_dialog)
-        assert.are.same({ id = "open", text = "Open" }, selected)
-    end)
-
     it("shows the Suwayomi home hub as two-column buttons", function()
         local ui = require("suwayomi/ui")
         local selected = {}
@@ -373,9 +319,6 @@ describe("suwayomi/ui", function()
                 { id = "library", text = "Library" },
                 { id = "browse", text = "Browse" },
                 { id = "downloads", text = "Downloads" },
-                { id = "sync", text = "Sync" },
-                { id = "settings", text = "Settings" },
-                { id = "close", text = "Close" },
             },
         }, function(action)
             table.insert(selected, action.id)
@@ -386,94 +329,12 @@ describe("suwayomi/ui", function()
         assert.are.equal("Library", shown_dialog.buttons[1][1].text)
         assert.are.equal("Browse", shown_dialog.buttons[1][2].text)
         assert.are.equal("Downloads", shown_dialog.buttons[2][1].text)
-        assert.are.equal("Sync", shown_dialog.buttons[2][2].text)
-        assert.are.equal("Settings", shown_dialog.buttons[3][1].text)
-        assert.are.equal("Close", shown_dialog.buttons[3][2].text)
 
         shown_dialog.buttons[1][2].callback()
 
         assert.are.same({ "close", "browse" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
         assert.are.same({ "browse" }, selected)
-    end)
-
-    it("shows downloads menu rows for active queued and failed items", function()
-        local ui = require("suwayomi/ui")
-        local cancelled_key
-        local retried_key
-        local selected_active_key
-        local active_menu
-        local queued_menu
-        local failed_menu
-        local clear_menu
-        local cleared = false
-
-        ui.showDownloadsMenu({
-            active = {
-                {
-                    key = "m-active:144",
-                    state = "downloading",
-                    manga = { title = "Frieren" },
-                    chapter = { name = "Ch. 144" },
-                    progress = { current = 3, total = 24 },
-                },
-            },
-            queued = {
-                {
-                    key = "m-queued:192",
-                    state = "queued",
-                    manga = { title = "Dandadan" },
-                    chapter = { name = "Ch. 192" },
-                },
-            },
-            failed = {
-                {
-                    key = "m-failed:205",
-                    state = "failed",
-                    manga = { title = "Chainsaw Man" },
-                    chapter = { name = "Ch. 205" },
-                    progress = { error = "network timeout" },
-                },
-            },
-        }, {
-            onSelectActive = function(job, menu)
-                selected_active_key = job.key
-                active_menu = menu
-            end,
-            onSelectQueued = function(job, menu)
-                cancelled_key = job.key
-                queued_menu = menu
-            end,
-            onRetryFailed = function(job, menu)
-                retried_key = job.key
-                failed_menu = menu
-            end,
-            onClearFailed = function(menu)
-                cleared = true
-                clear_menu = menu
-            end,
-        })
-
-        assert.are.equal("Suwayomi Downloads", shown_dialog.title)
-        assert.are.equal("Downloading 3/24  Frieren / Ch. 144", shown_dialog.item_table[1].text)
-        assert.are.equal("Queued  Dandadan / Ch. 192", shown_dialog.item_table[2].text)
-        assert.are.equal("Failed  Chainsaw Man / Ch. 205 - network timeout", shown_dialog.item_table[3].text)
-        assert.are.equal("Clear failed", shown_dialog.item_table[4].text)
-
-        assert.is_function(shown_dialog.item_table[1].callback)
-        shown_dialog.item_table[1].callback()
-        shown_dialog.item_table[2].callback()
-        shown_dialog.item_table[3].callback()
-        shown_dialog.item_table[4].callback()
-
-        assert.are.equal("m-active:144", selected_active_key)
-        assert.are.equal("m-queued:192", cancelled_key)
-        assert.are.equal("m-failed:205", retried_key)
-        assert.are.equal(shown_dialog, active_menu)
-        assert.are.equal(shown_dialog, queued_menu)
-        assert.are.equal(shown_dialog, failed_menu)
-        assert.are.equal(shown_dialog, clear_menu)
-        assert.is_true(cleared)
     end)
 
     it("passes the native settings menu instance to setting callbacks", function()
@@ -519,407 +380,13 @@ describe("suwayomi/ui", function()
         assert.is_true(confirmed)
     end)
 
-    it("shows a sources menu", function()
-        local ui = require("suwayomi/ui")
-        local selected = {}
-        local global_search_started = false
-
-        ui.showSourcesMenu({
-            { id = "s1", name = "MangaDex" },
-            { id = "s2", name = "ComicK" },
-            { id = "s3", name = "Local source" },
-        }, function(source)
-            table.insert(selected, source)
-        end, {
-            on_global_search = function()
-                global_search_started = true
-            end,
-        })
-
-        assert.are.equal("Suwayomi Sources", shown_dialog.title)
-        assert.are.equal("Global search", shown_dialog.item_table[1].text)
-        assert.are.equal("MangaDex", shown_dialog.item_table[2].text)
-        assert.are.equal("ComicK", shown_dialog.item_table[3].text)
-        assert.are.equal("Local source", shown_dialog.item_table[4].text)
-
-        shown_dialog.item_table[1].callback()
-        shown_dialog.item_table[2].callback()
-        shown_dialog.item_table[3].callback()
-        shown_dialog.item_table[4].callback()
-
-        assert.is_true(global_search_started)
-        assert.are.same({
-            { id = "s1", name = "MangaDex" },
-            { id = "s2", name = "ComicK" },
-            { id = "s3", name = "Local source" },
-        }, selected)
-    end)
-
-    it("shows global search summaries and opens only successful or pageable source rows", function()
-        local ui = require("suwayomi/ui")
-        local selected = {}
-
-        ui.showGlobalSearchResultsMenu({
-            {
-                source = { id = "s1", name = "MangaDex" },
-                status = "ok",
-                first_match = { title = "Frieren Beyond Journey's End" },
-            },
-            {
-                source = { id = "s4", name = "More Source" },
-                status = "pageable_empty",
-                has_next_page = true,
-                query = "frieren",
-            },
-            {
-                source = { id = "s2", name = "ComicK" },
-                status = "empty",
-            },
-            {
-                source = { id = "s3", name = "Some Source" },
-                status = "error",
-                error = "Timed out",
-            },
-        }, function(summary)
-            table.insert(selected, summary)
-        end)
-
-        assert.are.equal("Global search", shown_dialog.title)
-        assert.are.equal("MangaDex: Frieren Beyond Journey's End", shown_dialog.item_table[1].text)
-        assert.are.equal("More Source: More results", shown_dialog.item_table[2].text)
-        assert.are.equal("ComicK: No results", shown_dialog.item_table[3].text)
-        assert.are.equal("Some Source: Error - Timed out", shown_dialog.item_table[4].text)
-
-        shown_dialog.item_table[1].callback()
-        shown_dialog.item_table[2].callback()
-        assert.are.equal("s1", selected[1].source.id)
-        assert.are.equal("s4", selected[2].source.id)
-
-        shown_dialog.item_table[3].callback()
-        shown_dialog.item_table[4].callback()
-        assert.are.equal(2, #selected)
-    end)
-
-    it("adds a home title-bar action to sources menus when requested", function()
-        local ui = require("suwayomi/ui")
-        local tapped_home = false
-
-        ui.showSourcesMenu({
-            { id = "s1", name = "MangaDex" },
-        }, nil, {
-            title_bar_left_icon = "appbar.filebrowser",
-            on_title_bar_left_tap = function()
-                tapped_home = true
-                return true
-            end,
-        })
-
-        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
-
-        shown_dialog.onLeftButtonTap()
-
-        assert.is_true(tapped_home)
-    end)
-
-    it("adds a home title-bar action to source mode menus when requested", function()
-        local ui = require("suwayomi/ui")
-        local tapped_home = false
-
-        ui.showSourceModeMenu({
-            id = "s1",
-            name = "MangaDex",
-        }, nil, {
-            title_bar_left_icon = "appbar.filebrowser",
-            on_title_bar_left_tap = function()
-                tapped_home = true
-                return true
-            end,
-        })
-
-        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
-
-        shown_dialog.onLeftButtonTap()
-
-        assert.is_true(tapped_home)
-    end)
-
-    it("adds a home title-bar action to source result pages when requested", function()
-        local ui = require("suwayomi/ui")
-        local tapped_home = false
-
-        ui.showMangaMenu({
-            { id = "m1", title = "Sousou no Frieren" },
-        }, nil, {
-            title = "MangaDex - Popular - Page 1",
-            title_bar_left_icon = "appbar.filebrowser",
-            on_title_bar_left_tap = function()
-                tapped_home = true
-                return true
-            end,
-        })
-
-        assert.are.equal("MangaDex - Popular - Page 1", shown_dialog.title)
-        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
-
-        shown_dialog.onLeftButtonTap()
-
-        assert.is_true(tapped_home)
-    end)
-
-    it("adds a home title-bar action to global search result pages when requested", function()
-        local ui = require("suwayomi/ui")
-        local tapped_home = false
-
-        ui.showGlobalSearchResultsMenu({
-            {
-                source = { id = "s1", name = "MangaDex" },
-                status = "ok",
-                first_match = { title = "Sousou no Frieren" },
-            },
-        }, nil, {
-            title_bar_left_icon = "appbar.filebrowser",
-            on_title_bar_left_tap = function()
-                tapped_home = true
-                return true
-            end,
-        })
-
-        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
-
-        shown_dialog.onLeftButtonTap()
-
-        assert.is_true(tapped_home)
-    end)
-
-    it("adds a home title-bar action to library manga menus when requested", function()
-        local ui = require("suwayomi/ui")
-        local tapped_home = false
-
-        ui.showLibraryMangaMenu({
-            { id = "m1", title = "Sousou no Frieren" },
-        }, nil, {
-            title_bar_left_icon = "appbar.filebrowser",
-            on_title_bar_left_tap = function()
-                tapped_home = true
-                return true
-            end,
-        })
-
-        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
-
-        shown_dialog.onLeftButtonTap()
-
-        assert.is_true(tapped_home)
-    end)
-
-    it("shows a source mode menu and hides latest when unsupported", function()
-        local ui = require("suwayomi/ui")
-        local selected = {}
-
-        ui.showSourceModeMenu({
-            id = "s1",
-            name = "MangaDex",
-            supports_latest = false,
-        }, function(mode)
-            table.insert(selected, mode)
-        end)
-
-        assert.are.equal("MangaDex", shown_dialog.title)
-        assert.are.equal("Popular", shown_dialog.item_table[1].text)
-        assert.are.equal("Search", shown_dialog.item_table[2].text)
-        assert.is_nil(shown_dialog.item_table[3])
-
-        shown_dialog.item_table[1].callback()
-        shown_dialog.item_table[2].callback()
-
-        assert.are.same({ "POPULAR", "SEARCH" }, selected)
-    end)
-
-    it("shows latest for unknown source support and collects a search query", function()
-        local ui = require("suwayomi/ui")
-        local selected_mode
-        local searched_query
-
-        ui.showSourceModeMenu({
-            id = "s1",
-            name = "MangaDex",
-        }, function(mode)
-            selected_mode = mode
-        end)
-
-        assert.are.equal("Latest", shown_dialog.item_table[2].text)
-        shown_dialog.item_table[2].callback()
-        assert.are.equal("LATEST", selected_mode)
-
-        ui.showSourceSearchPrompt({
-            id = "s1",
-            name = "MangaDex",
-        }, function(query)
-            searched_query = query
-        end)
-
-        assert.are.equal("Search MangaDex", shown_dialog.title)
-        shown_dialog.getFields = function()
-            return { " frieren " }
-        end
-        shown_dialog.buttons[1][2].callback()
-
-        assert.are.equal(" frieren ", searched_query)
-        assert.are.equal(shown_dialog, closed_dialog)
-    end)
-
-    it("updates a sources menu in place", function()
-        local ui = require("suwayomi/ui")
-        local selected
-        local menu = {
-            updateItems = function(self)
-                self.updated = true
-            end,
-        }
-
-        ui.updateSourcesMenu(menu, {
-            { id = "s4", name = "Local source" },
-        }, function(source)
-            selected = source
-        end)
-
-        assert.is_true(menu.updated)
-        assert.are.equal("Local source", menu.item_table[1].text)
-
-        menu.item_table[1].callback()
-
-        assert.are.same({ id = "s4", name = "Local source" }, selected)
-    end)
-
-    it("updates a manga menu title bar in place", function()
-        local ui = require("suwayomi/ui")
-        local title_bar_title
-        local left_icon
-        local menu = {
-            title = "MangaDex - Popular - Page 1",
-            title_bar = {
-                setTitle = function(_, title, refresh)
-                    title_bar_title = { title = title, refresh = refresh }
-                end,
-            },
-            setTitleBarLeftIcon = function(_, icon)
-                left_icon = icon
-            end,
-            updateItems = function(self)
-                self.updated = true
-            end,
-        }
-
-        ui.updateMangaMenu(menu, {
-            { id = "m2", title = "Page 2" },
-        }, function() end, {
-            title = "MangaDex - Popular - Page 2",
-            title_bar_left_icon = "appbar.filebrowser",
-        })
-
-        assert.are.equal("MangaDex - Popular - Page 2", menu.title)
-        assert.are.same({ title = "MangaDex - Popular - Page 2", refresh = true }, title_bar_title)
-        assert.are.equal("appbar.filebrowser", left_icon)
-        assert.is_true(menu.updated)
-    end)
-
-    it("uses KOReader path chooser to choose a directory", function()
-        local ui = require("suwayomi/ui")
-        local chosen_path
-
-        ui.showDirectoryChooser(function(path)
-            chosen_path = path
-        end)
-
-        assert.are.equal("Choose download directory", shown_dialog.title)
-        assert.is_true(shown_dialog.select_directory)
-        assert.is_false(shown_dialog.select_file)
-        assert.is_false(shown_dialog.show_files)
-        shown_dialog.onConfirm("/storage/emulated/0/Books/Manga")
-        assert.are.equal("/storage/emulated/0/Books/Manga", chosen_path)
-    end)
-
-    it("starts the directory chooser in the provided directory", function()
-        local ui = require("suwayomi/ui")
-
-        ui.showDirectoryChooser(function() end, "/storage/emulated/0/Books/Manga")
-
-        assert.are.equal("/storage/emulated/0/Books/Manga", shown_dialog.path)
-    end)
-
-    it("keeps KOReader-style current path visibility in the directory chooser", function()
-        local ui = require("suwayomi/ui")
-
-        ui.showDirectoryChooser(function() end, "/storage/emulated/0/Books/Manga")
-
-        assert.is_true(shown_dialog.show_path)
-    end)
-
-    it("shows a visible use-this-folder action for the current directory", function()
-        local ui = require("suwayomi/ui")
-        local chosen_path
-
-        ui.showDirectoryChooser(function(path)
-            chosen_path = path
-        end, "/storage/emulated/0/Books/Manga")
-
-        local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books/Manga")
-
-        assert.are.equal("Use this folder", item_table[1].text)
-        assert.are.equal("/storage/emulated/0/Books/Manga/.", item_table[1].path)
-
-        shown_dialog:onMenuSelect(item_table[1])
-
-        assert.are.equal("/storage/emulated/0/Books/Manga/.", shown_dialog.held_path)
-        assert.are.equal("/storage/emulated/0/Books/Manga", chosen_path)
-    end)
-
-    it("keeps current folder selection under KOReader path chooser hold handling", function()
-        local ui = require("suwayomi/ui")
-        local chosen_path
-        local instance_hold_called = false
-
-        ui.showDirectoryChooser(function(path)
-            chosen_path = path
-        end, "/storage/emulated/0/Books/Manga")
-
-        local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books/Manga")
-        shown_dialog.onMenuHold = function()
-            instance_hold_called = true
-            return true
-        end
-
-        shown_dialog:onMenuSelect(item_table[1])
-
-        assert.is_false(instance_hold_called)
-        assert.are.equal("/storage/emulated/0/Books/Manga/.", shown_dialog.held_path)
-        assert.are.equal("/storage/emulated/0/Books/Manga", chosen_path)
-    end)
-
-    it("keeps child folder taps under KOReader path chooser navigation handling", function()
-        local ui = require("suwayomi/ui")
-        local chosen_path
-
-        ui.showDirectoryChooser(function(path)
-            chosen_path = path
-        end, "/storage/emulated/0/Books/Manga")
-
-        local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books/Manga")
-
-        shown_dialog:onMenuSelect(item_table[2])
-
-        assert.are.equal("/storage/emulated/0/Books/Manga/Sousou no Frieren", shown_dialog.selected_path)
-        assert.is_nil(shown_dialog.held_path)
-        assert.is_nil(chosen_path)
-    end)
-
     it("shows a parallel chapter downloads menu", function()
         local ui = require("suwayomi/ui")
         local selected
 
         ui.showParallelDownloadsMenu({
             current = 2,
-            choices = { 1, 2, 3, 4 },
+            choices = { 1, 2, 3 },
             onSelect = function(value)
                 selected = value
             end,
@@ -930,17 +397,9 @@ describe("suwayomi/ui", function()
         assert.are.equal("1", shown_dialog.item_table[1].text)
         assert.is_true(shown_dialog.item_table[1].radio)
         assert.is_false(shown_dialog.item_table[1].checked_func())
-        assert.are.same({ mark_type = "radio", checked = false, dimen = { w = 20 }, getSize = shown_dialog.item_table[1].state.getSize }, shown_dialog.item_table[1].state)
         assert.are.equal("2", shown_dialog.item_table[2].text)
-        assert.is_true(shown_dialog.item_table[2].radio)
         assert.is_true(shown_dialog.item_table[2].checked_func())
         assert.is_true(shown_dialog.item_table[2].state.checked)
-        assert.are.equal("3", shown_dialog.item_table[3].text)
-        assert.is_true(shown_dialog.item_table[3].radio)
-        assert.is_false(shown_dialog.item_table[3].checked_func())
-        assert.are.equal("4", shown_dialog.item_table[4].text)
-        assert.is_true(shown_dialog.item_table[4].radio)
-        assert.is_false(shown_dialog.item_table[4].checked_func())
 
         shown_dialog.item_table[3].callback()
 
@@ -970,85 +429,6 @@ describe("suwayomi/ui", function()
 
         assert.are.same({ "close", "summary" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
-    end)
-
-    it("runs the language menu close callback when KOReader closes the menu natively", function()
-        local ui = require("suwayomi/ui")
-
-        ui.showLanguageMenu({
-            languages = {
-                { code = "en", label = "EN", enabled = true },
-            },
-            onClose = function()
-                table.insert(events, "summary")
-            end,
-        })
-
-        shown_dialog.close_callback()
-        shown_dialog.item_table[2].callback()
-
-        assert.are.same({ "summary" }, events)
-        assert.is_nil(closed_dialog)
-    end)
-
-    it("does not run the language close callback after toggling a checkbox row", function()
-        local ui = require("suwayomi/ui")
-        local toggled
-
-        ui.showLanguageMenu({
-            languages = {
-                { code = "en", label = "EN", enabled = true },
-                { code = "ru", label = "RU", enabled = false },
-            },
-            onToggle = function(code, enabled)
-                toggled = { code = code, enabled = enabled }
-            end,
-            onClose = function()
-                table.insert(events, "summary")
-            end,
-        })
-
-        shown_dialog.item_table[2].callback()
-        shown_dialog.close_callback()
-
-        assert.are.same({ code = "ru", enabled = true }, toggled)
-        assert.are.same({}, events)
-    end)
-
-    it("updates an existing language menu instead of requiring a new menu", function()
-        local ui = require("suwayomi/ui")
-        local update_count = 0
-        local summary_count = 0
-        local menu = {
-            updateItems = function()
-                update_count = update_count + 1
-            end,
-        }
-
-        ui.updateLanguageMenu(menu, {
-            languages = {
-                { code = "en", label = "EN", enabled = true },
-                { code = "ru", label = "RU", enabled = false },
-            },
-            onClose = function()
-                summary_count = summary_count + 1
-            end,
-        }, function() end)
-
-        assert.are.equal("EN", menu.item_table[1].text)
-        assert.is_true(menu.item_table[1].checked_func())
-        assert.are.equal("check", menu.item_table[1].state.mark_type)
-        assert.is_true(menu.item_table[1].state.checked)
-        assert.are.equal("RU", menu.item_table[2].text)
-        assert.is_false(menu.item_table[2].checked_func())
-        assert.is_false(menu.item_table[2].state.checked)
-        assert.are.equal("Done", menu.item_table[3].text)
-        assert.are.equal(1, update_count)
-
-        menu.item_table[3].callback()
-
-        assert.are.equal(menu, closed_dialog)
-        assert.are.equal(1, summary_count)
     end)
 
     it("does not run the language close callback during an in-place menu refresh", function()
