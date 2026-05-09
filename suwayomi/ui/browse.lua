@@ -42,6 +42,7 @@ function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
         item_table = menu_table,
     }
     menu_utils.applyTitleBarOptions(menu, options)
+    menu_utils.applyCloseCallback(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
@@ -80,6 +81,7 @@ function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
         item_table = menu_table,
     }
     menu_utils.applyTitleBarOptions(menu, options)
+    menu_utils.applyCloseCallback(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
@@ -242,6 +244,7 @@ function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, optio
         item_table = menu_table,
     }
     menu_utils.applyTitleBarOptions(menu, options)
+    menu_utils.applyCloseCallback(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
@@ -287,6 +290,7 @@ function BrowseUI.showMangaMenu(manga_list, onSelectCallback, options)
         item_table = menu_table,
     }
     menu_utils.applyTitleBarOptions(menu, options)
+    menu_utils.applyCloseCallback(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
@@ -326,6 +330,7 @@ function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
         item_table = menu_table,
     }
     menu_utils.applyTitleBarOptions(menu, options)
+    menu_utils.applyCloseCallback(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu
@@ -351,6 +356,7 @@ function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
         item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
     }
     menu_utils.applyTitleBarOptions(menu, options)
+    menu_utils.applyCloseCallback(menu, options)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)
     return menu

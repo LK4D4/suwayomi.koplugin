@@ -119,10 +119,11 @@ function Methods:showQueuedDownloadActions(job, menu)
             end
             self:showDownloads()
         elseif action and action.id == "open_chapter_list" then
-            self:closeMenu(menu)
             self:showMangaActions(job.manga, {
                 onMangaUpdated = function()
-                    self:showDownloads()
+                    if not self.isSuwayomiScreenActive or self:isSuwayomiScreenActive(menu) then
+                        self:showDownloads()
+                    end
                 end,
             })
         end
@@ -146,10 +147,11 @@ function Methods:showActiveDownloadActions(job, menu)
         },
     }, function(action)
         if action and action.id == "open_chapter_list" then
-            self:closeMenu(menu)
             self:showMangaActions(job.manga, {
                 onMangaUpdated = function()
-                    self:showDownloads()
+                    if not self.isSuwayomiScreenActive or self:isSuwayomiScreenActive(menu) then
+                        self:showDownloads()
+                    end
                 end,
             })
         end
@@ -165,7 +167,7 @@ function Methods:showDownloads()
         return
     end
 
-    return SuwayomiUI.showDownloadsMenu(snapshot, {
+    local menu = SuwayomiUI.showDownloadsMenu(snapshot, {
         onSelectActive = function(job, menu)
             self:showActiveDownloadActions(job, menu)
         end,
@@ -195,6 +197,10 @@ function Methods:showDownloads()
             return true
         end,
     })
+    if self.trackSuwayomiScreen then
+        self:trackSuwayomiScreen("downloads", menu)
+    end
+    return menu
 end
 
 

@@ -25,6 +25,7 @@ local MODULES_TO_CLEAR = {
     "suwayomi/readsync/worker",
     "suwayomi/browse/source_fetch_worker",
     "suwayomi/ui",
+    "suwayomi/navigation",
     "suwayomi/settings",
     "suwayomi/debug",
     "suwayomi/plugin/home",
@@ -78,6 +79,7 @@ function Helper.install(options)
         client_instances = {},
         debug_events = {},
         api_debug_logger = nil,
+        closed_widgets = {},
     }
 
     package.preload.dispatcher = function()
@@ -120,7 +122,12 @@ function Helper.install(options)
     package.preload["ui/uimanager"] = function()
         return {
             show = function() end,
-            close = function() end,
+            close = function(_, widget)
+                table.insert(state.closed_widgets, widget)
+                if type(widget) == "table" and widget.close_callback then
+                    widget.close_callback()
+                end
+            end,
             nextTick = function(_, callback)
                 if callback then
                     callback()

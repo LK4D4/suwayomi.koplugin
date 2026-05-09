@@ -97,6 +97,21 @@ describe("suwayomi/ui/browse", function()
         }, selected)
     end)
 
+    it("passes close callbacks through source menus", function()
+        local browse = require("suwayomi/ui/browse")
+        local closed = false
+
+        browse.showSourcesMenu({}, function() end, {
+            close_callback = function()
+                closed = true
+            end,
+        })
+
+        shown_dialog.close_callback()
+
+        assert.is_true(closed)
+    end)
+
     it("shows a source mode menu and hides latest when unsupported", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}

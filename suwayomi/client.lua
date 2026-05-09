@@ -45,6 +45,13 @@ function SuwayomiClient:getHomeMenuOptions()
     return nil
 end
 
+function SuwayomiClient:trackScreen(route_id, widget)
+    if widget and self.plugin and self.plugin.trackSuwayomiScreen then
+        self.plugin:trackSuwayomiScreen(route_id, widget)
+    end
+    return widget
+end
+
 function SuwayomiClient:attachSourceToManga(manga, source)
     if type(manga) ~= "table" or type(source) ~= "table" then
         return manga
@@ -328,6 +335,7 @@ function SuwayomiClient:showLibraryManga(category, credentials)
             self.plugin:showChaptersForManga(selected_manga)
         end
     end, self:getHomeMenuOptions())
+    self:trackScreen("library", library_menu)
     if pending_library_menu_refresh then
         refreshLibraryMangaMenu()
     end
@@ -363,9 +371,10 @@ function SuwayomiClient:showLibrary()
             or (picker_behavior == "automatic" and #categories > 1)
 
         if should_show_category_picker and #categories > 0 then
-            self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
+            local category_menu = self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
                 self:showLibraryManga(category, credentials)
             end, self:getHomeMenuOptions())
+            self:trackScreen("library-categories", category_menu)
             return
         end
 
@@ -468,7 +477,7 @@ function SuwayomiClient:showGlobalSearch(sources)
         })
 
         if self.ui.showGlobalSearchResultsMenu then
-            self.ui.showGlobalSearchResultsMenu(summaries, function(summary)
+            local results_menu = self.ui.showGlobalSearchResultsMenu(summaries, function(summary)
                 if summary and (summary.status == "ok" or summary.status == "pageable_empty") then
                     return self:showMangaForSource(summary.source, {
                         type = "SEARCH",
@@ -478,6 +487,7 @@ function SuwayomiClient:showGlobalSearch(sources)
                     })
                 end
             end, self:getHomeMenuOptions())
+            self:trackScreen("browse-global-search", results_menu)
         end
     end)
 end
@@ -490,7 +500,7 @@ function SuwayomiClient:showSourceModeMenu(source)
         })
     end
 
-    return self.ui.showSourceModeMenu(source, function(mode)
+    local mode_menu = self.ui.showSourceModeMenu(source, function(mode)
         if mode == "SEARCH" then
             return self:showSourceSearchPrompt(source)
         end
@@ -499,6 +509,7 @@ function SuwayomiClient:showSourceModeMenu(source)
             skip_mode_menu = true,
         })
     end, self:getHomeMenuOptions())
+    return self:trackScreen("browse-source", mode_menu)
 end
 
 function SuwayomiClient:showMangaForSource(source, options)
@@ -596,6 +607,7 @@ function SuwayomiClient:showMangaForSource(source, options)
                 self.plugin:showChaptersForManga(manga)
             end
         end, menu_options)
+        self:trackScreen("browse-results", manga_menu)
         if pending_manga_menu_refresh then
             refreshMangaMenu()
         end

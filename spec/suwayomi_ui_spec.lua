@@ -284,6 +284,7 @@ describe("suwayomi/ui", function()
     it("shows a chapter actions menu", function()
         local ui = require("suwayomi/ui")
         local selected = {}
+        local closed = false
 
         ui.showChapterActionsMenu({
             title = "Chapter 1",
@@ -292,6 +293,9 @@ describe("suwayomi/ui", function()
                 { id = "delete", text = "Delete from device" },
                 { id = "mark_read", text = "Mark as read" },
             },
+            close_callback = function()
+                closed = true
+            end,
         }, function(action)
             table.insert(selected, action)
         end)
@@ -308,6 +312,10 @@ describe("suwayomi/ui", function()
             { id = "open", text = "Open" },
             { id = "mark_read", text = "Mark as read" },
         }, selected)
+
+        shown_dialog.close_callback()
+
+        assert.is_true(closed)
     end)
 
     it("shows the Suwayomi home hub as two-column buttons", function()
@@ -320,6 +328,9 @@ describe("suwayomi/ui", function()
                 { id = "browse", text = "Browse" },
                 { id = "downloads", text = "Downloads" },
             },
+            onClose = function()
+                table.insert(events, "home-close")
+            end,
         }, function(action)
             table.insert(selected, action.id)
             table.insert(events, action.id)
@@ -332,9 +343,28 @@ describe("suwayomi/ui", function()
 
         shown_dialog.buttons[1][2].callback()
 
-        assert.are.same({ "close", "browse" }, events)
+        assert.are.same({ "close", "home-close", "browse" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
         assert.are.same({ "browse" }, selected)
+    end)
+
+    it("passes menu close callbacks through chapter menus", function()
+        local ui = require("suwayomi/ui")
+        local closed = false
+
+        ui.showChapterMenu({
+            title = "Chapters",
+            chapters = {
+                { id = "c1", name = "Chapter 1" },
+            },
+            close_callback = function()
+                closed = true
+            end,
+        })
+
+        shown_dialog.close_callback()
+
+        assert.is_true(closed)
     end)
 
     it("passes the native settings menu instance to setting callbacks", function()

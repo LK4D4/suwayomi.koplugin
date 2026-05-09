@@ -100,12 +100,27 @@ function Methods:showChapterResultForManga(manga, result)
     local chapters = self:mergeChaptersWithReadLedger(manga, result.chapters)
     self:setCurrentMangaChapterContext(manga, chapters)
 
+    local previous_chapter_menu = self.current_chapter_menu
+    if previous_chapter_menu and self.isSuwayomiScreenActive and self:isSuwayomiScreenActive(previous_chapter_menu) and self.closeMenu then
+        self:closeMenu(previous_chapter_menu)
+    end
+
+    local chapter_menu
     self.current_chapter_options = self:buildChapterMenuOptions(manga, chapters)
-    self.current_chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, function(chapter)
+    self.current_chapter_options.close_callback = function()
+        if self.current_chapter_menu == chapter_menu then
+            self.current_chapter_menu = nil
+        end
+    end
+    chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, function(chapter)
         self:handleChapterTap(manga, chapter)
     end, function(chapter)
         self:toggleChapterSelection(manga, chapter)
     end)
+    self.current_chapter_menu = chapter_menu
+    if self.trackSuwayomiScreen then
+        self:trackSuwayomiScreen("chapters", chapter_menu)
+    end
     return true
 end
 
@@ -171,7 +186,7 @@ function Methods:showMangaActions(manga, options)
         return self:showChaptersForManga(manga)
     end
 
-    return SuwayomiUI.showMangaActionsMenu({
+    local menu = SuwayomiUI.showMangaActionsMenu({
         title = manga and (manga.title or tostring(manga.id)) or _("Manga actions"),
         actions = self:getMangaActions(manga),
     }, function(action)
@@ -179,6 +194,10 @@ function Methods:showMangaActions(manga, options)
             self:performMangaAction(manga, action.id, options)
         end
     end)
+    if self.trackSuwayomiScreen then
+        self:trackSuwayomiScreen("manga-actions", menu)
+    end
+    return menu
 end
 
 
@@ -298,7 +317,7 @@ function Methods:showMoreMangaActions(manga, options)
     if not SuwayomiUI.showMangaActionsMenu then
         return false
     end
-    return SuwayomiUI.showMangaActionsMenu({
+    local menu = SuwayomiUI.showMangaActionsMenu({
         title = _("More..."),
         actions = {
             { id = "download_next_5_unread", text = _("Download next 5 unread") },
@@ -313,6 +332,10 @@ function Methods:showMoreMangaActions(manga, options)
             self:performMangaAction(manga, action.id, options)
         end
     end)
+    if self.trackSuwayomiScreen then
+        self:trackSuwayomiScreen("manga-actions", menu)
+    end
+    return menu
 end
 
 
@@ -320,7 +343,7 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
     if not SuwayomiUI.showMangaActionsMenu then
         return false
     end
-    return SuwayomiUI.showMangaActionsMenu({
+    local menu = SuwayomiUI.showMangaActionsMenu({
         title = _("Keep downloaded"),
         actions = {
             { id = "keep_next_5_unread", text = _("Keep next 5 unread") },
@@ -333,6 +356,10 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
             self:performMangaAction(manga, action.id, options)
         end
     end)
+    if self.trackSuwayomiScreen then
+        self:trackSuwayomiScreen("manga-actions", menu)
+    end
+    return menu
 end
 
 

@@ -32,13 +32,28 @@ function Methods:getHomeMenuOptions()
     return {
         title_bar_left_icon = "appbar.filebrowser",
         on_title_bar_left_tap = function(menu)
-            if menu and UIManager.close then
+            local tracked = self.isSuwayomiScreenActive and self:isSuwayomiScreenActive(menu)
+            if self.closeSuwayomiPlugin then
+                self:closeSuwayomiPlugin()
+            end
+            if not tracked and menu and UIManager.close then
                 UIManager:close(menu)
             end
             self:showHome()
             return true
         end,
     }
+end
+
+function Methods:showTopLevelScreen(route_id, callback)
+    if self.closeSuwayomiPlugin then
+        self:closeSuwayomiPlugin()
+    end
+    local widget = callback()
+    if widget and self.trackSuwayomiScreen then
+        self:trackSuwayomiScreen(route_id, widget)
+    end
+    return widget
 end
 
 
@@ -48,21 +63,27 @@ function Methods:buildHomeActions()
             id = "library",
             text = _("Library"),
             callback = function()
-                self:showLibrary()
+                return self:showTopLevelScreen("library", function()
+                    return self:showLibrary()
+                end)
             end,
         },
         {
             id = "browse",
             text = _("Browse"),
             callback = function()
-                self:browseSuwayomi()
+                return self:showTopLevelScreen("browse", function()
+                    return self:browseSuwayomi()
+                end)
             end,
         },
         {
             id = "downloads",
             text = _("Downloads"),
             callback = function()
-                self:showDownloads()
+                return self:showTopLevelScreen("downloads", function()
+                    return self:showDownloads()
+                end)
             end,
         },
         {
@@ -76,12 +97,19 @@ function Methods:buildHomeActions()
             id = "settings",
             text = _("Settings"),
             callback = function()
-                self:showSettings()
+                return self:showTopLevelScreen("settings", function()
+                    return self:showSettings()
+                end)
             end,
         },
         {
             id = "close",
-            text = _("Close"),
+            text = _("Close plugin"),
+            callback = function()
+                if self.closeSuwayomiPlugin then
+                    self:closeSuwayomiPlugin()
+                end
+            end,
         },
     }
 end

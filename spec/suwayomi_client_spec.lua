@@ -14,6 +14,7 @@ describe("suwayomi/client", function()
         local shown_manga_actions
         local scheduled_sync_credentials
         local log_events = {}
+        local tracked_screens = {}
         local client = Client:new{
             settings = {
                 load = function()
@@ -59,6 +60,12 @@ describe("suwayomi/client", function()
                 getHomeMenuOptions = function()
                     return options.home_menu_options
                 end,
+                trackSuwayomiScreen = function(_, route_id, widget)
+                    table.insert(tracked_screens, { route_id = route_id, widget = widget })
+                    if options.trackSuwayomiScreen then
+                        options.trackSuwayomiScreen(route_id, widget)
+                    end
+                end,
             },
             gettext = function(text)
                 return text
@@ -78,6 +85,7 @@ describe("suwayomi/client", function()
             scheduled_sync_credentials = function()
                 return scheduled_sync_credentials
             end,
+            tracked_screens = tracked_screens,
         }
     end
 
@@ -112,6 +120,7 @@ describe("suwayomi/client", function()
         local shown_manga_actions
         local loading_messages = {}
         local log_events = {}
+        local tracked = {}
         local client = Client:new{
             settings = {
                 load = function()
@@ -141,6 +150,7 @@ describe("suwayomi/client", function()
                         title_bar_left_icon = "appbar.filebrowser",
                     }, menu_options)
                     onSelect(manga[1])
+                    return { name = "browse-results-menu" }
                 end,
             },
             debug = {
@@ -165,6 +175,9 @@ describe("suwayomi/client", function()
                 getHomeMenuOptions = function()
                     return { title_bar_left_icon = "appbar.filebrowser" }
                 end,
+                trackSuwayomiScreen = function(_, route_id, widget)
+                    table.insert(tracked, { route_id = route_id, widget = widget })
+                end,
             },
             gettext = function(text)
                 return text
@@ -187,6 +200,8 @@ describe("suwayomi/client", function()
         }, shown_manga_actions.source)
         assert.are.equal("manga_loaded", log_events[1].event)
         assert.are.equal(1, log_events[1].manga_count)
+        assert.are.equal("browse-results", tracked[1].route_id)
+        assert.are.equal("browse-results-menu", tracked[1].widget.name)
     end)
 
     it("opens a source mode menu for non-local sources and fetches popular manga from it", function()
@@ -714,6 +729,7 @@ describe("suwayomi/client", function()
     it("skips the category picker for a single category and opens selected library manga actions", function()
         local shown_manga
         local shown_menu_options
+        local tracked = {}
         local client, state = newClient({
             home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
             api = {
@@ -745,8 +761,12 @@ describe("suwayomi/client", function()
                     shown_manga = manga
                     shown_menu_options = menu_options
                     onSelect(manga[1])
+                    return { name = "library-menu" }
                 end,
             },
+            trackSuwayomiScreen = function(route_id, widget)
+                table.insert(tracked, { route_id = route_id, widget = widget })
+            end,
         })
 
         client:showLibrary()
@@ -755,6 +775,8 @@ describe("suwayomi/client", function()
         assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, shown_menu_options)
         assert.are.equal("m1", state.shown_manga_actions().id)
         assert.are.equal("library_manga_loaded", state.log_events[#state.log_events].event)
+        assert.are.equal("library", tracked[1].route_id)
+        assert.are.equal("library-menu", tracked[1].widget.name)
     end)
 
     it("lets manga actions refresh the visible library row after membership changes", function()

@@ -29,6 +29,14 @@ function MenuUtils.applyTitleBarOptions(menu, options)
     return menu
 end
 
+function MenuUtils.applyCloseCallback(menu, options)
+    options = options or {}
+    if options.close_callback then
+        menu.close_callback = options.close_callback
+    end
+    return menu
+end
+
 function MenuUtils.bindMenuCallbacks(items, menu)
     for _, item in ipairs(items or {}) do
         if item.callback then

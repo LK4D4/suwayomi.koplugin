@@ -72,10 +72,16 @@ end
 function Methods:showSourceList(sources, options)
     local SuwayomiUI = getUI()
     options = options or {}
+    local menu
     local function buildSourceMenuOptions()
         local menu_options = self:getHomeMenuOptions() or {}
         menu_options.on_global_search = function()
             return self:getClient():showGlobalSearch(sources)
+        end
+        menu_options.close_callback = function()
+            if self.current_sources_menu == menu then
+                self.current_sources_menu = nil
+            end
         end
         return menu_options
     end
@@ -87,9 +93,13 @@ function Methods:showSourceList(sources, options)
         return self.current_sources_menu
     end
 
-    self.current_sources_menu = SuwayomiUI.showSourcesMenu(sources, function(source)
+    menu = SuwayomiUI.showSourcesMenu(sources, function(source)
         self:showMangaForSource(source)
     end, buildSourceMenuOptions())
+    self.current_sources_menu = menu
+    if self.trackSuwayomiScreen then
+        self:trackSuwayomiScreen("browse-sources", menu)
+    end
     return self.current_sources_menu
 end
 

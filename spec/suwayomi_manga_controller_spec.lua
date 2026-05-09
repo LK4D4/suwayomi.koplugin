@@ -26,6 +26,7 @@ local function installController(options)
         messages = {},
         update_calls = {},
         refresh_calls = {},
+        tracked_screens = {},
         saved_keep_next = 5,
     }
 
@@ -95,6 +96,7 @@ local function installController(options)
             end,
             showChapterMenu = function(chapter_options)
                 state.chapter_menu_options = chapter_options
+                return { name = "chapter-menu", close_callback = chapter_options.close_callback }
             end,
         }
     end
@@ -199,6 +201,9 @@ local function installController(options)
     function plugin:pluralize(value, singular, plural)
         return value == 1 and singular or plural
     end
+    function plugin:trackSuwayomiScreen(route_id, widget)
+        table.insert(state.tracked_screens, { route_id = route_id, widget = widget })
+    end
     return plugin, state
 end
 
@@ -229,6 +234,8 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("Open chapters", state.manga_actions_options.actions[1].text)
         assert.are.equal("Open first unread", state.manga_actions_options.actions[2].text)
         assert.are.equal("Refresh chapters", state.manga_actions_options.actions[3].text)
+        assert.are.equal("manga-actions", state.tracked_screens[1].route_id)
+        assert.are.equal("manga-actions-menu", state.tracked_screens[1].widget.name)
 
         state.manga_actions_callback({ id = "more" })
         assert.are.equal("More...", state.manga_actions_options.title)
@@ -291,6 +298,12 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("Refreshed title", manga.title)
         assert.are.equal("Refreshed title", state.chapter_menu_options.title)
         assert.are.equal("c2", plugin.current_chapter_context.chapters[1].id)
+        assert.are.equal("chapters", state.tracked_screens[1].route_id)
+        assert.are.equal("chapter-menu", state.tracked_screens[1].widget.name)
+
+        state.chapter_menu_options.close_callback()
+
+        assert.is_nil(plugin.current_chapter_menu)
     end)
 
     it("persists keep-next policy and confirms broad queue actions", function()

@@ -14,6 +14,7 @@ local SuwayomiClient = require("suwayomi/client")
 local SuwayomiDownloadQueue = require("suwayomi/downloads/queue")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
+local SuwayomiNavigation = require("suwayomi/navigation")
 local SuwayomiDebug = require("suwayomi/debug")
 local HomeController = require("suwayomi/plugin/home")
 local SettingsController = require("suwayomi/plugin/settings_controller")
@@ -94,6 +95,42 @@ function SuwayomiPlugin:getClient()
         self.client = self:createClient()
     end
     return self.client
+end
+
+function SuwayomiPlugin:getNavigation()
+    if not self.suwayomi_navigation then
+        self.suwayomi_navigation = SuwayomiNavigation.new(UIManager)
+    end
+    return self.suwayomi_navigation
+end
+
+function SuwayomiPlugin:trackSuwayomiScreen(route_id, widget, options)
+    if widget == nil then
+        return nil
+    end
+    return self:getNavigation():push(route_id, widget, options)
+end
+
+function SuwayomiPlugin:replaceSuwayomiBranch(route_id, widget, options)
+    if widget == nil then
+        return nil
+    end
+    return self:getNavigation():replaceBranch(route_id, widget, options)
+end
+
+function SuwayomiPlugin:isSuwayomiScreenActive(widget)
+    if not self.suwayomi_navigation then
+        return false
+    end
+    return self.suwayomi_navigation:contains(widget)
+end
+
+function SuwayomiPlugin:closeSuwayomiPlugin()
+    if self.suwayomi_navigation then
+        self.suwayomi_navigation:closeAll()
+    end
+    self.current_sources_menu = nil
+    self.current_chapter_menu = nil
 end
 
 function SuwayomiPlugin:withChapterMenuRefreshSuppressed(callback)

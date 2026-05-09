@@ -77,7 +77,7 @@ describe("suwayomi plugin", function()
         assert.are.equal("Downloads", runtime.shown_home_dialog.actions[3].text)
         assert.are.equal("Sync", runtime.shown_home_dialog.actions[4].text)
         assert.are.equal("Settings", runtime.shown_home_dialog.actions[5].text)
-        assert.are.equal("Close", runtime.shown_home_dialog.actions[6].text)
+        assert.are.equal("Close plugin", runtime.shown_home_dialog.actions[6].text)
     end)
 
     it("constructs the client lazily and reuses it", function()
@@ -118,6 +118,25 @@ describe("suwayomi plugin", function()
         assert.are.equal(3, queue.max_active_chapters)
         assert.is_true(queue.recovered)
         assert.are.equal(1, #runtime.queue_instances)
+    end)
+
+    it("constructs navigation lazily and closes tracked Suwayomi screens", function()
+        local plugin = build_plugin()
+        local first = { name = "sources" }
+        local second = { name = "manga" }
+
+        assert.are.equal(plugin:getNavigation(), plugin:getNavigation())
+
+        plugin:trackSuwayomiScreen("sources", first)
+        plugin:trackSuwayomiScreen("manga", second)
+        assert.is_true(plugin:isSuwayomiScreenActive(first))
+        assert.is_true(plugin:isSuwayomiScreenActive(second))
+
+        plugin:closeSuwayomiPlugin()
+
+        assert.are.same({ second, first }, runtime.closed_widgets)
+        assert.is_false(plugin:isSuwayomiScreenActive(first))
+        assert.is_false(plugin:isSuwayomiScreenActive(second))
     end)
 
     it("configures API debug logging and plugin read-sync defaults on init", function()
@@ -174,5 +193,18 @@ describe("suwayomi plugin", function()
         runtime.shown_home_dialog.actions[1].callback()
 
         assert.are.equal("library", plugin.delegated_action)
+    end)
+
+    it("routes the Close plugin home action through the navigation closer", function()
+        local plugin = build_plugin({
+            closeSuwayomiPlugin = function(self)
+                self.closed_plugin = true
+            end,
+        })
+
+        plugin:showHome()
+        runtime.shown_home_dialog.actions[6].callback()
+
+        assert.is_true(plugin.closed_plugin)
     end)
 end)

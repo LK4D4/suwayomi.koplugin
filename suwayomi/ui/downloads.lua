@@ -111,6 +111,7 @@ function DownloadsUI.showDownloadsMenu(snapshot, callbacks, options)
         item_table = DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks),
     }
     menu_utils.applyTitleBarOptions(menu, options)
+    menu_utils.applyCloseCallback(menu, options)
     menu_utils.bindMenuCallbacks(menu.item_table, menu)
     local UIManager = require("ui/uimanager")
     UIManager:show(menu)

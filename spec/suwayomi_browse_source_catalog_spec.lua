@@ -44,6 +44,7 @@ local function stubDependencies()
     package.preload["suwayomi/ui"] = function()
         return {
             showSourcesMenu = function(sources, onSelect, options)
+                ui_calls.shown_count = (ui_calls.shown_count or 0) + 1
                 ui_calls.shown = {
                     sources = sources,
                     onSelect = onSelect,
@@ -258,5 +259,23 @@ describe("suwayomi/browse/source_catalog", function()
         assert.are.equal("manga-for-source", manga_result)
         assert.are.equal("english", controller.global_search_sources[1].id)
         assert.are.equal("english", controller.selected_source.id)
+    end)
+
+    it("clears stale source menu state when the sources menu closes", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        local menu = controller:showSourceList({ { id = "english", lang = "en" } })
+        assert.are.same(menu, controller.current_sources_menu)
+        assert.is_function(ui_calls.shown.options.close_callback)
+
+        ui_calls.shown.options.close_callback()
+
+        assert.is_nil(controller.current_sources_menu)
+
+        controller:showSourceList({ { id = "local", lang = "localsourcelang" } })
+
+        assert.are.equal(2, ui_calls.shown_count)
+        assert.is_nil(ui_calls.updated)
     end)
 end)

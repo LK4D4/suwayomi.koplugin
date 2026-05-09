@@ -78,6 +78,7 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
         title = options.title or _("Suwayomi Chapters"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback),
+        close_callback = options.close_callback,
     }
     if options.on_title_bar_left_tap then
         menu.onLeftButtonTap = options.on_title_bar_left_tap
@@ -107,6 +108,9 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
             text = action.text,
             callback = function()
                 UIManager:close(dialog)
+                if options.onClose then
+                    options.onClose()
+                end
                 if onSelectCallback then
                     onSelectCallback(action)
                 elseif action.callback then
@@ -160,6 +164,7 @@ function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
     dialog = ButtonDialog:new{
         title = options.title or _("Chapter actions"),
         buttons = buttons,
+        close_callback = options.close_callback,
     }
     UIManager:show(dialog)
     return dialog

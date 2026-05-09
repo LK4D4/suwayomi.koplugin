@@ -26,6 +26,7 @@ local function installController(options)
         home_count = 0,
         downloads_count = 0,
         manga_actions = {},
+        tracked_screens = {},
     }
 
     package.preload.gettext = function()
@@ -119,6 +120,15 @@ local function installController(options)
     function plugin:showMangaActions(manga, manga_options)
         table.insert(state.manga_actions, { manga = manga, options = manga_options })
     end
+    function plugin:trackSuwayomiScreen(route_id, widget)
+        table.insert(state.tracked_screens, { route_id = route_id, widget = widget })
+    end
+    function plugin:isSuwayomiScreenActive(widget)
+        if options.inactive_downloads_menu == true and widget and widget.name == "downloads-menu" then
+            return false
+        end
+        return true
+    end
     function plugin:getVisibleChapters(chapters)
         return chapters
     end
@@ -186,6 +196,8 @@ describe("suwayomi/downloads/controller", function()
 
         assert.are.equal("m1:c1", state.downloads_menu_snapshot.queued[1].key)
         assert.are.equal("appbar.menu", state.downloads_menu_options.title_bar_left_icon)
+        assert.are.equal("downloads", state.tracked_screens[1].route_id)
+        assert.are.equal("downloads-menu", state.tracked_screens[1].widget.name)
 
         state.downloads_menu_options.on_title_bar_left_tap(menu)
         assert.are.equal("Suwayomi Downloads", state.actions_menu_options.title)
@@ -242,6 +254,21 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(job.manga, state.manga_actions[1].manga)
         state.manga_actions[1].options.onMangaUpdated()
         assert.are.equal(2, state.downloads_count)
+    end)
+
+    it("does not reopen downloads after manga actions if the downloads route is gone", function()
+        local plugin, state = installController({ inactive_downloads_menu = true })
+        local menu = { name = "downloads-menu" }
+        local job = {
+            manga = { id = "m1", title = "Dandadan" },
+            chapter = { id = "c1", name = "Ch. 1" },
+        }
+
+        plugin:showActiveDownloadActions(job, menu)
+        state.actions_menu_callback(state.actions_menu_options.actions[1])
+        state.manga_actions[1].options.onMangaUpdated()
+
+        assert.are.equal(0, state.downloads_count)
     end)
 
     it("reconciles read ledger entries and applies keep-next unread policy", function()

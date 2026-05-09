@@ -169,4 +169,19 @@ describe("suwayomi/ui/downloads", function()
 
         assert.is_true(tapped_home)
     end)
+
+    it("passes close callbacks through the downloads menu", function()
+        local downloads = require("suwayomi/ui/downloads")
+        local closed = false
+
+        downloads.showDownloadsMenu({}, {}, {
+            close_callback = function()
+                closed = true
+            end,
+        })
+
+        shown_dialog.close_callback()
+
+        assert.is_true(closed)
+    end)
 end)
