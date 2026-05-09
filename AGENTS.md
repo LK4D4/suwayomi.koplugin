@@ -5,7 +5,7 @@
 - CI installs LuaJIT with `leafo/gh-actions-lua@v13` and LuaRocks with `leafo/gh-actions-luarocks@v6`; local development should use LuaJIT too.
 - On fresh Ubuntu/dev containers, install local tools with `sudo apt-get install -y luajit luarocks`.
 - Verify LuaRocks is using LuaJIT before installing deps: `luarocks config lua_interpreter` should print a LuaJIT executable.
-- Install local test/lint deps like CI: `luarocks install --local busted`, `luarocks install --local dkjson`, and `luarocks install --local luacheck`.
+- Install local test/lint deps with user-local LuaRocks packages: `luarocks install --local busted`, `luarocks install --local dkjson`, and `luarocks install --local luacheck`.
 - `luarocks --local` puts executables in `$HOME/.luarocks/bin`; use `PATH="$HOME/.luarocks/bin:$PATH" ...` unless that path is already exported.
 - Run the full lint suite from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes spec suwayomi main.lua _meta.lua`.
 - Run the full test suite from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" busted spec`.
@@ -16,6 +16,7 @@
 ## Project Shape
 
 - This is a LuaJIT/Lua 5.1 KOReader plugin, not a standalone Lua app; KOReader modules such as `ui/uimanager`, `dispatcher`, `datastorage`, `ffi/util`, and `ffi/archiver` exist at runtime and are usually stubbed in specs.
+- `docs/ARCHITECTURE.md` is the active architecture reference. Keep this file as concise agent guidance and update the architecture doc when module ownership, public facades, packaging boundaries, or test strategy change materially.
 - KOReader requires `_meta.lua` and `main.lua` at the top of the `suwayomi_dl.koplugin/` directory. Keep `main.lua` as a thin lifecycle/composition shell: action registration, KOReader plugin callbacks, dependency construction, and compatibility delegators only. Do not add new feature logic to `main.lua` unless it is truly KOReader lifecycle glue.
 - Put runtime modules under the plugin-local `suwayomi/` namespace directory instead of adding top-level `suwayomi_*.lua` files. Use slash-style Lua requires that work with KOReader's plugin loader package path, for example `require("suwayomi/api")` or `require("suwayomi/downloads/controller")`.
 - Current preferred layout for new/extracted code:
@@ -37,7 +38,9 @@
   - `suwayomi/chapters/local_downloads.lua`, `suwayomi/chapters/delete_actions.lua`, `suwayomi/chapters/read_actions.lua`: local archive state, device deletion flows, and read/unread action orchestration.
   - `suwayomi/readsync/ledger.lua`, `suwayomi/readsync/koreader_metadata.lua`, `suwayomi/readsync/worker.lua`, `suwayomi/readsync/controller.lua`: read ledger, KOReader sidecar/history handling, worker code, and read-sync orchestration.
 - Do not add compatibility wrappers for old top-level `suwayomi_*.lua` module names; update callers and tests to the slash-style module names instead.
+- Runtime Lua files should start with a short line-comment `-- Boundary:` header matching the current module convention. Use regular `--` comments for explanatory notes; avoid top-of-file `--[[ ... ]]` documentation blocks unless a future file has a specific reason to differ.
 - Document any code whose purpose is not immediately obvious with a short comment explaining why it exists; avoid comments that merely restate what the code says.
+- Keep lint policy centralized in `.luacheckrc`. Do not add inline `-- luacheck:` directives for routine repo-wide conventions such as unused `self`; update `.luacheckrc` instead when the rule should apply broadly.
 - Path layout is source-scoped through the paths module: `<download_directory>/<source_label>/<manga_title>/<chapter_name>.cbz`. Do not add old unscoped path detection unless explicitly requested.
 - Downloads are KOReader-device-local CBZ downloads. Do not use Suwayomi server download mutations as a hidden side effect.
 
