@@ -1,6 +1,6 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_read_sync_worker", function()
+describe("suwayomi/readsync/worker", function()
     local original_io_open
     local original_os_rename
     local original_os_remove
@@ -70,22 +70,22 @@ describe("suwayomi_read_sync_worker", function()
 
     before_each(function()
         install_file_mock()
-        package.loaded.suwayomi_read_sync_worker = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/readsync/worker"] = nil
+        package.loaded["suwayomi/api"] = nil
     end)
 
     after_each(function()
         io.open = original_io_open
         os.rename = original_os_rename
         os.remove = original_os_remove
-        package.loaded.suwayomi_read_sync_worker = nil
-        package.loaded.suwayomi_api = nil
-        package.preload.suwayomi_api = nil
+        package.loaded["suwayomi/readsync/worker"] = nil
+        package.loaded["suwayomi/api"] = nil
+        package.preload["suwayomi/api"] = nil
     end)
 
     it("groups read and unread mutations and writes mixed results atomically", function()
         local calls = {}
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function(credentials, chapter_ids, desired_read_state)
                     table.insert(calls, {
@@ -107,7 +107,7 @@ describe("suwayomi_read_sync_worker", function()
             }
         end
 
-        local worker = require("suwayomi_read_sync_worker")
+        local worker = require("suwayomi/readsync/worker")
         worker:run(
             { server_url = "https://suwayomi.example" },
             {
@@ -138,7 +138,7 @@ describe("suwayomi_read_sync_worker", function()
     end)
 
     it("fails batch items missing from the batch mutation response", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChaptersReadState = function()
                     return {
@@ -151,7 +151,7 @@ describe("suwayomi_read_sync_worker", function()
             }
         end
 
-        local worker = require("suwayomi_read_sync_worker")
+        local worker = require("suwayomi/readsync/worker")
         worker:run(
             { server_url = "https://suwayomi.example" },
             {
@@ -177,7 +177,7 @@ describe("suwayomi_read_sync_worker", function()
 
     it("writes failures for invalid requests without calling the API", function()
         local calls = 0
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChapterRead = function()
                     calls = calls + 1
@@ -186,7 +186,7 @@ describe("suwayomi_read_sync_worker", function()
             }
         end
 
-        local worker = require("suwayomi_read_sync_worker")
+        local worker = require("suwayomi/readsync/worker")
         worker:run(
             { server_url = "https://suwayomi.example" },
             {
@@ -204,7 +204,7 @@ describe("suwayomi_read_sync_worker", function()
 
     it("writes failures for malformed batch items without crashing", function()
         local calls = 0
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChapterRead = function()
                     calls = calls + 1
@@ -213,7 +213,7 @@ describe("suwayomi_read_sync_worker", function()
             }
         end
 
-        local worker = require("suwayomi_read_sync_worker")
+        local worker = require("suwayomi/readsync/worker")
         worker:run(
             { server_url = "https://suwayomi.example" },
             { 42 },
@@ -229,7 +229,7 @@ describe("suwayomi_read_sync_worker", function()
 
     it("writes failures when credentials are missing", function()
         local calls = 0
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 markChapterRead = function()
                     calls = calls + 1
@@ -238,7 +238,7 @@ describe("suwayomi_read_sync_worker", function()
             }
         end
 
-        local worker = require("suwayomi_read_sync_worker")
+        local worker = require("suwayomi/readsync/worker")
         worker:run(
             { server_url = "" },
             {

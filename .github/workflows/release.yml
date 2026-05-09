@@ -16,7 +16,8 @@ jobs:
       - name: Build project
         run: |
           mkdir suwayomi_dl.koplugin
-          cp _meta.lua main.lua suwayomi_*.lua README.md suwayomi_dl.koplugin/
+          cp _meta.lua main.lua README.md suwayomi_dl.koplugin/
+          cp -R suwayomi suwayomi_dl.koplugin/
           zip -r suwayomi_dl.koplugin.zip suwayomi_dl.koplugin/
 
       - name: Release

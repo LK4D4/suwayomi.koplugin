@@ -1,12 +1,12 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_client", function()
+describe("suwayomi/client", function()
     after_each(function()
-        package.loaded.suwayomi_client = nil
+        package.loaded["suwayomi/client"] = nil
     end)
 
     local function newClient(options)
-        local Client = require("suwayomi_client")
+        local Client = require("suwayomi/client")
         options = options or {}
         local loading_messages = {}
         local shown_messages = {}
@@ -82,7 +82,7 @@ describe("suwayomi_client", function()
     end
 
     it("attaches source metadata to selected manga without overwriting existing values", function()
-        local Client = require("suwayomi_client")
+        local Client = require("suwayomi/client")
         local client = Client:new{}
         local manga = {
             id = "m1",
@@ -108,7 +108,7 @@ describe("suwayomi_client", function()
     end)
 
     it("loads manga for a source and opens the selected manga actions through the plugin", function()
-        local Client = require("suwayomi_client")
+        local Client = require("suwayomi/client")
         local shown_manga_actions
         local loading_messages = {}
         local log_events = {}
@@ -464,7 +464,7 @@ describe("suwayomi_client", function()
     end)
 
     it("detects only latest unsupported error text", function()
-        local Client = require("suwayomi_client")
+        local Client = require("suwayomi/client")
         local client = Client:new{}
 
         assert.is_true(client:isLatestUnsupportedError("Source returned unsupported latest mode"))
@@ -646,7 +646,7 @@ describe("suwayomi_client", function()
     end)
 
     it("formats compact library manga rows", function()
-        local Client = require("suwayomi_client")
+        local Client = require("suwayomi/client")
         local client = Client:new{}
 
         assert.are.equal(

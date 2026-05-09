@@ -32,4 +32,4 @@ jobs:
       run: busted spec
 
     - name: Check Lua syntax
-      run: luac -p main.lua suwayomi_api.lua suwayomi_client.lua suwayomi_debug.lua suwayomi_download_queue.lua suwayomi_downloader.lua suwayomi_paths.lua suwayomi_read_sync_worker.lua suwayomi_settings.lua suwayomi_ui.lua _meta.lua
+      run: find . -name '*.lua' -not -path './spec/*' -not -path './docs/*' -print0 | xargs -0 luac -p

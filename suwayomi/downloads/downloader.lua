@@ -1,7 +1,7 @@
 local lfs = require("lfs")
 local Archiver = require("ffi/archiver")
-local SuwayomiAPI = require("suwayomi_api")
-local SuwayomiPaths = require("suwayomi_paths")
+local SuwayomiAPI = require("suwayomi/api")
+local SuwayomiPaths = require("suwayomi/paths")
 
 local Downloader = {}
 

@@ -1,8 +1,8 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_paths", function()
+describe("suwayomi/paths", function()
     after_each(function()
-        package.loaded.suwayomi_paths = nil
+        package.loaded["suwayomi/paths"] = nil
         package.loaded["ffi/util"] = nil
         package.preload["ffi/util"] = nil
     end)
@@ -18,7 +18,7 @@ describe("suwayomi_paths", function()
                 end,
             }
         end
-        return require("suwayomi_paths")
+        return require("suwayomi/paths")
     end
 
     it("sanitizes unsafe and empty path segments", function()

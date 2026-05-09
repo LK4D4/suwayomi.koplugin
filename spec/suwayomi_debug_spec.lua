@@ -1,6 +1,6 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_debug", function()
+describe("suwayomi/debug", function()
     local logs
     local file_lines
     local loaded_configs
@@ -8,8 +8,8 @@ describe("suwayomi_debug", function()
     local original_io_open
 
     local function loadDebug()
-        package.loaded.suwayomi_debug = nil
-        local debug = require("suwayomi_debug")
+        package.loaded["suwayomi/debug"] = nil
+        local debug = require("suwayomi/debug")
         if debug._resetForTests then
             debug._resetForTests()
         end
@@ -21,7 +21,7 @@ describe("suwayomi_debug", function()
         file_lines = {}
         loaded_configs = {}
 
-        package.loaded.suwayomi_debug = nil
+        package.loaded["suwayomi/debug"] = nil
         package.loaded.datastorage = nil
         package.loaded.logger = nil
         package.loaded.socket = nil
@@ -82,7 +82,7 @@ describe("suwayomi_debug", function()
         package.preload.datastorage = nil
         package.preload.logger = nil
         package.preload.socket = nil
-        package.loaded.suwayomi_debug = nil
+        package.loaded["suwayomi/debug"] = nil
         package.loaded.datastorage = nil
         package.loaded.logger = nil
         package.loaded.socket = nil

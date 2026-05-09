@@ -1,6 +1,6 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_source_fetch_worker", function()
+describe("suwayomi/browse/source_fetch_worker", function()
     local original_io_open
     local original_os_rename
     local original_os_remove
@@ -64,21 +64,21 @@ describe("suwayomi_source_fetch_worker", function()
 
     before_each(function()
         install_file_mock()
-        package.loaded.suwayomi_source_fetch_worker = nil
-        package.loaded.suwayomi_api = nil
+        package.loaded["suwayomi/browse/source_fetch_worker"] = nil
+        package.loaded["suwayomi/api"] = nil
     end)
 
     after_each(function()
         io.open = original_io_open
         os.rename = original_os_rename
         os.remove = original_os_remove
-        package.loaded.suwayomi_source_fetch_worker = nil
-        package.loaded.suwayomi_api = nil
-        package.preload.suwayomi_api = nil
+        package.loaded["suwayomi/browse/source_fetch_worker"] = nil
+        package.loaded["suwayomi/api"] = nil
+        package.preload["suwayomi/api"] = nil
     end)
 
     it("fetches sources and writes the result atomically", function()
-        package.preload.suwayomi_api = function()
+        package.preload["suwayomi/api"] = function()
             return {
                 fetchSources = function(credentials)
                     return {
@@ -93,7 +93,7 @@ describe("suwayomi_source_fetch_worker", function()
             }
         end
 
-        local worker = require("suwayomi_source_fetch_worker")
+        local worker = require("suwayomi/browse/source_fetch_worker")
         local result = worker:run({ server_url = "https://suwayomi.example" }, "/settings/source_fetch.json")
 
         assert.is_true(result.ok)

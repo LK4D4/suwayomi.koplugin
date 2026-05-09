@@ -1,6 +1,6 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_download_queue", function()
+describe("suwayomi/downloads/queue", function()
     local original_io_open
     local original_os_remove
     local original_os_rename
@@ -72,8 +72,8 @@ describe("suwayomi_download_queue", function()
 
     local function build_queue(options)
         options = options or {}
-        package.loaded.suwayomi_download_queue = nil
-        local DownloadQueue = require("suwayomi_download_queue")
+        package.loaded["suwayomi/downloads/queue"] = nil
+        local DownloadQueue = require("suwayomi/downloads/queue")
         local scheduled = {}
         local saved_queue = options.saved_queue or {}
         local save_count = 0
@@ -249,7 +249,7 @@ describe("suwayomi_download_queue", function()
         io.open = original_io_open
         os.remove = original_os_remove
         os.rename = original_os_rename
-        package.loaded.suwayomi_download_queue = nil
+        package.loaded["suwayomi/downloads/queue"] = nil
         package.loaded.gettext = nil
         package.loaded["ffi/util"] = nil
         package.preload.gettext = nil

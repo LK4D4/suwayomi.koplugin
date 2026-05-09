@@ -1,6 +1,6 @@
 package.path = "?.lua;" .. package.path
 
-describe("suwayomi_settings", function()
+describe("suwayomi/settings", function()
     local flushed
     local stored_data
 
@@ -8,7 +8,7 @@ describe("suwayomi_settings", function()
         flushed = false
         stored_data = {}
 
-        package.loaded.suwayomi_settings = nil
+        package.loaded["suwayomi/settings"] = nil
         package.loaded.datastorage = nil
         package.loaded.luasettings = nil
 
@@ -58,7 +58,7 @@ describe("suwayomi_settings", function()
             auth_method = "basic_auth",
         }
 
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
         local credentials = settings:load()
 
         assert.are.equal("/mock/settings/suwayomi_dl.lua", settings.settings_file)
@@ -66,7 +66,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("saves credentials and flushes the settings file", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
         settings:save({
             server_url = "suwayomi.local:4567",
             username = "alice",
@@ -82,14 +82,14 @@ describe("suwayomi_settings", function()
     end)
 
     it("loads source languages with english enabled by default", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
         local source_languages = settings:loadSourceLanguages()
 
         assert.are.same({ "en" }, source_languages)
     end)
 
     it("saves source languages and flushes the settings file", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
         settings:saveSourceLanguages({ "en", "ru", "de" })
 
         assert.is_true(flushed)
@@ -97,7 +97,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("loads conservative browse settings by default", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         assert.are.same({
             show_nsfw_sources = false,
@@ -106,7 +106,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("saves normalized browse settings and flushes the settings file", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         local saved = settings:saveBrowseSettings({
             show_nsfw_sources = true,
@@ -122,7 +122,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("normalizes persisted browse settings", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
         stored_data.browse_settings = {
             show_nsfw_sources = 1,
             hide_in_library_results = true,
@@ -135,13 +135,13 @@ describe("suwayomi_settings", function()
     end)
 
     it("loads automatic library category picker behavior by default", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         assert.are.equal("automatic", settings:loadLibraryCategoryPickerBehavior())
     end)
 
     it("saves supported library category picker behavior", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         local saved = settings:saveLibraryCategoryPickerBehavior("always")
 
@@ -151,7 +151,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("normalizes unsupported library category picker behavior to automatic", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         stored_data.library_category_picker_behavior = "mystery"
 
@@ -160,7 +160,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("loads and saves source cache for the current server", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
         local cache = settings:saveSourceCache("https://suwayomi.example", {
             { id = "1", name = "Local source", lang = "localsourcelang" },
         }, 1777777777)
@@ -171,13 +171,13 @@ describe("suwayomi_settings", function()
     end)
 
     it("loads an empty download directory by default", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         assert.are.equal("", settings:loadDownloadDirectory())
     end)
 
     it("saves the download directory and flushes the settings file", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
         settings:saveDownloadDirectory("/storage/emulated/0/Books/Manga")
 
         assert.is_true(flushed)
@@ -185,7 +185,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("loads an empty download queue by default", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         assert.are.same({}, settings:loadDownloadQueue())
     end)
@@ -201,7 +201,7 @@ describe("suwayomi_settings", function()
             },
         }
 
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
         settings:saveDownloadQueue(jobs)
 
         assert.is_true(flushed)
@@ -209,13 +209,13 @@ describe("suwayomi_settings", function()
     end)
 
     it("loads two parallel chapter downloads by default", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         assert.are.equal(2, settings:loadMaxParallelChapterDownloads())
     end)
 
     it("clamps persisted parallel chapter downloads to the supported range", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         stored_data.max_parallel_chapter_downloads = 0
         assert.are.equal(1, settings:loadMaxParallelChapterDownloads())
@@ -228,7 +228,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("saves clamped parallel chapter download settings", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         local saved = settings:saveMaxParallelChapterDownloads(9)
 
@@ -238,13 +238,13 @@ describe("suwayomi_settings", function()
     end)
 
     it("loads keep-next unread downloads as off by default", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         assert.are.equal(0, settings:loadKeepNextUnreadDownloads())
     end)
 
     it("normalizes unsupported keep-next unread download values to off", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         stored_data.keep_next_unread_downloads = 17
         assert.are.equal(0, settings:loadKeepNextUnreadDownloads())
@@ -256,7 +256,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("saves supported keep-next unread download settings", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         local saved = settings:saveKeepNextUnreadDownloads(50)
 
@@ -266,7 +266,7 @@ describe("suwayomi_settings", function()
     end)
 
     it("loads an empty chapter ledger by default", function()
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
 
         assert.are.same({}, settings:loadChapterLedger())
     end)
@@ -280,7 +280,7 @@ describe("suwayomi_settings", function()
             },
         }
 
-        local settings = require("suwayomi_settings")
+        local settings = require("suwayomi/settings")
         settings:saveChapterLedger(ledger)
 
         assert.is_true(flushed)
