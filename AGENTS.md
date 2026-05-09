@@ -21,7 +21,8 @@
   - `suwayomi/client.lua`: Library/Browse orchestration that is not KOReader lifecycle glue.
   - `suwayomi/ui.lua`: KOReader menu/dialog construction helpers.
   - `suwayomi/settings.lua`, `suwayomi/paths.lua`, `suwayomi/debug.lua`: settings, source-scoped path layout, and debug logging.
-  - `suwayomi/downloads/queue.lua`: persistent device-local queue state, subprocess launch, polling, recovery, and status text.
+  - `suwayomi/downloads/queue.lua`: public download queue facade, subprocess launch, polling, and recovery orchestration.
+  - `suwayomi/downloads/job_store.lua`, `suwayomi/downloads/progress_file.lua`, `suwayomi/downloads/status_formatter.lua`: persisted queue schema, progress-file IO, and chapter download status text.
   - `suwayomi/downloads/downloader.lua`: one-chapter downloads, page validation, ordered CBZ writing, `.part` cleanup, and final rename.
   - `suwayomi/downloads/controller.lua`: top-level Downloads hub/menu orchestration.
   - `suwayomi/browse/source_catalog.lua` and `suwayomi/browse/source_fetch_worker.lua`: source filtering/cache and source fetch worker lifecycle.
