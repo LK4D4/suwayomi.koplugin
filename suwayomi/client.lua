@@ -321,7 +321,6 @@ function SuwayomiClient:showLibraryManga(category, credentials)
         end
     end, self:getHomeMenuOptions())
     if pending_library_menu_refresh then
-        pending_library_menu_refresh = false
         refreshLibraryMangaMenu()
     end
 end
@@ -590,7 +589,6 @@ function SuwayomiClient:showMangaForSource(source, options)
             end
         end, menu_options)
         if pending_manga_menu_refresh then
-            pending_manga_menu_refresh = false
             refreshMangaMenu()
         end
     end)

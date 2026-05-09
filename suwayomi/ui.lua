@@ -95,7 +95,8 @@ function SuwayomiUI.showDirectoryChooser(callback, start_dir)
         local item_table = PathChooser.genItemTable(self, dirs, files, path)
         if path then
             local current_folder_path = path .. "/."
-            for __, item in ipairs(item_table) do
+            for index = 1, #item_table do
+                local item = item_table[index]
                 if item.path == current_folder_path then
                     item.text = _("Use this folder")
                     item.bold = true

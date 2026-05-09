@@ -166,7 +166,6 @@ describe("suwayomi/ui", function()
                 new = function(_, options)
                     return {
                         chooseDir = function()
-                            chooser_start_dir = nil
                             shown_dialog = options
                         end,
                     }

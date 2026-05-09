@@ -1651,7 +1651,7 @@ describe("suwayomi/api", function()
                 },
                 sink = {
                     table = function(target)
-                        return function(chunk)
+                        return function()
                             table.insert(target, [[{"data":{"sources":{"nodes":[]}}}]])
                         end
                     end,
@@ -1886,7 +1886,7 @@ describe("suwayomi/api", function()
                 },
                 sink = {
                     table = function(target)
-                        return function(chunk)
+                        return function()
                             table.insert(target, [[{"data":{"sources":{"nodes":[]}}}]])
                         end
                     end,

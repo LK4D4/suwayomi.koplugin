@@ -76,14 +76,23 @@ Manual installation:
 
 ## Testing Locally
 
-This plugin uses Busted for unit testing. To run tests locally:
+This plugin targets KOReader's LuaJIT runtime. Local checks use Luacheck for
+repo-wide parsing/linting and Busted for unit tests:
 
 ```bash
-# Install busted via luarocks
+# Confirm LuaRocks is configured for LuaJIT
+luarocks config lua_interpreter
+
+# Install test and lint dependencies via LuaJIT-backed LuaRocks
 luarocks install busted
+luarocks install dkjson
+luarocks install luacheck
+
+# Run lint, including syntax parsing for all Lua files
+luacheck --codes .
 
 # Run tests
-busted spec/
+busted spec
 ```
 
 ## Contributing

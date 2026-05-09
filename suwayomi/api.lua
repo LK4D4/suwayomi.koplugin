@@ -645,7 +645,7 @@ function SuwayomiAPI.downloadBinary(credentials, page_url)
     if ok_socket and socket and socket.gettime then
         started_at = socket.gettime()
     end
-    local ok, code, headers = client.request{
+    local ok, code, response_headers = client.request{
         url = request_url,
         method = "GET",
         headers = headers,
@@ -653,7 +653,7 @@ function SuwayomiAPI.downloadBinary(credentials, page_url)
         timeout = REQUEST_TIMEOUT_SECONDS,
     }
 
-    headers = headers or {}
+    response_headers = response_headers or {}
     local body = table.concat(response_chunks)
     local finished_at = os.time()
     if ok_socket and socket and socket.gettime then
@@ -673,7 +673,7 @@ function SuwayomiAPI.downloadBinary(credentials, page_url)
         return {
             ok = true,
             body = body,
-            content_type = headers["content-type"] or headers["Content-Type"],
+            content_type = response_headers["content-type"] or response_headers["Content-Type"],
         }
     end
 

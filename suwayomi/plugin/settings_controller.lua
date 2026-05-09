@@ -7,13 +7,8 @@ External data: callers must continue to treat API responses, settings values, wo
 ]]
 
 local UIManager = require("ui/uimanager")
-local InfoMessage = require("ui/widget/infomessage")
-local SuwayomiAPI = require("suwayomi/api")
-local SuwayomiReadSyncWorker = require("suwayomi/readsync/worker")
-local SuwayomiSourceFetchWorker = require("suwayomi/browse/source_fetch_worker")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
-local SuwayomiDebug = require("suwayomi/debug")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
 local T = FFIUtil.template
@@ -218,8 +213,8 @@ function Methods:getDownloadDirectoryChooserStartDir()
         end
 
         if lfs.mkdir then
-            local ok = lfs.mkdir(manga_dir)
-            if ok and directoryExists(manga_dir) then
+            local created = lfs.mkdir(manga_dir)
+            if created and directoryExists(manga_dir) then
                 return manga_dir
             end
         end

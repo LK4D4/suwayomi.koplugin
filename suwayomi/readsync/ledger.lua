@@ -6,17 +6,7 @@ Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are req
 External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 ]]
 
-local UIManager = require("ui/uimanager")
-local InfoMessage = require("ui/widget/infomessage")
-local SuwayomiAPI = require("suwayomi/api")
-local SuwayomiReadSyncWorker = require("suwayomi/readsync/worker")
-local SuwayomiSourceFetchWorker = require("suwayomi/browse/source_fetch_worker")
 local SuwayomiSettings = require("suwayomi/settings")
-local SuwayomiUI = require("suwayomi/ui")
-local SuwayomiDebug = require("suwayomi/debug")
-local _ = require("gettext")
-local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
 
 local ReadSyncLedger = {}
 ReadSyncLedger.__index = ReadSyncLedger

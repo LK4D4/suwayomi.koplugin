@@ -107,7 +107,7 @@ function Methods:autoDeleteReadLocalDownload(manga, chapter, options)
     })
 end
 
-function Methods:autoDeleteReadLocalDownloadFromLedgerEntry(entry, ledger)
+function Methods:autoDeleteReadLocalDownloadFromLedgerEntry(entry)
     if self:getKeepNextUnreadDownloadsPolicyLimit() <= 0 then
         return false, "disabled"
     end

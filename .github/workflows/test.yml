@@ -11,25 +11,27 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
-    - name: Install Lua and LuaRocks
+    - uses: leafo/gh-actions-lua@v13
+      with:
+        luaVersion: "luajit-2.1"
+
+    - uses: leafo/gh-actions-luarocks@v6
+
+    - name: Show Lua environment
       run: |
-        sudo apt-get update
-        sudo apt-get install -y lua5.1 luarocks
-        lua5.1 -v
+        lua -v
         luarocks --version
 
     - name: Install dependencies
       run: |
-        luarocks install --local busted
-        luarocks install --local dkjson
+        luarocks install busted
+        luarocks install dkjson
+        luarocks install luacheck
 
-    - name: Add LuaRocks user bin to PATH
-      run: echo "$HOME/.luarocks/bin" >> "$GITHUB_PATH"
+    - name: Run lint
+      run: luacheck --codes .
 
     - name: Run tests
       run: busted spec
-
-    - name: Check Lua syntax
-      run: find . -name '*.lua' -not -path './spec/*' -not -path './docs/*' -print0 | xargs -0 luac -p

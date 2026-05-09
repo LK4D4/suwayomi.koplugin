@@ -7,9 +7,6 @@ External data: callers must continue to treat API responses, settings values, wo
 ]]
 
 local UIManager = require("ui/uimanager")
-local InfoMessage = require("ui/widget/infomessage")
-local SuwayomiAPI = require("suwayomi/api")
-local SuwayomiReadSyncWorker = require("suwayomi/readsync/worker")
 local SuwayomiSourceFetchWorker = require("suwayomi/browse/source_fetch_worker")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")

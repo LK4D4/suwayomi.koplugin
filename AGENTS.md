@@ -2,18 +2,20 @@
 
 ## Commands
 
-- On fresh Ubuntu runners/dev containers, install system tools first: `sudo apt-get install -y lua5.1 luarocks`.
-- Install local test deps like CI: `luarocks install --local busted` and `luarocks install --local dkjson`.
-- `luarocks --local` puts executables in `$HOME/.luarocks/bin`; use `PATH="$HOME/.luarocks/bin:$PATH" busted ...` unless that path is already exported.
+- CI installs LuaJIT with `leafo/gh-actions-lua@v13` and LuaRocks with `leafo/gh-actions-luarocks@v6`; local development should use LuaJIT too.
+- On fresh Ubuntu/dev containers, install local tools with `sudo apt-get install -y luajit luarocks`.
+- Verify LuaRocks is using LuaJIT before installing deps: `luarocks config lua_interpreter` should print a LuaJIT executable.
+- Install local test/lint deps like CI: `luarocks install --local busted`, `luarocks install --local dkjson`, and `luarocks install --local luacheck`.
+- `luarocks --local` puts executables in `$HOME/.luarocks/bin`; use `PATH="$HOME/.luarocks/bin:$PATH" ...` unless that path is already exported.
+- Run the full lint suite from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes .`.
 - Run the full test suite from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" busted spec`.
 - Run one spec file from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" busted spec/suwayomi_api_spec.lua`.
-- Match CI syntax checking with a Lua 5.1-compatible compiler: `find . -name '*.lua' -not -path './spec/*' -not -path './docs/*' -print0 | xargs -0 luac -p`.
-- On Windows, prefer PowerShell recursion for syntax checks: `Get-ChildItem -Recurse -Filter *.lua | Where-Object { $_.FullName -notmatch '\\spec\\|\\docs\\' } | ForEach-Object { luac -p $_.FullName }`.
+- `luacheck --codes .` provides repo-wide Lua parsing/syntax coverage; do not add a separate `luac` syntax pass.
 - Specs set `package.path = "?.lua;" .. package.path`; run `busted` from the plugin root or local module requires will not resolve.
 
 ## Project Shape
 
-- This is a Lua 5.1 KOReader plugin, not a standalone Lua app; KOReader modules such as `ui/uimanager`, `dispatcher`, `datastorage`, `ffi/util`, and `ffi/archiver` exist at runtime and are usually stubbed in specs.
+- This is a LuaJIT/Lua 5.1 KOReader plugin, not a standalone Lua app; KOReader modules such as `ui/uimanager`, `dispatcher`, `datastorage`, `ffi/util`, and `ffi/archiver` exist at runtime and are usually stubbed in specs.
 - KOReader requires `_meta.lua` and `main.lua` at the top of the `suwayomi_dl.koplugin/` directory. Keep `main.lua` as a thin lifecycle/composition shell: action registration, KOReader plugin callbacks, dependency construction, and compatibility delegators only. Do not add new feature logic to `main.lua` unless it is truly KOReader lifecycle glue.
 - Put runtime modules under the plugin-local `suwayomi/` namespace directory instead of adding top-level `suwayomi_*.lua` files. Use slash-style Lua requires that work with KOReader's plugin loader package path, for example `require("suwayomi/api")` or `require("suwayomi/downloads/controller")`.
 - Preferred target layout for new/extracted code:

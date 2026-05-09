@@ -1236,7 +1236,7 @@ return {
 
     it("opens shared manga actions for manga selected from library and can open chapters", function()
         local shown_library_manga
-        local shown_chapter_menu_options
+        local library_chapter_menu_options
         local shown_manga_actions
         local shown_manga_actions_callback
 
@@ -1277,7 +1277,7 @@ return {
                     error("unexpected category menu")
                 end,
                 showChapterMenu = function(options)
-                    shown_chapter_menu_options = options
+                    library_chapter_menu_options = options
                     return { name = "chapter-menu" }
                 end,
                 showMangaActionsMenu = function(options, onSelect)
@@ -1310,14 +1310,14 @@ return {
         assert.are.equal("Download next 10 unread", shown_manga_actions.actions[5].text)
         assert.are.equal("More...", shown_manga_actions.actions[6].text)
         assert.is_nil(shown_manga_actions.actions[7])
-        assert.is_nil(shown_chapter_menu_options)
+        assert.is_nil(library_chapter_menu_options)
 
         shown_manga_actions_callback(shown_manga_actions.actions[1])
 
         assert.are.equal("Sousou no Frieren", plugin.current_chapter_context.manga.title)
         assert.are.equal("Ch. 1", plugin.current_chapter_context.chapters[1].name)
-        assert.are.equal("Sousou no Frieren", shown_chapter_menu_options.title)
-        assert.is_true(#shown_chapter_menu_options.chapters > 0)
+        assert.are.equal("Sousou no Frieren", library_chapter_menu_options.title)
+        assert.is_true(#library_chapter_menu_options.chapters > 0)
     end)
 
     it("opens shared manga actions from a queued download chapter-list action", function()

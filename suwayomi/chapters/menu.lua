@@ -6,11 +6,6 @@ Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are req
 External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 ]]
 
-local UIManager = require("ui/uimanager")
-local InfoMessage = require("ui/widget/infomessage")
-local SuwayomiAPI = require("suwayomi/api")
-local SuwayomiReadSyncWorker = require("suwayomi/readsync/worker")
-local SuwayomiSourceFetchWorker = require("suwayomi/browse/source_fetch_worker")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
@@ -148,7 +143,7 @@ function Methods:buildChapterMenuOptions(manga, chapters, ledger)
         chapters = self:buildChapterMenuItems(manga, visible_chapters, ledger),
         title_bar_left_icon = "appbar.menu",
         on_title_bar_left_tap = function()
-            self:showBulkChapterActions(manga)
+            self:showBulkChapterActions()
             return true
         end,
     }
@@ -217,7 +212,7 @@ function Methods:buildQuickChapterMenuOptions(manga, chapters)
         chapters = self:buildQuickChapterMenuItems(manga, visible_chapters),
         title_bar_left_icon = "appbar.menu",
         on_title_bar_left_tap = function()
-            self:showBulkChapterActions(manga)
+            self:showBulkChapterActions()
             return true
         end,
     }
@@ -338,7 +333,7 @@ function Methods:showBulkDownloadActions()
 end
 
 
-function Methods:showBulkChapterActions(manga)
+function Methods:showBulkChapterActions()
     if not SuwayomiUI.showChapterActionsMenu then
         self:downloadSelectedChapters()
         return
