@@ -1,10 +1,9 @@
---[[
-SettingsController
-Responsibility: Owns settings menu orchestration and settings dialogs.
-Owned state: Accepts persisted settings values and user-selected filesystem paths; values stay normalized through suwayomi/settings.lua.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: SettingsController.
+--
+-- Responsibility: Owns settings menu orchestration and settings dialogs.
+-- Owned state: Accepts persisted settings values and user-selected filesystem paths; values stay normalized through suwayomi/settings.lua.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
 local SuwayomiSettings = require("suwayomi/settings")
@@ -180,96 +179,10 @@ function Methods:toggleBrowseSetting(key, touchmenu_instance)
 end
 
 
-function Methods:getDownloadDirectoryChooserStartDir()
-    local ok, lfs = pcall(require, "lfs")
-    if not ok or not lfs or not lfs.attributes then
-        return nil
-    end
-
-    local function directoryExists(path)
-        return path and path ~= "" and lfs.attributes(path, "mode") == "directory"
-    end
-
-    local function joinPath(base, name)
-        if base:sub(-1) == "/" then
-            return base .. name
-        end
-        return base .. "/" .. name
-    end
-
-    local function getDefaultMangaDirectory(home_dir)
-        if not directoryExists(home_dir) then
-            return nil
-        end
-
-        local books_dir = joinPath(home_dir, "Books")
-        if not directoryExists(books_dir) then
-            return nil
-        end
-
-        local manga_dir = joinPath(books_dir, "Manga")
-        if directoryExists(manga_dir) then
-            return manga_dir
-        end
-
-        if lfs.mkdir then
-            local created = lfs.mkdir(manga_dir)
-            if created and directoryExists(manga_dir) then
-                return manga_dir
-            end
-        end
-        return nil
-    end
-
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if directoryExists(download_directory) then
-        return download_directory
-    end
-
-    local reader_settings = _G.G_reader_settings
-    if reader_settings and reader_settings.readSetting then
-        local home_dir = reader_settings:readSetting("home_dir")
-        if directoryExists(home_dir) then
-            return home_dir
-        end
-    end
-
-    local device_ok, Device = pcall(require, "device")
-    if device_ok and Device and directoryExists(Device.home_dir) then
-        local default_manga_dir = getDefaultMangaDirectory(Device.home_dir)
-        if default_manga_dir then
-            return default_manga_dir
-        end
-        return Device.home_dir
-    end
-    return nil
-end
-
-
-function Methods:getDownloadDirectorySummary()
-    local path = SuwayomiSettings:loadDownloadDirectory()
-    if not path or path == "" then
-        return _("not set")
-    end
-
-    path = tostring(path):gsub("/+$", "")
-    local parts = {}
-    for part in path:gmatch("[^/]+") do
-        table.insert(parts, part)
-    end
-    if #parts >= 2 then
-        return parts[#parts - 1] .. "/" .. parts[#parts]
-    end
-    return path
-end
-
-
 function Methods:showDownloadDirectoryDialog(touchmenu_instance)
-    SuwayomiUI.showDirectoryChooser(function(path)
-        local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-        self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+    self:chooseDownloadDirectory(function()
         self:refreshSettingsMenu(touchmenu_instance)
-    end, self:getDownloadDirectoryChooserStartDir())
+    end)
 end
 
 

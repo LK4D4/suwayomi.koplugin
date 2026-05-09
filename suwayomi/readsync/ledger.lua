@@ -1,10 +1,9 @@
---[[
-ReadSyncLedger
-Responsibility: Owns read-ledger keys, upserts, pending batches, and downloaded chapter reconciliation.
-Owned state: Works on settings-backed ledger tables and keeps network sync decisions explicit for the controller.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: ReadSyncLedger.
+--
+-- Responsibility: Owns read-ledger keys, upserts, pending batches, and downloaded chapter reconciliation.
+-- Owned state: Works on settings-backed ledger tables and keeps network sync decisions explicit for the controller.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local SuwayomiSettings = require("suwayomi/settings")
 

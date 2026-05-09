@@ -1,10 +1,9 @@
---[[
-DownloadsController
-Responsibility: Owns the Downloads hub UI, retry/cancel actions, and keep-next-unread queue policy.
-Owned state: Uses the device-local queue only; it must not call Suwayomi server download mutations.
-Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
-External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-]]
+-- Boundary: DownloadsController.
+--
+-- Responsibility: Owns the Downloads hub UI, retry/cancel actions, and keep-next-unread queue policy.
+-- Owned state: Uses the device-local queue only; it must not call Suwayomi server download mutations.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
@@ -331,13 +330,10 @@ function Methods:keepNextUnreadChaptersDownloaded(limit)
     end
 
     local manga = self.current_chapter_context.manga
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        SuwayomiUI.showDirectoryChooser(function(path)
-            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+    local download_directory = self:getDownloadDirectoryOrChoose(function()
             self:keepNextUnreadChaptersDownloaded(limit)
-        end, self:getDownloadDirectoryChooserStartDir())
+    end)
+    if not download_directory then
         return 0
     end
 

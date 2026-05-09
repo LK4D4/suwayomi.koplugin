@@ -1,7 +1,14 @@
+-- Boundary: Browse source fetch worker process.
+--
+-- Responsibility: fetch sources in a subprocess-friendly module and write a
+-- small JSON result file for the controller to poll.
+-- Owned state: none.
+-- Dependencies: dkjson, Suwayomi API facade, and Lua file IO.
+-- External data: credentials, result paths, API responses, and filesystem
+-- writes are normalized into an explicit result file.
+
 local json = require("dkjson")
 local SuwayomiAPI = require("suwayomi/api")
-
--- luacheck: ignore self
 
 local SourceFetchWorker = {}
 

@@ -1,0 +1,306 @@
+-- Shared KOReader runtime harness for main.lua composition tests.
+--
+-- Keep this helper limited to plugin shell wiring. Domain controller behavior
+-- belongs in focused controller specs, while main_spec uses this harness to
+-- verify module installation, dispatcher registration, and lifecycle callbacks.
+
+local Helper = {}
+
+local MODULES_TO_CLEAR = {
+    "main",
+    "dispatcher",
+    "ffi/util",
+    "gettext",
+    "ui/uimanager",
+    "ui/widget/infomessage",
+    "ui/widget/container/widgetcontainer",
+    "suwayomi/api",
+    "suwayomi/client",
+    "suwayomi/downloads/queue",
+    "suwayomi/downloads/downloader",
+    "suwayomi/downloads/active_jobs",
+    "suwayomi/downloads/job_store",
+    "suwayomi/downloads/progress_file",
+    "suwayomi/downloads/status_formatter",
+    "suwayomi/readsync/worker",
+    "suwayomi/browse/source_fetch_worker",
+    "suwayomi/ui",
+    "suwayomi/settings",
+    "suwayomi/debug",
+    "suwayomi/plugin/home",
+    "suwayomi/plugin/settings_controller",
+    "suwayomi/browse/source_catalog",
+    "suwayomi/browse/controller",
+    "suwayomi/downloads/directory",
+    "suwayomi/manga/controller",
+    "suwayomi/chapters/context",
+    "suwayomi/chapters/menu",
+    "suwayomi/chapters/actions",
+    "suwayomi/chapters/local_downloads",
+    "suwayomi/chapters/delete_actions",
+    "suwayomi/chapters/read_actions",
+    "suwayomi/downloads/controller",
+    "suwayomi/readsync/ledger",
+    "suwayomi/readsync/koreader_metadata",
+    "suwayomi/readsync/controller",
+    "datastorage",
+    "luasettings",
+    "lfs",
+    "device",
+}
+
+function Helper.clearModules()
+    for _, name in ipairs(MODULES_TO_CLEAR) do
+        package.loaded[name] = nil
+    end
+end
+
+function Helper.clearPreloads()
+    for _, name in ipairs(MODULES_TO_CLEAR) do
+        package.preload[name] = nil
+    end
+end
+
+local function identity_gettext(text)
+    return text
+end
+
+function Helper.install(options)
+    options = options or {}
+    Helper.clearModules()
+    Helper.clearPreloads()
+
+    local state = {
+        registered_actions = {},
+        registered_menu_plugin = nil,
+        shown_home_dialog = nil,
+        queue_instances = {},
+        client_instances = {},
+        debug_events = {},
+        api_debug_logger = nil,
+    }
+
+    package.preload.dispatcher = function()
+        return {
+            registerAction = function(_, name, definition)
+                table.insert(state.registered_actions, {
+                    name = name,
+                    definition = definition,
+                })
+            end,
+        }
+    end
+
+    package.preload.gettext = function()
+        return identity_gettext
+    end
+
+    package.preload["ffi/util"] = function()
+        return {
+            template = function(template_string, ...)
+                local result = template_string
+                local values = {...}
+                for index, value in ipairs(values) do
+                    result = result:gsub("%%" .. index, tostring(value))
+                end
+                return result
+            end,
+            runInSubProcess = function(callback)
+                if callback then
+                    callback()
+                end
+                return 1234
+            end,
+            isSubProcessDone = function()
+                return true
+            end,
+        }
+    end
+
+    package.preload["ui/uimanager"] = function()
+        return {
+            show = function() end,
+            close = function() end,
+            nextTick = function(_, callback)
+                if callback then
+                    callback()
+                end
+            end,
+            scheduleIn = function() end,
+            setDirty = function() end,
+            forceRePaint = function() end,
+        }
+    end
+
+    package.preload["ui/widget/infomessage"] = function()
+        return {
+            new = function(_, widget_options)
+                return widget_options or {}
+            end,
+        }
+    end
+
+    package.preload["ui/widget/container/widgetcontainer"] = function()
+        local WidgetContainer = {}
+
+        function WidgetContainer:extend(definition)
+            definition.__index = definition
+            return setmetatable(definition, {
+                __index = self,
+                __call = function(class, instance)
+                    instance = instance or {}
+                    setmetatable(instance, class)
+                    return instance
+                end,
+            })
+        end
+
+        return WidgetContainer
+    end
+
+    package.preload["suwayomi/api"] = function()
+        return {
+            setDebugLogger = function(logger)
+                state.api_debug_logger = logger
+            end,
+        }
+    end
+
+    package.preload["suwayomi/client"] = function()
+        local Client = {}
+
+        function Client:new(client_options)
+            local instance = {
+                options = client_options,
+            }
+            table.insert(state.client_instances, instance)
+            return instance
+        end
+
+        return Client
+    end
+
+    package.preload["suwayomi/downloads/queue"] = function()
+        local Queue = {}
+
+        function Queue:new(queue_options)
+            local instance = {
+                options = queue_options,
+                max_active_chapters = queue_options and queue_options.max_active_chapters,
+                recovered = false,
+            }
+
+            function instance:recover()
+                self.recovered = true
+            end
+
+            table.insert(state.queue_instances, instance)
+            return instance
+        end
+
+        return Queue
+    end
+
+    package.preload["suwayomi/downloads/downloader"] = function()
+        return {}
+    end
+
+    package.preload["suwayomi/readsync/worker"] = function()
+        return {}
+    end
+
+    package.preload["suwayomi/browse/source_fetch_worker"] = function()
+        return {}
+    end
+
+    package.preload["suwayomi/ui"] = function()
+        return {
+            showHomeDialog = function(dialog_options)
+                state.shown_home_dialog = dialog_options
+            end,
+        }
+    end
+
+    package.preload["suwayomi/settings"] = function()
+        return {
+            load = function()
+                return options.credentials or {
+                    server_url = "https://suwayomi.example",
+                }
+            end,
+            loadMaxParallelChapterDownloads = function()
+                return options.max_parallel_chapter_downloads or 2
+            end,
+            loadDownloadQueue = function()
+                return {}
+            end,
+            saveDownloadQueue = function(_, jobs)
+                return jobs
+            end,
+            loadChapterLedger = function()
+                return {}
+            end,
+            saveChapterLedger = function(_, ledger)
+                return ledger
+            end,
+        }
+    end
+
+    package.preload["suwayomi/debug"] = function()
+        return {
+            log = function(event)
+                table.insert(state.debug_events, event)
+            end,
+        }
+    end
+
+    package.preload.datastorage = function()
+        return {
+            getSettingsDir = function()
+                return "/settings"
+            end,
+        }
+    end
+
+    package.preload.luasettings = function()
+        return {
+            open = function()
+                return {
+                    readSetting = function(_, _, default)
+                        return default
+                    end,
+                    saveSetting = function(self)
+                        return self
+                    end,
+                    flush = function() end,
+                }
+            end,
+        }
+    end
+
+    package.preload.lfs = function()
+        return {
+            attributes = function()
+                return nil
+            end,
+            mkdir = function()
+                return true
+            end,
+        }
+    end
+
+    package.preload.device = function()
+        return {
+            home_dir = "/device-home",
+        }
+    end
+
+    return state
+end
+
+function Helper.teardown()
+    Helper.clearModules()
+    Helper.clearPreloads()
+end
+
+return Helper

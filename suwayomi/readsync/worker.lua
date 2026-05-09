@@ -1,3 +1,12 @@
+-- Boundary: read-sync worker process.
+--
+-- Responsibility: mark read batches through the API facade and write a compact
+-- JSON result file for the read-sync controller.
+-- Owned state: none.
+-- Dependencies: dkjson, Suwayomi API facade, and Lua file IO.
+-- External data: credentials, chapter IDs, result paths, and API responses are
+-- normalized into explicit success/failure records.
+
 local json = require("dkjson")
 local SuwayomiAPI = require("suwayomi/api")
 

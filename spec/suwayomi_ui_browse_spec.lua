@@ -1,0 +1,308 @@
+package.path = "?.lua;" .. package.path
+
+-- Browse UI specs cover menu/widget construction only. Controller specs own the
+-- business decisions behind source selection, searches, and library navigation.
+describe("suwayomi/ui/browse", function()
+    local shown_dialog
+    local closed_dialog
+    local events
+
+    before_each(function()
+        shown_dialog = nil
+        closed_dialog = nil
+        events = {}
+
+        package.loaded["suwayomi/ui/browse"] = nil
+        package.loaded["suwayomi/ui/menu_utils"] = nil
+        package.loaded.gettext = nil
+        package.loaded["ui/widget/menu"] = nil
+        package.loaded["ui/widget/multiinputdialog"] = nil
+        package.loaded["ui/uimanager"] = nil
+
+        package.preload.gettext = function()
+            return function(text)
+                return text
+            end
+        end
+
+        package.preload["ui/widget/menu"] = function()
+            return {
+                new = function(_, options)
+                    return options
+                end,
+            }
+        end
+
+        package.preload["ui/widget/multiinputdialog"] = function()
+            return {
+                new = function(_, options)
+                    options.getFields = function()
+                        return { "frieren" }
+                    end
+                    options.onShowKeyboard = function() end
+                    return options
+                end,
+            }
+        end
+
+        package.preload["ui/uimanager"] = function()
+            return {
+                show = function(_, widget)
+                    shown_dialog = widget
+                end,
+                close = function(_, widget)
+                    closed_dialog = widget
+                    table.insert(events, "close")
+                end,
+            }
+        end
+    end)
+
+    after_each(function()
+        package.preload.gettext = nil
+        package.preload["ui/widget/menu"] = nil
+        package.preload["ui/widget/multiinputdialog"] = nil
+        package.preload["ui/uimanager"] = nil
+    end)
+
+    it("shows a sources menu with global search and source callbacks", function()
+        local browse = require("suwayomi/ui/browse")
+        local selected = {}
+        local global_search_started = false
+
+        browse.showSourcesMenu({
+            { id = "s1", name = "MangaDex" },
+            { id = "s2", name = "ComicK" },
+        }, function(source)
+            table.insert(selected, source)
+        end, {
+            on_global_search = function()
+                global_search_started = true
+            end,
+        })
+
+        assert.are.equal("Suwayomi Sources", shown_dialog.title)
+        assert.are.equal("Global search", shown_dialog.item_table[1].text)
+        assert.are.equal("MangaDex", shown_dialog.item_table[2].text)
+        assert.are.equal("ComicK", shown_dialog.item_table[3].text)
+
+        shown_dialog.item_table[1].callback()
+        shown_dialog.item_table[2].callback()
+        shown_dialog.item_table[3].callback()
+
+        assert.is_true(global_search_started)
+        assert.are.same({
+            { id = "s1", name = "MangaDex" },
+            { id = "s2", name = "ComicK" },
+        }, selected)
+    end)
+
+    it("shows a source mode menu and hides latest when unsupported", function()
+        local browse = require("suwayomi/ui/browse")
+        local selected = {}
+
+        browse.showSourceModeMenu({
+            id = "s1",
+            name = "MangaDex",
+            supports_latest = false,
+        }, function(mode)
+            table.insert(selected, mode)
+        end)
+
+        assert.are.equal("MangaDex", shown_dialog.title)
+        assert.are.equal("Popular", shown_dialog.item_table[1].text)
+        assert.are.equal("Search", shown_dialog.item_table[2].text)
+        assert.is_nil(shown_dialog.item_table[3])
+
+        shown_dialog.item_table[1].callback()
+        shown_dialog.item_table[2].callback()
+
+        assert.are.same({ "POPULAR", "SEARCH" }, selected)
+    end)
+
+    it("shows latest for unknown source support and collects search queries", function()
+        local browse = require("suwayomi/ui/browse")
+        local selected_mode
+        local searched_query
+        local global_query
+
+        browse.showSourceModeMenu({
+            id = "s1",
+            name = "MangaDex",
+        }, function(mode)
+            selected_mode = mode
+        end)
+
+        assert.are.equal("Latest", shown_dialog.item_table[2].text)
+        shown_dialog.item_table[2].callback()
+        assert.are.equal("LATEST", selected_mode)
+
+        browse.showSourceSearchPrompt({
+            id = "s1",
+            name = "MangaDex",
+        }, function(query)
+            searched_query = query
+        end)
+
+        assert.are.equal("Search MangaDex", shown_dialog.title)
+        shown_dialog.getFields = function()
+            return { " frieren " }
+        end
+        shown_dialog.buttons[1][2].callback()
+        assert.are.equal(" frieren ", searched_query)
+        assert.are.equal(shown_dialog, closed_dialog)
+
+        browse.showGlobalSearchPrompt(function(query)
+            global_query = query
+        end)
+        assert.are.equal("Global search", shown_dialog.title)
+        shown_dialog.getFields = function()
+            return { "dandadan" }
+        end
+        shown_dialog.buttons[1][2].callback()
+        assert.are.equal("dandadan", global_query)
+    end)
+
+    it("shows global search summaries and opens only successful or pageable source rows", function()
+        local browse = require("suwayomi/ui/browse")
+        local selected = {}
+
+        browse.showGlobalSearchResultsMenu({
+            {
+                source = { id = "s1", name = "MangaDex" },
+                status = "ok",
+                first_match = { title = "Frieren Beyond Journey's End" },
+            },
+            {
+                source = { id = "s4", name = "More Source" },
+                status = "pageable_empty",
+                has_next_page = true,
+                query = "frieren",
+            },
+            {
+                source = { id = "s2", name = "ComicK" },
+                status = "empty",
+            },
+            {
+                source = { id = "s3", name = "Some Source" },
+                status = "error",
+                error = "Timed out",
+            },
+        }, function(summary)
+            table.insert(selected, summary)
+        end)
+
+        assert.are.equal("Global search", shown_dialog.title)
+        assert.are.equal("MangaDex: Frieren Beyond Journey's End", shown_dialog.item_table[1].text)
+        assert.are.equal("More Source: More results", shown_dialog.item_table[2].text)
+        assert.are.equal("ComicK: No results", shown_dialog.item_table[3].text)
+        assert.are.equal("Some Source: Error - Timed out", shown_dialog.item_table[4].text)
+
+        shown_dialog.item_table[1].callback()
+        shown_dialog.item_table[2].callback()
+        shown_dialog.item_table[3].callback()
+        shown_dialog.item_table[4].callback()
+
+        assert.are.equal("s1", selected[1].source.id)
+        assert.are.equal("s4", selected[2].source.id)
+        assert.are.equal(2, #selected)
+    end)
+
+    it("shows compact browse result markers, title, and paging rows", function()
+        local browse = require("suwayomi/ui/browse")
+        local selected = {}
+        local paging = {}
+
+        browse.showMangaMenu({
+            { id = "m1", title = "Already Added", in_library = true },
+            { id = "m2", title = "New Find", in_library = false },
+            { id = "m3", title = "Unknown State" },
+        }, function(manga)
+            table.insert(selected, manga.id)
+        end, {
+            title = "MangaDex (EN) - Search: frieren - Page 2",
+            on_previous_page = function()
+                table.insert(paging, "previous")
+            end,
+            on_next_page = function()
+                table.insert(paging, "next")
+            end,
+        })
+
+        assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_dialog.title)
+        assert.are.equal("Previous page", shown_dialog.item_table[1].text)
+        assert.are.equal("[+] Already Added", shown_dialog.item_table[2].text)
+        assert.are.equal("[ ] New Find", shown_dialog.item_table[3].text)
+        assert.are.equal("[ ] Unknown State", shown_dialog.item_table[4].text)
+        assert.are.equal("Next page", shown_dialog.item_table[5].text)
+
+        shown_dialog.item_table[1].callback()
+        shown_dialog.item_table[2].callback()
+        shown_dialog.item_table[5].callback()
+
+        assert.are.same({ "previous", "next" }, paging)
+        assert.are.same({ "m1" }, selected)
+    end)
+
+    it("updates a manga menu title bar in place", function()
+        local browse = require("suwayomi/ui/browse")
+        local title_bar_title
+        local left_icon
+        local menu = {
+            title = "MangaDex - Popular - Page 1",
+            title_bar = {
+                setTitle = function(_, title, refresh)
+                    title_bar_title = { title = title, refresh = refresh }
+                end,
+            },
+            setTitleBarLeftIcon = function(_, icon)
+                left_icon = icon
+            end,
+            updateItems = function(self)
+                self.updated = true
+            end,
+        }
+
+        browse.updateMangaMenu(menu, {
+            { id = "m2", title = "Page 2" },
+        }, function() end, {
+            title = "MangaDex - Popular - Page 2",
+            title_bar_left_icon = "appbar.filebrowser",
+        })
+
+        assert.are.equal("MangaDex - Popular - Page 2", menu.title)
+        assert.are.same({ title = "MangaDex - Popular - Page 2", refresh = true }, title_bar_title)
+        assert.are.equal("appbar.filebrowser", left_icon)
+        assert.is_true(menu.updated)
+    end)
+
+    it("shows library category and manga menus", function()
+        local browse = require("suwayomi/ui/browse")
+        local selected_category
+        local selected_manga
+
+        browse.showLibraryCategoryMenu({
+            { id = 0, name = "Default", manga_count = 2 },
+            { id = 7, name = "Favorites" },
+        }, function(category)
+            selected_category = category
+        end)
+
+        assert.are.equal("Suwayomi Library", shown_dialog.title)
+        assert.are.equal("Default (2)", shown_dialog.item_table[1].text)
+        assert.are.equal("Favorites", shown_dialog.item_table[2].text)
+        shown_dialog.item_table[1].callback()
+        assert.are.same({ id = 0, name = "Default", manga_count = 2 }, selected_category)
+
+        browse.showLibraryMangaMenu({
+            { id = "m1", title = "Sousou no Frieren", menu_text = "Frieren [12 unread]" },
+        }, function(manga)
+            selected_manga = manga
+        end)
+
+        assert.are.equal("Suwayomi Library", shown_dialog.title)
+        assert.are.equal("Frieren [12 unread]", shown_dialog.item_table[1].text)
+        shown_dialog.item_table[1].callback()
+        assert.are.same({ id = "m1", title = "Sousou no Frieren", menu_text = "Frieren [12 unread]" }, selected_manga)
+    end)
+end)

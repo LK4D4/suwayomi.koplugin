@@ -1,4 +1,12 @@
-local Dispatcher = require("dispatcher") -- luacheck:ignore
+-- Boundary: KOReader plugin lifecycle and composition shell.
+--
+-- Responsibility: register KOReader actions, compose controller method tables,
+-- and lazily construct shared runtime services.
+-- Owned state: plugin instance fields only.
+-- Dependencies: KOReader runtime modules and plugin-local suwayomi/* modules.
+-- External data: delegated to focused controllers and services.
+
+local Dispatcher = require("dispatcher")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local SuwayomiAPI = require("suwayomi/api")
@@ -10,6 +18,7 @@ local SuwayomiDebug = require("suwayomi/debug")
 local HomeController = require("suwayomi/plugin/home")
 local SettingsController = require("suwayomi/plugin/settings_controller")
 local BrowseController = require("suwayomi/browse/controller")
+local DownloadsDirectory = require("suwayomi/downloads/directory")
 local MangaController = require("suwayomi/manga/controller")
 local ChapterContext = require("suwayomi/chapters/context")
 local ChapterMenu = require("suwayomi/chapters/menu")
@@ -133,6 +142,7 @@ local CONTROLLER_MODULES = {
     HomeController,
     SettingsController,
     BrowseController,
+    DownloadsDirectory,
     MangaController,
     ChapterContext,
     ChapterMenu,

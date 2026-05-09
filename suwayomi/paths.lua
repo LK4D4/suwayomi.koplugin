@@ -1,3 +1,12 @@
+-- Boundary: source-scoped download path layout.
+--
+-- Responsibility: sanitize path segments and build manga/chapter paths using
+-- the supported <download>/<source>/<manga>/<chapter>.cbz layout.
+-- Owned state: none.
+-- Dependencies: KOReader ffi/util path join helper.
+-- External data: source, manga, and chapter labels are sanitized before becoming
+-- filesystem path segments.
+
 local FFIUtil = require("ffi/util")
 
 local SuwayomiPaths = {}

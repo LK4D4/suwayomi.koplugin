@@ -1,3 +1,11 @@
+-- Boundary: library and browse orchestration client.
+--
+-- Responsibility: coordinate API calls, loading messages, browse/library menus,
+-- and controller callbacks that are not KOReader plugin lifecycle glue.
+-- Owned state: injected API/UI/settings/debug/plugin dependencies.
+-- Dependencies: supplied through new() so specs can stub runtime services.
+-- External data: API results and settings values are checked before rendering.
+
 local SuwayomiClient = {}
 SuwayomiClient.__index = SuwayomiClient
 

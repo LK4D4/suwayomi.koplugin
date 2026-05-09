@@ -1,3 +1,12 @@
+-- Boundary: persisted plugin settings.
+--
+-- Responsibility: load, normalize, save, and flush Suwayomi plugin settings from
+-- KOReader's settings directory.
+-- Owned state: cached LuaSettings handle and settings file path.
+-- Dependencies: datastorage and luasettings.
+-- External data: stored settings tables are treated as optional and normalized
+-- before callers consume them.
+
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
 

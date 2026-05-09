@@ -1,17 +1,13 @@
---[[
-ChapterActions
-Responsibility: Public chapter action facade composed from focused action modules plus remaining download/bulk orchestration.
-Owned state: State stays on the plugin instance so KOReader callbacks keep stable method names and return values.
-Dependencies: Focused chapter action modules, KOReader UI helpers, settings, debug timing, and gettext.
-External data: API responses, settings values, queue status, worker files, and filesystem paths remain untrusted at module boundaries.
-]]
+-- Boundary: ChapterActions.
+--
+-- Responsibility: Public chapter action facade composed from focused action modules plus remaining download/bulk orchestration.
+-- Owned state: State stays on the plugin instance so KOReader callbacks keep stable method names and return values.
+-- Dependencies: Focused chapter action modules, KOReader UI helpers, settings, debug timing, and gettext.
+-- External data: API responses, settings values, queue status, worker files, and filesystem paths remain untrusted at module boundaries.
 
-local UIManager = require("ui/uimanager")
 local ChapterDeleteActions = require("suwayomi/chapters/delete_actions")
 local ChapterLocalDownloads = require("suwayomi/chapters/local_downloads")
 local ChapterReadActions = require("suwayomi/chapters/read_actions")
-local SuwayomiSettings = require("suwayomi/settings")
-local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
@@ -153,13 +149,10 @@ function Methods:confirmNextUnreadChapterDownloads(limit)
     end
 
     local manga = self.current_chapter_context.manga
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        SuwayomiUI.showDirectoryChooser(function(path)
-            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+    local download_directory = self:getDownloadDirectoryOrChoose(function()
             self:confirmNextUnreadChapterDownloads(limit)
-        end, self:getDownloadDirectoryChooserStartDir())
+    end)
+    if not download_directory then
         return 0
     end
 
@@ -182,34 +175,16 @@ function Methods:confirmNextUnreadChapterDownloads(limit)
 end
 
 
-function Methods:getDownloadDirectoryOrChoose(callback)
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if download_directory and download_directory ~= "" then
-        return download_directory
-    end
-
-    SuwayomiUI.showDirectoryChooser(function(path)
-        local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-        self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
-        callback(saved_path)
-    end, self:getDownloadDirectoryChooserStartDir())
-    return nil
-end
-
-
 function Methods:enqueueNextUnreadChapterDownloads(limit)
     if not self.current_chapter_context then
         return 0
     end
 
     local manga = self.current_chapter_context.manga
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        SuwayomiUI.showDirectoryChooser(function(path)
-            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+    local download_directory = self:getDownloadDirectoryOrChoose(function()
             self:enqueueNextUnreadChapterDownloads(limit)
-        end, self:getDownloadDirectoryChooserStartDir())
+    end)
+    if not download_directory then
         return 0
     end
 
@@ -235,13 +210,10 @@ function Methods:downloadSelectedChapters()
         return 0
     end
 
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        SuwayomiUI.showDirectoryChooser(function(path)
-            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+    local download_directory = self:getDownloadDirectoryOrChoose(function(saved_path)
             self:enqueueSelectedChapterDownloads(manga, chapters, saved_path)
-        end, self:getDownloadDirectoryChooserStartDir())
+    end)
+    if not download_directory then
         return 0
     end
 
@@ -526,15 +498,10 @@ end
 
 
 function Methods:enqueueChapterDownload(manga, chapter)
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        SuwayomiUI.showDirectoryChooser(function(path)
-            local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
-            UIManager:nextTick(function()
-                self:enqueueChapterDownload(manga, chapter)
-            end)
-        end, self:getDownloadDirectoryChooserStartDir())
+    local download_directory = self:getDownloadDirectoryOrChoose(function()
+        self:enqueueChapterDownload(manga, chapter)
+    end, { next_tick = true })
+    if not download_directory then
         return
     end
 

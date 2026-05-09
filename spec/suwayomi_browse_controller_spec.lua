@@ -6,6 +6,9 @@ describe("suwayomi/browse/controller", function()
     it("exports source cache, worker, and browse flow methods", function()
         helper.assertControllerModule("suwayomi/browse/controller", {
             "filterSourcesByLanguage",
+            "showFetchedSources",
+            "showCachedSources",
+            "showMangaForSource",
             "startSourceFetchWorker",
             "pollSourceFetch",
             "browseSuwayomi",

@@ -1,10 +1,9 @@
---[[
-ChapterReadActions
-Responsibility: Mark chapters read/unread and coordinate local metadata, ledger, read-sync, and keep-next policy side effects.
-Owned state: Mutates current chapter context and settings-backed read ledger through plugin methods.
-Dependencies: Plugin mixin methods and Suwayomi debug timing.
-External data: Manga/chapter tables may come from API responses or cached UI state and are matched by stable ids.
-]]
+-- Boundary: ChapterReadActions.
+--
+-- Responsibility: Mark chapters read/unread and coordinate local metadata, ledger, read-sync, and keep-next policy side effects.
+-- Owned state: Mutates current chapter context and settings-backed read ledger through plugin methods.
+-- Dependencies: Plugin mixin methods and Suwayomi debug timing.
+-- External data: Manga/chapter tables may come from API responses or cached UI state and are matched by stable ids.
 
 local SuwayomiDebug = require("suwayomi/debug")
 

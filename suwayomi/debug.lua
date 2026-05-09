@@ -1,3 +1,11 @@
+-- Boundary: optional debug logging.
+--
+-- Responsibility: load debug settings, redact sensitive values, and send
+-- structured SuwayomiDL-prefixed logs when enabled.
+-- Owned state: cached logger, settings dir, and debug config.
+-- Dependencies: KOReader logger/datastorage/luasettings when available.
+-- External data: log payloads are redacted before leaving this module.
+
 local Debug = {}
 
 local logger
