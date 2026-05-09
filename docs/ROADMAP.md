@@ -69,7 +69,7 @@ Current limitations:
 - Chapter API requests preserve scanlator data, and chapter lists can be filtered by scanlator/translation group.
 - Automatic read-download cleanup is tied to the local keep-next-unread policy rather than a separate delete-while-reading toggle.
 - Full dynamic source filter editing is deferred.
-- Remote source workflow verification remains Phase 8 work.
+- Remote source workflow verification has started. A Boox Palma live pass verified Comick Latest -> chapter list -> scanlator filter -> read-state toggles -> local CBZ download/open. Source-specific search timeout behavior remains a release-readiness risk even though global search is now partial and cancellable.
 - The codebase is now split into facades/controllers/submodules; the next risk is validating the unit-covered remote-source flows on real sources and devices.
 
 ## Suwayomi-WebUI Alignment Review
@@ -380,50 +380,59 @@ Tests:
 
 Exit criteria:
 
-- A user can search across sources or within one source, page results, add a manga to the library, and open its chapter list in unit-covered flows. Live remote-source verification remains Phase 8.
+- A user can search across sources or within one source, page results, add a manga to the library, and open its chapter list in unit-covered flows. Global search is cancellable and isolates per-source failures. Live remote-source verification found usable browse/latest flows and a source-specific search timeout hardening gap.
 
 ## Phase 8: Remote Source Verification
 
 Goal: prove the client MVP works with real remote source flows and the first release scenario.
 
 - [ ] Verify end-to-end release scenario:
-  - global search or source search
-  - open manga chapter list
-  - filter by scanlator/translation group
-  - mark selected/previous chapters read
-  - download whole manga or all unread chapters
-  - keep next unread downloaded
-  - read/open local CBZ in KOReader
-  - best-effort read sync and automatic local cleanup when enabled
+  - [ ] global search or source search
+  - [x] open manga chapter list
+  - [x] filter by scanlator/translation group
+  - [x] mark individual chapters read/unread
+  - [ ] mark selected/previous chapters read
+  - [ ] download whole manga or all unread chapters
+  - [ ] keep next unread downloaded
+  - [x] read/open local CBZ in KOReader
+  - [ ] best-effort read sync and automatic local cleanup when enabled
 - [ ] Verify MangaDex search, library add/remove, refresh, chapter listing, and download
+  - [x] Search returned results quickly on the tested server.
+  - [x] Add/remove library worked for the tested MangaDex result.
+  - [ ] Refresh/chapter listing/download remain source-data blocked for one tested result: direct GraphQL returned `No chapters found`.
 - [ ] Verify Comick search, library add/remove, refresh, chapter listing, and download
+  - [ ] Text search timed out on the tested server after about 60 seconds with `wantread` in KOReader and HTTP 504 through direct GraphQL.
+  - [x] Latest returned 54 results over 4 pages.
+  - [x] A manga selected from Latest refreshed/opened chapters successfully.
+  - [x] Scanlator filter exposed duplicate translation groups.
+  - [x] Single-chapter download completed and opened in KOReader.
 - [ ] Verify Local source still works with source-scoped paths
 - [ ] Confirm Downloads shows KOReader-local queue state
-- [ ] Confirm KOReader-local download does not call Suwayomi server download queue mutations
-- [ ] Confirm server-side downloaded state is not treated as KOReader-local availability
-- [ ] Confirm downloaded CBZ chapters can be opened from KOReader's normal file manager
-- [ ] Confirm plugin `Open` actions remain shortcuts into KOReader rather than custom reader flows
-- [ ] Confirm Settings exposes Connection, Library, Browse, and Downloads on device
-- [ ] Document any source-specific quirks in debug notes or README
+- [x] Confirm KOReader-local download does not call Suwayomi server download queue mutations
+- [x] Confirm server-side downloaded state is not treated as KOReader-local availability
+- [x] Confirm downloaded CBZ chapters can be opened from KOReader's normal file manager
+- [x] Confirm plugin `Open` actions remain shortcuts into KOReader rather than custom reader flows
+- [x] Confirm Settings exposes Connection, Library, Browse, and Downloads on device
+- [x] Document any source-specific quirks in debug notes or README
 - [ ] Add regression tests for any live-server bug that can be reasonably reproduced in unit tests
 
 Exit criteria:
 
-- Remote source support can be described as usable for the tested sources.
-- The release scenario works on at least one remote source with duplicate scanlator/translation choices.
-- The README no longer needs to say the practical flow is Local-source-only.
+- Remote source browse/latest support can be described as usable for the tested Comick flow.
+- The release scenario works on at least one remote source with duplicate scanlator/translation choices for chapter listing, filtering, read-state toggles, single-chapter download, and open-local-CBZ.
+- The README no longer describes the practical flow as limited to Local Source, but it documents remote source quirks and the distinction between cancellable global search and source-specific timeouts.
 
 ## Phase 9: Documentation And Release Polish
 
 Goal: keep public documentation aligned with the client MVP.
 
-- [ ] Update README feature list
-- [ ] Update README usage flow to start with Library, Browse, and Downloads
-- [ ] Document grouped Settings
-- [ ] Document source-scoped download layout
-- [ ] Document that KOReader downloads are device-local, not Suwayomi server downloads
-- [ ] Document that normal reading happens through KOReader's file manager/reader, not inside the plugin
-- [ ] Document unsupported/deferred features:
+- [x] Update README feature list
+- [x] Update README usage flow to start with Library, Browse, and Downloads
+- [x] Document grouped Settings
+- [x] Document source-scoped download layout
+- [x] Document that KOReader downloads are device-local, not Suwayomi server downloads
+- [x] Document that normal reading happens through KOReader's file manager/reader, not inside the plugin
+- [x] Document unsupported/deferred features:
   - full source filters
   - source preferences
   - custom in-plugin manga reader
@@ -432,7 +441,7 @@ Goal: keep public documentation aligned with the client MVP.
   - server-side download settings
   - per-source download directory overrides
 - [ ] Add screenshots or short demo media if useful
-- [ ] Improve debug logging guidance for remote source failures
+- [x] Improve debug logging guidance for remote source failures
 - [ ] Add release notes/changelog entry
 
 Exit criteria:
@@ -487,4 +496,4 @@ These are intentionally outside the client MVP:
 
 ## Current Next Step
 
-Start Phase 8 remote-source verification for the Browse/Search flows that are now unit-covered. Keep full source filters deferred until the tested remote-source behavior is stable.
+Harden source-specific remote search timeout behavior and keep validating cancellable global search against slow extensions. One source timeout should not block the KOReader UI for about a minute. Keep full source filters deferred until the tested remote-source behavior is stable.

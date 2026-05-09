@@ -8,7 +8,7 @@ This plugin is experimental and still under active development.
 
 - Expect rough edges and incomplete features.
 - The login flow, Suwayomi hub, Library entry point, source browsing/search, global search, manga browsing, manga actions, chapter browsing, chapter actions menu, single-chapter downloads, source-scoped download paths, cached source refresh, local queue inspection, and read-state syncing are currently implemented and being tested.
-- At the moment, the plugin is only considered fully verified with the Suwayomi **Local Source**. Remote source verification remains planned for Phase 8.
+- The practical flow has been verified on device with the Suwayomi **Local Source** and a live Comick remote-source browse/latest workflow. Remote source search still depends heavily on source/server behavior; global search is partial and cancellable, while individual source requests can still time out.
 - The top-level Downloads screen can inspect active, queued, and failed local downloads, although completed history is not implemented yet.
 
 ## Features
@@ -34,10 +34,13 @@ This plugin is experimental and still under active development.
 - Background retry of pending read/unread syncs when Suwayomi is temporarily unavailable
 - Manual `Sync` action for flushing pending read/unread changes immediately
 
-Current limitation:
-- The practical, verified flow currently targets the Suwayomi **Local Source**. Other Suwayomi sources may browse and search correctly, but full remote source download/read workflow verification remains Phase 8 work.
+Current limitations:
+- Remote source browse/latest workflows can be usable. Global search now keeps per-source failures isolated and can be cancelled, but source-specific search still depends on the selected source and may time out before showing a result or error.
+- Some Suwayomi extensions mark broadly used sources, including MangaDex and Comick in the tested server setup, as NSFW. Enable **Settings** > **Browse** > **Show NSFW sources** if expected sources are missing.
+- Source-specific quirks are expected. In the May 2026 live test, MangaDex search returned results quickly, but one tested result had no chapters from Suwayomi; Comick Latest returned manga and chapters, while Comick text search timed out at the server.
 - Full source filter editing is still deferred; source-specific search currently uses text search without dynamic source filters.
 - `Downloads` currently shows KOReader-local active, queued, and failed downloads. Completed history and server-side Suwayomi download queue management are not implemented.
+- Downloaded files are KOReader-device-local CBZ files under the configured download directory. The plugin does not manage Suwayomi's server-side download queue.
 
 ## Installation
 
@@ -72,7 +75,37 @@ Manual installation:
 10. Use the title-bar home button on Suwayomi Library/Browse/Search screens to return to the hub.
 11. Tap a manga result to open manga actions, or tap a chapter to open the chapter actions dialog.
 12. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
-13. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to download or keep the next unread chapters.
+13. Tap **Downloads** from the hub to inspect active, queued, and failed KOReader-local jobs.
+14. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to download or keep the next unread chapters.
+
+## Remote Source Notes
+
+Remote sources must already be installed and enabled on your Suwayomi server. KOReader only sees the sources Suwayomi exposes through GraphQL and the plugin's Browse settings.
+
+The May 2026 Boox Palma verification used a live Suwayomi server with MangaDex and Comick enabled. The strongest verified remote-source path was:
+
+```text
+Suwayomi -> Browse -> Comick (Unoriginal) (EN) -> Latest -> choose a manga -> Open chapters -> Scanlator filter -> Download -> Open
+```
+
+That flow opened duplicate scanlator choices, marked chapters read/unread, and downloaded a chapter to:
+
+```text
+<download directory>/<source label>/<manga title>/<chapter title>.cbz
+```
+
+and opened the CBZ in KOReader's normal reader. MangaDex search and library add/remove were also verified, but one tested result returned no chapters from Suwayomi. Comick text search timed out on the tested server; Comick Latest still worked.
+
+## Unsupported / Deferred
+
+The current client MVP intentionally does not implement:
+
+- Full dynamic source filter editing
+- Source preference editing
+- Extension install, update, or source enable/disable management
+- Server-side Suwayomi download queue, download settings, or completed history management
+- Per-source download directory overrides
+- A custom in-plugin manga reader; downloaded chapters open in KOReader's normal reader
 
 ## Testing Locally
 

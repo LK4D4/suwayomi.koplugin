@@ -94,12 +94,14 @@ adb shell dumpsys gfxinfo org.koreader.launcher framestats > gfxinfo-flow-frames
 
 ## Focused flows
 
+### Local source stress flow
+
 1. Open KOReader.
 2. Open the top menu, then the Search tab.
 3. Open Suwayomi.
 4. Browse Suwayomi.
 5. Select Local source.
-6. Select a manga with many chapters, e.g. Sousou no Frieren.
+6. Select a manga with many chapters from the test server.
 7. Open the chapter list.
 8. Long-press/select about 70 chapters.
 9. Open the chapter-list menu and run Mark selected as read.
@@ -107,9 +109,43 @@ adb shell dumpsys gfxinfo org.koreader.launcher framestats > gfxinfo-flow-frames
 11. Repeat with Mark selected as unread.
 12. Queue a large batch download, then collect queue/process/poll logs.
 
+### Remote source release flow
+
+This flow records the May 2026 Phase 8 device verification shape. It uses
+sources that are already installed and enabled on the Suwayomi server.
+
+1. Open KOReader.
+2. Open the top menu, then the Search tab.
+3. Open Suwayomi.
+4. Open **Settings** > **Browse** and enable **Show NSFW sources** if MangaDex or Comick are missing. The tested Suwayomi server marks those extensions as NSFW.
+5. Return to the Suwayomi hub and open **Browse**.
+6. Confirm the source list includes **Local source**, **MangaDex (EN)**, and **Comick (Unoriginal) (EN)**.
+7. Open **MangaDex (EN)** > **Search**, use a query that testers know should return results on the configured server, and confirm results load. In the May 2026 run, the tested query returned multiple results in about 0.7 seconds through the plugin.
+8. Open a MangaDex result and confirm library add/remove updates the row marker. One tested result returned `No chapters found` from Suwayomi for refresh/chapter listing.
+9. Open **Comick (Unoriginal) (EN)** > **Latest**.
+10. Open a manga from the Latest results that has multiple chapters.
+11. Open the chapter-list menu and confirm **Scanlator filter** shows duplicate translation groups when the source returns them.
+12. Filter to one scanlator, mark a chapter read, then mark it unread again.
+13. Download one chapter and confirm the final file lands under the source-scoped path:
+
+```text
+/sdcard/Books/Manga/<source label>/<manga title>/<chapter title>.cbz
+```
+
+14. Use the chapter action **Open** and confirm KOReader opens the downloaded CBZ in the normal reader.
+
+Direct GraphQL probing against the same Suwayomi server is useful when a live source looks suspicious. In the May 2026 run, direct probing confirmed:
+
+- MangaDex text search returned multiple results quickly.
+- Comick text search returned HTTP 504 after about 60 seconds for the tested query.
+- Comick Latest returned 54 results over 4 pages.
+- A manga selected from Comick Latest returned chapters with duplicate scanlator groups.
+- One MangaDex search result returned `No chapters found` for chapter fetch, matching the device behavior.
+
 ## Known weak spots from the first investigation
 
 - `browseSuwayomi`, `showMangaForSource`, and `showChaptersForManga` perform synchronous GraphQL requests on the UI path.
+- Global search is now partial and cancellable; keep validating that slow-source failures stay isolated. Source-specific search can still wait on the selected source: in the May 2026 Phase 8 run, a Comick text search held the UI for about 60 seconds before surfacing `Could not reach the Suwayomi server: wantread`; direct GraphQL returned HTTP 504 for the same request.
 - Pending read sync now starts a subprocess worker from `schedulePendingReadSync`; verify that worker startup, polling, timeout, and retry handling remain non-blocking on Android.
 - Against the provided Suwayomi test instance, 10 sequential read-state mutations took 16.6 to 22.5 seconds total in direct GraphQL probing, with single requests ranging roughly 0.6 to 4.5 seconds.
 - A 70-chapter local batch is still useful as a stress case because it exercises the read-sync worker, result polling, and retry scheduling.
