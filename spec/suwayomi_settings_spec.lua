@@ -96,6 +96,44 @@ describe("suwayomi_settings", function()
         assert.are.same({ "en", "ru", "de" }, stored_data.source_languages)
     end)
 
+    it("loads conservative browse settings by default", function()
+        local settings = require("suwayomi_settings")
+
+        assert.are.same({
+            show_nsfw_sources = false,
+            hide_in_library_results = false,
+        }, settings:loadBrowseSettings())
+    end)
+
+    it("saves normalized browse settings and flushes the settings file", function()
+        local settings = require("suwayomi_settings")
+
+        local saved = settings:saveBrowseSettings({
+            show_nsfw_sources = true,
+            hide_in_library_results = "yes",
+        })
+
+        assert.is_true(flushed)
+        assert.are.same({
+            show_nsfw_sources = true,
+            hide_in_library_results = false,
+        }, saved)
+        assert.are.same(saved, stored_data.browse_settings)
+    end)
+
+    it("normalizes persisted browse settings", function()
+        local settings = require("suwayomi_settings")
+        stored_data.browse_settings = {
+            show_nsfw_sources = 1,
+            hide_in_library_results = true,
+        }
+
+        assert.are.same({
+            show_nsfw_sources = false,
+            hide_in_library_results = true,
+        }, settings:loadBrowseSettings())
+    end)
+
     it("loads automatic library category picker behavior by default", function()
         local settings = require("suwayomi_settings")
 

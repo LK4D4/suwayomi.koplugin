@@ -14,6 +14,10 @@ local DEFAULT_CREDENTIALS = {
 }
 
 local DEFAULT_SOURCE_LANGUAGES = { "en" }
+local DEFAULT_BROWSE_SETTINGS = {
+    show_nsfw_sources = false,
+    hide_in_library_results = false,
+}
 local DEFAULT_LIBRARY_CATEGORY_PICKER_BEHAVIOR = "automatic"
 local LIBRARY_CATEGORY_PICKER_BEHAVIORS = {
     automatic = true,
@@ -115,6 +119,26 @@ function SuwayomiSettings:saveSourceLanguages(source_languages)
     end
 
     self:open():saveSetting("source_languages", normalized):flush()
+    return normalized
+end
+
+function SuwayomiSettings:normalizeBrowseSettings(browse_settings)
+    browse_settings = type(browse_settings) == "table" and browse_settings or {}
+    return {
+        show_nsfw_sources = browse_settings.show_nsfw_sources == true,
+        hide_in_library_results = browse_settings.hide_in_library_results == true,
+    }
+end
+
+function SuwayomiSettings:loadBrowseSettings()
+    return self:normalizeBrowseSettings(
+        self:open():readSetting("browse_settings", copyTable(DEFAULT_BROWSE_SETTINGS))
+    )
+end
+
+function SuwayomiSettings:saveBrowseSettings(browse_settings)
+    local normalized = self:normalizeBrowseSettings(browse_settings)
+    self:open():saveSetting("browse_settings", normalized):flush()
     return normalized
 end
 

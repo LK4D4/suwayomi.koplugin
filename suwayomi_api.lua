@@ -45,6 +45,12 @@ end
 
 function SuwayomiAPI._buildSourcesQuery()
     return json.encode({
+        query = "query getSources { sources { nodes { id name displayName lang isNsfw supportsLatest } } }",
+    })
+end
+
+function SuwayomiAPI._buildLegacySourcesQuery()
+    return json.encode({
         query = "query getSources { sources { nodes { id name displayName lang } } }",
     })
 end
@@ -128,10 +134,31 @@ function SuwayomiAPI.parseSourcesResponse(response_body)
             display_name = source.displayName,
             raw_name = source.name,
             lang = source.lang,
+            is_nsfw = source.isNsfw,
+            supports_latest = source.supportsLatest,
         })
     end
 
     return parsed_sources
+end
+
+local function isOptionalSourceMetadataFieldError(response_body)
+    local payload = json.decode(response_body, 1, nil)
+    if type(payload) ~= "table" or type(payload.errors) ~= "table" then
+        return false
+    end
+
+    for _, graph_error in ipairs(payload.errors) do
+        local message = tostring(graph_error and graph_error.message or "")
+        local mentions_optional_field = message:match("isNsfw") or message:match("supportsLatest")
+        local looks_like_schema_error = message:match("Cannot query field")
+            or message:match("Unknown field")
+            or message:match("FieldUndefined")
+        if mentions_optional_field and looks_like_schema_error then
+            return true
+        end
+    end
+    return false
 end
 
 local function normalizeNumber(value, fallback)
@@ -832,6 +859,13 @@ function SuwayomiAPI.fetchSources(credentials)
     local result = performGraphQLRequest(credentials, SuwayomiAPI._buildSourcesQuery(), "fetchSources")
     if not result.ok then
         return result
+    end
+    if isOptionalSourceMetadataFieldError(result.response_body) then
+        logDebugEvent({ operation = "fetchSources", event = "legacy_source_query_retry" })
+        result = performGraphQLRequest(credentials, SuwayomiAPI._buildLegacySourcesQuery(), "fetchSources")
+        if not result.ok then
+            return result
+        end
     end
 
     local sources, parse_error = SuwayomiAPI.parseSourcesResponse(result.response_body)

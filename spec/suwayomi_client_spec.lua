@@ -22,6 +22,12 @@ describe("suwayomi_client", function()
                 loadLibraryCategoryPickerBehavior = function()
                     return options.picker_behavior or "automatic"
                 end,
+                loadBrowseSettings = function()
+                    return options.browse_settings or {
+                        show_nsfw_sources = false,
+                        hide_in_library_results = false,
+                    }
+                end,
             },
             api = options.api,
             ui = options.ui,
@@ -130,7 +136,10 @@ describe("suwayomi_client", function()
             ui = {
                 showMangaMenu = function(manga, onSelect, menu_options)
                     assert.are.equal("Sousou no Frieren", manga[1].title)
-                    assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, menu_options)
+                    assert.are.same({
+                        title = "MangaDex (EN) - Popular - Page 1",
+                        title_bar_left_icon = "appbar.filebrowser",
+                    }, menu_options)
                     onSelect(manga[1])
                 end,
             },
@@ -178,6 +187,462 @@ describe("suwayomi_client", function()
         }, shown_manga_actions.source)
         assert.are.equal("manga_loaded", log_events[1].event)
         assert.are.equal(1, log_events[1].manga_count)
+    end)
+
+    it("opens a source mode menu for non-local sources and fetches popular manga from it", function()
+        local fetched_options
+        local client, state = newClient({
+            api = {
+                fetchMangaForSource = function(_, options)
+                    fetched_options = options
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Sousou no Frieren" },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showSourceModeMenu = function(source, onSelect, menu_options)
+                    assert.are.equal("s1", source.id)
+                    assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, menu_options)
+                    onSelect("POPULAR")
+                end,
+                showMangaMenu = function() end,
+            },
+            home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
+        })
+
+        client:showMangaForSource({ id = "s1", name = "MangaDex", lang = "en" })
+
+        assert.are.same({ source_id = "s1", page = 1, type = "POPULAR" }, fetched_options)
+        assert.are.same({ "manga:Loading manga..." }, state.loading_messages)
+    end)
+
+    it("keeps local sources on the direct manga listing flow", function()
+        local mode_menu_shown = false
+        local fetched_options
+        local client = newClient({
+            api = {
+                fetchMangaForSource = function(_, options)
+                    fetched_options = options
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Local Manga" },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showSourceModeMenu = function()
+                    mode_menu_shown = true
+                end,
+                showMangaMenu = function() end,
+            },
+        })
+
+        client:showMangaForSource({ id = "local", name = "Local source", lang = "localsourcelang" })
+
+        assert.is_false(mode_menu_shown)
+        assert.are.same({ source_id = "local", page = 1, type = "POPULAR" }, fetched_options)
+    end)
+
+    it("searches a source with user text and rejects blank searches without calling the API", function()
+        local fetched_options
+        local client, state = newClient({
+            api = {
+                fetchMangaForSource = function(_, options)
+                    fetched_options = options
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Sousou no Frieren" },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showSourceSearchPrompt = function(_, onSearch)
+                    onSearch("  ")
+                    onSearch(" frieren ")
+                end,
+                showMangaMenu = function() end,
+            },
+        })
+
+        client:showSourceSearchPrompt({ id = "s1", name = "MangaDex", lang = "en" })
+
+        assert.are.equal("Enter a search query.", state.shown_messages[1])
+        assert.are.same({
+            source_id = "s1",
+            page = 1,
+            type = "SEARCH",
+            query = "frieren",
+        }, fetched_options)
+    end)
+
+    it("rejects blank global searches without calling source APIs", function()
+        local api_called = false
+        local client, state = newClient({
+            api = {
+                fetchMangaForSource = function()
+                    api_called = true
+                    return { ok = true, manga = {} }
+                end,
+            },
+            ui = {
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch("  ")
+                end,
+            },
+        })
+
+        client:showGlobalSearch({
+            { id = "s1", name = "MangaDex", lang = "en" },
+        })
+
+        assert.is_false(api_called)
+        assert.are.same({ "Enter a search query." }, state.shown_messages)
+    end)
+
+    it("shows one global search summary per visible source and isolates source errors", function()
+        local fetched_options = {}
+        local shown_summaries
+        local opened_options
+        local client = newClient({
+            api = {
+                fetchMangaForSource = function(_, options)
+                    table.insert(fetched_options, options)
+                    if options.source_id == "s1" then
+                        return {
+                            ok = true,
+                            manga = {
+                                { id = "m1", title = "Frieren Beyond Journey's End" },
+                                { id = "m2", title = "Frieren Side Story" },
+                            },
+                            has_next_page = true,
+                        }
+                    end
+                    if options.source_id == "s2" then
+                        return { ok = true, manga = {} }
+                    end
+                    return { ok = false, error = "Timed out" }
+                end,
+            },
+            ui = {
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch(" frieren ")
+                end,
+                showGlobalSearchResultsMenu = function(summaries, onSelect, menu_options)
+                    shown_summaries = summaries
+                    assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, menu_options)
+                    onSelect(summaries[1])
+                    onSelect(summaries[2])
+                    onSelect(summaries[3])
+                end,
+                showMangaMenu = function(_, _, options)
+                    opened_options = options
+                end,
+            },
+            home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
+        })
+
+        client:showGlobalSearch({
+            { id = "s1", display_name = "MangaDex (EN)", name = "MangaDex", lang = "en" },
+            { id = "s2", display_name = "ComicK (EN)", name = "ComicK", lang = "en" },
+            { id = "s3", name = "Some Source", lang = "en" },
+        })
+
+        assert.are.same({
+            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
+            { source_id = "s2", page = 1, type = "SEARCH", query = "frieren" },
+            { source_id = "s3", page = 1, type = "SEARCH", query = "frieren" },
+            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
+        }, fetched_options)
+        assert.are.equal("ok", shown_summaries[1].status)
+        assert.are.equal("Frieren Beyond Journey's End", shown_summaries[1].first_match.title)
+        assert.are.equal("empty", shown_summaries[2].status)
+        assert.are.equal("error", shown_summaries[3].status)
+        assert.are.equal("Timed out", shown_summaries[3].error)
+        assert.are.equal("MangaDex (EN) - Search: frieren - Page 1", opened_options.title)
+        assert.are.equal("appbar.filebrowser", opened_options.title_bar_left_icon)
+        assert.is_function(opened_options.on_next_page)
+    end)
+
+    it("lets global search drill into hidden first-page results when later pages exist", function()
+        local fetched_options = {}
+        local shown_summaries
+        local opened_options
+        local client = newClient({
+            browse_settings = {
+                hide_in_library_results = true,
+            },
+            api = {
+                fetchMangaForSource = function(_, options)
+                    table.insert(fetched_options, options)
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Already Added", in_library = true },
+                        },
+                        has_next_page = true,
+                    }
+                end,
+            },
+            ui = {
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch(" frieren ")
+                end,
+                showGlobalSearchResultsMenu = function(summaries, onSelect)
+                    shown_summaries = summaries
+                    onSelect(summaries[1])
+                end,
+                showMangaMenu = function(_, _, options)
+                    opened_options = options
+                end,
+            },
+        })
+
+        client:showGlobalSearch({
+            { id = "s1", display_name = "MangaDex (EN)", name = "MangaDex", lang = "en" },
+        })
+
+        assert.are.same({
+            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
+            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
+        }, fetched_options)
+        assert.are.equal("pageable_empty", shown_summaries[1].status)
+        assert.is_true(shown_summaries[1].has_next_page)
+        assert.are.equal("frieren", shown_summaries[1].query)
+        assert.are.equal("MangaDex (EN) - Search: frieren - Page 1", opened_options.title)
+        assert.is_function(opened_options.on_next_page)
+    end)
+
+    it("shows a friendly latest message when unknown support is rejected as unsupported", function()
+        local messages
+        local latest_options
+        local client, state = newClient({
+            api = {
+                fetchMangaForSource = function(_, options)
+                    latest_options = options
+                    return { ok = false, error = "GraphQL error: latest not supported" }
+                end,
+            },
+            ui = {},
+        })
+
+        client:showMangaForSource({ id = "s1", name = "MangaDex", lang = "en" }, { type = "LATEST" })
+        messages = state.shown_messages
+
+        assert.are.same({ source_id = "s1", page = 1, type = "LATEST" }, latest_options)
+        assert.are.equal("Latest manga is not supported by this source.", messages[#messages])
+    end)
+
+    it("preserves unrelated latest errors when support is unknown", function()
+        local errors = {
+            "Authentication failed: invalid token",
+            "Network error: connection timed out",
+            "Could not parse Suwayomi response.",
+        }
+
+        for _, error_message in ipairs(errors) do
+            local client, state = newClient({
+                api = {
+                    fetchMangaForSource = function()
+                        return { ok = false, error = error_message }
+                    end,
+                },
+                ui = {},
+            })
+
+            client:showMangaForSource({ id = "s1", name = "MangaDex", lang = "en" }, { type = "LATEST" })
+
+            assert.are.equal(error_message, state.shown_messages[#state.shown_messages])
+        end
+    end)
+
+    it("detects only latest unsupported error text", function()
+        local Client = require("suwayomi_client")
+        local client = Client:new{}
+
+        assert.is_true(client:isLatestUnsupportedError("Source returned unsupported latest mode"))
+        assert.is_true(client:isLatestUnsupportedError("GraphQL error: latest not supported"))
+        assert.is_true(client:isLatestUnsupportedError("This source does not support latest"))
+
+        assert.is_false(client:isLatestUnsupportedError("Authentication failed: invalid token"))
+        assert.is_false(client:isLatestUnsupportedError("Network error: connection timed out"))
+        assert.is_false(client:isLatestUnsupportedError("Could not parse Suwayomi response."))
+    end)
+
+    it("hides in-library browse results when browse settings request it", function()
+        local shown_manga
+        local client, state = newClient({
+            browse_settings = {
+                hide_in_library_results = true,
+            },
+            api = {
+                fetchMangaForSource = function(_, options)
+                    assert.are.same({ source_id = "s1", page = 1, type = "POPULAR" }, options)
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Already Added", in_library = true },
+                            { id = "m2", title = "New Find", in_library = false },
+                            { id = "m3", title = "Unknown State" },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function(manga)
+                    shown_manga = manga
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1" })
+
+        assert.are.same({
+            { id = "m2", title = "New Find", in_library = false },
+            { id = "m3", title = "Unknown State" },
+        }, shown_manga)
+        assert.are.equal(2, state.log_events[1].manga_count)
+    end)
+
+    it("passes browse result title and paging callbacks that preserve source context", function()
+        local fetched_options = {}
+        local menu_options = {}
+        local client = newClient({
+            api = {
+                fetchMangaForSource = function(_, options)
+                    table.insert(fetched_options, options)
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m" .. tostring(options.page), title = "Page " .. tostring(options.page) },
+                        },
+                        has_next_page = options.page < 2,
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function(_, _, options)
+                    table.insert(menu_options, options)
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+            raw_name = "MangaDex",
+            lang = "en",
+        }, {
+            type = "SEARCH",
+            query = "frieren",
+            skip_mode_menu = true,
+        })
+        menu_options[1].on_next_page()
+        menu_options[2].on_previous_page()
+
+        assert.are.same({
+            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
+            { source_id = "s1", page = 2, type = "SEARCH", query = "frieren" },
+            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
+        }, fetched_options)
+        assert.are.equal("MangaDex (EN) - Search: frieren - Page 1", menu_options[1].title)
+        assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", menu_options[2].title)
+        assert.is_nil(menu_options[1].on_previous_page)
+        assert.is_function(menu_options[1].on_next_page)
+        assert.is_function(menu_options[2].on_previous_page)
+        assert.is_nil(menu_options[2].on_next_page)
+    end)
+
+    it("shows a next-page-only menu when hide-in-library filters all visible rows", function()
+        local shown_manga
+        local shown_options
+        local client, state = newClient({
+            browse_settings = {
+                hide_in_library_results = true,
+            },
+            api = {
+                fetchMangaForSource = function(_, options)
+                    assert.are.same({ source_id = "s1", page = 1, type = "POPULAR" }, options)
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Already Added", in_library = true },
+                        },
+                        has_next_page = true,
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function(manga, _, options)
+                    shown_manga = manga
+                    shown_options = options
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+        }, {
+            skip_mode_menu = true,
+        })
+
+        assert.are.equal(0, #shown_manga)
+        assert.are.equal("MangaDex (EN) - Popular - Page 1", shown_options.title)
+        assert.is_nil(shown_options.on_previous_page)
+        assert.is_function(shown_options.on_next_page)
+        assert.are.equal(0, #state.shown_messages)
+    end)
+
+    it("shows a previous-page-only menu when page greater than one filters all visible rows", function()
+        local shown_manga
+        local shown_options
+        local client, state = newClient({
+            browse_settings = {
+                hide_in_library_results = true,
+            },
+            api = {
+                fetchMangaForSource = function(_, options)
+                    assert.are.same({ source_id = "s1", page = 2, type = "SEARCH", query = "frieren" }, options)
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m2", title = "Already Added Too", in_library = true },
+                        },
+                        has_next_page = false,
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function(manga, _, options)
+                    shown_manga = manga
+                    shown_options = options
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+        }, {
+            type = "SEARCH",
+            query = "frieren",
+            page = 2,
+            skip_mode_menu = true,
+        })
+
+        assert.are.equal(0, #shown_manga)
+        assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_options.title)
+        assert.is_function(shown_options.on_previous_page)
+        assert.is_nil(shown_options.on_next_page)
+        assert.are.equal(0, #state.shown_messages)
     end)
 
     it("formats compact library manga rows", function()
@@ -422,6 +887,42 @@ describe("suwayomi_client", function()
 
         assert.are.equal(1, #updated_manga)
         assert.is_true(updated_manga[1].in_library)
+    end)
+
+    it("opens browse result manga actions without changing the action surface", function()
+        local shown_manga_action_options
+        local client = newClient({
+            home_menu_options = {
+                title_bar_left_icon = "appbar.filebrowser",
+                on_title_bar_left_tap = function() end,
+            },
+            api = {
+                fetchMangaForSource = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Sousou no Frieren", in_library = false },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function(manga, onSelect)
+                    onSelect(manga[1])
+                    return { name = "browse-menu" }
+                end,
+            },
+        })
+
+        client.plugin.showMangaActions = function(_, _, options)
+            shown_manga_action_options = options
+        end
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" })
+
+        assert.is_function(shown_manga_action_options.onMangaUpdated)
+        assert.is_nil(shown_manga_action_options.title_bar_left_icon)
+        assert.is_nil(shown_manga_action_options.on_title_bar_left_tap)
     end)
 
     it("shows categories when multiple categories are present and filters selected category manga", function()

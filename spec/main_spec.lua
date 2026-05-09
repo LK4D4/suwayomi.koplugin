@@ -28,6 +28,7 @@ describe("suwayomi plugin", function()
     local directory_chooser_start_dir
     local saved_download_directory
     local saved_library_category_picker_behavior
+    local saved_browse_settings
     local trapper_wrapped
     local trapper_subprocess_calls
     local scheduled_callbacks
@@ -65,6 +66,7 @@ describe("suwayomi plugin", function()
         directory_chooser_start_dir = nil
         saved_download_directory = nil
         saved_library_category_picker_behavior = nil
+        saved_browse_settings = nil
         trapper_wrapped = 0
         trapper_subprocess_calls = {}
         scheduled_callbacks = {}
@@ -416,6 +418,16 @@ describe("suwayomi plugin", function()
                 saveLibraryCategoryPickerBehavior = function(_, behavior)
                     saved_library_category_picker_behavior = behavior
                     return behavior
+                end,
+                loadBrowseSettings = function()
+                    return saved_browse_settings or {
+                        show_nsfw_sources = false,
+                        hide_in_library_results = false,
+                    }
+                end,
+                saveBrowseSettings = function(_, browse_settings)
+                    saved_browse_settings = browse_settings
+                    return browse_settings
                 end,
                 loadDownloadDirectory = function()
                     return ""
@@ -1980,6 +1992,98 @@ return {
         }, shown_sources)
     end)
 
+    it("hides explicit NSFW sources by default while keeping unknown source metadata visible", function()
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    return {
+                        ok = true,
+                        sources = {
+                            { id = "safe", name = "Safe Source", lang = "en", is_nsfw = false },
+                            { id = "adult", name = "Adult Source", lang = "en", is_nsfw = true },
+                            { id = "unknown", name = "Unknown Source", lang = "en" },
+                            { id = "ru", name = "RU Source", lang = "ru", is_nsfw = false },
+                        },
+                    }
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret" }
+                end,
+                loadSourceLanguages = function() return { "en" } end,
+                loadBrowseSettings = function()
+                    return { show_nsfw_sources = false, hide_in_library_results = false }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        plugin:browseSuwayomi()
+
+        assert.are.same({
+            { id = "safe", name = "Safe Source", lang = "en", is_nsfw = false },
+            { id = "unknown", name = "Unknown Source", lang = "en" },
+        }, shown_sources)
+    end)
+
+    it("shows explicit NSFW sources when browse settings allow them", function()
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    return {
+                        ok = true,
+                        sources = {
+                            { id = "safe", name = "Safe Source", lang = "en", is_nsfw = false },
+                            { id = "adult", name = "Adult Source", lang = "en", is_nsfw = true },
+                        },
+                    }
+                end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                getSettingsDir = function() return "/settings" end,
+                load = function()
+                    return { server_url = "https://suwayomi.example", username = "alice", password = "secret" }
+                end,
+                loadSourceLanguages = function() return { "en" } end,
+                loadBrowseSettings = function()
+                    return { show_nsfw_sources = true, hide_in_library_results = false }
+                end,
+                loadDownloadQueue = function() return {} end,
+                saveDownloadQueue = function(_, jobs) return jobs end,
+                loadChapterLedger = function() return {} end,
+                saveChapterLedger = function(_, ledger) return ledger end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        plugin:browseSuwayomi()
+
+        assert.are.same({
+            { id = "safe", name = "Safe Source", lang = "en", is_nsfw = false },
+            { id = "adult", name = "Adult Source", lang = "en", is_nsfw = true },
+        }, shown_sources)
+    end)
+
     it("adds a home action to browse source menus", function()
         local plugin_class = require("main")
         local menu_items = {}
@@ -1996,6 +2100,131 @@ return {
         assert.is_table(home_dialog_options)
         assert.are.equal("Library", home_dialog_options.actions[1].text)
         assert.are.equal(source_menu, closed_widgets[#closed_widgets])
+    end)
+
+    it("opens the source mode menu when a non-local source is selected", function()
+        local mode_source
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    return {
+                        ok = true,
+                        sources = {
+                            { id = "s1", name = "MangaDex", lang = "en" },
+                        },
+                    }
+                end,
+                fetchMangaForSource = function()
+                    error("unexpected direct manga fetch")
+                end,
+            }
+        end
+        package.preload.suwayomi_ui = function()
+            return {
+                showSourcesMenu = function(sources, onSelect)
+                    onSelect(sources[1])
+                end,
+                showSourceModeMenu = function(source)
+                    mode_source = source
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+                showSettingsMenu = function() end,
+                showHomeDialog = function() end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_ui = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        plugin:browseSuwayomi()
+
+        assert.are.same({ id = "s1", name = "MangaDex", lang = "en" }, mode_source)
+    end)
+
+    it("starts global search from the visible filtered source list", function()
+        local fetched_options = {}
+        local shown_summaries
+
+        package.preload.suwayomi_api = function()
+            return {
+                fetchSources = function()
+                    return {
+                        ok = true,
+                        sources = {
+                            { id = "s1", name = "MangaDex", lang = "en" },
+                            { id = "s2", name = "Hidden Language", lang = "jp" },
+                            { id = "s3", name = "Hidden NSFW", lang = "en", is_nsfw = true },
+                        },
+                    }
+                end,
+                fetchMangaForSource = function(_, options)
+                    table.insert(fetched_options, options)
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Frieren" },
+                        },
+                    }
+                end,
+            }
+        end
+        package.preload.suwayomi_ui = function()
+            return {
+                showSourcesMenu = function(sources, _, options)
+                    shown_sources = sources
+                    options.on_global_search()
+                end,
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch("frieren")
+                end,
+                showGlobalSearchResultsMenu = function(summaries)
+                    shown_summaries = summaries
+                end,
+                showDirectoryChooser = function() end,
+                showLoginDialog = function() end,
+                showLanguageMenu = function() end,
+                showSettingsMenu = function() end,
+                showHomeDialog = function() end,
+            }
+        end
+        package.preload.suwayomi_settings = function()
+            return {
+                load = function()
+                    return { server_url = "https://suwayomi.example" }
+                end,
+                loadSourceLanguages = function() return { "en" } end,
+                loadBrowseSettings = function()
+                    return {
+                        show_nsfw_sources = false,
+                        hide_in_library_results = false,
+                    }
+                end,
+            }
+        end
+        package.loaded.main = nil
+        package.loaded.suwayomi_api = nil
+        package.loaded.suwayomi_ui = nil
+        package.loaded.suwayomi_settings = nil
+
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+
+        plugin:browseSuwayomi()
+
+        assert.are.same({
+            { id = "s1", name = "MangaDex", lang = "en" },
+        }, shown_sources)
+        assert.are.same({
+            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
+        }, fetched_options)
+        assert.are.equal("ok", shown_summaries[1].status)
+        assert.are.equal("Frieren", shown_summaries[1].first_match.title)
     end)
 
     it("shows loading feedback around source, manga, and chapter fetches", function()
@@ -8430,6 +8659,38 @@ return {
 
         assert.are.equal(1, refresh_count)
         assert.are.equal("Suwayomi source languages saved: EN, RU, DE", shown_messages[#shown_messages])
+    end)
+
+    it("shows conservative browse settings in the settings menu", function()
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local browse_items = getSettingsMenu(plugin)[3].sub_item_table
+
+        assert.are.equal("Source languages: EN, RU", browse_items[1].text_func())
+        assert.are.equal("Show NSFW sources: no", browse_items[2].text_func())
+        assert.are.equal("Hide in-library results: no", browse_items[3].text_func())
+    end)
+
+    it("toggles browse settings and refreshes the settings menu", function()
+        local plugin_class = require("main")
+        local plugin = plugin_class{}
+        local refresh_count = 0
+        local touchmenu_instance = {
+            updateItems = function()
+                refresh_count = refresh_count + 1
+            end,
+        }
+        local browse_items = getSettingsMenu(plugin)[3].sub_item_table
+
+        browse_items[2].callback(touchmenu_instance)
+        browse_items[3].callback(touchmenu_instance)
+
+        assert.are.same({
+            show_nsfw_sources = true,
+            hide_in_library_results = true,
+        }, saved_browse_settings)
+        assert.are.equal(2, refresh_count)
+        assert.are.equal("Suwayomi Browse setting saved.", shown_messages[#shown_messages])
     end)
 
     it("saves the chosen download directory and shows a confirmation", function()

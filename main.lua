@@ -486,12 +486,33 @@ function SuwayomiPlugin:buildSourceLanguageSet(source_languages)
     return selected
 end
 
+function SuwayomiPlugin:loadBrowseSettings()
+    if SuwayomiSettings.loadBrowseSettings then
+        return SuwayomiSettings:loadBrowseSettings()
+    end
+    return {
+        show_nsfw_sources = false,
+        hide_in_library_results = false,
+    }
+end
+
+function SuwayomiPlugin:sourceMatchesBrowseSettings(source, selected_languages, browse_settings)
+    if source.lang ~= "localsourcelang" and not selected_languages[source.lang] then
+        return false
+    end
+    if source.is_nsfw == true and not browse_settings.show_nsfw_sources then
+        return false
+    end
+    return true
+end
+
 function SuwayomiPlugin:filterSourcesByLanguage(sources)
     local selected = self:buildSourceLanguageSet(SuwayomiSettings:loadSourceLanguages())
+    local browse_settings = self:loadBrowseSettings()
     local filtered = {}
 
     for _, source in ipairs(sources or {}) do
-        if source.lang == "localsourcelang" or selected[source.lang] then
+        if self:sourceMatchesBrowseSettings(source, selected, browse_settings) then
             table.insert(filtered, source)
         end
     end
@@ -583,6 +604,22 @@ function SuwayomiPlugin:getSourceLanguageSummary()
         end
     end
     return #labels > 0 and table.concat(labels, ", ") or _("none")
+end
+
+function SuwayomiPlugin:getBrowseSettingSummary(key)
+    return self:loadBrowseSettings()[key] and _("yes") or _("no")
+end
+
+function SuwayomiPlugin:toggleBrowseSetting(key, touchmenu_instance)
+    if not SuwayomiSettings.saveBrowseSettings then
+        self:showMessage(_("Browse settings are unavailable."))
+        return
+    end
+    local browse_settings = self:loadBrowseSettings()
+    browse_settings[key] = not browse_settings[key]
+    SuwayomiSettings:saveBrowseSettings(browse_settings)
+    self:refreshSettingsMenu(touchmenu_instance)
+    self:showMessage(_("Suwayomi Browse setting saved."))
 end
 
 function SuwayomiPlugin:getDownloadDirectoryChooserStartDir()
@@ -772,16 +809,24 @@ end
 
 function SuwayomiPlugin:showSourceList(sources, options)
     options = options or {}
+    local function buildSourceMenuOptions()
+        local menu_options = self:getHomeMenuOptions() or {}
+        menu_options.on_global_search = function()
+            return self:getClient():showGlobalSearch(sources)
+        end
+        return menu_options
+    end
+
     if not options.force_new and self.current_sources_menu and SuwayomiUI.updateSourcesMenu then
         SuwayomiUI.updateSourcesMenu(self.current_sources_menu, sources, function(source)
             self:showMangaForSource(source)
-        end, self:getHomeMenuOptions())
+        end, buildSourceMenuOptions())
         return self.current_sources_menu
     end
 
     self.current_sources_menu = SuwayomiUI.showSourcesMenu(sources, function(source)
         self:showMangaForSource(source)
-    end, self:getHomeMenuOptions())
+    end, buildSourceMenuOptions())
     return self.current_sources_menu
 end
 
@@ -3959,6 +4004,27 @@ function SuwayomiPlugin:buildSettingsMenu()
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:showSourceLanguageDialog(touchmenu_instance)
+                    end,
+                },
+                {
+                    text_func = function()
+                        return T(_("Show NSFW sources: %1"), self:getBrowseSettingSummary("show_nsfw_sources"))
+                    end,
+                    keep_menu_open = true,
+                    callback = function(touchmenu_instance)
+                        self:toggleBrowseSetting("show_nsfw_sources", touchmenu_instance)
+                    end,
+                },
+                {
+                    text_func = function()
+                        return T(
+                            _("Hide in-library results: %1"),
+                            self:getBrowseSettingSummary("hide_in_library_results")
+                        )
+                    end,
+                    keep_menu_open = true,
+                    callback = function(touchmenu_instance)
+                        self:toggleBrowseSetting("hide_in_library_results", touchmenu_instance)
                     end,
                 },
             },
