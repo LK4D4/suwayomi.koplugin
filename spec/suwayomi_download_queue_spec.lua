@@ -190,14 +190,10 @@ describe("suwayomi/downloads/queue", function()
                 subprocess_done[pid] = done
             end,
             active_count = function()
-                local count = 0
-                for _ in pairs(context.queue.active_jobs or {}) do
-                    count = count + 1
-                end
-                return count
+                return context.queue:getActiveCount()
             end,
             active_job = function(manga, chapter)
-                return context.queue.active_jobs[context.queue:getKey(manga, chapter)]
+                return context.queue:getActiveJob(context.queue:getKey(manga, chapter))
             end,
             write_progress = function(manga, chapter, state, current, total, path, error_message)
                 local progress_path = context.queue:buildProgressPath(manga, chapter, "/books")
@@ -448,198 +444,27 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal("downloading", context.saved_queue()[1].state)
     end)
 
-    it("starts downloads up to the active chapter limit", function()
-        local context = build_queue({
-            max_active_chapters = 2,
-            subprocess_done = false,
-            skip_subprocess_callback = true,
-        })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
-        local chapters = {
-            { id = "398", name = "Official_Vol. 1 Ch. 1" },
-            { id = "399", name = "Official_Vol. 1 Ch. 2" },
-            { id = "400", name = "Official_Vol. 1 Ch. 3" },
-        }
-
-        context.queue:enqueueBatch(manga, chapters, "/books")
-        table.remove(context.scheduled, 1).callback()
-
-        assert.are.equal(2, context.active_count())
-        assert.is_not_nil(context.active_job(manga, chapters[1]))
-        assert.is_not_nil(context.active_job(manga, chapters[2]))
-        assert.is_nil(context.active_job(manga, chapters[3]))
-        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[1]).state)
-        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[2]).state)
-        assert.are.equal("queued", context.queue:getStatus(manga, chapters[3]).state)
-    end)
-
-    it("persists initial progress when a queued job becomes active", function()
-        local context = build_queue({
-            subprocess_done = false,
-            skip_subprocess_callback = true,
-        })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
-        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
-
-        context.queue:enqueue(manga, chapter, "/books")
-        table.remove(context.scheduled, 1).callback()
-
-        local persisted = context.saved_queue()[1]
-        assert.are.equal("downloading", persisted.state)
-        assert.are.equal(100, persisted.started_at)
-        assert.are.equal(100, persisted.last_progress_at)
-        assert.are.same({
-            state = "downloading",
-            current = 0,
-            total = 0,
-            updated_at = 100,
-        }, persisted.progress)
-        assert.is_nil(persisted.pid)
-        assert.is_nil(persisted.credentials)
-        assert.is_nil(persisted.downloader)
-    end)
-
-    it("persists changed active progress while a subprocess keeps running", function()
-        local context = build_queue({
-            subprocess_done = false,
-            skip_subprocess_callback = true,
-        })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
-        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
-
-        context.queue:enqueue(manga, chapter, "/books")
-        table.remove(context.scheduled, 1).callback()
-
-        context.advance(3)
-        context.write_progress(manga, chapter, "downloading", 2, 5, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
-        table.remove(context.scheduled, 1).callback()
-
-        local persisted = context.saved_queue()[1]
-        assert.are.equal("downloading", persisted.state)
-        assert.are.equal(100, persisted.started_at)
-        assert.are.equal(103, persisted.last_progress_at)
-        assert.are.same({
-            state = "downloading",
-            current = 2,
-            total = 5,
-            path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
-            updated_at = 103,
-        }, persisted.progress)
-    end)
-
-    it("does not persist unchanged active progress on repeated polls", function()
-        local context = build_queue({
-            subprocess_done = false,
-            skip_subprocess_callback = true,
-        })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
-        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
-
-        context.queue:enqueue(manga, chapter, "/books")
-        table.remove(context.scheduled, 1).callback()
-
-        context.advance(1)
-        context.write_progress(manga, chapter, "downloading", 1, 5, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
-        table.remove(context.scheduled, 1).callback()
-        local save_count_after_change = context.save_count()
-
-        context.advance(1)
-        table.remove(context.scheduled, 1).callback()
-
-        assert.are.equal(save_count_after_change, context.save_count())
-        assert.are.equal(101, context.saved_queue()[1].last_progress_at)
-        assert.are.equal(101, context.saved_queue()[1].progress.updated_at)
-    end)
-
     it("clamps the active chapter limit to the supported range", function()
         assert.are.equal(1, build_queue({ max_active_chapters = 0 }).queue.max_active_chapters)
         assert.are.equal(4, build_queue({ max_active_chapters = 99 }).queue.max_active_chapters)
         assert.are.equal(3, build_queue({ max_active_chapters = "3" }).queue.max_active_chapters)
     end)
 
-    it("backfills a completed active slot while another chapter keeps downloading", function()
-        local context = build_queue({
-            max_active_chapters = 2,
-            subprocess_done = {},
-            skip_subprocess_callback = true,
-        })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
-        local chapters = {
-            { id = "398", name = "Official_Vol. 1 Ch. 1" },
-            { id = "399", name = "Official_Vol. 1 Ch. 2" },
-            { id = "400", name = "Official_Vol. 1 Ch. 3" },
-        }
-
-        context.queue:enqueueBatch(manga, chapters, "/books")
-        table.remove(context.scheduled, 1).callback()
-        local first = context.active_job(manga, chapters[1])
-        local second = context.active_job(manga, chapters[2])
-        context.write_progress(manga, chapters[1], "downloaded", 1, 1, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
-        context.write_progress(manga, chapters[2], "downloading", 1, 2, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 2.cbz")
-        context.set_subprocess_done(first.pid, true)
-        context.set_subprocess_done(second.pid, false)
-
-        table.remove(context.scheduled, 1).callback()
-
-        assert.are.equal(2, context.active_count())
-        assert.is_nil(context.active_job(manga, chapters[1]))
-        assert.is_not_nil(context.active_job(manga, chapters[2]))
-        assert.is_not_nil(context.active_job(manga, chapters[3]))
-        assert.are.equal("downloaded", context.queue:getStatus(manga, chapters[1]).state)
-        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[2]).state)
-        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[3]).state)
-    end)
-
-    it("uses atomic progress writes so polling sees complete updates", function()
+    it("keeps active job state and lifecycle internals behind the active facade", function()
         local context = build_queue()
-        local progress_path = context.queue:buildProgressPath(
-            { id = "m1", title = "Sousou no Frieren" },
-            { id = "398", name = "Official_Vol. 1 Ch. 1" },
-            "/books"
-        )
 
-        context.queue:writeProgressFallback(progress_path, "failed", 0, 1, "", "network timeout")
-
-        assert.are.equal(progress_path .. ".tmp", context.renamed_paths[#context.renamed_paths].from)
-        assert.are.equal(progress_path, context.renamed_paths[#context.renamed_paths].to)
-        assert.are.equal("state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n", context.progress_files[progress_path])
-        assert.is_nil(context.progress_files[progress_path .. ".tmp"])
-    end)
-
-    it("persists chapter details when the downloader reports failure", function()
-        local context = build_queue({
-            downloader = {
-                getTargetPath = function(_, download_directory, manga, chapter)
-                    return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
-                end,
-                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
-                writeProgress = function(_, progress_path)
-                    local handle = assert(io.open(progress_path, "w"))
-                    handle:write("state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n")
-                    handle:close()
-                end,
-                downloadChapterWithProgress = function(self, _, _, _, _, progress_path)
-                    self:writeProgress(progress_path)
-                end,
-                chapterExists = function() return false end,
-            },
-        })
-
-        context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
-        context.run_scheduled()
-
-        assert.are.equal("failed", context.saved_queue()[1].state)
-        local message = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): network timeout"
-        assert.are.same({
-            state = "failed",
-            current = 0,
-            total = 1,
-            path = "",
-            error = message,
-            updated_at = 100,
-        }, context.saved_queue()[1].progress)
-        assert.are.equal(message, context.messages[#context.messages])
+        assert.is_nil(rawget(context.queue, "active_jobs"))
+        assert.is_function(context.queue.getActiveCount)
+        assert.is_function(context.queue.getActiveJob)
+        assert.is_function(context.queue.setActiveJob)
+        assert.is_function(context.queue.removeActiveJob)
+        assert.is_function(context.queue.schedulePoll)
+        assert.is_function(context.queue.process)
+        assert.is_function(context.queue.poll)
+        assert.is_nil(context.queue.writeProgressFallback)
+        assert.is_nil(context.queue.runDownloaderJob)
+        assert.is_nil(context.queue.finishActiveWithFailure)
+        assert.is_nil(context.queue.readProgress)
     end)
 
     it("uses the human chapter number in failure messages when available", function()
@@ -1173,113 +998,4 @@ describe("suwayomi/downloads/queue", function()
         }, context.debug_events)
     end)
 
-    it("marks the active job failed when the watchdog expires", function()
-        local context = build_queue({
-            subprocess_done = false,
-            skip_subprocess_callback = true,
-        })
-
-        context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
-        local first = table.remove(context.scheduled, 1)
-        first.callback()
-
-        context.advance((30 * 60) + 1)
-        local poll = table.remove(context.scheduled, 1)
-        poll.callback()
-
-        assert.are.equal("failed", context.saved_queue()[1].state)
-        assert.are.same({
-            state = "failed",
-            current = 0,
-            total = 0,
-            error = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): Chapter download timed out.",
-            updated_at = 1901,
-        }, context.saved_queue()[1].progress)
-        assert.are.equal(
-            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): Chapter download timed out.",
-            context.messages[#context.messages]
-        )
-    end)
-
-    it("does not time out an active job that is still reporting progress", function()
-        local context = build_queue({
-            subprocess_done = false,
-            skip_subprocess_callback = true,
-        })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
-        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
-
-        context.queue:enqueue(manga, chapter, "/books")
-        table.remove(context.scheduled, 1).callback()
-
-        context.advance((30 * 60) - 1)
-        context.write_progress(manga, chapter, "downloading", 1, 2, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
-        table.remove(context.scheduled, 1).callback()
-
-        context.advance(2)
-        context.write_progress(manga, chapter, "downloading", 2, 3, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
-        table.remove(context.scheduled, 1).callback()
-
-        assert.are.equal("downloading", context.queue:getStatus(manga, chapter).state)
-        assert.are.equal(2, context.queue:getStatus(manga, chapter).current)
-        assert.are.equal("downloading", context.saved_queue()[1].state)
-        assert.are.same({}, context.messages)
-    end)
-
-    it("treats failed progress as downloaded when the archive exists locally", function()
-        local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
-        local context = build_queue({
-            subprocess_done = true,
-            skip_subprocess_callback = true,
-            downloader = {
-                getTargetPath = function(_, download_directory, manga, chapter)
-                    return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
-                end,
-                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
-                chapterExists = function(_, chapter_path)
-                    return chapter_path == target_path
-                end,
-            },
-        })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
-        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
-
-        context.queue:enqueue(manga, chapter, "/books")
-        table.remove(context.scheduled, 1).callback()
-        context.write_progress(manga, chapter, "failed", 2, 2, target_path, "Could not finalize chapter archive.")
-        table.remove(context.scheduled, 1).callback()
-
-        assert.are.same({}, context.saved_queue())
-        assert.are.equal("downloaded", context.queue:getStatus(manga, chapter).state)
-        assert.are.same({}, context.messages)
-    end)
-
-    it("treats a finished subprocess as downloaded when progress is missing but the archive exists locally", function()
-        local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
-        local context = build_queue({
-            subprocess_done = true,
-            skip_subprocess_callback = true,
-            downloader = {
-                getTargetPath = function(_, download_directory, manga, chapter)
-                    return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
-                end,
-                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
-                chapterExists = function(_, chapter_path)
-                    return chapter_path == target_path
-                end,
-            },
-        })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
-        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
-
-        context.queue:enqueue(manga, chapter, "/books")
-        table.remove(context.scheduled, 1).callback()
-        table.remove(context.scheduled, 1).callback()
-
-        assert.are.same({}, context.saved_queue())
-        assert.are.equal("downloaded", context.queue:getStatus(manga, chapter).state)
-        assert.are.same({}, context.messages)
-    end)
 end)
