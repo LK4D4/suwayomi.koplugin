@@ -1,0 +1,362 @@
+local Menu = require("ui/widget/menu")
+local MultiInputDialog = require("ui/widget/multiinputdialog")
+local _ = require("gettext")
+local menu_utils = require("suwayomi/ui/menu_utils")
+
+local BrowseUI = {}
+
+function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
+    local menu_table = {}
+    options = options or {}
+    if type(onSelectCallback) == "table" then
+        options = onSelectCallback
+        onSelectCallback = options.onSelect
+    end
+    if options.on_global_search then
+        table.insert(menu_table, {
+            text = _("Global search"),
+            callback = options.on_global_search,
+        })
+    end
+    for _, source in ipairs(sources) do
+        table.insert(menu_table, {
+            text = source.name,
+            callback = function()
+                if onSelectCallback then onSelectCallback(source) end
+            end
+        })
+    end
+
+    local menu = Menu:new{
+        title = _("Suwayomi Sources"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = menu_table,
+    }
+    menu_utils.applyTitleBarOptions(menu, options)
+    local UIManager = require("ui/uimanager")
+    UIManager:show(menu)
+    return menu
+end
+
+function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
+    options = options or {}
+    local menu_table = {
+        {
+            text = _("Popular"),
+            callback = function()
+                if onSelectCallback then onSelectCallback("POPULAR") end
+            end,
+        },
+    }
+
+    if not source or source.supports_latest ~= false then
+        table.insert(menu_table, {
+            text = _("Latest"),
+            callback = function()
+                if onSelectCallback then onSelectCallback("LATEST") end
+            end,
+        })
+    end
+
+    table.insert(menu_table, {
+        text = _("Search"),
+        callback = function()
+            if onSelectCallback then onSelectCallback("SEARCH") end
+        end,
+    })
+
+    local menu = Menu:new{
+        title = source and (source.name or source.display_name or source.displayName) or _("Suwayomi Source"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = menu_table,
+    }
+    menu_utils.applyTitleBarOptions(menu, options)
+    local UIManager = require("ui/uimanager")
+    UIManager:show(menu)
+    return menu
+end
+
+function BrowseUI.showSourceSearchPrompt(source, onSearchCallback)
+    local UIManager = require("ui/uimanager")
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = _("Search ") .. (source and (source.name or source.display_name or source.displayName) or _("source")),
+        fields = {
+            {
+                hint = _("Search query"),
+                text = "",
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    id = "close",
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+                {
+                    text = _("Search"),
+                    is_enter_default = true,
+                    callback = function()
+                        local fields = dialog:getFields()
+                        UIManager:close(dialog)
+                        if onSearchCallback then
+                            onSearchCallback(fields[1] or "")
+                        end
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+    return dialog
+end
+
+function BrowseUI.showGlobalSearchPrompt(onSearchCallback)
+    local UIManager = require("ui/uimanager")
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = _("Global search"),
+        fields = {
+            {
+                hint = _("Search query"),
+                text = "",
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    id = "close",
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+                {
+                    text = _("Search"),
+                    is_enter_default = true,
+                    callback = function()
+                        local fields = dialog:getFields()
+                        UIManager:close(dialog)
+                        if onSearchCallback then
+                            onSearchCallback(fields[1] or "")
+                        end
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+    return dialog
+end
+
+function BrowseUI.updateSourcesMenu(menu, sources, onSelectCallback, options)
+    if not menu then
+        return
+    end
+
+    local menu_table = {}
+    if options and options.on_global_search then
+        table.insert(menu_table, {
+            text = _("Global search"),
+            callback = options.on_global_search,
+        })
+    end
+    for _, source in ipairs(sources or {}) do
+        table.insert(menu_table, {
+            text = source.name,
+            callback = function()
+                if onSelectCallback then onSelectCallback(source) end
+            end
+        })
+    end
+    menu.item_table = menu_table
+    menu_utils.applyTitleBarOptions(menu, options)
+    if menu.updateItems then
+        menu:updateItems()
+    end
+end
+
+local function getSourceRowName(source)
+    if type(source) ~= "table" then
+        return _("Source")
+    end
+    return source.display_name
+        or source.displayName
+        or source.name
+        or source.raw_name
+        or tostring(source.id)
+end
+
+local function getMangaRowTitle(manga)
+    if type(manga) ~= "table" then
+        return ""
+    end
+    return manga.title or tostring(manga.id or "")
+end
+
+local function formatGlobalSearchSummary(summary)
+    local source_name = getSourceRowName(summary and summary.source)
+    if not summary or summary.status == "empty" then
+        return source_name .. ": " .. _("No results")
+    end
+    if summary.status == "pageable_empty" then
+        return source_name .. ": " .. _("More results")
+    end
+    if summary.status == "error" then
+        return source_name .. ": " .. _("Error") .. " - " .. tostring(summary.error or _("Unknown error"))
+    end
+    return source_name .. ": " .. getMangaRowTitle(summary.first_match)
+end
+
+function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, options)
+    options = options or {}
+    local menu_table = {}
+    for _, summary in ipairs(summaries or {}) do
+        table.insert(menu_table, {
+            text = formatGlobalSearchSummary(summary),
+            callback = function()
+                if (summary.status == "ok" or summary.status == "pageable_empty") and onSelectCallback then
+                    onSelectCallback(summary)
+                end
+            end,
+        })
+    end
+
+    local menu = Menu:new{
+        title = _("Global search"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = menu_table,
+    }
+    menu_utils.applyTitleBarOptions(menu, options)
+    local UIManager = require("ui/uimanager")
+    UIManager:show(menu)
+    return menu
+end
+
+local function formatBrowseMangaRow(manga)
+    local marker = manga and manga.in_library == true and "[+] " or "[ ] "
+    return marker .. tostring(manga and (manga.title or manga.id) or "")
+end
+
+local function buildMangaMenuTable(manga_list, onSelectCallback, options)
+    options = options or {}
+    local menu_table = {}
+    if options.on_previous_page then
+        table.insert(menu_table, {
+            text = _("Previous page"),
+            callback = options.on_previous_page,
+        })
+    end
+    for _, manga in ipairs(manga_list or {}) do
+        table.insert(menu_table, {
+            text = formatBrowseMangaRow(manga),
+            callback = function()
+                if onSelectCallback then onSelectCallback(manga) end
+            end
+        })
+    end
+    if options.on_next_page then
+        table.insert(menu_table, {
+            text = _("Next page"),
+            callback = options.on_next_page,
+        })
+    end
+    return menu_table
+end
+
+function BrowseUI.showMangaMenu(manga_list, onSelectCallback, options)
+    local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
+
+    local menu = Menu:new{
+        title = options and options.title or _("Suwayomi Manga"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = menu_table,
+    }
+    menu_utils.applyTitleBarOptions(menu, options)
+    local UIManager = require("ui/uimanager")
+    UIManager:show(menu)
+    return menu
+end
+
+function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
+    if not menu then
+        return
+    end
+
+    local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
+    menu.item_table = menu_table
+    menu_utils.applyTitleBarOptions(menu, options)
+    if menu.updateItems then
+        menu:updateItems()
+    end
+end
+
+function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
+    local menu_table = {}
+    for _, category in ipairs(categories or {}) do
+        local suffix = ""
+        if category.manga_count ~= nil then
+            suffix = " (" .. tostring(category.manga_count) .. ")"
+        end
+        table.insert(menu_table, {
+            text = (category.name or tostring(category.id)) .. suffix,
+            callback = function()
+                if onSelectCallback then onSelectCallback(category) end
+            end,
+        })
+    end
+
+    local menu = Menu:new{
+        title = _("Suwayomi Library"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = menu_table,
+    }
+    menu_utils.applyTitleBarOptions(menu, options)
+    local UIManager = require("ui/uimanager")
+    UIManager:show(menu)
+    return menu
+end
+
+local function buildLibraryMangaMenuTable(manga_list, onSelectCallback)
+    local menu_table = {}
+    for _, manga in ipairs(manga_list or {}) do
+        table.insert(menu_table, {
+            text = manga.menu_text or manga.title,
+            callback = function()
+                if onSelectCallback then onSelectCallback(manga) end
+            end,
+        })
+    end
+    return menu_table
+end
+
+function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
+    local menu = Menu:new{
+        title = _("Suwayomi Library"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
+    }
+    menu_utils.applyTitleBarOptions(menu, options)
+    local UIManager = require("ui/uimanager")
+    UIManager:show(menu)
+    return menu
+end
+
+function BrowseUI.updateLibraryMangaMenu(menu, manga_list, onSelectCallback, options)
+    if not menu then
+        return
+    end
+
+    menu.item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback)
+    menu_utils.applyTitleBarOptions(menu, options)
+    if menu.updateItems then
+        menu:updateItems()
+    end
+end
+
+return BrowseUI
