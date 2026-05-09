@@ -7,10 +7,10 @@
 - Verify LuaRocks is using LuaJIT before installing deps: `luarocks config lua_interpreter` should print a LuaJIT executable.
 - Install local test/lint deps like CI: `luarocks install --local busted`, `luarocks install --local dkjson`, and `luarocks install --local luacheck`.
 - `luarocks --local` puts executables in `$HOME/.luarocks/bin`; use `PATH="$HOME/.luarocks/bin:$PATH" ...` unless that path is already exported.
-- Run the full lint suite from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes .`.
+- Run the full lint suite from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes spec suwayomi main.lua _meta.lua`.
 - Run the full test suite from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" busted spec`.
 - Run one spec file from the repo root: `PATH="$HOME/.luarocks/bin:$PATH" busted spec/suwayomi_api_spec.lua`.
-- `luacheck --codes .` provides repo-wide Lua parsing/syntax coverage; do not add a separate `luac` syntax pass.
+- `luacheck --codes spec suwayomi main.lua _meta.lua` provides project Lua parsing/syntax coverage without linting generated dependency directories such as `.lua` and `.luarocks`; do not add a separate `luac` syntax pass.
 - Specs set `package.path = "?.lua;" .. package.path`; run `busted` from the plugin root or local module requires will not resolve.
 
 ## Project Shape

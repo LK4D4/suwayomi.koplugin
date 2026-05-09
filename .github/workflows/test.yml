@@ -31,7 +31,7 @@ jobs:
         luarocks install luacheck
 
     - name: Run lint
-      run: luacheck --codes .
+      run: luacheck --codes spec suwayomi main.lua _meta.lua
 
     - name: Run tests
       run: busted spec

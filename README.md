@@ -77,7 +77,7 @@ Manual installation:
 ## Testing Locally
 
 This plugin targets KOReader's LuaJIT runtime. Local checks use Luacheck for
-repo-wide parsing/linting and Busted for unit tests:
+project parsing/linting and Busted for unit tests:
 
 ```bash
 # Confirm LuaRocks is configured for LuaJIT
@@ -88,8 +88,8 @@ luarocks install busted
 luarocks install dkjson
 luarocks install luacheck
 
-# Run lint, including syntax parsing for all Lua files
-luacheck --codes .
+# Run lint, including syntax parsing for project Lua files
+luacheck --codes spec suwayomi main.lua _meta.lua
 
 # Run tests
 busted spec
