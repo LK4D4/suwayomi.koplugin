@@ -74,7 +74,7 @@ Current limitations:
 - Automatic read-download cleanup is tied to the local keep-next-unread policy rather than a separate delete-while-reading toggle.
 - Full dynamic source filter editing is deferred.
 - Remote source workflow verification remains Phase 8 work.
-- `main.lua` owns too much orchestration for the next client features to remain comfortable.
+- The codebase is now split into facades/controllers/submodules; the next risk is validating the unit-covered remote-source flows on real sources and devices.
 
 ## Suwayomi-WebUI Alignment Review
 
@@ -93,7 +93,7 @@ Goal: create small homes for path and client orchestration before adding more be
 
 ### 1.1 Source-scoped paths
 
-- [x] Add `suwayomi_paths.lua`
+- [x] Add `suwayomi/paths.lua`
 - [x] Move path segment sanitization into the path module, or make the downloader delegate to it
 - [x] Add source label selection:
   - `manga.source.displayName`
@@ -120,12 +120,12 @@ Exit criteria:
 
 ### 1.2 Client orchestration module
 
-- [x] Add `suwayomi_client.lua`
+- [x] Add `suwayomi/client.lua`
 - [x] Move small existing browse orchestration pieces out of `main.lua` when it reduces pressure
 - [x] Keep plugin lifecycle, main menu registration, and KOReader integration in `main.lua`
-- [x] Keep API parsing in `suwayomi_api.lua`
-- [x] Keep KOReader menu/dialog construction in `suwayomi_ui.lua`
-- [x] Keep queue mechanics in `suwayomi_download_queue.lua`
+- [x] Keep API parsing in `suwayomi/api/parsers.lua` behind the `suwayomi/api.lua` facade
+- [x] Keep KOReader menu/dialog construction in `suwayomi/ui.lua` and its `suwayomi/ui/` submodules
+- [x] Keep queue mechanics behind the `suwayomi/downloads/queue.lua` facade
 - [x] Avoid extracting read-state reconciliation unless a later slice truly needs it
 
 Exit criteria:
@@ -243,7 +243,7 @@ Exit criteria:
 Goal: make the existing KOReader-local download queue inspectable and manageable from the top level.
 
 - [x] Add top-level `Downloads` menu implementation
-- [x] Read active and queued items from `suwayomi_download_queue.lua`
+- [x] Read active and queued items from `suwayomi/downloads/queue.lua`
 - [x] Surface failed items with last error where available
 - [x] Skip completed history because completed jobs are not persisted
 - [x] Add compact rows with status, manga title, and chapter name

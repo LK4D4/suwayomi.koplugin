@@ -77,22 +77,23 @@ Manual installation:
 ## Testing Locally
 
 This plugin targets KOReader's LuaJIT runtime. Local checks use Luacheck for
-repo-wide parsing/linting and Busted for unit tests:
+project Lua parsing/linting, avoiding generated dependency directories such as
+`.lua` and `.luarocks`, and Busted for unit tests:
 
 ```bash
 # Confirm LuaRocks is configured for LuaJIT
 luarocks config lua_interpreter
 
 # Install test and lint dependencies via LuaJIT-backed LuaRocks
-luarocks install busted
-luarocks install dkjson
-luarocks install luacheck
+luarocks install --local busted
+luarocks install --local dkjson
+luarocks install --local luacheck
 
-# Run lint, including syntax parsing for all Lua files
-luacheck --codes .
+# Run project Lua parsing/linting while avoiding generated dependency directories
+PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes spec suwayomi main.lua _meta.lua
 
 # Run tests
-busted spec
+PATH="$HOME/.luarocks/bin:$PATH" busted spec
 ```
 
 ## Contributing

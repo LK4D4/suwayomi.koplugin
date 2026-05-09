@@ -2,6 +2,8 @@
 
 Date: 2026-05-03
 
+Historical note: this plan predates the slash-style `suwayomi/` module refactor and uses old top-level module names such as `suwayomi_download_queue.lua`, `suwayomi_downloader.lua`, and `suwayomi_api.lua`. The implemented architecture now lives behind `suwayomi/downloads/queue.lua`, `suwayomi/downloads/active_jobs.lua`, `suwayomi/downloads/job_store.lua`, `suwayomi/downloads/progress_file.lua`, `suwayomi/downloads/downloader.lua`, and the `suwayomi/api.lua` facade. Treat the body below as historical design context, not the active module map.
+
 ## Goal
 
 Improve Suwayomi chapter download speed without making download behavior hard to test or unsafe on KOReader devices.
