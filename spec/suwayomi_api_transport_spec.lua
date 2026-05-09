@@ -1,0 +1,182 @@
+package.path = "?.lua;" .. package.path
+
+describe("suwayomi/api/transport", function()
+    local transport
+
+    before_each(function()
+        package.loaded["suwayomi/api/transport"] = nil
+        package.loaded["socket.http"] = nil
+        package.loaded["ssl.https"] = nil
+        package.loaded.ltn12 = nil
+        package.loaded.socket = nil
+        transport = require("suwayomi/api/transport")
+    end)
+
+    local function valid_credentials()
+        return {
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }
+    end
+
+    local function install_ltn12()
+        package.preload.ltn12 = function()
+            return {
+                source = {
+                    string = function(value)
+                        return value
+                    end,
+                },
+                sink = {
+                    table = function(target)
+                        return function(chunk)
+                            table.insert(target, chunk)
+                        end
+                    end,
+                },
+            }
+        end
+    end
+
+    it("builds auth headers and request URLs", function()
+        assert.are.equal("Basic YWxpY2U6czNjcmV0", transport.buildBasicAuthHeader("alice", "s3cret"))
+
+        local headers = transport.buildRequestHeaders(valid_credentials())
+        assert.are.equal("application/json", headers["Content-Type"])
+        assert.are.equal("Basic YWxpY2U6c2VjcmV0", headers.Authorization)
+
+        assert.are.equal("https://suwayomi.example/api/graphql", transport.buildGraphQLEndpoint("https://suwayomi.example/"))
+        assert.are.equal("https://suwayomi.example/api/v1/page/1", transport.buildRequestURL("https://suwayomi.example/", "/api/v1/page/1"))
+        assert.are.equal("https://cdn.example/page.jpg", transport.buildRequestURL("https://suwayomi.example", "https://cdn.example/page.jpg"))
+        assert.are.equal(
+            "https://suwayomi.example/api/v1/chapter/398/download?markAsRead=false",
+            transport.buildChapterArchiveDownloadURL("https://suwayomi.example/", "398")
+        )
+    end)
+
+    it("performs GraphQL requests with auth headers and debug metadata", function()
+        install_ltn12()
+        local request = {}
+        local events = {}
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    request.url = options.url
+                    request.method = options.method
+                    request.headers = options.headers
+                    request.source = options.source
+                    request.timeout = options.timeout
+                    options.sink([[{"data":{"ok":true}}]])
+                    return 1, 200
+                end,
+            }
+        end
+
+        local result = transport.performGraphQLRequest(
+            valid_credentials(),
+            [[{"query":"query Test { ok }"}]],
+            "testOperation",
+            function(event)
+                table.insert(events, event)
+            end
+        )
+
+        assert.are.equal(true, result.ok)
+        assert.are.equal([[{"data":{"ok":true}}]], result.response_body)
+        assert.are.equal("https://suwayomi.example/api/graphql", request.url)
+        assert.are.equal("POST", request.method)
+        assert.are.equal("Basic YWxpY2U6c2VjcmV0", request.headers.Authorization)
+        assert.are.equal(tostring(#([[{"query":"query Test { ok }"}]])), request.headers["Content-Length"])
+        assert.are.equal(15, request.timeout)
+        assert.are.equal("testOperation", events[1].operation)
+        assert.are.equal("response", events[1].event)
+    end)
+
+    it("returns transport errors for missing URLs and non-200 GraphQL responses", function()
+        local missing = transport.performGraphQLRequest({}, "{}", "missing")
+        assert.are.equal(false, missing.ok)
+        assert.are.equal("Missing Suwayomi server URL.", missing.error)
+
+        install_ltn12()
+        package.preload["socket.http"] = function()
+            return {
+                request = function()
+                    return nil, "connection refused"
+                end,
+            }
+        end
+
+        local failed = transport.performGraphQLRequest({ server_url = "http://suwayomi.example" }, "{}", "failure")
+        assert.are.equal(false, failed.ok)
+        assert.are.equal("Could not reach the Suwayomi server: connection refused", failed.error)
+    end)
+
+    it("downloads binary bytes and only sends auth to same-origin URLs", function()
+        install_ltn12()
+        local requests = {}
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    table.insert(requests, options)
+                    options.sink("PNG")
+                    return 1, 200, { ["content-type"] = "image/png" }
+                end,
+            }
+        end
+
+        local relative = transport.downloadBinary(valid_credentials(), "/api/v1/page/1")
+        assert.are.equal(true, relative.ok)
+        assert.are.equal("PNG", relative.body)
+        assert.are.equal("image/png", relative.content_type)
+        assert.are.equal("Basic YWxpY2U6c2VjcmV0", requests[1].headers.Authorization)
+
+        local absolute = transport.downloadBinary(valid_credentials(), "https://cdn.example/page.jpg")
+        assert.are.equal(true, absolute.ok)
+        assert.is_nil(requests[2].headers.Authorization)
+    end)
+
+    it("downloads chapter archives to disk and removes failed partial files", function()
+        local target_path = os.tmpname()
+        os.remove(target_path)
+        local request
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    request = options
+                    options.sink("CBZ")
+                    return 1, 200, { ["content-length"] = "3", ["content-type"] = "application/vnd.comicbook+zip" }
+                end,
+            }
+        end
+
+        local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path)
+        assert.are.equal(true, result.ok)
+        assert.are.equal(target_path, result.path)
+        assert.are.equal(3, result.bytes)
+        assert.are.equal(3, result.content_length)
+        assert.are.equal("https://suwayomi.example/api/v1/chapter/398/download?markAsRead=false", request.url)
+        assert.are.equal("Basic YWxpY2U6c2VjcmV0", request.headers.Authorization)
+
+        os.remove(target_path)
+        package.loaded["ssl.https"] = nil
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    options.sink("missing")
+                    return 1, 404
+                end,
+            }
+        end
+
+        local failed = transport.downloadChapterArchive(valid_credentials(), "404", target_path)
+        assert.are.equal(false, failed.ok)
+        assert.are.equal("Chapter archive not found.", failed.error)
+        assert.is_nil(io.open(target_path, "rb"))
+    end)
+end)
