@@ -1,5 +1,5 @@
 local _ = require("gettext")
-local T = require("ffi/util").template
+local ActiveJobs = require("suwayomi/downloads/active_jobs")
 local JobStore = require("suwayomi/downloads/job_store")
 local ProgressFile = require("suwayomi/downloads/progress_file")
 local StatusFormatter = require("suwayomi/downloads/status_formatter")
@@ -56,10 +56,13 @@ function DownloadQueue:new(options)
         items = {},
         statuses = {},
         active_jobs = {},
-        poll_scheduled = false,
         max_active_chapters = self:normalizeActiveChapterLimit(options.max_active_chapters),
     }
     setmetatable(queue, self)
+    queue.active_job_lifecycle = options.active_job_lifecycle or ActiveJobs:new{
+        queue = queue,
+        jobs = queue.active_jobs,
+    }
     queue.job_store = options.job_store or JobStore:new{
         settings = queue.settings,
         getKey = function(manga, chapter)
@@ -76,38 +79,23 @@ function DownloadQueue:logDebug(event)
 end
 
 function DownloadQueue:getActiveCount()
-    local count = 0
-    for _ in pairs(self.active_jobs or {}) do
-        count = count + 1
-    end
-    return count
+    return self.active_job_lifecycle:getCount()
 end
 
 function DownloadQueue:getActiveJob(key)
-    return self.active_jobs and self.active_jobs[key] or nil
+    return self.active_job_lifecycle:getJob(key)
 end
 
 function DownloadQueue:setActiveJob(job)
-    self.active_jobs = self.active_jobs or {}
-    self.active_jobs[job.key or self:getKey(job.manga, job.chapter)] = job
+    self.active_job_lifecycle:setJob(job)
 end
 
 function DownloadQueue:removeActiveJob(job)
-    if not self.active_jobs then
-        return
-    end
-    self.active_jobs[job.key or self:getKey(job.manga, job.chapter)] = nil
+    self.active_job_lifecycle:removeJob(job)
 end
 
 function DownloadQueue:schedulePoll()
-    if self.poll_scheduled or self:getActiveCount() == 0 then
-        return
-    end
-
-    self.poll_scheduled = true
-    self.ui_manager:scheduleIn(self.POLL_INTERVAL_SECONDS, function()
-        self:poll()
-    end)
+    self.active_job_lifecycle:schedulePoll()
 end
 
 function DownloadQueue:getKey(manga, chapter)
@@ -589,299 +577,23 @@ function DownloadQueue:getCredentialsForJob()
 end
 
 function DownloadQueue:writeProgressFallback(progress_path, state, current, total, path, error_message)
-    return ProgressFile.writeFallback(progress_path, state, current, total, path, error_message)
+    return self.active_job_lifecycle:writeProgressFallback(progress_path, state, current, total, path, error_message)
 end
 
 function DownloadQueue:runDownloaderJob(queued)
-    if queued.downloader.downloadChapterWithProgress then
-        queued.downloader:downloadChapterWithProgress(
-            queued.credentials,
-            queued.download_directory,
-            queued.manga,
-            queued.chapter,
-            queued.progress_path
-        )
-        return
-    end
-
-    local result = queued.downloader:startChapterDownload(queued.credentials, queued.download_directory, queued.manga, queued.chapter)
-    if not result.ok or result.skipped then
-        local state = result.skipped and "skipped" or (result.ok and "downloaded" or "failed")
-        self:writeProgressFallback(queued.progress_path, state, result.ok and 1 or 0, result.ok and 1 or 0, result.path, result.error)
-        return
-    end
-
-    repeat
-        result = queued.downloader:downloadNextPage(result.job)
-        self:writeProgressFallback(
-            queued.progress_path,
-            result.ok and (result.done and "downloaded" or "downloading") or "failed",
-            result.current,
-            result.total,
-            result.path,
-            result.error
-        )
-    until not result.ok or result.done
-end
-
-local function startQueuedJob(self, queued)
-    queued.started_at = self.now()
-    queued.last_progress_at = queued.started_at
-    queued.last_progress_current = nil
-    queued.last_progress_state = nil
-    queued.progress_path = self:buildProgressPath(queued.manga, queued.chapter, queued.download_directory)
-    os.remove(queued.progress_path)
-    queued.credentials = queued.credentials or self:getCredentialsForJob()
-    self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading", {
-        started_at = queued.started_at,
-        last_progress_at = queued.last_progress_at,
-        progress = {
-            state = "downloading",
-            current = 0,
-            total = 0,
-            updated_at = queued.last_progress_at,
-        },
-    }))
-
-    local pid, err = self.ffi_util.runInSubProcess(function()
-        self:runDownloaderJob(queued)
-    end)
-
-    if not pid then
-        self:setStatus(queued.manga, queued.chapter, { state = "failed" })
-        local message = self:formatFailureMessage(
-            queued.manga,
-            queued.chapter,
-            T(_("Could not start chapter download: %1"), err or _("unknown error"))
-        )
-        self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "failed", {
-            started_at = queued.started_at,
-            last_progress_at = self.now(),
-            progress = {
-                state = "failed",
-                current = 0,
-                total = 0,
-                error = message,
-                updated_at = self.now(),
-            },
-        }))
-        self.onMessage(message)
-        return false
-    end
-
-    queued.pid = pid
-    self:setActiveJob(queued)
-    self:setStatus(queued.manga, queued.chapter, {
-        state = "downloading",
-        current = 0,
-        total = 0,
-    })
-    return true
+    return self.active_job_lifecycle:runDownloaderJob(queued)
 end
 
 function DownloadQueue:process()
-    local started_at = os.time()
-    local ok_socket, socket = pcall(require, "socket")
-    if ok_socket and socket and socket.gettime then
-        started_at = socket.gettime()
-    end
-    local started_count = 0
-    while self:getActiveCount() < self.max_active_chapters do
-        local queued = table.remove(self.items, 1)
-        if not queued then
-            break
-        end
-
-        if startQueuedJob(self, queued) then
-            started_count = started_count + 1
-        end
-    end
-
-    self:schedulePoll()
-    local finished_at = os.time()
-    if ok_socket and socket and socket.gettime then
-        finished_at = socket.gettime()
-    end
-    self:logDebug({
-        operation = "downloadQueue.process",
-        event = "end",
-        started_count = started_count,
-        active_count = self:getActiveCount(),
-        queued_count = #(self.items or {}),
-        elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
-    })
+    return self.active_job_lifecycle:process()
 end
 
 function DownloadQueue:finishActiveWithFailure(active, message)
-    local failure_message = self:formatFailureMessage(active.manga, active.chapter, message or _("Chapter download failed."))
-    self:removeActiveJob(active)
-    os.remove(active.progress_path)
-    self:setStatus(active.manga, active.chapter, { state = "failed" })
-    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
-        started_at = active.started_at,
-        last_progress_at = self.now(),
-        progress = {
-            state = "failed",
-            current = active.last_progress_current or 0,
-            total = active.last_progress_total or 0,
-            path = active.last_progress_path,
-            error = failure_message,
-            updated_at = self.now(),
-        },
-    }))
-    self.onMessage(failure_message)
-end
-
-local function recordActiveProgress(self, active, progress)
-    if not progress or not progress.state then
-        return
-    end
-
-    if progress.current ~= active.last_progress_current or progress.state ~= active.last_progress_state then
-        active.last_progress_at = self.now()
-        active.last_progress_current = progress.current
-        active.last_progress_total = progress.total
-        active.last_progress_path = progress.path
-        active.last_progress_error = progress.error
-        active.last_progress_state = progress.state
-        self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, progress.state, {
-            started_at = active.started_at,
-            last_progress_at = active.last_progress_at,
-            progress = {
-                state = progress.state,
-                current = progress.current,
-                total = progress.total,
-                path = progress.path,
-                error = progress.error,
-                updated_at = active.last_progress_at,
-            },
-        }))
-    end
-    self:setStatus(active.manga, active.chapter, {
-        state = progress.state,
-        current = progress.current,
-        total = progress.total,
-    })
-end
-
-local function finishActiveFromProgress(self, active, progress)
-    self:removeActiveJob(active)
-    os.remove(active.progress_path)
-    if progress and (progress.state == "downloaded" or progress.state == "skipped") then
-        self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
-    elseif progress and progress.state == "failed" and self:jobArchiveExists(active, progress) then
-        -- A downloader may report failure after writing a valid CBZ. Keep the
-        -- user-facing state aligned with the archive that now exists on disk.
-        self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
-        self:setStatus(active.manga, active.chapter, {
-            state = "downloaded",
-            current = progress.current,
-            total = progress.total,
-        })
-    elseif progress and progress.state == "failed" then
-        local message = self:formatFailureMessage(
-            active.manga,
-            active.chapter,
-            progress.error or _("Chapter download failed.")
-        )
-        self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
-            started_at = active.started_at,
-            last_progress_at = active.last_progress_at or self.now(),
-            progress = {
-                state = "failed",
-                current = progress.current,
-                total = progress.total,
-                path = progress.path,
-                error = message,
-                updated_at = active.last_progress_at or self.now(),
-            },
-        }))
-        self.onMessage(message)
-    end
-end
-
-local function finishActiveWithoutProgress(self, active)
-    self:removeActiveJob(active)
-    os.remove(active.progress_path)
-    if self:jobArchiveExists(active) then
-        self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
-        self:setStatus(active.manga, active.chapter, {
-            state = "downloaded",
-            current = active.last_progress_current,
-            total = active.last_progress_total,
-        })
-        return
-    end
-
-    self:setStatus(active.manga, active.chapter, { state = "failed" })
-    local message = self:formatFailureMessage(active.manga, active.chapter, _("Chapter download failed."))
-    self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
-        started_at = active.started_at,
-        last_progress_at = self.now(),
-        progress = {
-            state = "failed",
-            current = active.last_progress_current or 0,
-            total = active.last_progress_total or 0,
-            path = active.last_progress_path,
-            error = message,
-            updated_at = self.now(),
-        },
-    }))
-    self.onMessage(message)
+    return self.active_job_lifecycle:finishWithFailure(active, message)
 end
 
 function DownloadQueue:poll()
-    local started_at = os.time()
-    local ok_socket, socket = pcall(require, "socket")
-    if ok_socket and socket and socket.gettime then
-        started_at = socket.gettime()
-    end
-    self.poll_scheduled = false
-    if self:getActiveCount() == 0 then
-        return
-    end
-
-    local active_jobs = {}
-    for _, active in pairs(self.active_jobs or {}) do
-        table.insert(active_jobs, active)
-    end
-
-    for index = 1, #active_jobs do
-        local active = active_jobs[index]
-        local progress = self:readProgress(active.progress_path)
-        recordActiveProgress(self, active, progress)
-
-        if self.now() - (active.last_progress_at or active.started_at or self.now()) > self.WATCHDOG_TIMEOUT_SECONDS then
-            -- The worker may have died without writing terminal progress. The
-            -- watchdog converts that silent active state into a recoverable
-            -- failed job instead of leaving a permanent "downloading" row.
-            self:finishActiveWithFailure(active, _("Chapter download timed out."))
-        else
-            local done = self.ffi_util.isSubProcessDone(active.pid)
-            local terminal = progress and (progress.state == "downloaded" or progress.state == "skipped" or progress.state == "failed")
-            if terminal or done then
-                if terminal then
-                    finishActiveFromProgress(self, active, progress)
-                else
-                    finishActiveWithoutProgress(self, active)
-                end
-            end
-        end
-    end
-
-    self:process()
-    local finished_at = os.time()
-    if ok_socket and socket and socket.gettime then
-        finished_at = socket.gettime()
-    end
-    self:logDebug({
-        operation = "downloadQueue.poll",
-        event = "end",
-        polled_count = #active_jobs,
-        active_count = self:getActiveCount(),
-        queued_count = #(self.items or {}),
-        elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
-    })
+    return self.active_job_lifecycle:poll()
 end
 
 return DownloadQueue
