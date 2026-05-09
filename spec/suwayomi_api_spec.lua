@@ -3,16 +3,27 @@ package.path = "?.lua;" .. package.path
 describe("suwayomi/api facade", function()
     local api
 
+    local function clear_transport_stubs()
+        package.loaded["socket.http"] = nil
+        package.loaded["ssl.https"] = nil
+        package.loaded.ltn12 = nil
+        package.loaded.socket = nil
+        package.preload["socket.http"] = nil
+        package.preload["ssl.https"] = nil
+        package.preload.ltn12 = nil
+    end
+
     before_each(function()
         package.loaded["suwayomi/api"] = nil
         package.loaded["suwayomi/api/queries"] = nil
         package.loaded["suwayomi/api/parsers"] = nil
         package.loaded["suwayomi/api/transport"] = nil
-        package.loaded["socket.http"] = nil
-        package.loaded["ssl.https"] = nil
-        package.loaded.ltn12 = nil
-        package.loaded.socket = nil
+        clear_transport_stubs()
         api = require("suwayomi/api")
+    end)
+
+    after_each(function()
+        clear_transport_stubs()
     end)
 
     local function valid_credentials()
@@ -271,5 +282,11 @@ describe("suwayomi/api facade", function()
         assert.are.equal("https://suwayomi.example/api/v1/chapter/398/download?markAsRead=false", requests[2].url)
 
         os.remove(target_path)
+    end)
+
+    it("does not inherit transport preload stubs from earlier examples", function()
+        assert.is_nil(package.preload["ssl.https"])
+        assert.is_nil(package.preload["socket.http"])
+        assert.is_nil(package.preload.ltn12)
     end)
 end)

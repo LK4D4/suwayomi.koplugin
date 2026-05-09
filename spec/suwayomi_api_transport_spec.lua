@@ -3,13 +3,24 @@ package.path = "?.lua;" .. package.path
 describe("suwayomi/api/transport", function()
     local transport
 
-    before_each(function()
-        package.loaded["suwayomi/api/transport"] = nil
+    local function clear_transport_stubs()
         package.loaded["socket.http"] = nil
         package.loaded["ssl.https"] = nil
         package.loaded.ltn12 = nil
         package.loaded.socket = nil
+        package.preload["socket.http"] = nil
+        package.preload["ssl.https"] = nil
+        package.preload.ltn12 = nil
+    end
+
+    before_each(function()
+        package.loaded["suwayomi/api/transport"] = nil
+        clear_transport_stubs()
         transport = require("suwayomi/api/transport")
+    end)
+
+    after_each(function()
+        clear_transport_stubs()
     end)
 
     local function valid_credentials()
@@ -114,6 +125,31 @@ describe("suwayomi/api/transport", function()
         assert.are.equal("Could not reach the Suwayomi server: connection refused", failed.error)
     end)
 
+    it("maps GraphQL HTTP statuses and non-numeric status strings", function()
+        install_ltn12()
+        local statuses = {
+            { code = 401, error = "Authentication failed." },
+            { code = 403, error = "Authentication failed." },
+            { code = 404, error = "Suwayomi GraphQL endpoint not found." },
+            { code = "closed", error = "Could not reach the Suwayomi server: closed" },
+        }
+
+        for _, status in ipairs(statuses) do
+            package.loaded["ssl.https"] = nil
+            package.preload["ssl.https"] = function()
+                return {
+                    request = function()
+                        return 1, status.code
+                    end,
+                }
+            end
+
+            local result = transport.performGraphQLRequest(valid_credentials(), "{}", "status")
+            assert.are.equal(false, result.ok)
+            assert.are.equal(status.error, result.error)
+        end
+    end)
+
     it("downloads binary bytes and only sends auth to same-origin URLs", function()
         install_ltn12()
         local requests = {}
@@ -137,6 +173,78 @@ describe("suwayomi/api/transport", function()
         local absolute = transport.downloadBinary(valid_credentials(), "https://cdn.example/page.jpg")
         assert.are.equal(true, absolute.ok)
         assert.is_nil(requests[2].headers.Authorization)
+    end)
+
+    it("uses socket.http for absolute http page URLs without rewriting them", function()
+        install_ltn12()
+        local requested_url
+        local selected_client
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function()
+                    selected_client = "ssl.https"
+                    return nil, "unexpected ssl client"
+                end,
+            }
+        end
+
+        package.preload["socket.http"] = function()
+            return {
+                request = function(options)
+                    selected_client = "socket.http"
+                    requested_url = options.url
+                    options.sink("png-bytes")
+                    return 1, 200, { ["content-type"] = "image/png" }
+                end,
+            }
+        end
+
+        local result = transport.downloadBinary(valid_credentials(), "http://cdn.example/assets/page-1.png")
+        assert.are.equal(true, result.ok)
+        assert.are.equal("socket.http", selected_client)
+        assert.are.equal("http://cdn.example/assets/page-1.png", requested_url)
+        assert.are.equal("png-bytes", result.body)
+        assert.are.equal("image/png", result.content_type)
+    end)
+
+    it("reports binary download failure and not-found paths", function()
+        install_ltn12()
+        package.preload["socket.http"] = function()
+            return {
+                request = function()
+                    return nil, "network timeout"
+                end,
+            }
+        end
+
+        local transport_error = transport.downloadBinary({
+            server_url = "http://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }, "/api/v1/manga/85/chapter/1/page/0")
+        assert.are.equal(false, transport_error.ok)
+        assert.are.equal("Could not reach the Suwayomi server: network timeout", transport_error.error)
+
+        package.loaded["socket.http"] = nil
+        package.preload["socket.http"] = function()
+            return {
+                request = function(options)
+                    options.sink("missing")
+                    return 1, 404, {}
+                end,
+            }
+        end
+
+        local not_found = transport.downloadBinary({
+            server_url = "http://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }, "/api/v1/manga/85/chapter/1/page/0")
+        assert.are.equal(false, not_found.ok)
+        assert.are.equal("Chapter page not found.", not_found.error)
     end)
 
     it("downloads chapter archives to disk and removes failed partial files", function()
@@ -178,5 +286,11 @@ describe("suwayomi/api/transport", function()
         assert.are.equal(false, failed.ok)
         assert.are.equal("Chapter archive not found.", failed.error)
         assert.is_nil(io.open(target_path, "rb"))
+    end)
+
+    it("does not inherit transport preload stubs from earlier examples", function()
+        assert.is_nil(package.preload["ssl.https"])
+        assert.is_nil(package.preload["socket.http"])
+        assert.is_nil(package.preload.ltn12)
     end)
 end)
