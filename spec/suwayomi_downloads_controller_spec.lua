@@ -107,6 +107,9 @@ local function installController(options)
     function plugin:showMessage(message)
         table.insert(self.messages, message)
     end
+    function plugin:getDownloadDirectorySummary()
+        return options.download_directory_summary or "Books/Manga"
+    end
     function plugin:closeMenu(menu)
         table.insert(state.closed_menus, menu)
     end
@@ -182,13 +185,15 @@ describe("suwayomi/downloads/controller", function()
         })
     end)
 
-    it("shows an empty downloads message without opening the hub", function()
-        local plugin, state = installController()
+    it("opens the downloads hub with empty-state folder context", function()
+        local plugin, state = installController({ download_directory_summary = "Books/Manga" })
 
-        plugin:showDownloads()
+        local menu = plugin:showDownloads()
 
-        assert.are.equal("No active downloads.", state.messages[1])
-        assert.is_nil(state.downloads_menu_snapshot)
+        assert.are.equal(menu, state.tracked_screens[1].widget)
+        assert.are.same({ active = {}, queued = {}, failed = {} }, state.downloads_menu_snapshot)
+        assert.are.equal("Books/Manga", state.downloads_menu_options.download_directory_summary)
+        assert.are.equal(0, #state.messages)
     end)
 
     it("opens the downloads hub and wires title-bar actions", function()

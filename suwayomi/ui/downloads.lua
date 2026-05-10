@@ -51,10 +51,41 @@ local function formatFailedDownloadText(job)
     return shortenMenuText(text)
 end
 
-function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks)
+local function isDownloadsSnapshotEmpty(snapshot)
+    return #(snapshot.active or {}) == 0
+        and #(snapshot.queued or {}) == 0
+        and #(snapshot.failed or {}) == 0
+end
+
+local function appendEmptyStateRows(menu_table, snapshot, options)
+    local active_count = #(snapshot.active or {})
+    local queued_count = #(snapshot.queued or {})
+    local failed_count = #(snapshot.failed or {})
+    local folder = options.download_directory_summary
+    if not folder or folder == "" then
+        folder = _("not set")
+    end
+
+    table.insert(menu_table, { text = _("Download folder: ") .. folder })
+    table.insert(menu_table, {
+        text = "Queue: "
+            .. tostring(active_count) .. " active, "
+            .. tostring(queued_count) .. " queued, "
+            .. tostring(failed_count) .. " failed",
+    })
+    table.insert(menu_table, { text = _("No downloads queued.") })
+end
+
+function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
     snapshot = snapshot or {}
     callbacks = callbacks or {}
+    options = options or {}
     local menu_table = {}
+
+    if isDownloadsSnapshotEmpty(snapshot) then
+        appendEmptyStateRows(menu_table, snapshot, options)
+        return menu_table
+    end
 
     for _, job in ipairs(snapshot.active or {}) do
         local progress = formatDownloadProgress(job)
@@ -108,7 +139,7 @@ function DownloadsUI.showDownloadsMenu(snapshot, callbacks, options)
     local menu_options = {
         title = options.title or _("Suwayomi Downloads"),
         title_bar_left_icon = options.title_bar_left_icon,
-        item_table = DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks),
+        item_table = DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options),
     }
     local menu = Menu:new(menu_utils.applyNativeTitleBarStyle(menu_options))
     menu_utils.applyTitleBarOptions(menu, options)

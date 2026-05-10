@@ -24,13 +24,6 @@ end
 
 local Methods = {}
 
-function Methods:isDownloadsSnapshotEmpty(snapshot)
-    return #(snapshot.active or {}) == 0
-        and #(snapshot.queued or {}) == 0
-        and #(snapshot.failed or {}) == 0
-end
-
-
 function Methods:getDownloadJobTitle(job)
     local manga_title = job and job.manga and job.manga.title or nil
     local chapter_name = job and job.chapter and job.chapter.name or nil
@@ -102,6 +95,19 @@ function Methods:getDownloadsTitleBarOptions(snapshot)
     })
 end
 
+function Methods:getDownloadsMenuOptions(snapshot)
+    local options = self:getDownloadsTitleBarOptions(snapshot)
+    if self.getDownloadDirectorySummary then
+        options.download_directory_summary = self:getDownloadDirectorySummary()
+    else
+        options.download_directory_summary = SuwayomiSettings:loadDownloadDirectory()
+        if not options.download_directory_summary or options.download_directory_summary == "" then
+            options.download_directory_summary = _("not set")
+        end
+    end
+    return options
+end
+
 
 function Methods:showQueuedDownloadActions(job, menu)
     if not SuwayomiUI.showChapterActionsMenu then
@@ -170,10 +176,6 @@ end
 function Methods:showDownloads()
     local queue = self:getDownloadQueue()
     local snapshot = queue:getSnapshot()
-    if self:isDownloadsSnapshotEmpty(snapshot) then
-        self:showMessage(_("No active downloads."))
-        return
-    end
 
     local menu = SuwayomiUI.showDownloadsMenu(snapshot, {
         onSelectActive = function(job, menu)
@@ -198,7 +200,7 @@ function Methods:showDownloads()
             self:showMessage(T(_("Cleared %1 failed downloads."), cleared), { timeout = 2 })
             self:showDownloads()
         end,
-    }, self:getDownloadsTitleBarOptions(snapshot))
+    }, self:getDownloadsMenuOptions(snapshot))
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("downloads", menu)
     end

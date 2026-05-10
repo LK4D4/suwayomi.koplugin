@@ -88,6 +88,25 @@ describe("suwayomi/ui/downloads", function()
         assert.are.equal("Clear failed", rows[4].text)
     end)
 
+    it("builds persistent empty-state rows with folder and queue summary", function()
+        local downloads = require("suwayomi/ui/downloads")
+
+        local rows = downloads.buildDownloadsMenuTable({
+            active = {},
+            queued = {},
+            failed = {},
+        }, {}, {
+            download_directory_summary = "Books/Manga",
+        })
+
+        assert.are.equal("Download folder: Books/Manga", rows[1].text)
+        assert.are.equal("Queue: 0 active, 0 queued, 0 failed", rows[2].text)
+        assert.are.equal("No downloads queued.", rows[3].text)
+        assert.is_nil(rows[1].callback)
+        assert.is_nil(rows[2].callback)
+        assert.is_nil(rows[3].callback)
+    end)
+
     it("shows downloads menu and passes the native menu to row callbacks", function()
         local downloads = require("suwayomi/ui/downloads")
         local cancelled_key
