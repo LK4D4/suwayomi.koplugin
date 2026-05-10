@@ -73,6 +73,6 @@
 
 ## Product Constraints
 
-- The supported practical flow currently targets Suwayomi Local Source; remote sources may browse but are not the main tested reading/download path.
+- The supported practical flow includes Suwayomi Local Source and remote sources. Remote source behavior can still vary by source/server, especially search timeouts and extension-specific browse/latest quirks.
 - The top-level Downloads hub is implemented for KOReader-local active, queued, and failed jobs. Completed history and Suwayomi server download queue management are intentionally not implemented.
 - Known performance-sensitive paths are synchronous UI GraphQL calls, chapter menu filesystem/metadata checks, batch delete cleanup, and background read-sync worker polling; use `docs/android-performance-testing.md` for Android stall evidence collection.
