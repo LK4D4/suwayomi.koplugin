@@ -53,6 +53,8 @@ describe("suwayomi/chapters/menu", function()
         assert.are.equal("appbar.menu", options.title_bar_left_icon)
         assert.are.equal("Chapter downloads", captured_title_options.title)
         assert.are.equal("bulk_downloads", captured_title_options.actions[1].id)
+        assert.is_true(captured_title_options.vertical)
+        assert.is_true(captured_title_options.destructive_actions_at_bottom)
 
         captured_title_options.onSelect({ id = "bulk_downloads" })
         assert.are.equal("bulk_downloads", performed_action)
@@ -92,6 +94,43 @@ describe("suwayomi/chapters/menu", function()
         assert.are.equal("appbar.menu", options.title_bar_left_icon)
         assert.are.equal("Chapter downloads", captured_title_options.title)
         assert.are.equal("select_all", captured_title_options.actions[1].id)
+    end)
+
+    it("marks destructive chapter actions so action menus can separate them", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local plugin = {
+            current_chapter_context = {
+                chapters = {
+                    { id = "c1", name = "Chapter 1", is_read = true },
+                },
+            },
+        }
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+        function plugin:isChapterDownloaded()
+            return true
+        end
+        function plugin:getSelectedChapterCount()
+            return 1
+        end
+        function plugin:getChapterScanlatorChoices()
+            return { "Official" }
+        end
+
+        local chapter_actions = plugin:getChapterActions({ id = "m1" }, {
+            id = "c1",
+            name = "Chapter 1",
+            is_read = true,
+        })
+        assert.are.equal("Delete from device", chapter_actions[#chapter_actions].text)
+        assert.is_true(chapter_actions[#chapter_actions].destructive)
+
+        local bulk_actions = plugin:getBulkChapterActions()
+        assert.are.equal("Delete downloads", bulk_actions[#bulk_actions].text)
+        assert.is_true(bulk_actions[#bulk_actions].destructive)
     end)
 
     it("quick refresh reflects updated read state instead of stale cached row status", function()

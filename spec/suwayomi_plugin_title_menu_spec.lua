@@ -103,6 +103,31 @@ describe("suwayomi/plugin/title_menu", function()
         assert.are.equal(source_menu, delegated.menu)
     end)
 
+    it("forwards vertical destructive action layout options to title action menus", function()
+        local TitleMenu = require("suwayomi/plugin/title_menu")
+        local plugin = {}
+        for name, method in pairs(TitleMenu.methods) do
+            plugin[name] = method
+        end
+
+        local options = plugin:getTitleBarMenuOptions({
+            title = "Chapter downloads",
+            actions = {
+                { id = "bulk_downloads", text = "Bulk downloads" },
+                { id = "delete_read_downloaded", text = "Delete read downloads", destructive = true },
+            },
+            vertical = true,
+            destructive_actions_at_bottom = true,
+        })
+
+        options.on_title_bar_left_tap({ name = "chapter-menu" })
+
+        assert.is_true(shown_action_menu.vertical)
+        assert.is_true(shown_action_menu.destructive_actions_at_bottom)
+        assert.are.equal("delete_read_downloaded", shown_action_menu.actions[#shown_action_menu.actions].id)
+        assert.is_true(shown_action_menu.actions[#shown_action_menu.actions].destructive)
+    end)
+
     it("handles home centrally by closing plugin screens and showing the hub", function()
         local TitleMenu = require("suwayomi/plugin/title_menu")
         local events = {}

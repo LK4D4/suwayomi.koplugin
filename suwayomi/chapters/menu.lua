@@ -51,6 +51,8 @@ function Methods:getChapterTitleBarMenuOptions()
     return self:getTitleBarMenuOptions({
         title = _("Chapter downloads"),
         actions = self:getBulkChapterActions(),
+        vertical = true,
+        destructive_actions_at_bottom = true,
         onSelect = function(action)
             return self:performBulkChapterAction(action.id)
         end,
@@ -255,7 +257,7 @@ function Methods:getChapterActions(manga, chapter)
         table.insert(actions, { id = "mark_through_read", text = _("Mark through here") })
     end
     if downloaded then
-        table.insert(actions, { id = "delete", text = _("Delete from device") })
+        table.insert(actions, { id = "delete", text = _("Delete from device"), destructive = true })
     end
     return actions
 end
@@ -269,10 +271,10 @@ function Methods:getBulkChapterActions()
         table.insert(actions, { id = "mark_read_selected", text = _("Mark read") })
         table.insert(actions, { id = "mark_unread_selected", text = _("Mark unread") })
         table.insert(actions, { id = "clear_selection", text = _("Clear selection") })
-        table.insert(actions, { id = "delete_selected", text = _("Delete downloads") })
         if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
             table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter") })
         end
+        table.insert(actions, { id = "delete_selected", text = _("Delete downloads"), destructive = true })
         return actions
     end
 
@@ -281,10 +283,10 @@ function Methods:getBulkChapterActions()
     end
 
     table.insert(actions, { id = "bulk_downloads", text = _("Bulk downloads") })
-    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read downloads") })
     if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
         table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter") })
     end
+    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read downloads"), destructive = true })
 
     return actions
 end

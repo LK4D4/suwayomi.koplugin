@@ -227,6 +227,7 @@ describe("suwayomi/manga/controller", function()
         local manga = {
             id = "m1",
             title = "Frieren",
+            in_library = true,
             first_unread_chapter = { id = "c2", name = "Ch. 2" },
         }
 
@@ -234,6 +235,8 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("Open chapters", state.manga_actions_options.actions[1].text)
         assert.are.equal("Open first unread", state.manga_actions_options.actions[2].text)
         assert.are.equal("Refresh chapters", state.manga_actions_options.actions[3].text)
+        assert.are.equal("Remove from library", state.manga_actions_options.actions[#state.manga_actions_options.actions].text)
+        assert.is_true(state.manga_actions_options.actions[#state.manga_actions_options.actions].destructive)
         assert.are.equal("manga-actions", state.tracked_screens[1].route_id)
         assert.are.equal("manga-actions-menu", state.tracked_screens[1].widget.name)
 
@@ -241,6 +244,8 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("More...", state.manga_actions_options.title)
         assert.are.equal("Download next 5 unread", state.manga_actions_options.actions[1].text)
         assert.are.equal("Keep downloaded", state.manga_actions_options.actions[5].text)
+        assert.are.equal("Delete read downloads", state.manga_actions_options.actions[#state.manga_actions_options.actions].text)
+        assert.is_true(state.manga_actions_options.actions[#state.manga_actions_options.actions].destructive)
 
         state.manga_actions_callback({ id = "keep_downloaded" })
         assert.are.equal("Keep downloaded", state.manga_actions_options.title)
