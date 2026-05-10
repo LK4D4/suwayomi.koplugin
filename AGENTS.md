@@ -15,6 +15,15 @@
 - `luacheck --codes spec suwayomi main.lua _meta.lua` provides project Lua parsing/linting while avoiding generated dependency directories such as `.lua` and `.luarocks`; do not add a separate `luac` syntax pass.
 - Specs set `package.path = "?.lua;" .. package.path`; run `busted` from the plugin root or local module requires will not resolve.
 
+## AGENTS.md Maintenance
+
+- Keep this file agent-focused and actionable: commands, verification expectations, code ownership boundaries, packaging rules, product constraints, and safety notes that help agents work correctly without rereading the whole repo.
+- Prefer repo-specific instructions over generic coding advice. If a rule does not change what an agent should do in this repository, remove it.
+- Update this file when build/test commands, LuaRocks setup, module ownership, packaging boundaries, product support, or workflow expectations change. Update `docs/ARCHITECTURE.md` instead when the detailed architecture changes materially, and keep only the short agent-facing summary here.
+- Keep guidance concise enough to stay comfortably below Codex's default instruction-chain cap. If future subdirectories need different commands or ownership rules, add a nested `AGENTS.md` close to that subtree instead of overloading the root file; closer instruction files override broader ones in Codex.
+- Do not add `AGENTS.override.md` files unless the intent is to deliberately replace same-directory `AGENTS.md` guidance for that scope. Prefer ordinary nested `AGENTS.md` files for durable project guidance.
+- When investigating stale instructions, compare against current source, specs, README, `docs/ARCHITECTURE.md`, and recent commits before editing. Remove outdated constraints rather than softening them into ambiguous language.
+
 ## Commit Messages
 
 - Keep commits small, reviewable, and about one logical change. If the subject needs "and", split the commit or make the body explain why the work cannot be separated.
@@ -65,6 +74,13 @@
 - `spec/main_spec.lua` should stay focused on KOReader lifecycle and shell composition: dispatcher/menu registration, lazy dependency construction, queue recovery, debug logger setup, and controller method installation.
 - For settings behavior, specs stub `datastorage` and `luasettings`; real settings are stored under KOReader's settings dir as `suwayomi_dl.lua`.
 - Debug instrumentation is off unless KOReader settings contain `suwayomi_dl_debug.lua` with `enabled = true`; logs are redacted and use the `SuwayomiDL` prefix.
+
+## Security And Data Handling
+
+- Do not commit KOReader settings files, Suwayomi credentials or tokens, debug logs, downloaded manga archives, generated CBZ files, queue/progress state, or other user data.
+- Treat Suwayomi server URLs, auth headers, source names tied to a user's library, filesystem paths, and manga/chapter titles from real libraries as user data when sharing logs or screenshots.
+- Keep debug output redacted by default. New logging should go through `suwayomi/debug.lua` or existing redaction helpers instead of printing raw request headers, response bodies, or filesystem paths.
+- Tests should use stubs, fixtures, and temporary directories for runtime data. Do not require a live Suwayomi server, KOReader install, or local manga library for unit tests unless a task explicitly asks for integration/manual QA.
 
 ## Release/Runtime Packaging
 
