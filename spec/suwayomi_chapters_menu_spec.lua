@@ -53,6 +53,8 @@ describe("suwayomi/chapters/menu", function()
         assert.are.equal("appbar.menu", options.title_bar_left_icon)
         assert.are.equal("Chapter downloads", captured_title_options.title)
         assert.are.equal("bulk_downloads", captured_title_options.actions[1].id)
+        assert.is_true(captured_title_options.vertical)
+        assert.is_true(captured_title_options.destructive_actions_at_bottom)
 
         captured_title_options.onSelect({ id = "bulk_downloads" })
         assert.are.equal("bulk_downloads", performed_action)

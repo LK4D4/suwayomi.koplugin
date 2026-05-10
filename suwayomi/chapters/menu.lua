@@ -51,6 +51,8 @@ function Methods:getChapterTitleBarMenuOptions()
     return self:getTitleBarMenuOptions({
         title = _("Chapter downloads"),
         actions = self:getBulkChapterActions(),
+        vertical = true,
+        destructive_actions_at_bottom = true,
         onSelect = function(action)
             return self:performBulkChapterAction(action.id)
         end,

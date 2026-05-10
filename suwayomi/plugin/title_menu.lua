@@ -66,6 +66,9 @@ function Methods:showTitleBarActionMenu(menu, screen_options)
     return SuwayomiUI.showActionMenu({
         title = screen_options.title or _("Suwayomi"),
         actions = self:buildTitleBarActions(screen_options.actions),
+        vertical = screen_options.vertical,
+        columns = screen_options.columns,
+        destructive_actions_at_bottom = screen_options.destructive_actions_at_bottom,
         anchor = function()
             return titleBarLeftButtonDimen(menu)
         end,
