@@ -318,6 +318,40 @@ describe("suwayomi/ui", function()
         assert.is_true(closed)
     end)
 
+    it("refreshes chapter menus with a dimension recalculation for changed row statuses", function()
+        local ui = require("suwayomi/ui")
+        local switched
+        local updated = false
+        local menu = {
+            title = "Old chapters",
+            switchItemTable = function(self, title, item_table, item_number)
+                switched = {
+                    title = title,
+                    item_table = item_table,
+                    item_number = item_number,
+                }
+                self.title = title
+                self.item_table = item_table
+            end,
+            updateItems = function()
+                updated = true
+            end,
+        }
+
+        ui.updateChapterMenu(menu, {
+            title = "New chapters",
+            chapters = {
+                { id = "c1", name = "Chapter 1", menu_status = "Queued" },
+            },
+        })
+
+        assert.is_table(switched)
+        assert.are.equal("New chapters", switched.title)
+        assert.are.equal(-1, switched.item_number)
+        assert.are.equal("Queued", switched.item_table[1].mandatory)
+        assert.is_false(updated)
+    end)
+
     it("shows the Suwayomi home hub as two-column buttons", function()
         local ui = require("suwayomi/ui")
         local selected = {}

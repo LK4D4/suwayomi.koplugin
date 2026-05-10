@@ -194,7 +194,8 @@ function SuwayomiUI.updateChapterMenu(menu, options, onSelectCallback, onHoldCal
         return
     end
 
-    menu.item_table = SuwayomiUI.buildChapterMenuTable(options.chapters or {}, onSelectCallback)
+    local item_table = SuwayomiUI.buildChapterMenuTable(options.chapters or {}, onSelectCallback)
+    menu.item_table = item_table
     menu.title = options.title or menu.title
     if menu.title_bar and options.title then
         menu.title_bar:setTitle(options.title, true)
@@ -212,6 +213,10 @@ function SuwayomiUI.updateChapterMenu(menu, options, onSelectCallback, onHoldCal
             end
             return true
         end
+    end
+    if menu.switchItemTable then
+        menu:switchItemTable(options.title or menu.title, item_table, -1)
+        return
     end
     if menu.updateItems then
         menu:updateItems(nil, true)

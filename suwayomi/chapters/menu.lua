@@ -175,12 +175,12 @@ function Methods:buildQuickChapterMenuItems(manga, chapters)
         if status then
             item.menu_text = item.name
             item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, status)
-        elseif cached and cached.menu_text then
-            item.menu_text = self:stripChapterSelectionMarker(cached.menu_text)
-            item.menu_status = self:stripChapterSelectionStatus(cached.menu_status)
         elseif item.is_read then
             item.menu_text = item.name
             item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, { state = "read" })
+        elseif cached and cached.menu_text then
+            item.menu_text = self:stripChapterSelectionMarker(cached.menu_text)
+            item.menu_status = self:stripChapterSelectionStatus(cached.menu_status)
         else
             item.menu_text = item.name
             item.menu_status = nil
