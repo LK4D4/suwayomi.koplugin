@@ -15,6 +15,19 @@
 - `luacheck --codes spec suwayomi main.lua _meta.lua` provides project Lua parsing/linting while avoiding generated dependency directories such as `.lua` and `.luarocks`; do not add a separate `luac` syntax pass.
 - Specs set `package.path = "?.lua;" .. package.path`; run `busted` from the plugin root or local module requires will not resolve.
 
+## GitHub Actions Verification
+
+- Before merging work to `master` or pushing `master`, first push the work
+  branch and run the GitHub Actions `Test` workflow against that branch. GitHub
+  Actions can only run commits available on GitHub, so local-only commits must
+  be pushed to a branch before this check is meaningful.
+- Use `gh workflow run test.yml --ref <branch>` for an explicit pre-merge run,
+  then watch or inspect the run with `gh run watch` / `gh run view --log-failed`.
+  Do not merge or push `master` until the branch workflow run passes.
+- If GitHub Actions cannot be run because of authentication, network, or GitHub
+  availability, report that blocker explicitly instead of treating local
+  lint/tests as a substitute for the required Actions check.
+
 ## AGENTS.md Maintenance
 
 - Keep this file agent-focused and actionable: commands, verification expectations, code ownership boundaries, packaging rules, product constraints, and safety notes that help agents work correctly without rereading the whole repo.
