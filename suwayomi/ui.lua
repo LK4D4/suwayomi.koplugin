@@ -49,6 +49,7 @@ function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
             text = chapter.menu_text or chapter.name,
             mandatory = chapter.menu_status,
             chapter = chapter,
+            keep_menu_open = true,
             callback = function()
                 if onSelectCallback then onSelectCallback(chapter) end
             end
