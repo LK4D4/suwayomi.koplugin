@@ -53,6 +53,12 @@ describe("suwayomi/api/transport", function()
         end
     end
 
+    local function forbid_ltn12()
+        package.preload.ltn12 = function()
+            error("ltn12 should not be required before credentials are valid")
+        end
+    end
+
     it("builds auth headers and request URLs", function()
         assert.are.equal("Basic YWxpY2U6czNjcmV0", transport.buildBasicAuthHeader("alice", "s3cret"))
 
@@ -109,6 +115,7 @@ describe("suwayomi/api/transport", function()
     end)
 
     it("returns transport errors for missing URLs and non-200 GraphQL responses", function()
+        forbid_ltn12()
         local missing = transport.performGraphQLRequest({}, "{}", "missing")
         assert.are.equal(false, missing.ok)
         assert.are.equal("Missing Suwayomi server URL.", missing.error)
@@ -125,6 +132,14 @@ describe("suwayomi/api/transport", function()
         local failed = transport.performGraphQLRequest({ server_url = "http://suwayomi.example" }, "{}", "failure")
         assert.are.equal(false, failed.ok)
         assert.are.equal("Could not reach the Suwayomi server: connection refused", failed.error)
+    end)
+
+    it("returns binary download errors for missing URLs before loading HTTP helpers", function()
+        forbid_ltn12()
+        local missing = transport.downloadBinary({}, "/api/v1/page/1")
+
+        assert.are.equal(false, missing.ok)
+        assert.are.equal("Missing Suwayomi server URL.", missing.error)
     end)
 
     it("maps GraphQL HTTP statuses and non-numeric status strings", function()

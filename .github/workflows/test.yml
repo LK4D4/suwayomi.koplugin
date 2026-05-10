@@ -28,6 +28,8 @@ jobs:
       run: |
         luarocks install busted
         luarocks install dkjson
+        luarocks install luasocket
+        luarocks install luasec
         luarocks install luacheck
 
     - name: Run lint

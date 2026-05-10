@@ -119,7 +119,6 @@ function Transport.buildChapterArchiveDownloadURL(server_url, chapter_id)
 end
 
 function Transport.performGraphQLRequest(credentials, request_body, operation_name, log_debug_event)
-    local ltn12 = require("ltn12")
     local server_url = credentials and credentials.server_url
 
     if not server_url or server_url == "" then
@@ -129,6 +128,7 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
         }
     end
 
+    local ltn12 = require("ltn12")
     local client
     if server_url:match("^https://") then
         client = require("ssl.https")
@@ -199,7 +199,6 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
 end
 
 function Transport.downloadBinary(credentials, page_url, log_debug_event)
-    local ltn12 = require("ltn12")
     local server_url = credentials and credentials.server_url
     if not server_url or server_url == "" then
         return {
@@ -208,6 +207,7 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event)
         }
     end
 
+    local ltn12 = require("ltn12")
     local request_url = Transport.buildRequestURL(server_url, page_url)
     local client = request_url:match("^https://") and require("ssl.https") or require("socket.http")
     local response_chunks = {}

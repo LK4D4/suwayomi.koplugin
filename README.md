@@ -120,6 +120,8 @@ luarocks config lua_interpreter
 # Install test and lint dependencies via LuaJIT-backed LuaRocks
 luarocks install --local busted
 luarocks install --local dkjson
+luarocks install --local luasocket
+luarocks install --local luasec
 luarocks install --local luacheck
 
 # Run project Lua parsing/linting while avoiding generated dependency directories

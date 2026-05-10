@@ -5,7 +5,7 @@
 - CI installs LuaJIT with `leafo/gh-actions-lua@v13` and LuaRocks with `leafo/gh-actions-luarocks@v6`; local development should use LuaJIT too.
 - On fresh Ubuntu/dev containers, install local tools with `sudo apt-get install -y luajit luarocks`.
 - Verify LuaRocks is using LuaJIT before installing deps: `luarocks config lua_interpreter` should print a LuaJIT executable.
-- Install local test/lint deps with user-local LuaRocks packages: `luarocks install --local busted`, `luarocks install --local dkjson`, and `luarocks install --local luacheck`.
+- Install local test/lint deps with user-local LuaRocks packages: `luarocks install --local busted`, `luarocks install --local dkjson`, `luarocks install --local luasocket`, `luarocks install --local luasec`, and `luarocks install --local luacheck`.
 - `luarocks --local` puts executables in `$HOME/.luarocks/bin`; use `PATH="$HOME/.luarocks/bin:$PATH" ...` unless that path is already exported.
 - On Windows, do not use the Linux `$HOME/.luarocks/bin` PATH prefix. LuaRocks user-local executables normally live in `%APPDATA%\luarocks\bin`; in PowerShell run `$env:PATH = "$env:APPDATA\luarocks\bin;$env:PATH"` before invoking `luacheck` or `busted`. If a Windows LuaRocks install differs, run `luarocks path --bin` and use the printed LuaRocks `bin` directory for the current shell.
 - Windows PowerShell examples from the repo root: `$env:PATH = "$env:APPDATA\luarocks\bin;$env:PATH"; luacheck --codes spec suwayomi main.lua _meta.lua` and `$env:PATH = "$env:APPDATA\luarocks\bin;$env:PATH"; busted spec`.
