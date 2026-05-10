@@ -463,6 +463,27 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(0, plugin.keep_policy_count)
     end)
 
+    it("keeps burger action origin when opening nested bulk action menus", function()
+        local plugin = build_plugin()
+        local anchor = function()
+            return { x = 3, y = 4, w = 32, h = 32 }
+        end
+        local bulk_download_options
+        local scanlator_options
+        function plugin:showBulkDownloadActions(options)
+            bulk_download_options = options
+        end
+        function plugin:showScanlatorFilterActions(options)
+            scanlator_options = options
+        end
+
+        plugin:performBulkChapterAction("bulk_downloads", { anchor = anchor })
+        plugin:performBulkChapterAction("scanlator_filter", { anchor = anchor })
+
+        assert.are.equal(anchor, bulk_download_options and bulk_download_options.anchor)
+        assert.are.equal(anchor, scanlator_options and scanlator_options.anchor)
+    end)
+
     it("marks a chapter unread and schedules sync by default", function()
         local plugin = build_plugin({
             existing = {

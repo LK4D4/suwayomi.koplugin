@@ -70,8 +70,8 @@ describe("suwayomi/plugin/title_menu", function()
         local options = plugin:getTitleBarMenuOptions({
             title = "Library",
             actions = { { id = "refresh", text = "Refresh" } },
-            onSelect = function(action, menu)
-                delegated = { action = action, menu = menu }
+            onSelect = function(action, menu, context)
+                delegated = { action = action, menu = menu, context = context }
             end,
         })
         local title_bar_dimen = { x = 3, y = 4, w = 32, h = 32 }
@@ -101,6 +101,8 @@ describe("suwayomi/plugin/title_menu", function()
 
         assert.are.equal("refresh", delegated.action.id)
         assert.are.equal(source_menu, delegated.menu)
+        assert.is_function(delegated.context and delegated.context.anchor)
+        assert.are.equal(title_bar_dimen, delegated.context and delegated.context.anchor())
     end)
 
     it("forwards vertical destructive action layout options to title action menus", function()

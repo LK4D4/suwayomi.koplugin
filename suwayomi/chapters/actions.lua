@@ -440,13 +440,13 @@ function Methods:markSelectedChaptersUnread()
 end
 
 
-function Methods:performBulkChapterAction(action_id)
+function Methods:performBulkChapterAction(action_id, menu_context)
     if action_id == "bulk_downloads" then
-        self:showBulkDownloadActions()
+        self:showBulkDownloadActions(menu_context)
         return true
     end
     if action_id == "scanlator_filter" then
-        self:showScanlatorFilterActions()
+        self:showScanlatorFilterActions(menu_context)
         return true
     end
     local next_unread_count = tostring(action_id or ""):match("^download_next_(%d+)_unread$")

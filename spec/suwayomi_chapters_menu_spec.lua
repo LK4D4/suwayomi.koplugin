@@ -18,6 +18,7 @@ describe("suwayomi/chapters/menu", function()
         local ChapterMenu = require("suwayomi/chapters/menu")
         local captured_title_options
         local performed_action
+        local performed_menu_context
         local plugin = {}
         for name, method in pairs(ChapterMenu.methods) do
             plugin[name] = method
@@ -34,8 +35,9 @@ describe("suwayomi/chapters/menu", function()
         function plugin:getBulkChapterActions()
             return { { id = "bulk_downloads", text = "Bulk downloads" } }
         end
-        function plugin:performBulkChapterAction(action_id)
+        function plugin:performBulkChapterAction(action_id, menu_context)
             performed_action = action_id
+            performed_menu_context = menu_context
         end
         function plugin:getTitleBarMenuOptions(options)
             captured_title_options = options
@@ -56,8 +58,52 @@ describe("suwayomi/chapters/menu", function()
         assert.is_true(captured_title_options.vertical)
         assert.is_true(captured_title_options.destructive_actions_at_bottom)
 
-        captured_title_options.onSelect({ id = "bulk_downloads" })
+        local anchor = function()
+            return { x = 3, y = 4, w = 32, h = 32 }
+        end
+        captured_title_options.onSelect({ id = "bulk_downloads" }, nil, { anchor = anchor })
         assert.are.equal("bulk_downloads", performed_action)
+        assert.are.equal(anchor, performed_menu_context and performed_menu_context.anchor)
+    end)
+
+    it("anchors burger-descended chapter submenus to the title action origin", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        local shown_menus = {}
+        package.preload["suwayomi/ui"] = function()
+            return {
+                showChapterActionsMenu = function(options)
+                    table.insert(shown_menus, options)
+                    return options
+                end,
+            }
+        end
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local anchor = function()
+            return { x = 3, y = 4, w = 32, h = 32 }
+        end
+        local plugin = {
+            current_chapter_context = { chapters = {} },
+            getScanlatorFilterActions = function()
+                return { { id = "scanlator_filter_all", text = "All" } }
+            end,
+            getBulkDownloadActions = function()
+                return { { id = "download_next_5_unread", text = "Download 5 unread" } }
+            end,
+        }
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+
+        plugin:showScanlatorFilterActions({ anchor = anchor })
+        plugin:showBulkDownloadActions({ anchor = anchor })
+
+        assert.are.equal(anchor, shown_menus[1].anchor)
+        assert.are.equal(anchor, shown_menus[2].anchor)
+
+        package.preload["suwayomi/ui"] = nil
+        package.loaded["suwayomi/ui"] = nil
     end)
 
     it("builds quick-refresh title actions through the shared title menu", function()

@@ -31,7 +31,7 @@ function Methods:buildTitleBarActions(screen_actions)
     return actions
 end
 
-function Methods:performTitleBarAction(menu, action, screen_options)
+function Methods:performTitleBarAction(menu, action, screen_options, action_context)
     screen_options = screen_options or {}
     if not action then
         return false
@@ -46,7 +46,7 @@ function Methods:performTitleBarAction(menu, action, screen_options)
         return true
     end
     if screen_options.onSelect then
-        return screen_options.onSelect(action, menu)
+        return screen_options.onSelect(action, menu, action_context)
     end
     return false
 end
@@ -61,19 +61,26 @@ local function titleBarLeftButtonDimen(menu)
     return nil
 end
 
+local function titleBarAnchor(menu)
+    return function()
+        return titleBarLeftButtonDimen(menu)
+    end
+end
+
 function Methods:showTitleBarActionMenu(menu, screen_options)
     screen_options = screen_options or {}
+    local anchor = titleBarAnchor(menu)
     return SuwayomiUI.showActionMenu({
         title = screen_options.title or _("Suwayomi"),
         actions = self:buildTitleBarActions(screen_options.actions),
         vertical = screen_options.vertical,
         columns = screen_options.columns,
         destructive_actions_at_bottom = screen_options.destructive_actions_at_bottom,
-        anchor = function()
-            return titleBarLeftButtonDimen(menu)
-        end,
+        anchor = anchor,
     }, function(action)
-        return self:performTitleBarAction(menu, action, screen_options)
+        return self:performTitleBarAction(menu, action, screen_options, {
+            anchor = anchor,
+        })
     end)
 end
 

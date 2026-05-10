@@ -53,8 +53,8 @@ function Methods:getChapterTitleBarMenuOptions()
         actions = self:getBulkChapterActions(),
         vertical = true,
         destructive_actions_at_bottom = true,
-        onSelect = function(action)
-            return self:performBulkChapterAction(action.id)
+        onSelect = function(action, _, menu_context)
+            return self:performBulkChapterAction(action.id, menu_context)
         end,
     })
 end
@@ -320,7 +320,7 @@ function Methods:showBulkActionConfirmation(text, ok_text, callback)
 end
 
 
-function Methods:showScanlatorFilterActions()
+function Methods:showScanlatorFilterActions(menu_context)
     if not SuwayomiUI.showChapterActionsMenu then
         return false
     end
@@ -328,6 +328,7 @@ function Methods:showScanlatorFilterActions()
     SuwayomiUI.showChapterActionsMenu({
         title = _("Scanlator filter"),
         actions = self:getScanlatorFilterActions(),
+        anchor = menu_context and menu_context.anchor,
     }, function(action)
         if action.id == "scanlator_filter_all" then
             self:setScanlatorFilter(nil)
@@ -339,7 +340,7 @@ function Methods:showScanlatorFilterActions()
 end
 
 
-function Methods:showBulkDownloadActions()
+function Methods:showBulkDownloadActions(menu_context)
     if not SuwayomiUI.showChapterActionsMenu then
         return
     end
@@ -347,6 +348,7 @@ function Methods:showBulkDownloadActions()
     SuwayomiUI.showChapterActionsMenu({
         title = _("Bulk downloads"),
         actions = self:getBulkDownloadActions(),
+        anchor = menu_context and menu_context.anchor,
     }, function(action)
         self:performBulkChapterAction(action.id)
     end)
