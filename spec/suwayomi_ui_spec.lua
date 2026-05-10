@@ -253,7 +253,7 @@ describe("suwayomi/ui", function()
         ui.showChapterMenu({
             title = "Sousou no Frieren",
             chapters = {
-                { id = "c1", name = "Chapter 1", menu_text = "Chapter 1", menu_status = "✓↓" },
+                { id = "c1", name = "Chapter 1", menu_text = "Chapter 1", menu_status = "Read · Downloaded" },
                 { id = "c2", name = "Chapter 2" },
             },
         }, function(chapter)
@@ -264,7 +264,7 @@ describe("suwayomi/ui", function()
 
         assert.are.equal("Sousou no Frieren", shown_dialog.title)
         assert.are.equal("Chapter 1", shown_dialog.item_table[1].text)
-        assert.are.equal("✓↓", shown_dialog.item_table[1].mandatory)
+        assert.are.equal("Read · Downloaded", shown_dialog.item_table[1].mandatory)
         assert.are.equal("Chapter 2", shown_dialog.item_table[2].text)
         assert.is_nil(shown_dialog.item_table[2].mandatory)
 
@@ -273,11 +273,11 @@ describe("suwayomi/ui", function()
         shown_dialog:onMenuHold(shown_dialog.item_table[1])
 
         assert.are.same({
-            { id = "c1", name = "Chapter 1", menu_text = "Chapter 1", menu_status = "✓↓" },
+            { id = "c1", name = "Chapter 1", menu_text = "Chapter 1", menu_status = "Read · Downloaded" },
             { id = "c2", name = "Chapter 2" },
         }, selected)
         assert.are.same({
-            { id = "c1", name = "Chapter 1", menu_text = "Chapter 1", menu_status = "✓↓" },
+            { id = "c1", name = "Chapter 1", menu_text = "Chapter 1", menu_status = "Read · Downloaded" },
         }, held)
     end)
 

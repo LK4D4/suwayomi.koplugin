@@ -300,7 +300,7 @@ describe("suwayomi/downloads/queue", function()
         local context = build_queue()
 
         assert.are.equal(
-            "✓↓",
+            "Read · Downloaded",
             context.queue:formatChapterMenuStatus(
                 { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = true },
                 { state = "downloaded" }
@@ -308,25 +308,25 @@ describe("suwayomi/downloads/queue", function()
         )
     end)
 
-    it("puts compact status symbols after shortened chapter names", function()
+    it("puts compact status labels after shortened chapter names", function()
         local context = build_queue()
 
         assert.are.equal(
-            "Official_Vol. 25 Ch. 126 A Very Long Chapter Ti…  ✓ ↓ 3/12",
+            "Official_Vol. 25 Ch. 126 A Very Lo…  Read Downloading 3/12",
             context.queue:formatChapterMenuText(
                 { id = "398", name = "Official_Vol. 25 Ch. 126 A Very Long Chapter Title", is_read = true },
                 { state = "downloading", current = 3, total = 12 }
             )
         )
         assert.are.equal(
-            "Official_Vol. 25 Ch. 126 A Very Long Chapter Title  ⌛",
+            "Official_Vol. 25 Ch. 126 A Very Long Chapter…  Downloading",
             context.queue:formatChapterMenuText(
                 { id = "398", name = "Official_Vol. 25 Ch. 126 A Very Long Chapter Title" },
                 { state = "downloading", current = 0, total = 0 }
             )
         )
         assert.are.equal(
-            "Official_Vol. 25 Ch. 127 Another Long Chapter Title  ⚠",
+            "Official_Vol. 25 Ch. 127 Another Long Chapter Tit…  Failed",
             context.queue:formatChapterMenuText(
                 { id = "399", name = "Official_Vol. 25 Ch. 127 Another Long Chapter Title" },
                 { state = "failed" }
@@ -338,7 +338,7 @@ describe("suwayomi/downloads/queue", function()
         local context = build_queue()
 
         assert.are.equal(
-            "Очень длинное название главы с кириллицей для провер…  ✓ ↓",
+            "Очень длинное название главы с кириллице…  Read Downloaded",
             context.queue:formatChapterMenuText(
                 { id = "401", name = "Очень длинное название главы с кириллицей для проверки", is_read = true },
                 { state = "downloaded" }

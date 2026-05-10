@@ -29,20 +29,31 @@ describe("suwayomi/downloads/status_formatter", function()
         package.preload["ffi/util"] = nil
     end)
 
-    it("keeps read and download status symbols compact", function()
-        assert.are.same({ "✓", "↓" }, formatter.buildChapterStatusSymbols(
+    it("labels read and downloaded chapter rows clearly", function()
+        assert.are.same({ "Read", "Downloaded" }, formatter.buildChapterStatusSymbols(
             { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = true },
             { state = "downloaded" }
         ))
-        assert.are.equal("✓↓", formatter.formatChapterMenuStatus(
+        assert.are.equal("Read · Downloaded", formatter.formatChapterMenuStatus(
             { id = "398", name = "Official_Vol. 1 Ch. 1", is_read = true },
             { state = "downloaded" }
         ))
     end)
 
+    it("labels queued and downloading chapter rows clearly", function()
+        assert.are.equal("Queued", formatter.formatChapterMenuStatus(
+            { id = "399", name = "Official_Vol. 1 Ch. 2" },
+            { state = "queued" }
+        ))
+        assert.are.equal("Downloading 2/26", formatter.formatChapterMenuStatus(
+            { id = "400", name = "Official_Vol. 1 Ch. 3" },
+            { state = "downloading", current = 2, total = 26 }
+        ))
+    end)
+
     it("formats downloading progress and shortens long titles without changing text", function()
         assert.are.equal(
-            "Official_Vol. 25 Ch. 126 A Very Long Chapter Ti…  ✓ ↓ 3/12",
+            "Official_Vol. 25 Ch. 126 A Very Lo…  Read Downloading 3/12",
             formatter.formatChapterMenuText(
                 { id = "398", name = "Official_Vol. 25 Ch. 126 A Very Long Chapter Title", is_read = true },
                 { state = "downloading", current = 3, total = 12 }
@@ -52,7 +63,7 @@ describe("suwayomi/downloads/status_formatter", function()
 
     it("shortens unicode chapter names without splitting multibyte characters", function()
         assert.are.equal(
-            "Очень длинное название главы с кириллицей для провер…  ✓ ↓",
+            "Очень длинное название главы с кириллице…  Read Downloaded",
             formatter.formatChapterMenuText(
                 { id = "401", name = "Очень длинное название главы с кириллицей для проверки", is_read = true },
                 { state = "downloaded" }

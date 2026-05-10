@@ -1,6 +1,6 @@
 -- Boundary: stateless chapter-download text formatting.
 --
--- Responsibility: build the compact read/download symbols used in chapter menus
+-- Responsibility: build compact read/download labels used in chapter menus
 -- and produce user-facing failure labels.
 -- Owned state: none.
 -- Injected dependencies: KOReader gettext/template helpers only.
@@ -57,7 +57,7 @@ function StatusFormatter.joinChapterStatusSymbols(symbols)
     if not symbols or #symbols == 0 then
         return nil
     end
-    return table.concat(symbols, "")
+    return table.concat(symbols, _(" · "))
 end
 
 function StatusFormatter.formatChapterStatusSymbols(chapter, symbols, max_title_chars)
@@ -76,36 +76,36 @@ end
 function StatusFormatter.buildChapterStatusSymbols(chapter, status)
     local symbols = {}
     if chapter and chapter.is_read == true then
-        table.insert(symbols, "✓")
+        table.insert(symbols, _("Read"))
     end
 
     if not status then
         return symbols
     end
     if status.state == "queued" then
-        table.insert(symbols, "⌛")
+        table.insert(symbols, _("Queued"))
         return symbols
     end
     if status.state == "downloading" then
         if status.total and status.total > 0 and status.current then
-            table.insert(symbols, T(_("↓ %1/%2"), status.current, status.total))
+            table.insert(symbols, T(_("Downloading %1/%2"), status.current, status.total))
             return symbols
         end
-        table.insert(symbols, "⌛")
+        table.insert(symbols, _("Downloading"))
         return symbols
     end
     if status.state == "downloaded" or status.state == "skipped" then
-        table.insert(symbols, "↓")
+        table.insert(symbols, _("Downloaded"))
         return symbols
     end
     if status.state == "read" then
         if #symbols == 0 then
-            table.insert(symbols, "✓")
+            table.insert(symbols, _("Read"))
         end
         return symbols
     end
     if status.state == "failed" then
-        table.insert(symbols, "⚠")
+        table.insert(symbols, _("Failed"))
         return symbols
     end
     return symbols
