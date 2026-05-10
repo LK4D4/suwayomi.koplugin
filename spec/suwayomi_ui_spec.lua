@@ -265,10 +265,8 @@ describe("suwayomi/ui", function()
         assert.are.equal("Sousou no Frieren", shown_dialog.title)
         assert.are.equal("Chapter 1", shown_dialog.item_table[1].text)
         assert.are.equal("Read · Downloaded", shown_dialog.item_table[1].mandatory)
-        assert.is_true(shown_dialog.item_table[1].keep_menu_open)
         assert.are.equal("Chapter 2", shown_dialog.item_table[2].text)
         assert.is_nil(shown_dialog.item_table[2].mandatory)
-        assert.is_true(shown_dialog.item_table[2].keep_menu_open)
 
         shown_dialog.item_table[1].callback()
         shown_dialog.item_table[2].callback()
@@ -281,6 +279,29 @@ describe("suwayomi/ui", function()
         assert.are.same({
             { id = "c1", name = "Chapter 1", menu_text = "Chapter 1", menu_status = "Read · Downloaded" },
         }, held)
+    end)
+
+    it("keeps chapter menus current when selecting a row", function()
+        local ui = require("suwayomi/ui")
+        local selected
+        local closed = false
+
+        ui.showChapterMenu({
+            title = "Sousou no Frieren",
+            chapters = {
+                { id = "c1", name = "Chapter 1" },
+            },
+            close_callback = function()
+                closed = true
+            end,
+        }, function(chapter)
+            selected = chapter
+        end)
+
+        shown_dialog:onMenuSelect(shown_dialog.item_table[1])
+
+        assert.are.same({ id = "c1", name = "Chapter 1" }, selected)
+        assert.is_false(closed)
     end)
 
     it("shows a chapter actions menu", function()
