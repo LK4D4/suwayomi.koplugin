@@ -17,6 +17,7 @@ local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiNavigation = require("suwayomi/navigation")
 local SuwayomiDebug = require("suwayomi/debug")
 local HomeController = require("suwayomi/plugin/home")
+local TitleMenuController = require("suwayomi/plugin/title_menu")
 local SettingsController = require("suwayomi/plugin/settings_controller")
 local ReaderReturn = require("suwayomi/reader_return")
 local BrowseController = require("suwayomi/browse/controller")
@@ -181,6 +182,7 @@ end
 
 local CONTROLLER_MODULES = {
     HomeController,
+    TitleMenuController,
     SettingsController,
     ReaderReturn,
     BrowseController,

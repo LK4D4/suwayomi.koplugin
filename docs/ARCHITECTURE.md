@@ -34,6 +34,7 @@ Core plugin shell:
 
 - `main.lua`: KOReader lifecycle, dependency construction, action/menu registration, queue recovery, and controller method installation.
 - `suwayomi/plugin/home.lua`: Suwayomi hub and main-menu entry behavior.
+- `suwayomi/plugin/title_menu.lua`: shared title-bar burger menus for full-screen plugin screens, including the universal Suwayomi home action.
 - `suwayomi/plugin/settings_controller.lua`: grouped Settings menus and settings action routing.
 
 API:

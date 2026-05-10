@@ -1,0 +1,77 @@
+-- Boundary: TitleMenuController.
+--
+-- Responsibility: Owns shared title-bar burger action menus and the universal
+-- Suwayomi home title action for full-screen plugin menus.
+-- Owned state: none; callbacks and screen-specific actions are supplied by callers.
+-- Dependencies: Suwayomi UI action menu renderer and gettext.
+-- External data: screen actions are controller-owned and treated as opaque action tables.
+
+local SuwayomiUI = require("suwayomi/ui")
+local _ = require("gettext")
+
+local TitleMenuController = {}
+TitleMenuController.__index = TitleMenuController
+
+function TitleMenuController:new(deps)
+    deps = deps or {}
+    return setmetatable({
+        plugin = deps.plugin,
+    }, self)
+end
+
+local Methods = {}
+
+function Methods:buildTitleBarActions(screen_actions)
+    local actions = {
+        { id = "home", text = _("Suwayomi home") },
+    }
+    for _, action in ipairs(screen_actions or {}) do
+        table.insert(actions, action)
+    end
+    return actions
+end
+
+function Methods:performTitleBarAction(menu, action, screen_options)
+    screen_options = screen_options or {}
+    if not action then
+        return false
+    end
+    if action.id == "home" then
+        if self.closeSuwayomiPlugin then
+            self:closeSuwayomiPlugin()
+        end
+        if self.showHome then
+            self:showHome()
+        end
+        return true
+    end
+    if screen_options.onSelect then
+        return screen_options.onSelect(action, menu)
+    end
+    return false
+end
+
+function Methods:showTitleBarActionMenu(menu, screen_options)
+    screen_options = screen_options or {}
+    return SuwayomiUI.showActionMenu({
+        title = screen_options.title or _("Suwayomi"),
+        actions = self:buildTitleBarActions(screen_options.actions),
+    }, function(action)
+        return self:performTitleBarAction(menu, action, screen_options)
+    end)
+end
+
+function Methods:getTitleBarMenuOptions(screen_options)
+    screen_options = screen_options or {}
+    return {
+        title_bar_left_icon = "appbar.menu",
+        on_title_bar_left_tap = function(menu)
+            self:showTitleBarActionMenu(menu, screen_options)
+            return true
+        end,
+    }
+end
+
+TitleMenuController.methods = Methods
+
+return TitleMenuController

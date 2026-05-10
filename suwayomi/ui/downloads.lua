@@ -105,11 +105,12 @@ end
 
 function DownloadsUI.showDownloadsMenu(snapshot, callbacks, options)
     options = options or {}
-    local menu = Menu:new{
-        title = _("Suwayomi Downloads"),
+    local menu_options = {
+        title = options.title or _("Suwayomi Downloads"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks),
     }
+    local menu = Menu:new(menu_utils.applyNativeTitleBarStyle(menu_options))
     menu_utils.applyTitleBarOptions(menu, options)
     menu_utils.applyCloseCallback(menu, options)
     menu_utils.bindMenuCallbacks(menu.item_table, menu)

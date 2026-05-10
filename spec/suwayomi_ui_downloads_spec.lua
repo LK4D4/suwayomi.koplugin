@@ -12,6 +12,7 @@ describe("suwayomi/ui/downloads", function()
         package.loaded["suwayomi/ui/menu_utils"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
+        package.loaded["ui/widget/titlebar"] = nil
         package.loaded["ui/uimanager"] = nil
 
         package.preload.gettext = function()
@@ -21,6 +22,14 @@ describe("suwayomi/ui/downloads", function()
         end
 
         package.preload["ui/widget/menu"] = function()
+            return {
+                new = function(_, options)
+                    return options
+                end,
+            }
+        end
+
+        package.preload["ui/widget/titlebar"] = function()
             return {
                 new = function(_, options)
                     return options
@@ -40,6 +49,7 @@ describe("suwayomi/ui/downloads", function()
     after_each(function()
         package.preload.gettext = nil
         package.preload["ui/widget/menu"] = nil
+        package.preload["ui/widget/titlebar"] = nil
         package.preload["ui/uimanager"] = nil
     end)
 
@@ -155,15 +165,17 @@ describe("suwayomi/ui/downloads", function()
 
         downloads.showDownloadsMenu({}, {}, {
             title = "Downloads (2)",
-            title_bar_left_icon = "appbar.filebrowser",
-            on_title_bar_left_tap = function()
-                tapped_home = true
+            title_bar_left_icon = "appbar.menu",
+            on_title_bar_left_tap = function(menu)
+                tapped_home = menu == shown_dialog
                 return true
             end,
         })
 
         assert.are.equal("Downloads (2)", shown_dialog.title)
-        assert.are.equal("appbar.filebrowser", shown_dialog.title_bar_left_icon)
+        assert.is_nil(shown_dialog.custom_title_bar)
+        assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
+        assert.is_true(shown_dialog.title_bar_fm_style)
 
         shown_dialog.onLeftButtonTap()
 

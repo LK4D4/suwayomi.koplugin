@@ -242,6 +242,7 @@ describe("suwayomi plugin", function()
         local plugin_class = require("main")
         local controllers = {
             require("suwayomi/plugin/home"),
+            require("suwayomi/plugin/title_menu"),
             require("suwayomi/plugin/settings_controller"),
             require("suwayomi/reader_return"),
             require("suwayomi/browse/controller"),

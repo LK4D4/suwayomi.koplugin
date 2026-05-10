@@ -113,6 +113,16 @@ local function installController(options)
     function plugin:showHome()
         state.home_count = state.home_count + 1
     end
+    function plugin:getTitleBarMenuOptions(menu_options)
+        state.title_menu_options = menu_options
+        return {
+            title_bar_left_icon = "appbar.menu",
+            on_title_bar_left_tap = function(menu)
+                state.title_menu_tapped = menu
+                return true
+            end,
+        }
+    end
     function plugin:showDownloads()
         state.downloads_count = state.downloads_count + 1
         return controller.methods.showDownloads(self)
@@ -198,13 +208,14 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal("appbar.menu", state.downloads_menu_options.title_bar_left_icon)
         assert.are.equal("downloads", state.tracked_screens[1].route_id)
         assert.are.equal("downloads-menu", state.tracked_screens[1].widget.name)
+        assert.are.equal("Downloads", state.title_menu_options.title)
+        assert.are.equal("cancel_queued", state.title_menu_options.actions[1].id)
+        assert.is_nil(state.title_menu_options.actions[2])
 
         state.downloads_menu_options.on_title_bar_left_tap(menu)
-        assert.are.equal("Suwayomi Downloads", state.actions_menu_options.title)
-        assert.are.equal("Suwayomi home", state.actions_menu_options.actions[1].text)
-        assert.are.equal("Cancel queued downloads", state.actions_menu_options.actions[2].text)
+        assert.are.equal(menu, state.title_menu_tapped)
 
-        state.actions_menu_callback(state.actions_menu_options.actions[2])
+        state.title_menu_options.onSelect(state.title_menu_options.actions[1], menu)
         assert.are.equal(1, queue.cancel_queued_count)
         assert.are.equal(menu, state.closed_menus[1])
         assert.are.equal(2, state.downloads_count)

@@ -75,14 +75,17 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
         chapter_list = options.chapters
     end
 
-    local menu = Menu:new{
+    local menu_options = {
         title = options.title or _("Suwayomi Chapters"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback),
         close_callback = options.close_callback,
     }
+    local menu = Menu:new(menu_utils.applyNativeTitleBarStyle(menu_options))
     if options.on_title_bar_left_tap then
-        menu.onLeftButtonTap = options.on_title_bar_left_tap
+        menu.onLeftButtonTap = function(...)
+            return options.on_title_bar_left_tap(menu, ...)
+        end
     end
     menu.onMenuSelect = function(_, entry)
         if entry and entry.callback then
@@ -143,11 +146,12 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
     return dialog
 end
 
-function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
+function SuwayomiUI.showActionMenu(options, onSelectCallback)
     local UIManager = require("ui/uimanager")
     local dialog
     local buttons = {}
     local row = {}
+    options = options or {}
     for _, action in ipairs(options.actions or {}) do
         table.insert(row, {
             text = action.text,
@@ -169,7 +173,7 @@ function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
     end
 
     dialog = ButtonDialog:new{
-        title = options.title or _("Chapter actions"),
+        title = options.title or _("Actions"),
         buttons = buttons,
         close_callback = options.close_callback,
     }
@@ -177,10 +181,16 @@ function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
     return dialog
 end
 
+function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
+    options = options or {}
+    options.title = options.title or _("Chapter actions")
+    return SuwayomiUI.showActionMenu(options, onSelectCallback)
+end
+
 function SuwayomiUI.showMangaActionsMenu(options, onSelectCallback)
     options = options or {}
     options.title = options.title or _("Manga actions")
-    return SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
+    return SuwayomiUI.showActionMenu(options, onSelectCallback)
 end
 
 function SuwayomiUI.showConfirm(options)
@@ -210,7 +220,9 @@ function SuwayomiUI.updateChapterMenu(menu, options, onSelectCallback, onHoldCal
         menu:setTitleBarLeftIcon(options.title_bar_left_icon)
     end
     if options.on_title_bar_left_tap then
-        menu.onLeftButtonTap = options.on_title_bar_left_tap
+        menu.onLeftButtonTap = function(...)
+            return options.on_title_bar_left_tap(menu, ...)
+        end
     end
     if onHoldCallback then
         menu.onMenuHold = function(_, entry)

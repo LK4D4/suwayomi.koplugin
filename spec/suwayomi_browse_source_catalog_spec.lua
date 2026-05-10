@@ -94,8 +94,9 @@ local function buildController(catalog, overrides)
         loadBrowseSettings = function()
             return { show_nsfw_sources = false }
         end,
-        getHomeMenuOptions = function()
-            return { home = true }
+        getTitleBarMenuOptions = function(_, options)
+            controller.title_menu_options = options
+            return { title_bar_left_icon = "appbar.menu" }
         end,
         getClient = function()
             return {
@@ -255,6 +256,9 @@ describe("suwayomi/browse/source_catalog", function()
         local manga_result = controller:showMangaForSource({ id = "english" })
 
         assert.are.same(controller.current_sources_menu, menu)
+        assert.are.equal("Suwayomi Sources", controller.title_menu_options.title)
+        assert.are.equal("global_search", controller.title_menu_options.actions[1].id)
+        assert.are.equal("appbar.menu", ui_calls.updated.options.title_bar_left_icon)
         assert.are.equal("global-search", search_result)
         assert.are.equal("manga-for-source", manga_result)
         assert.are.equal("english", controller.global_search_sources[1].id)

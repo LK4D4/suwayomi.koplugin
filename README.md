@@ -72,7 +72,7 @@ Manual installation:
 7. Tap **Library** to open manga already in your Suwayomi library, or **Browse** to explore sources.
 8. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, or **Search**.
 9. Use **Next page** and **Previous page** on source result pages when available.
-10. Use the title-bar home button on Suwayomi Library/Browse/Search screens to return to the hub.
+10. Use the title-bar burger menu on Suwayomi Library/Browse/Search screens to return to the hub.
 11. Tap a manga result to open manga actions, or tap a chapter to open the chapter actions dialog.
 12. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
 13. Tap **Downloads** from the hub to inspect active, queued, and failed KOReader-local jobs.

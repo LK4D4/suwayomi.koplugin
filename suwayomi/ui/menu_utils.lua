@@ -9,6 +9,14 @@
 
 local MenuUtils = {}
 
+function MenuUtils.applyNativeTitleBarStyle(menu_options)
+    menu_options = menu_options or {}
+    if menu_options.title_bar_left_icon then
+        menu_options.title_bar_fm_style = true
+    end
+    return menu_options
+end
+
 function MenuUtils.applyTitleBarOptions(menu, options)
     options = options or {}
     if options.title then
@@ -24,7 +32,9 @@ function MenuUtils.applyTitleBarOptions(menu, options)
         end
     end
     if options.on_title_bar_left_tap then
-        menu.onLeftButtonTap = options.on_title_bar_left_tap
+        menu.onLeftButtonTap = function(...)
+            return options.on_title_bar_left_tap(menu, ...)
+        end
     end
     return menu
 end

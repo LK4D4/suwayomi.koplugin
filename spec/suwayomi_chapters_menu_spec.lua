@@ -12,6 +12,88 @@ describe("suwayomi/chapters/menu", function()
         })
     end)
 
+    it("builds chapter title actions through the shared title menu", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local captured_title_options
+        local performed_action
+        local plugin = {}
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+        function plugin:getVisibleChapters(chapters)
+            return chapters
+        end
+        function plugin:formatChapterListTitle()
+            return "Frieren"
+        end
+        function plugin:buildChapterMenuItems()
+            return { { name = "Chapter 1" } }
+        end
+        function plugin:getBulkChapterActions()
+            return { { id = "bulk_downloads", text = "Bulk downloads" } }
+        end
+        function plugin:performBulkChapterAction(action_id)
+            performed_action = action_id
+        end
+        function plugin:getTitleBarMenuOptions(options)
+            captured_title_options = options
+            return {
+                title_bar_left_icon = "appbar.menu",
+                on_title_bar_left_tap = function()
+                    return true
+                end,
+            }
+        end
+
+        local options = plugin:buildChapterMenuOptions({ title = "Frieren" }, { { name = "Chapter 1" } }, {})
+
+        assert.are.equal("Frieren", options.title)
+        assert.are.equal("appbar.menu", options.title_bar_left_icon)
+        assert.are.equal("Chapter downloads", captured_title_options.title)
+        assert.are.equal("bulk_downloads", captured_title_options.actions[1].id)
+
+        captured_title_options.onSelect({ id = "bulk_downloads" })
+        assert.are.equal("bulk_downloads", performed_action)
+    end)
+
+    it("builds quick-refresh title actions through the shared title menu", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local captured_title_options
+        local plugin = {}
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+        function plugin:getVisibleChapters(chapters)
+            return chapters
+        end
+        function plugin:formatChapterListTitle()
+            return "Frieren"
+        end
+        function plugin:buildQuickChapterMenuItems()
+            return { { name = "Chapter 1" } }
+        end
+        function plugin:getBulkChapterActions()
+            return { { id = "select_all", text = "Select all" } }
+        end
+        function plugin:performBulkChapterAction()
+            return true
+        end
+        function plugin:getTitleBarMenuOptions(options)
+            captured_title_options = options
+            return { title_bar_left_icon = "appbar.menu" }
+        end
+
+        local options = plugin:buildQuickChapterMenuOptions({ title = "Frieren" }, { { name = "Chapter 1" } })
+
+        assert.are.equal("appbar.menu", options.title_bar_left_icon)
+        assert.are.equal("Chapter downloads", captured_title_options.title)
+        assert.are.equal("select_all", captured_title_options.actions[1].id)
+    end)
+
     it("quick refresh reflects updated read state instead of stale cached row status", function()
         helper.stubControllerDependencies()
         package.loaded["suwayomi/chapters/menu"] = nil

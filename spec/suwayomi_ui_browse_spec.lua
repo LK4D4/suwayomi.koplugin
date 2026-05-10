@@ -102,10 +102,14 @@ describe("suwayomi/ui/browse", function()
         local closed = false
 
         browse.showSourcesMenu({}, function() end, {
+            title_bar_left_icon = "appbar.menu",
             close_callback = function()
                 closed = true
             end,
         })
+
+        assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
+        assert.is_true(shown_dialog.title_bar_fm_style)
 
         shown_dialog.close_callback()
 
@@ -332,12 +336,12 @@ describe("suwayomi/ui/browse", function()
             { id = "m2", title = "Page 2" },
         }, function() end, {
             title = "MangaDex - Popular - Page 2",
-            title_bar_left_icon = "appbar.filebrowser",
+            title_bar_left_icon = "appbar.menu",
         })
 
         assert.are.equal("MangaDex - Popular - Page 2", menu.title)
         assert.are.same({ title = "MangaDex - Popular - Page 2", refresh = true }, title_bar_title)
-        assert.are.equal("appbar.filebrowser", left_icon)
+        assert.are.equal("appbar.menu", left_icon)
         assert.is_true(menu.updated)
     end)
 

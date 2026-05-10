@@ -54,16 +54,9 @@ function Methods:formatCancelQueuedDownloadMessage(state)
 end
 
 
-function Methods:showDownloadsActions(menu, snapshot)
-    if not SuwayomiUI.showChapterActionsMenu then
-        self:closeMenu(menu)
-        self:showHome()
-        return
-    end
-
-    local actions = {
-        { id = "home", text = _("Suwayomi home") },
-    }
+function Methods:getDownloadsTitleActions(snapshot)
+    snapshot = snapshot or {}
+    local actions = {}
     if #(snapshot.queued or {}) > 0 then
         table.insert(actions, { id = "cancel_queued", text = _("Cancel queued downloads") })
     end
@@ -71,27 +64,42 @@ function Methods:showDownloadsActions(menu, snapshot)
         table.insert(actions, { id = "clear_failed", text = _("Clear failed") })
     end
 
-    SuwayomiUI.showChapterActionsMenu({
-        title = _("Suwayomi Downloads"),
-        actions = actions,
-    }, function(action)
-        if not action then
-            return
-        end
-        local queue = self:getDownloadQueue()
-        if action.id == "home" then
-            self:closeMenu(menu)
-            self:showHome()
-        elseif action.id == "cancel_queued" then
-            queue:cancelQueued()
-            self:closeMenu(menu)
-            self:showDownloads()
-        elseif action.id == "clear_failed" then
-            queue:clearFailed()
-            self:closeMenu(menu)
-            self:showDownloads()
-        end
-    end)
+    return actions
+end
+
+
+function Methods:performDownloadsTitleAction(action, menu)
+    if not action then
+        return false
+    end
+
+    local queue = self:getDownloadQueue()
+    if action.id == "cancel_queued" then
+        queue:cancelQueued()
+        self:closeMenu(menu)
+        self:showDownloads()
+        return true
+    elseif action.id == "clear_failed" then
+        queue:clearFailed()
+        self:closeMenu(menu)
+        self:showDownloads()
+        return true
+    end
+    return false
+end
+
+
+function Methods:getDownloadsTitleBarOptions(snapshot)
+    if not self.getTitleBarMenuOptions then
+        return {}
+    end
+    return self:getTitleBarMenuOptions({
+        title = _("Downloads"),
+        actions = self:getDownloadsTitleActions(snapshot),
+        onSelect = function(action, menu)
+            return self:performDownloadsTitleAction(action, menu)
+        end,
+    })
 end
 
 
@@ -190,13 +198,7 @@ function Methods:showDownloads()
             self:showMessage(T(_("Cleared %1 failed downloads."), cleared), { timeout = 2 })
             self:showDownloads()
         end,
-    }, {
-        title_bar_left_icon = "appbar.menu",
-        on_title_bar_left_tap = function(menu)
-            self:showDownloadsActions(menu, snapshot)
-            return true
-        end,
-    })
+    }, self:getDownloadsTitleBarOptions(snapshot))
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("downloads", menu)
     end

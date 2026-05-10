@@ -14,6 +14,10 @@ local menu_utils = require("suwayomi/ui/menu_utils")
 
 local BrowseUI = {}
 
+local function newPluginMenu(options)
+    return Menu:new(menu_utils.applyNativeTitleBarStyle(options))
+end
+
 function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
     local menu_table = {}
     options = options or {}
@@ -36,7 +40,7 @@ function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
         })
     end
 
-    local menu = Menu:new{
+    local menu = newPluginMenu{
         title = _("Suwayomi Sources"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = menu_table,
@@ -75,7 +79,7 @@ function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
         end,
     })
 
-    local menu = Menu:new{
+    local menu = newPluginMenu{
         title = source and (source.name or source.display_name or source.displayName) or _("Suwayomi Source"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = menu_table,
@@ -252,7 +256,7 @@ end
 
 function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, options)
     options = options or {}
-    local menu = Menu:new{
+    local menu = newPluginMenu{
         title = _("Global search"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = buildGlobalSearchMenuTable(summaries, onSelectCallback, options),
@@ -311,7 +315,7 @@ end
 function BrowseUI.showMangaMenu(manga_list, onSelectCallback, options)
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
 
-    local menu = Menu:new{
+    local menu = newPluginMenu{
         title = options and options.title or _("Suwayomi Manga"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = menu_table,
@@ -351,7 +355,7 @@ function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
         })
     end
 
-    local menu = Menu:new{
+    local menu = newPluginMenu{
         title = _("Suwayomi Library"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = menu_table,
@@ -377,7 +381,7 @@ local function buildLibraryMangaMenuTable(manga_list, onSelectCallback)
 end
 
 function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
-    local menu = Menu:new{
+    local menu = newPluginMenu{
         title = _("Suwayomi Library"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),

@@ -27,6 +27,13 @@ local function copyDownloadStatus(status)
     }
 end
 
+local function copyTitleBarOptions(target, title_options)
+    for key, value in pairs(title_options or {}) do
+        target[key] = value
+    end
+    return target
+end
+
 -- Controllers expose new(deps) for a consistent boundary; methods remain plugin-bound mixins so this refactor can move code without changing callback behavior.
 function ChapterMenu:new(deps)
     deps = deps or {}
@@ -36,6 +43,19 @@ function ChapterMenu:new(deps)
 end
 
 local Methods = {}
+
+function Methods:getChapterTitleBarMenuOptions()
+    if not self.getTitleBarMenuOptions then
+        return {}
+    end
+    return self:getTitleBarMenuOptions({
+        title = _("Chapter downloads"),
+        actions = self:getBulkChapterActions(),
+        onSelect = function(action)
+            return self:performBulkChapterAction(action.id)
+        end,
+    })
+end
 
 function Methods:buildChapterMenuItems(manga, chapters, ledger)
     local started_at = SuwayomiDebug.now()
@@ -141,15 +161,10 @@ end
 function Methods:buildChapterMenuOptions(manga, chapters, ledger)
     local visible_chapters = self:getVisibleChapters(chapters)
 
-    return {
+    return copyTitleBarOptions({
         title = self:formatChapterListTitle(manga),
         chapters = self:buildChapterMenuItems(manga, visible_chapters, ledger),
-        title_bar_left_icon = "appbar.menu",
-        on_title_bar_left_tap = function()
-            self:showBulkChapterActions()
-            return true
-        end,
-    }
+    }, self:getChapterTitleBarMenuOptions())
 end
 
 
@@ -215,15 +230,10 @@ end
 function Methods:buildQuickChapterMenuOptions(manga, chapters)
     local visible_chapters = self:getVisibleChapters(chapters)
 
-    return {
+    return copyTitleBarOptions({
         title = self:formatChapterListTitle(manga),
         chapters = self:buildQuickChapterMenuItems(manga, visible_chapters),
-        title_bar_left_icon = "appbar.menu",
-        on_title_bar_left_tap = function()
-            self:showBulkChapterActions()
-            return true
-        end,
-    }
+    }, self:getChapterTitleBarMenuOptions())
 end
 
 

@@ -74,9 +74,25 @@ function Methods:showSourceList(sources, options)
     options = options or {}
     local menu
     local function buildSourceMenuOptions()
-        local menu_options = self:getHomeMenuOptions() or {}
-        menu_options.on_global_search = function()
+        local menu_options = {}
+        local function showGlobalSearch()
             return self:getClient():showGlobalSearch(sources)
+        end
+        if self.getTitleBarMenuOptions then
+            menu_options = self:getTitleBarMenuOptions({
+                title = _("Suwayomi Sources"),
+                actions = {
+                    { id = "global_search", text = _("Global search") },
+                },
+                onSelect = function(action)
+                    if action and action.id == "global_search" then
+                        return showGlobalSearch()
+                    end
+                end,
+            }) or {}
+        end
+        menu_options.on_global_search = function()
+            return showGlobalSearch()
         end
         menu_options.close_callback = function()
             if self.current_sources_menu == menu then

@@ -20,6 +20,7 @@ describe("suwayomi/ui", function()
         package.loaded["ui/widget/buttondialog"] = nil
         package.loaded["ui/widget/confirmbox"] = nil
         package.loaded["ui/widget/multiinputdialog"] = nil
+        package.loaded["ui/widget/titlebar"] = nil
         package.loaded["ui/widget/checkmark"] = nil
         package.loaded["ui/widget/radiomark"] = nil
         package.loaded["ui/widget/pathchooser"] = nil
@@ -66,6 +67,14 @@ describe("suwayomi/ui", function()
                         }
                     end
                     options.onShowKeyboard = function() end
+                    return options
+                end,
+            }
+        end
+
+        package.preload["ui/widget/titlebar"] = function()
+            return {
+                new = function(_, options)
                     return options
                 end,
             }
@@ -159,6 +168,7 @@ describe("suwayomi/ui", function()
         package.preload["ui/widget/buttondialog"] = nil
         package.preload["ui/widget/confirmbox"] = nil
         package.preload["ui/widget/multiinputdialog"] = nil
+        package.preload["ui/widget/titlebar"] = nil
         package.preload["ui/widget/checkmark"] = nil
         package.preload["ui/widget/radiomark"] = nil
         package.preload["ui/widget/pathchooser"] = nil
@@ -281,6 +291,31 @@ describe("suwayomi/ui", function()
         }, held)
     end)
 
+    it("uses KOReader native file-manager title-bar style for chapter bulk actions", function()
+        local ui = require("suwayomi/ui")
+        local tapped = false
+
+        ui.showChapterMenu({
+            title = "Sousou no Frieren",
+            title_bar_left_icon = "appbar.menu",
+            on_title_bar_left_tap = function()
+                tapped = true
+                return true
+            end,
+            chapters = {
+                { id = "c1", name = "Chapter 1" },
+            },
+        })
+
+        assert.is_nil(shown_dialog.custom_title_bar)
+        assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
+        assert.is_true(shown_dialog.title_bar_fm_style)
+
+        shown_dialog.onLeftButtonTap()
+
+        assert.is_true(tapped)
+    end)
+
     it("keeps chapter menus current when selecting a row", function()
         local ui = require("suwayomi/ui")
         local selected
@@ -304,17 +339,17 @@ describe("suwayomi/ui", function()
         assert.is_false(closed)
     end)
 
-    it("shows a chapter actions menu", function()
+    it("shows a generic action menu", function()
         local ui = require("suwayomi/ui")
         local selected = {}
         local closed = false
 
-        ui.showChapterActionsMenu({
-            title = "Chapter 1",
+        ui.showActionMenu({
+            title = "Title actions",
             actions = {
-                { id = "open", text = "Open" },
-                { id = "delete", text = "Delete from device" },
-                { id = "mark_read", text = "Mark as read" },
+                { id = "home", text = "Suwayomi home" },
+                { id = "refresh", text = "Refresh" },
+                { id = "cancel", text = "Cancel search" },
             },
             close_callback = function()
                 closed = true
@@ -323,22 +358,35 @@ describe("suwayomi/ui", function()
             table.insert(selected, action)
         end)
 
-        assert.are.equal("Chapter 1", shown_dialog.title)
-        assert.are.equal("Open", shown_dialog.buttons[1][1].text)
-        assert.are.equal("Delete from device", shown_dialog.buttons[1][2].text)
-        assert.are.equal("Mark as read", shown_dialog.buttons[2][1].text)
+        assert.are.equal("Title actions", shown_dialog.title)
+        assert.are.equal("Suwayomi home", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Refresh", shown_dialog.buttons[1][2].text)
+        assert.are.equal("Cancel search", shown_dialog.buttons[2][1].text)
 
         shown_dialog.buttons[1][1].callback()
         shown_dialog.buttons[2][1].callback()
 
         assert.are.same({
-            { id = "open", text = "Open" },
-            { id = "mark_read", text = "Mark as read" },
+            { id = "home", text = "Suwayomi home" },
+            { id = "cancel", text = "Cancel search" },
         }, selected)
 
         shown_dialog.close_callback()
 
         assert.is_true(closed)
+    end)
+
+    it("shows a chapter actions menu through the generic action renderer", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showChapterActionsMenu({
+            actions = {
+                { id = "open", text = "Open" },
+            },
+        })
+
+        assert.are.equal("Chapter actions", shown_dialog.title)
+        assert.are.equal("Open", shown_dialog.buttons[1][1].text)
     end)
 
     it("refreshes chapter menus with a dimension recalculation for changed row statuses", function()

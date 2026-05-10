@@ -29,6 +29,13 @@ function SuwayomiClient:translate(text)
     return self.gettext(text)
 end
 
+local function copyOptions(target, source)
+    for key, value in pairs(source or {}) do
+        target[key] = value
+    end
+    return target
+end
+
 function SuwayomiClient:time(operation, context, callback)
     if self.debug and self.debug.time then
         return self.debug.time(operation, context, callback)
@@ -42,9 +49,9 @@ function SuwayomiClient:log(event)
     end
 end
 
-function SuwayomiClient:getHomeMenuOptions()
-    if self.plugin and self.plugin.getHomeMenuOptions then
-        return self.plugin:getHomeMenuOptions()
+function SuwayomiClient:getTitleBarMenuOptions(options)
+    if self.plugin and self.plugin.getTitleBarMenuOptions then
+        return self.plugin:getTitleBarMenuOptions(options)
     end
     return nil
 end
@@ -179,12 +186,9 @@ function SuwayomiClient:buildBrowseResultTitle(source, options)
 end
 
 function SuwayomiClient:buildBrowseResultMenuOptions(source, options, has_next_page)
-    local menu_options = {}
-    local home_options = self:getHomeMenuOptions() or {}
-    for key, value in pairs(home_options) do
-        menu_options[key] = value
-    end
-    menu_options.title = self:buildBrowseResultTitle(source, options)
+    local title = self:buildBrowseResultTitle(source, options)
+    local menu_options = copyOptions({}, self:getTitleBarMenuOptions({ title = title }))
+    menu_options.title = title
 
     if (options.page or 1) > 1 then
         menu_options.on_previous_page = function()
@@ -364,6 +368,9 @@ function SuwayomiClient:showLibraryManga(category, credentials)
     end
 
     local library_manga = self:withLibraryMenuText(manga)
+    local menu_options = self:getTitleBarMenuOptions({
+        title = self:translate("Suwayomi Library"),
+    })
     local library_menu
     local pending_library_menu_refresh = false
     local function refreshLibraryMangaMenu()
@@ -386,7 +393,7 @@ function SuwayomiClient:showLibraryManga(category, credentials)
                 else
                     self.plugin:showChaptersForManga(selected_manga)
                 end
-            end, self:getHomeMenuOptions())
+            end, menu_options)
         end
     end
 
@@ -398,7 +405,7 @@ function SuwayomiClient:showLibraryManga(category, credentials)
         else
             self.plugin:showChaptersForManga(selected_manga)
         end
-    end, self:getHomeMenuOptions())
+    end, menu_options)
     self:trackScreen("library", library_menu)
     if pending_library_menu_refresh then
         refreshLibraryMangaMenu()
@@ -437,7 +444,9 @@ function SuwayomiClient:showLibrary()
         if should_show_category_picker and #categories > 0 then
             local category_menu = self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
                 self:showLibraryManga(category, credentials)
-            end, self:getHomeMenuOptions())
+            end, self:getTitleBarMenuOptions({
+                title = self:translate("Suwayomi Library"),
+            }))
             self:trackScreen("library-categories", category_menu)
             return
         end
@@ -517,15 +526,24 @@ function SuwayomiClient:isGlobalSearchComplete(search)
 end
 
 function SuwayomiClient:buildGlobalSearchMenuOptions(search)
-    local menu_options = {}
-    local home_options = self:getHomeMenuOptions() or {}
-    for key, value in pairs(home_options) do
-        menu_options[key] = value
-    end
+    local actions = {}
+    local cancel
     if not search.finished and not search.canceled then
-        local cancel = function()
+        cancel = function()
             self:cancelGlobalSearch(search)
         end
+        table.insert(actions, { id = "cancel_search", text = self:translate("Cancel search") })
+    end
+    local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
+        title = self:translate("Global search"),
+        actions = actions,
+        onSelect = function(action)
+            if action and action.id == "cancel_search" and cancel then
+                return cancel()
+            end
+        end,
+    }))
+    if cancel then
         menu_options.close_callback = cancel
         menu_options.on_cancel_search = cancel
     end
@@ -753,7 +771,9 @@ function SuwayomiClient:showSourceModeMenu(source)
             type = mode,
             skip_mode_menu = true,
         })
-    end, self:getHomeMenuOptions())
+    end, self:getTitleBarMenuOptions({
+        title = source and (source.name or source.display_name or source.displayName) or self:translate("Suwayomi Source"),
+    }))
     return self:trackScreen("browse-source", mode_menu)
 end
 

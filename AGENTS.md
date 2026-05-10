@@ -60,6 +60,7 @@
   - `suwayomi/chapters/context.lua`, `suwayomi/chapters/menu.lua`, `suwayomi/chapters/actions.lua`: chapter context, menu construction, and the public chapter action facade.
   - `suwayomi/chapters/local_downloads.lua`, `suwayomi/chapters/delete_actions.lua`, `suwayomi/chapters/read_actions.lua`: local archive state, device deletion flows, and read/unread action orchestration.
   - `suwayomi/readsync/ledger.lua`, `suwayomi/readsync/koreader_metadata.lua`, `suwayomi/readsync/worker.lua`, `suwayomi/readsync/controller.lua`: read ledger, KOReader sidecar/history handling, worker code, and read-sync orchestration.
+  - `suwayomi/plugin/title_menu.lua`: shared title-bar burger action menus and the universal Suwayomi home title action for full-screen plugin menus.
 - Do not add compatibility wrappers for old top-level `suwayomi_*.lua` module names; update callers and tests to the slash-style module names instead.
 - Runtime Lua files should start with a short line-comment `-- Boundary:` header matching the current module convention. Use regular `--` comments for explanatory notes; avoid top-of-file `--[[ ... ]]` documentation blocks unless a future file has a specific reason to differ.
 - Document any code whose purpose is not immediately obvious with a short comment explaining why it exists; avoid comments that merely restate what the code says.

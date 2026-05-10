@@ -61,8 +61,11 @@ describe("suwayomi/client", function()
                 schedulePendingReadSync = function(_, credentials)
                     scheduled_sync_credentials = credentials
                 end,
-                getHomeMenuOptions = function()
-                    return options.home_menu_options
+                getTitleBarMenuOptions = function(_, menu_options)
+                    if options.capture_title_options then
+                        options.capture_title_options(menu_options)
+                    end
+                    return options.title_menu_options
                 end,
                 trackSuwayomiScreen = function(_, route_id, widget)
                     table.insert(tracked_screens, { route_id = route_id, widget = widget })
@@ -154,7 +157,7 @@ describe("suwayomi/client", function()
                     assert.are.equal("Sousou no Frieren", manga[1].title)
                     assert.are.same({
                         title = "MangaDex (EN) - Popular - Page 1",
-                        title_bar_left_icon = "appbar.filebrowser",
+                        title_bar_left_icon = "appbar.menu",
                     }, menu_options)
                     onSelect(manga[1])
                     return { name = "browse-results-menu" }
@@ -179,8 +182,8 @@ describe("suwayomi/client", function()
                 showMangaActions = function(_, manga)
                     shown_manga_actions = manga
                 end,
-                getHomeMenuOptions = function()
-                    return { title_bar_left_icon = "appbar.filebrowser" }
+                getTitleBarMenuOptions = function()
+                    return { title_bar_left_icon = "appbar.menu" }
                 end,
                 trackSuwayomiScreen = function(_, route_id, widget)
                     table.insert(tracked, { route_id = route_id, widget = widget })
@@ -228,12 +231,12 @@ describe("suwayomi/client", function()
             ui = {
                 showSourceModeMenu = function(source, onSelect, menu_options)
                     assert.are.equal("s1", source.id)
-                    assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, menu_options)
+                    assert.are.same({ title_bar_left_icon = "appbar.menu" }, menu_options)
                     onSelect("POPULAR")
                 end,
                 showMangaMenu = function() end,
             },
-            home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
+            title_menu_options = { title_bar_left_icon = "appbar.menu" },
         })
 
         client:showMangaForSource({ id = "s1", name = "MangaDex", lang = "en" })
@@ -379,7 +382,7 @@ describe("suwayomi/client", function()
                     return { name = "global-search" }
                 end,
             },
-            home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
+            title_menu_options = { title_bar_left_icon = "appbar.menu" },
         })
 
         client:showGlobalSearch({
@@ -395,7 +398,7 @@ describe("suwayomi/client", function()
         assert.are.equal("local", started[1].source.id)
         assert.are.equal("s1", started[2].source.id)
         assert.are.equal("s2", started[3].source.id)
-        assert.are.equal("appbar.filebrowser", shown_options.title_bar_left_icon)
+        assert.are.equal("appbar.menu", shown_options.title_bar_left_icon)
         assert.is_function(shown_options.close_callback)
         assert.is_function(shown_options.on_cancel_search)
     end)
@@ -829,7 +832,7 @@ describe("suwayomi/client", function()
         local shown_menu_options
         local tracked = {}
         local client, state = newClient({
-            home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
+            title_menu_options = { title_bar_left_icon = "appbar.menu" },
             api = {
                 fetchCategories = function()
                     return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
@@ -870,7 +873,7 @@ describe("suwayomi/client", function()
         client:showLibrary()
 
         assert.are.equal("Sousou no Frieren (12 unread / MangaDex EN)", shown_manga[1].menu_text)
-        assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, shown_menu_options)
+        assert.are.equal("appbar.menu", shown_menu_options.title_bar_left_icon)
         assert.are.equal("m1", state.shown_manga_actions().id)
         assert.are.equal("library_manga_loaded", state.log_events[#state.log_events].event)
         assert.are.equal("library", tracked[1].route_id)
@@ -1012,8 +1015,8 @@ describe("suwayomi/client", function()
     it("opens browse result manga actions without changing the action surface", function()
         local shown_manga_action_options
         local client = newClient({
-            home_menu_options = {
-                title_bar_left_icon = "appbar.filebrowser",
+            title_menu_options = {
+                title_bar_left_icon = "appbar.menu",
                 on_title_bar_left_tap = function() end,
             },
             api = {
@@ -1050,7 +1053,7 @@ describe("suwayomi/client", function()
         local shown_category_menu_options
         local shown_manga
         local client = newClient({
-            home_menu_options = { title_bar_left_icon = "appbar.filebrowser" },
+            title_menu_options = { title_bar_left_icon = "appbar.menu" },
             api = {
                 fetchCategories = function()
                     return {
@@ -1097,7 +1100,7 @@ describe("suwayomi/client", function()
         assert.are.equal("All manga", shown_categories[1].name)
         assert.are.equal("Default", shown_categories[2].name)
         assert.are.equal("Reading", shown_categories[3].name)
-        assert.are.same({ title_bar_left_icon = "appbar.filebrowser" }, shown_category_menu_options)
+        assert.are.equal("appbar.menu", shown_category_menu_options.title_bar_left_icon)
         assert.are.same({ "Reading Manga (3 unread)" }, { shown_manga[1].menu_text })
     end)
 

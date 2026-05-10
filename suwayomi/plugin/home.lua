@@ -43,23 +43,6 @@ function Methods:showNotImplemented(message)
 end
 
 
-function Methods:getHomeMenuOptions()
-    return {
-        title_bar_left_icon = "appbar.filebrowser",
-        on_title_bar_left_tap = function(menu)
-            local tracked = self.isSuwayomiScreenActive and self:isSuwayomiScreenActive(menu)
-            if self.closeSuwayomiPlugin then
-                self:closeSuwayomiPlugin()
-            end
-            if not tracked and menu and UIManager.close then
-                UIManager:close(menu)
-            end
-            self:showHome()
-            return true
-        end,
-    }
-end
-
 function Methods:showTopLevelScreen(route_id, callback)
     if self.closeSuwayomiPlugin then
         self:closeSuwayomiPlugin()
