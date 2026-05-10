@@ -15,6 +15,18 @@
 - `luacheck --codes spec suwayomi main.lua _meta.lua` provides project Lua parsing/linting while avoiding generated dependency directories such as `.lua` and `.luarocks`; do not add a separate `luac` syntax pass.
 - Specs set `package.path = "?.lua;" .. package.path`; run `busted` from the plugin root or local module requires will not resolve.
 
+## Commit Messages
+
+- Keep commits small, reviewable, and about one logical change. If the subject needs "and", split the commit or make the body explain why the work cannot be separated.
+- Prefer a Conventional Commit subject when the change has a clear type and the prefix helps scanning history: `docs: update agent commit guidance`, `fix: preserve chapter menu state`, `feat: add reader return path`, `refactor: share job helpers`, `test: cover queue recovery`, or `ci: update lint workflow`.
+- Plain imperative subjects are still acceptable when they match nearby history and read better without a type prefix, for example `Stabilize chapter status refreshes`.
+- Write the subject as an imperative command to the codebase, not a diary entry: `Fix queue recovery`, not `Fixed queue recovery` or `Fixes queue recovery`. Keep it concise, with a soft limit around 50 characters and no trailing period.
+- Add a body when the change is not obvious from the subject and diff. Use the body to explain the motivation, user-visible behavior, important tradeoffs, test evidence, and known limitations; avoid merely listing files or restating the patch.
+- Wrap body text at about 72 columns when practical, and keep the message self-contained enough to understand from `git log` without opening an issue tracker or PR page.
+- Put structured metadata at the end as Git trailers after a blank line, one trailer per line, such as `Refs: #123`, `Fixes: #123`, `Signed-off-by: Name <email>`, or `Co-authored-by: Name <email>`.
+- Do not add AI/tool `Co-authored-by` trailers unless the human explicitly requests them. Only use co-author trailers for real collaborators whose name and email are known.
+- Avoid vague subjects such as `updates`, `fix stuff`, `wip`, `changes`, or generated summaries that describe the agent's actions instead of the repository behavior change.
+
 ## Project Shape
 
 - This is a LuaJIT/Lua 5.1 KOReader plugin, not a standalone Lua app; KOReader modules such as `ui/uimanager`, `dispatcher`, `datastorage`, `ffi/util`, and `ffi/archiver` exist at runtime and are usually stubbed in specs.
