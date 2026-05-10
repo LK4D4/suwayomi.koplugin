@@ -51,11 +51,24 @@ function Methods:performTitleBarAction(menu, action, screen_options)
     return false
 end
 
+local function titleBarLeftButtonDimen(menu)
+    if menu
+            and menu.title_bar
+            and menu.title_bar.left_button
+            and menu.title_bar.left_button.image then
+        return menu.title_bar.left_button.image.dimen
+    end
+    return nil
+end
+
 function Methods:showTitleBarActionMenu(menu, screen_options)
     screen_options = screen_options or {}
     return SuwayomiUI.showActionMenu({
         title = screen_options.title or _("Suwayomi"),
         actions = self:buildTitleBarActions(screen_options.actions),
+        anchor = function()
+            return titleBarLeftButtonDimen(menu)
+        end,
     }, function(action)
         return self:performTitleBarAction(menu, action, screen_options)
     end)

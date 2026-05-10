@@ -74,7 +74,17 @@ describe("suwayomi/plugin/title_menu", function()
                 delegated = { action = action, menu = menu }
             end,
         })
-        local source_menu = { name = "library-menu" }
+        local title_bar_dimen = { x = 3, y = 4, w = 32, h = 32 }
+        local source_menu = {
+            name = "library-menu",
+            title_bar = {
+                left_button = {
+                    image = {
+                        dimen = title_bar_dimen,
+                    },
+                },
+            },
+        }
 
         assert.are.equal("appbar.menu", options.title_bar_left_icon)
         assert.is_function(options.on_title_bar_left_tap)
@@ -84,6 +94,8 @@ describe("suwayomi/plugin/title_menu", function()
         assert.are.equal("Library", shown_action_menu.title)
         assert.are.equal("home", shown_action_menu.actions[1].id)
         assert.are.equal("refresh", shown_action_menu.actions[2].id)
+        assert.is_function(shown_action_menu.anchor)
+        assert.are.equal(title_bar_dimen, shown_action_menu.anchor())
 
         action_callback({ id = "refresh", text = "Refresh" })
 

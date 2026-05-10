@@ -13,6 +13,9 @@ function MenuUtils.applyNativeTitleBarStyle(menu_options)
     menu_options = menu_options or {}
     if menu_options.title_bar_left_icon then
         menu_options.title_bar_fm_style = true
+        if menu_options.is_popout == nil then
+            menu_options.is_popout = false
+        end
     end
     return menu_options
 end

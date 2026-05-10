@@ -310,6 +310,7 @@ describe("suwayomi/ui", function()
         assert.is_nil(shown_dialog.custom_title_bar)
         assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
         assert.is_true(shown_dialog.title_bar_fm_style)
+        assert.is_false(shown_dialog.is_popout)
 
         shown_dialog.onLeftButtonTap()
 
@@ -374,6 +375,23 @@ describe("suwayomi/ui", function()
         shown_dialog.close_callback()
 
         assert.is_true(closed)
+    end)
+
+    it("passes action menu anchors through to ButtonDialog", function()
+        local ui = require("suwayomi/ui")
+        local anchor = function()
+            return { x = 8, y = 12, w = 40, h = 40 }
+        end
+
+        ui.showActionMenu({
+            title = "Title actions",
+            actions = {
+                { id = "home", text = "Suwayomi home" },
+            },
+            anchor = anchor,
+        })
+
+        assert.are.equal(anchor, shown_dialog.anchor)
     end)
 
     it("shows a chapter actions menu through the generic action renderer", function()

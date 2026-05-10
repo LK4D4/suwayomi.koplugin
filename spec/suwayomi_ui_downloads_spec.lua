@@ -176,6 +176,7 @@ describe("suwayomi/ui/downloads", function()
         assert.is_nil(shown_dialog.custom_title_bar)
         assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
         assert.is_true(shown_dialog.title_bar_fm_style)
+        assert.is_false(shown_dialog.is_popout)
 
         shown_dialog.onLeftButtonTap()
 

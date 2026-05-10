@@ -175,6 +175,7 @@ function SuwayomiUI.showActionMenu(options, onSelectCallback)
     dialog = ButtonDialog:new{
         title = options.title or _("Actions"),
         buttons = buttons,
+        anchor = options.anchor,
         close_callback = options.close_callback,
     }
     UIManager:show(dialog)
