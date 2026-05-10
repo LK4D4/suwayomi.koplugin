@@ -15,6 +15,18 @@ local T = FFIUtil.template
 local ChapterMenu = {}
 ChapterMenu.__index = ChapterMenu
 
+local function copyDownloadStatus(status)
+    if type(status) ~= "table" then
+        return nil
+    end
+    if status.state ~= "downloaded" and status.state ~= "skipped" then
+        return nil
+    end
+    return {
+        state = status.state,
+    }
+end
+
 -- Controllers expose new(deps) for a consistent boundary; methods remain plugin-bound mixins so this refactor can move code without changing callback behavior.
 function ChapterMenu:new(deps)
     deps = deps or {}
@@ -83,15 +95,6 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
                 self:upsertChapterLedgerEntry(manga, item, updates)
             end
             ledger_upsert_count = ledger_upsert_count + 1
-            if item.is_read == true then
-                local deleted = self:autoDeleteReadLocalDownload(manga, item, {
-                    ledger = ledger,
-                    skip_refresh = true,
-                })
-                if deleted then
-                    chapter_exists = false
-                end
-            end
         end
 
         local status = self:getChapterDownloadStatus(manga, item)
@@ -108,6 +111,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
             end
         end
         item.menu_text = item.name
+        item._suwayomi_download_status = copyDownloadStatus(status)
         item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, status)
         if self.selection_mode then
             if self:isChapterSelected(manga, item) then
@@ -174,11 +178,16 @@ function Methods:buildQuickChapterMenuItems(manga, chapters)
         local status = self:getChapterDownloadStatus(manga, item)
         if status then
             item.menu_text = item.name
+            item._suwayomi_download_status = copyDownloadStatus(status)
             item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, status)
+        elseif cached and cached._suwayomi_download_status then
+            item.menu_text = item.name
+            item._suwayomi_download_status = copyDownloadStatus(cached._suwayomi_download_status)
+            item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, item._suwayomi_download_status)
         elseif item.is_read then
             item.menu_text = item.name
             item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, { state = "read" })
-        elseif cached and cached.menu_text then
+        elseif item.is_read == nil and cached and cached.menu_text then
             item.menu_text = self:stripChapterSelectionMarker(cached.menu_text)
             item.menu_status = self:stripChapterSelectionStatus(cached.menu_status)
         else
