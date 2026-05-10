@@ -161,6 +161,7 @@ function Methods:getMangaActions(manga)
     local actions = {
         { id = "open_chapters", text = _("Open chapters") },
     }
+    local destructive_action
 
     if self:canOpenFirstUnreadMangaChapter(manga) then
         table.insert(actions, { id = "open_first_unread", text = _("Open first unread") })
@@ -168,13 +169,16 @@ function Methods:getMangaActions(manga)
 
     table.insert(actions, { id = "refresh_chapters", text = _("Refresh chapters") })
     if manga and manga.in_library == true then
-        table.insert(actions, { id = "remove_from_library", text = _("Remove from library") })
+        destructive_action = { id = "remove_from_library", text = _("Remove from library"), destructive = true }
     else
         table.insert(actions, { id = "add_to_library", text = _("Add to library") })
     end
     table.insert(actions, { id = "download_first_unread", text = _("Download first unread") })
     table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
     table.insert(actions, { id = "more", text = _("More...") })
+    if destructive_action then
+        table.insert(actions, destructive_action)
+    end
 
     return actions
 end
@@ -325,7 +329,7 @@ function Methods:showMoreMangaActions(manga, options)
             { id = "download_all_unread", text = _("Download all unread") },
             { id = "download_all_chapters", text = _("Download all chapters") },
             { id = "keep_downloaded", text = _("Keep downloaded") },
-            { id = "delete_read_downloaded", text = _("Delete read downloads") },
+            { id = "delete_read_downloaded", text = _("Delete read downloads"), destructive = true },
         },
     }, function(action)
         if action then

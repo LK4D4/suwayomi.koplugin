@@ -146,23 +146,26 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
     return dialog
 end
 
-function SuwayomiUI.showActionMenu(options, onSelectCallback)
-    local UIManager = require("ui/uimanager")
-    local dialog
-    local buttons = {}
+local function buildActionMenuButton(action, dialogProvider, UIManager, onSelectCallback)
+    return {
+        id = action.id,
+        text = action.text,
+        destructive = action.destructive == true or nil,
+        callback = function()
+            UIManager:close(dialogProvider())
+            if onSelectCallback then
+                onSelectCallback(action)
+            end
+        end,
+    }
+end
+
+
+local function appendActionButtonRows(buttons, actions, columns, dialogProvider, UIManager, onSelectCallback)
     local row = {}
-    options = options or {}
-    for _, action in ipairs(options.actions or {}) do
-        table.insert(row, {
-            text = action.text,
-            callback = function()
-                UIManager:close(dialog)
-                if onSelectCallback then
-                    onSelectCallback(action)
-                end
-            end,
-        })
-        if #row == 2 then
+    for _, action in ipairs(actions or {}) do
+        table.insert(row, buildActionMenuButton(action, dialogProvider, UIManager, onSelectCallback))
+        if #row == columns then
             table.insert(buttons, row)
             row = {}
         end
@@ -171,10 +174,55 @@ function SuwayomiUI.showActionMenu(options, onSelectCallback)
     if #row > 0 then
         table.insert(buttons, row)
     end
+end
+
+
+local function splitActionGroups(actions)
+    local normal_actions = {}
+    local destructive_actions = {}
+    for _, action in ipairs(actions or {}) do
+        if action.destructive == true then
+            table.insert(destructive_actions, action)
+        else
+            table.insert(normal_actions, action)
+        end
+    end
+    return normal_actions, destructive_actions
+end
+
+
+local function buildActionMenuButtons(options, dialogProvider, UIManager, onSelectCallback)
+    local buttons = {}
+    local columns = options.vertical and 1 or (options.columns or 2)
+    local normal_actions = options.actions or {}
+    local destructive_actions = {}
+
+    if options.destructive_actions_at_bottom then
+        normal_actions, destructive_actions = splitActionGroups(options.actions)
+    end
+
+    appendActionButtonRows(buttons, normal_actions, columns, dialogProvider, UIManager, onSelectCallback)
+    if #destructive_actions > 0 then
+        if #buttons > 0 then
+            table.insert(buttons, {})
+        end
+        appendActionButtonRows(buttons, destructive_actions, columns, dialogProvider, UIManager, onSelectCallback)
+    end
+
+    return buttons
+end
+
+
+function SuwayomiUI.showActionMenu(options, onSelectCallback)
+    local UIManager = require("ui/uimanager")
+    local dialog
+    options = options or {}
 
     dialog = ButtonDialog:new{
         title = options.title or _("Actions"),
-        buttons = buttons,
+        buttons = buildActionMenuButtons(options, function()
+            return dialog
+        end, UIManager, onSelectCallback),
         anchor = options.anchor,
         close_callback = options.close_callback,
     }
@@ -185,12 +233,16 @@ end
 function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
     options = options or {}
     options.title = options.title or _("Chapter actions")
+    options.vertical = true
+    options.destructive_actions_at_bottom = true
     return SuwayomiUI.showActionMenu(options, onSelectCallback)
 end
 
 function SuwayomiUI.showMangaActionsMenu(options, onSelectCallback)
     options = options or {}
     options.title = options.title or _("Manga actions")
+    options.vertical = true
+    options.destructive_actions_at_bottom = true
     return SuwayomiUI.showActionMenu(options, onSelectCallback)
 end
 

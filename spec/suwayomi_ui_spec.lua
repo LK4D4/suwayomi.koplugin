@@ -407,6 +407,38 @@ describe("suwayomi/ui", function()
         assert.are.equal("Open", shown_dialog.buttons[1][1].text)
     end)
 
+    it("shows manga and chapter actions as vertical menus with destructive actions separated", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showChapterActionsMenu({
+            actions = {
+                { id = "open", text = "Open" },
+                { id = "mark_read", text = "Mark as read" },
+                { id = "delete", text = "Delete from device", destructive = true },
+            },
+        })
+
+        assert.are.equal("Open", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Mark as read", shown_dialog.buttons[2][1].text)
+        assert.are.same({}, shown_dialog.buttons[3])
+        assert.are.equal("Delete from device", shown_dialog.buttons[4][1].text)
+        assert.is_true(shown_dialog.buttons[4][1].destructive)
+
+        ui.showMangaActionsMenu({
+            actions = {
+                { id = "open_chapters", text = "Open chapters" },
+                { id = "more", text = "More..." },
+                { id = "remove_from_library", text = "Remove from library", destructive = true },
+            },
+        })
+
+        assert.are.equal("Open chapters", shown_dialog.buttons[1][1].text)
+        assert.are.equal("More...", shown_dialog.buttons[2][1].text)
+        assert.are.same({}, shown_dialog.buttons[3])
+        assert.are.equal("Remove from library", shown_dialog.buttons[4][1].text)
+        assert.is_true(shown_dialog.buttons[4][1].destructive)
+    end)
+
     it("refreshes chapter menus with a dimension recalculation for changed row statuses", function()
         local ui = require("suwayomi/ui")
         local switched
