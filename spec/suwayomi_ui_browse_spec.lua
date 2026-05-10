@@ -65,10 +65,9 @@ describe("suwayomi/ui/browse", function()
         package.preload["ui/uimanager"] = nil
     end)
 
-    it("shows a sources menu with global search and source callbacks", function()
+    it("shows a sources menu with source callbacks and no global search row", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}
-        local global_search_started = false
 
         browse.showSourcesMenu({
             { id = "s1", name = "MangaDex" },
@@ -76,21 +75,17 @@ describe("suwayomi/ui/browse", function()
         }, function(source)
             table.insert(selected, source)
         end, {
-            on_global_search = function()
-                global_search_started = true
-            end,
+            on_global_search = function() end,
         })
 
         assert.are.equal("Suwayomi Sources", shown_dialog.title)
-        assert.are.equal("Global search", shown_dialog.item_table[1].text)
-        assert.are.equal("MangaDex", shown_dialog.item_table[2].text)
-        assert.are.equal("ComicK", shown_dialog.item_table[3].text)
+        assert.are.equal("MangaDex", shown_dialog.item_table[1].text)
+        assert.are.equal("ComicK", shown_dialog.item_table[2].text)
+        assert.is_nil(shown_dialog.item_table[3])
 
         shown_dialog.item_table[1].callback()
         shown_dialog.item_table[2].callback()
-        shown_dialog.item_table[3].callback()
 
-        assert.is_true(global_search_started)
         assert.are.same({
             { id = "s1", name = "MangaDex" },
             { id = "s2", name = "ComicK" },

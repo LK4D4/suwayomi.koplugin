@@ -25,12 +25,6 @@ function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
         options = onSelectCallback
         onSelectCallback = options.onSelect
     end
-    if options.on_global_search then
-        table.insert(menu_table, {
-            text = _("Global search"),
-            callback = options.on_global_search,
-        })
-    end
     for _, source in ipairs(sources) do
         table.insert(menu_table, {
             text = source.name,
@@ -175,12 +169,6 @@ function BrowseUI.updateSourcesMenu(menu, sources, onSelectCallback, options)
     end
 
     local menu_table = {}
-    if options and options.on_global_search then
-        table.insert(menu_table, {
-            text = _("Global search"),
-            callback = options.on_global_search,
-        })
-    end
     for _, source in ipairs(sources or {}) do
         table.insert(menu_table, {
             text = source.name,

@@ -246,19 +246,20 @@ describe("suwayomi/browse/source_catalog", function()
         assert.is_nil(ui_calls.shown)
     end)
 
-    it("updates an existing source menu and delegates source selection to the client", function()
+    it("updates an existing source menu and keeps global search in the title menu", function()
         local catalog = loadCatalog()
         local controller = buildController(catalog)
         controller.current_sources_menu = { kind = "existing-menu" }
 
         local menu = controller:showSourceList({ { id = "english", lang = "en" } })
-        local search_result = ui_calls.updated.options.on_global_search()
+        local search_result = controller.title_menu_options.onSelect(controller.title_menu_options.actions[1])
         local manga_result = controller:showMangaForSource({ id = "english" })
 
         assert.are.same(controller.current_sources_menu, menu)
         assert.are.equal("Suwayomi Sources", controller.title_menu_options.title)
         assert.are.equal("global_search", controller.title_menu_options.actions[1].id)
         assert.are.equal("appbar.menu", ui_calls.updated.options.title_bar_left_icon)
+        assert.is_nil(ui_calls.updated.options.on_global_search)
         assert.are.equal("global-search", search_result)
         assert.are.equal("manga-for-source", manga_result)
         assert.are.equal("english", controller.global_search_sources[1].id)

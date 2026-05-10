@@ -91,9 +91,6 @@ function Methods:showSourceList(sources, options)
                 end,
             }) or {}
         end
-        menu_options.on_global_search = function()
-            return showGlobalSearch()
-        end
         menu_options.close_callback = function()
             if self.current_sources_menu == menu then
                 self.current_sources_menu = nil
