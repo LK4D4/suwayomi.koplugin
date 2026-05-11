@@ -1,7 +1,7 @@
--- Boundary: shared thumbnail list row formatting.
+-- Boundary: shared file-manager-like list row formatting.
 --
--- Responsibility: convert manga and source tables into KOReader Menu row
--- tables for Library, Browse, source search, and global-search result screens.
+-- Responsibility: convert source, manga, and chapter tables into KOReader Menu
+-- row tables for Library, Browse, source search, and chapter screens.
 -- Owned state: none.
 -- Dependencies: gettext only.
 -- External data: manga and source tables come from API/client layers and are
@@ -151,6 +151,53 @@ function ListRows.buildSourceMenuTable(sources, options)
     local menu_table = {}
     for _, source in ipairs(sources or {}) do
         table.insert(menu_table, ListRows.buildSourceRow(source, options))
+    end
+    return menu_table
+end
+
+function ListRows.getChapterTitle(chapter)
+    if type(chapter) ~= "table" then
+        return ""
+    end
+    return chapter.menu_text or chapter.name or (chapter.id ~= nil and tostring(chapter.id)) or ""
+end
+
+function ListRows.getChapterSubtitle(chapter)
+    if type(chapter) ~= "table" then
+        return nil
+    end
+    if chapter.scanlator == nil or chapter.scanlator == "" then
+        return nil
+    end
+    return tostring(chapter.scanlator)
+end
+
+function ListRows.getChapterMandatory(chapter)
+    if type(chapter) ~= "table" then
+        return nil
+    end
+    return chapter.menu_status
+end
+
+function ListRows.buildChapterRow(chapter, options)
+    options = options or {}
+    return {
+        text = ListRows.getChapterTitle(chapter),
+        subtitle = ListRows.getChapterSubtitle(chapter),
+        mandatory = ListRows.getChapterMandatory(chapter),
+        chapter = chapter,
+        callback = function()
+            if options.on_select then
+                options.on_select(chapter)
+            end
+        end,
+    }
+end
+
+function ListRows.buildChapterMenuTable(chapters, options)
+    local menu_table = {}
+    for _, chapter in ipairs(chapters or {}) do
+        table.insert(menu_table, ListRows.buildChapterRow(chapter, options))
     end
     return menu_table
 end

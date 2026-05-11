@@ -15,8 +15,8 @@ local menu_utils = require("suwayomi/ui/menu_utils")
 
 local BrowseUI = {}
 
-local function getMangaMenu()
-    return require("suwayomi/ui/manga_menu")
+local function getListMenu()
+    return require("suwayomi/ui/list_menu")
 end
 
 local function newPluginMenu(options)
@@ -30,7 +30,7 @@ function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
         onSelectCallback = options.onSelect
     end
 
-    return getMangaMenu().show{
+    return getListMenu().show{
         title = _("Suwayomi Sources"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = ListRows.buildSourceMenuTable(sources, {
@@ -166,7 +166,7 @@ function BrowseUI.updateSourcesMenu(menu, sources, onSelectCallback, options)
         return
     end
 
-    return getMangaMenu().update(menu, {
+    return getListMenu().update(menu, {
         title = _("Suwayomi Sources"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = ListRows.buildSourceMenuTable(sources, {
@@ -285,7 +285,7 @@ end
 function BrowseUI.showMangaMenu(manga_list, onSelectCallback, options)
     options = options or {}
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
-    return getMangaMenu().show{
+    return getListMenu().show{
         title = options.title or _("Suwayomi Manga"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = menu_table,
@@ -303,7 +303,7 @@ function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
 
     options = options or {}
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
-    return getMangaMenu().update(menu, {
+    return getListMenu().update(menu, {
         title = options.title or menu.title,
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = menu_table,
@@ -350,7 +350,7 @@ end
 
 function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
     options = options or {}
-    return getMangaMenu().show{
+    return getListMenu().show{
         title = _("Suwayomi Library"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
@@ -367,7 +367,7 @@ function BrowseUI.updateLibraryMangaMenu(menu, manga_list, onSelectCallback, opt
     end
 
     options = options or {}
-    return getMangaMenu().update(menu, {
+    return getListMenu().update(menu, {
         title = _("Suwayomi Library"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),

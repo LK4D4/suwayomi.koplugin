@@ -59,15 +59,15 @@ describe("suwayomi/ui/browse", function()
             }
         end
 
-        package.preload["suwayomi/ui/manga_menu"] = function()
+        package.preload["suwayomi/ui/list_menu"] = function()
             return {
                 show = function(options)
-                    options.renderer = "manga_menu"
+                    options.renderer = "list_menu"
                     shown_dialog = options
                     return options
                 end,
                 update = function(menu, options)
-                    menu.renderer = "manga_menu"
+                    menu.renderer = "list_menu"
                     menu.updated_options = options
                     menu.item_table = options.item_table
                     menu.title = options.title or menu.title
@@ -91,6 +91,7 @@ describe("suwayomi/ui/browse", function()
         package.preload["ui/widget/menu"] = nil
         package.preload["ui/widget/multiinputdialog"] = nil
         package.preload["ui/uimanager"] = nil
+        package.preload["suwayomi/ui/list_menu"] = nil
         package.preload["suwayomi/ui/manga_menu"] = nil
     end)
 
@@ -109,7 +110,7 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.are.equal("Suwayomi Sources", shown_dialog.title)
-        assert.are.equal("manga_menu", shown_dialog.renderer)
+        assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal("MangaDex", shown_dialog.item_table[1].text)
         assert.are.equal("EN", shown_dialog.item_table[1].subtitle)
         assert.are.equal("18+", shown_dialog.item_table[1].mandatory)
@@ -140,7 +141,7 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
-        assert.are.equal("manga_menu", shown_dialog.renderer)
+        assert.are.equal("list_menu", shown_dialog.renderer)
 
         shown_dialog.close_callback()
 
@@ -323,7 +324,7 @@ describe("suwayomi/ui/browse", function()
             thumbnail_credentials = { server_url = "http://127.0.0.1:4567" },
         })
 
-        assert.are.equal("manga_menu", menu.renderer)
+        assert.are.equal("list_menu", menu.renderer)
         assert.is_true(menu.updated)
         assert.are.equal("ComicK", menu.item_table[1].text)
         assert.are.equal("JA", menu.item_table[1].subtitle)
@@ -356,7 +357,7 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_dialog.title)
-        assert.are.equal("manga_menu", shown_dialog.renderer)
+        assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal("Previous page", shown_dialog.item_table[1].text)
         assert.are.equal("Already Added", shown_dialog.item_table[2].text)
         assert.are.equal("In Library", shown_dialog.item_table[2].mandatory)
@@ -405,7 +406,7 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.are.equal("MangaDex - Popular - Page 2", menu.title)
-        assert.are.equal("manga_menu", menu.renderer)
+        assert.are.equal("list_menu", menu.renderer)
         assert.are.same({ title = "MangaDex - Popular - Page 2", refresh = true }, title_bar_title)
         assert.are.equal("appbar.menu", left_icon)
         assert.is_true(menu.updated)
@@ -440,7 +441,7 @@ describe("suwayomi/ui/browse", function()
         end)
 
         assert.are.equal("Suwayomi Library", shown_dialog.title)
-        assert.are.equal("manga_menu", shown_dialog.renderer)
+        assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal("Sousou no Frieren", shown_dialog.item_table[1].text)
         assert.is_nil(shown_dialog.item_table[1].mandatory)
         shown_dialog.item_table[1].callback()

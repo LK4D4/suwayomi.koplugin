@@ -165,4 +165,56 @@ describe("suwayomi/ui/list_rows", function()
         assert.is_nil(row.mandatory)
         assert.is_true(row.thumbnail_placeholder)
     end)
+
+    it("builds chapter rows with shared text columns and no thumbnail slot", function()
+        local rows = require("suwayomi/ui/list_rows")
+        local chapter = {
+            id = "c1",
+            name = "Chapter 1",
+            menu_text = "Chapter 1",
+            menu_status = "Read · Downloaded",
+            scanlator = "Official",
+        }
+        local selected
+
+        local row = rows.buildChapterRow(chapter, {
+            on_select = function(value)
+                selected = value
+            end,
+        })
+
+        assert.are.equal("Chapter 1", row.text)
+        assert.are.equal("Official", row.subtitle)
+        assert.are.equal("Read · Downloaded", row.mandatory)
+        assert.is_nil(row.thumbnail_url)
+        assert.is_nil(row.thumbnail_placeholder)
+        assert.are.same(chapter, row.chapter)
+
+        row.callback()
+        assert.are.same(chapter, selected)
+    end)
+
+    it("builds chapter menu tables in source order", function()
+        local rows = require("suwayomi/ui/list_rows")
+        local selected = {}
+        local chapters = {
+            { id = "c1", name = "Chapter 1", scanlator = "Official" },
+            { id = "c2", name = "Chapter 2" },
+        }
+
+        local menu_table = rows.buildChapterMenuTable(chapters, {
+            on_select = function(value)
+                table.insert(selected, value.id)
+            end,
+        })
+
+        assert.are.equal("Chapter 1", menu_table[1].text)
+        assert.are.equal("Official", menu_table[1].subtitle)
+        assert.are.equal("Chapter 2", menu_table[2].text)
+        assert.is_nil(menu_table[2].subtitle)
+
+        menu_table[1].callback()
+        menu_table[2].callback()
+        assert.are.same({ "c1", "c2" }, selected)
+    end)
 end)

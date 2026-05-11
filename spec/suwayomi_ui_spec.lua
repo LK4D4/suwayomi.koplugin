@@ -163,17 +163,32 @@ describe("suwayomi/ui", function()
             }
         end
 
-        package.preload["suwayomi/ui/manga_menu"] = function()
+        package.preload["suwayomi/ui/list_menu"] = function()
             return {
                 show = function(options)
-                    options.renderer = "manga_menu"
+                    options.renderer = "list_menu"
+                    options.is_borderless = true
+                    options.is_popout = false
+                    options.title_bar_fm_style = true
+                    options.items_max_lines = 3
+                    options.multilines_show_more_text = true
                     shown_dialog = options
                     return options
                 end,
                 update = function(menu, options)
-                    menu.renderer = "manga_menu"
+                    menu.renderer = "list_menu"
                     menu.item_table = options.item_table
                     menu.title = options.title or menu.title
+                    menu.updated_options = options
+                    if menu.title_bar and menu.title_bar.setTitle and options.title then
+                        menu.title_bar:setTitle(options.title, true)
+                    end
+                    if menu.setTitleBarLeftIcon then
+                        menu:setTitleBarLeftIcon(options.title_bar_left_icon)
+                    end
+                    if menu.updateItems then
+                        menu:updateItems(nil, true)
+                    end
                 end,
             }
         end
@@ -190,6 +205,7 @@ describe("suwayomi/ui", function()
         package.preload["ui/widget/radiomark"] = nil
         package.preload["ui/widget/pathchooser"] = nil
         package.preload["ui/uimanager"] = nil
+        package.preload["suwayomi/ui/list_menu"] = nil
         package.preload["suwayomi/ui/manga_menu"] = nil
     end)
 
@@ -213,7 +229,7 @@ describe("suwayomi/ui", function()
         end)
 
         assert.are.equal("Suwayomi Manga", shown_dialog.title)
-        assert.are.equal("manga_menu", shown_dialog.renderer)
+        assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal("One Piece", shown_dialog.item_table[1].text)
         assert.is_nil(shown_dialog.item_table[1].mandatory)
 
@@ -470,19 +486,9 @@ describe("suwayomi/ui", function()
 
     it("refreshes chapter menus with a dimension recalculation for changed row statuses", function()
         local ui = require("suwayomi/ui")
-        local switched
         local updated = false
         local menu = {
             title = "Old chapters",
-            switchItemTable = function(self, title, item_table, item_number)
-                switched = {
-                    title = title,
-                    item_table = item_table,
-                    item_number = item_number,
-                }
-                self.title = title
-                self.item_table = item_table
-            end,
             updateItems = function()
                 updated = true
             end,
@@ -495,11 +501,10 @@ describe("suwayomi/ui", function()
             },
         })
 
-        assert.is_table(switched)
-        assert.are.equal("New chapters", switched.title)
-        assert.are.equal(-1, switched.item_number)
-        assert.are.equal("Queued", switched.item_table[1].mandatory)
-        assert.is_false(updated)
+        assert.are.equal("list_menu", menu.renderer)
+        assert.are.equal("New chapters", menu.title)
+        assert.are.equal("Queued", menu.item_table[1].mandatory)
+        assert.is_true(updated)
     end)
 
     it("shows the Suwayomi home hub as two-column buttons", function()

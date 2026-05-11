@@ -16,7 +16,7 @@ local _ = require("gettext")
 local BrowseUI = require("suwayomi/ui/browse")
 local DirectoryUI = require("suwayomi/ui/directory")
 local DownloadsUI = require("suwayomi/ui/downloads")
-local ListMenu = require("suwayomi/ui/list_menu")
+local ListRows = require("suwayomi/ui/list_rows")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local SuwayomiUI = {}
@@ -24,6 +24,10 @@ local SuwayomiUI = {}
 local bindMenuCallbacks = menu_utils.bindMenuCallbacks
 local newStateMark = menu_utils.newStateMark
 local getStateMarkWidth = menu_utils.getStateMarkWidth
+
+local function getListMenu()
+    return require("suwayomi/ui/list_menu")
+end
 
 SuwayomiUI.showDirectoryChooser = DirectoryUI.showDirectoryChooser
 
@@ -44,18 +48,9 @@ SuwayomiUI.buildDownloadsMenuTable = DownloadsUI.buildDownloadsMenuTable
 SuwayomiUI.showDownloadsMenu = DownloadsUI.showDownloadsMenu
 
 function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
-    local menu_table = {}
-    for _, chapter in ipairs(chapter_list) do
-        table.insert(menu_table, {
-            text = chapter.menu_text or chapter.name,
-            mandatory = chapter.menu_status,
-            chapter = chapter,
-            callback = function()
-                if onSelectCallback then onSelectCallback(chapter) end
-            end
-        })
-    end
-    return menu_table
+    return ListRows.buildChapterMenuTable(chapter_list, {
+        on_select = onSelectCallback,
+    })
 end
 
 function SuwayomiUI.showSettingsMenu(items)
@@ -82,7 +77,8 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
         item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback),
         close_callback = options.close_callback,
     }
-    local menu = ListMenu.new(menu_utils.applyNativeTitleBarStyle(menu_options))
+    menu_options.on_title_bar_left_tap = options.on_title_bar_left_tap
+    local menu = getListMenu().show(menu_options)
     if options.on_title_bar_left_tap then
         menu.onLeftButtonTap = function(...)
             return options.on_title_bar_left_tap(menu, ...)
@@ -102,8 +98,6 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
             return true
         end
     end
-    local UIManager = require("ui/uimanager")
-    UIManager:show(menu)
     return menu
 end
 
@@ -265,14 +259,6 @@ function SuwayomiUI.updateChapterMenu(menu, options, onSelectCallback, onHoldCal
     end
 
     local item_table = SuwayomiUI.buildChapterMenuTable(options.chapters or {}, onSelectCallback)
-    menu.item_table = item_table
-    menu.title = options.title or menu.title
-    if menu.title_bar and options.title then
-        menu.title_bar:setTitle(options.title, true)
-    end
-    if options.title_bar_left_icon and menu.setTitleBarLeftIcon then
-        menu:setTitleBarLeftIcon(options.title_bar_left_icon)
-    end
     if options.on_title_bar_left_tap then
         menu.onLeftButtonTap = function(...)
             return options.on_title_bar_left_tap(menu, ...)
@@ -286,13 +272,12 @@ function SuwayomiUI.updateChapterMenu(menu, options, onSelectCallback, onHoldCal
             return true
         end
     end
-    if menu.switchItemTable then
-        menu:switchItemTable(options.title or menu.title, item_table, -1)
-        return
-    end
-    if menu.updateItems then
-        menu:updateItems(nil, true)
-    end
+    return getListMenu().update(menu, {
+        title = options.title or menu.title,
+        title_bar_left_icon = options.title_bar_left_icon,
+        item_table = item_table,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+    })
 end
 
 function SuwayomiUI.buildLanguageMenuTable(options, onToggleCallback)

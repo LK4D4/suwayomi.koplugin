@@ -10,6 +10,7 @@ describe("suwayomi/ui/manga_menu", function()
     local function clearModules()
         for _, name in ipairs({
             "suwayomi/ui/manga_menu",
+            "suwayomi/ui/list_menu",
             "ui/bidi",
             "ffi/blitbuffer",
             "ui/widget/container/centercontainer",
@@ -365,11 +366,52 @@ describe("suwayomi/ui/manga_menu", function()
         local saw_metadata = false
         for _, widget in ipairs(textboxes) do
             if widget.text == "A long manga title" then
-                saw_title = widget.bold == true and widget.face.name == "cfont" and widget.face.size == 19
+                saw_title = widget.bold ~= true and widget.face.name == "cfont" and widget.face.size == 19
             elseif widget.text == "MangaDex" then
                 saw_subtitle = widget.face.name == "cfont" and widget.face.size == 17
             elseif widget.text == "12 chapters" then
                 saw_metadata = widget.face.name == "cfont" and widget.face.size == 13
+            end
+        end
+        assert.is_true(saw_title)
+        assert.is_true(saw_subtitle)
+        assert.is_true(saw_metadata)
+    end)
+
+    it("renders chapter rows with the shared row widget and no thumbnail gutter", function()
+        local list_menu = require("suwayomi/ui/list_menu")
+
+        local menu = list_menu.show{
+            title = "Chapters",
+            item_table = {
+                {
+                    text = "Chapter 1",
+                    subtitle = "Official",
+                    mandatory = "Read · Downloaded",
+                    chapter = { id = "c1" },
+                },
+            },
+        }
+
+        local row_group = menu.item_group[1][1][1]
+        local left_padding = row_group[1]
+        assert.are.equal("horizontal_group", row_group.kind)
+        assert.are.equal("horizontal_span", left_padding.kind)
+        assert.are.equal(0, left_padding.width)
+        assert.is_nil(findWidgetByKind(menu.item_group[1], "text"))
+        assert.are.equal(0, #started_jobs)
+
+        local textboxes = collectWidgetsByKind(menu.item_group[1], "textbox")
+        local saw_title = false
+        local saw_subtitle = false
+        local saw_metadata = false
+        for _, widget in ipairs(textboxes) do
+            if widget.text == "Chapter 1" then
+                saw_title = widget.face.name == "cfont"
+            elseif widget.text == "Official" then
+                saw_subtitle = widget.face.name == "cfont"
+            elseif widget.text == "Read · Downloaded" then
+                saw_metadata = widget.face.name == "cfont"
             end
         end
         assert.is_true(saw_title)
