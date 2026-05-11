@@ -102,9 +102,9 @@ describe("suwayomi/ui/thumbnail_cache", function()
 
         local path = cache.getPath({
             server_url = "https://suwayomi.example",
-        }, "/api/v1/manga/123/thumbnail", "image/webp")
+        }, "/api/v1/manga/123/thumbnail", "image/png")
 
-        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.webp$", path)
+        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.png$", path)
         assert.are.equal(16, cache.getKey({
             server_url = "https://suwayomi.example",
         }, "/api/v1/manga/123/thumbnail"):len())
@@ -123,5 +123,17 @@ describe("suwayomi/ui/thumbnail_cache", function()
         assert.are.equal("PNGDATA", written_files[path].body)
         assert.is_true(directories["/settings/suwayomi_dl_thumbnails"])
         assert.are.same({}, removed_files)
+    end)
+
+    it("does not reuse stale unsupported WebP thumbnails", function()
+        local cache = require("suwayomi/ui/thumbnail_cache")
+        local credentials = { server_url = "https://suwayomi.example" }
+        local webp_path = cache.getPath(credentials, "/cover.webp", "image/webp")
+        written_files[webp_path] = {
+            mode = "wb",
+            body = "WEBPDATA",
+        }
+
+        assert.is_nil(cache.find(credentials, "/cover.webp"))
     end)
 end)

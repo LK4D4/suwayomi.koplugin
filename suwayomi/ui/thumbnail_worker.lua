@@ -20,7 +20,6 @@ local SUPPORTED_IMAGE_TYPES = {
     ["image/jpg"] = true,
     ["image/png"] = true,
     ["image/svg+xml"] = true,
-    ["image/webp"] = true,
 }
 
 local EXTENSION_IMAGE_TYPES = {
@@ -29,7 +28,6 @@ local EXTENSION_IMAGE_TYPES = {
     jpg = "image/jpeg",
     png = "image/png",
     svg = "image/svg+xml",
-    webp = "image/webp",
 }
 
 local function normalizeContentType(content_type)

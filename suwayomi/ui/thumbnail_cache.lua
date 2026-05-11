@@ -14,7 +14,7 @@ local lfs = require("lfs")
 local ThumbnailCache = {}
 
 local CACHE_DIR_NAME = "suwayomi_dl_thumbnails"
-local KNOWN_EXTENSIONS = { "jpg", "jpeg", "png", "webp", "gif", "svg" }
+local KNOWN_EXTENSIONS = { "jpg", "jpeg", "png", "gif", "svg" }
 
 local function rollingHash(text, seed, multiplier)
     local hash = seed

@@ -105,6 +105,26 @@ describe("suwayomi/ui/thumbnail_worker", function()
         assert.are.same(result, written_results["/tmp/result.json"])
     end)
 
+    it("rejects WebP thumbnails before they reach KOReader image rendering", function()
+        api.downloadBinary = function()
+            return {
+                ok = true,
+                body = "webp bytes",
+                content_type = "image/webp",
+            }
+        end
+        cache.write = function()
+            error("cache.write should not be called")
+        end
+
+        local worker = require("suwayomi/ui/thumbnail_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, "/thumb.webp", "/tmp/result.json")
+
+        assert.is_false(result.ok)
+        assert.are.equal("Unsupported thumbnail image type.", result.error)
+        assert.are.same(result, written_results["/tmp/result.json"])
+    end)
+
     it("rejects oversized thumbnail responses", function()
         api.downloadBinary = function()
             return {

@@ -250,6 +250,9 @@ function MangaMenu.prepareThumbnail(menu, item)
     end
     item.thumbnail_path = item.thumbnail_path
         or ThumbnailCache.find(menu._suwayomi_thumbnail_credentials, item.thumbnail_url)
+    if item.thumbnail_path then
+        item.thumbnail_failed = nil
+    end
 end
 
 local function getThumbnailKey(credentials, thumbnail_url)
@@ -264,6 +267,9 @@ local function markThumbnailResult(menu, thumbnail_key, path)
             item.thumbnail_loading = nil
             if path then
                 item.thumbnail_path = path
+                item.thumbnail_failed = nil
+            else
+                item.thumbnail_failed = true
             end
         end
     end
@@ -276,6 +282,7 @@ function MangaMenu.startThumbnailJob(menu, item)
     if not item.thumbnail_url
         or item.thumbnail_path
         or item.thumbnail_loading
+        or item.thumbnail_failed
         or (menu._suwayomi_thumbnail_active and menu._suwayomi_thumbnail_active[thumbnail_key])
         or not credentials
         or not credentials.server_url
@@ -396,6 +403,7 @@ end
 local function cancelThumbnailJobs(menu)
     for _, item in ipairs(menu.item_table or {}) do
         item.thumbnail_loading = nil
+        item.thumbnail_failed = nil
     end
     for _, active in pairs(menu._suwayomi_thumbnail_active or {}) do
         if SubprocessJob.cancel then

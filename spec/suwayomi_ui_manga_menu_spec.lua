@@ -340,6 +340,22 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_nil(menu.item_table[1].thumbnail_path)
     end)
 
+    it("does not retry thumbnails that finish with a worker failure", function()
+        local manga_menu = require("suwayomi/ui/manga_menu")
+        local menu = manga_menu.show{
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            item_table = {
+                { text = "Remote", manga = { id = "remote" }, thumbnail_url = "/remote.webp" },
+            },
+        }
+        local failed_job = started_jobs[1]
+
+        failed_job.on_finish(failed_job, { ok = false, error = "Unsupported thumbnail image type." })
+
+        assert.is_true(menu.item_table[1].thumbnail_failed)
+        assert.are.equal(1, #started_jobs)
+    end)
+
     it("cancels active thumbnail jobs on close", function()
         local manga_menu = require("suwayomi/ui/manga_menu")
         local menu = manga_menu.show{
