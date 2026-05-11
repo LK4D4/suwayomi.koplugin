@@ -39,6 +39,7 @@ describe("suwayomi/api/queries", function()
         }))
 
         assert.truthy(payload.query:match("fetchSourceManga"))
+        assert.truthy(payload.query:match("chapters%s*{%s*totalCount%s*}"))
         assert.are.equal("2499283573021220255", payload.variables.input.source)
         assert.are.equal(2, payload.variables.input.page)
         assert.are.equal("SEARCH", payload.variables.input.type)

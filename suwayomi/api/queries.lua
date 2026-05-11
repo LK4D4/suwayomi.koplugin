@@ -45,7 +45,7 @@ function Queries._buildMangaQuery(options)
     end
 
     return json.encode({
-        query = "mutation GET_SOURCE_MANGAS_FETCH($input: FetchSourceMangaInput!) { fetchSourceManga(input: $input) { hasNextPage mangas { id title inLibrary initialized thumbnailUrl source { id displayName name lang } } } }",
+        query = "mutation GET_SOURCE_MANGAS_FETCH($input: FetchSourceMangaInput!) { fetchSourceManga(input: $input) { hasNextPage mangas { id title inLibrary initialized thumbnailUrl chapters { totalCount } source { id displayName name lang } } } }",
         variables = {
             input = input,
         },

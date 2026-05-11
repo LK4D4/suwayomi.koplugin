@@ -62,6 +62,9 @@ local function parseMangaNode(entry)
     if entry.thumbnailUrl ~= nil then
         manga.thumbnail_url = entry.thumbnailUrl
     end
+    if type(entry.chapters) == "table" and entry.chapters.totalCount ~= nil then
+        manga.chapter_count = tonumber(entry.chapters.totalCount) or 0
+    end
 
     local source = parseSource(entry.source)
     if source then

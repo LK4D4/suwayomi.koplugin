@@ -37,6 +37,7 @@ describe("suwayomi/api/parsers", function()
         local manga, has_next_page = parsers.parseMangaResponse([[
             { "data": { "fetchSourceManga": { "hasNextPage": true, "mangas": [
                 { "id": 17, "title": "Frieren", "inLibrary": true, "initialized": true,
+                  "chapters": { "totalCount": 42 },
                   "source": { "id": "local", "displayName": "Local Source", "name": "Local Source", "lang": "localsourcelang" } }
             ] } } }
         ]])
@@ -44,6 +45,7 @@ describe("suwayomi/api/parsers", function()
         assert.are.equal("17", manga[1].id)
         assert.are.equal("Frieren", manga[1].title)
         assert.are.equal(true, manga[1].in_library)
+        assert.are.equal(42, manga[1].chapter_count)
         assert.are.equal("local", manga[1].source.id)
 
         local library = assert(parsers.parseLibraryMangaResponse([[

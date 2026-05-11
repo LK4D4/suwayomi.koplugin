@@ -33,6 +33,20 @@ describe("suwayomi/ui/manga_rows", function()
         }))
     end)
 
+    it("shows chapter count in the status column", function()
+        local rows = require("suwayomi/ui/manga_rows")
+
+        assert.are.equal("12 chapters", rows.getMandatory({ chapter_count = 12 }))
+        assert.are.equal("1 chapter", rows.getMandatory({ chapter_count = 1 }))
+        assert.are.equal("0 chapters", rows.getMandatory({ chapter_count = 0 }))
+        assert.are.equal("In Library · 12 chapters", rows.getMandatory({
+            in_library = true,
+            chapter_count = 12,
+        }, {
+            show_in_library = true,
+        }))
+    end)
+
     it("builds rows without mutating manga tables", function()
         local rows = require("suwayomi/ui/manga_rows")
         local manga = { id = "m1", title = "Frieren", in_library = true }

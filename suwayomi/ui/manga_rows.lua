@@ -11,6 +11,17 @@ local _ = require("gettext")
 
 local MangaRows = {}
 
+local function formatChapterCount(count)
+    count = tonumber(count)
+    if not count then
+        return nil
+    end
+    if count == 1 then
+        return "1 " .. _("chapter")
+    end
+    return tostring(count) .. " " .. _("chapters")
+end
+
 function MangaRows.getTitle(manga)
     if type(manga) ~= "table" then
         return ""
@@ -26,10 +37,20 @@ end
 
 function MangaRows.getMandatory(manga, options)
     options = options or {}
+    local labels = {}
     if options.show_in_library == true and type(manga) == "table" and manga.in_library == true then
-        return _("In Library")
+        table.insert(labels, _("In Library"))
     end
-    return nil
+    if type(manga) == "table" then
+        local chapter_count = formatChapterCount(manga.chapter_count)
+        if chapter_count then
+            table.insert(labels, chapter_count)
+        end
+    end
+    if #labels == 0 then
+        return nil
+    end
+    return table.concat(labels, _(" · "))
 end
 
 function MangaRows.buildRow(manga, options)
