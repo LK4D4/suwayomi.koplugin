@@ -20,7 +20,7 @@ describe("suwayomi/api/queries", function()
     it("builds the sources queries", function()
         local query = queries._buildSourcesQuery()
         assert.truthy(query:match("query getSources"))
-        assert.truthy(query:match("sources { nodes { id name displayName lang isNsfw supportsLatest } }"))
+        assert.truthy(query:match("sources { nodes { id name displayName lang iconUrl isNsfw supportsLatest } }"))
 
         local legacy_query = queries._buildLegacySourcesQuery()
         assert.truthy(legacy_query:match("query getSources"))

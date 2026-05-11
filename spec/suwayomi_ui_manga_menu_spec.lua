@@ -403,6 +403,29 @@ describe("suwayomi/ui/manga_menu", function()
         assert.are.equal(1, dirty_count)
     end)
 
+    it("renders source rows with thumbnail placeholders and remote icon jobs", function()
+        local manga_menu = require("suwayomi/ui/manga_menu")
+
+        local menu = manga_menu.show{
+            title = "Sources",
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            item_table = {
+                {
+                    text = "MangaDex",
+                    subtitle = "EN",
+                    mandatory = "18+",
+                    source = { id = "s1" },
+                    thumbnail_placeholder = true,
+                    thumbnail_url = "/icons/mangadex.png",
+                },
+            },
+        }
+
+        assert.is_not_nil(findWidgetByKind(menu.item_group[1], "text"))
+        assert.are.equal(1, #started_jobs)
+        assert.are.equal("/icons/mangadex.png", started_jobs[1].thumbnail_url)
+    end)
+
     it("renders decoded cached thumbnails as in-memory images", function()
         local decoded_image = { kind = "decoded_bitmap" }
         cache_paths["/cached.webp"] = "/settings/cached.bb"

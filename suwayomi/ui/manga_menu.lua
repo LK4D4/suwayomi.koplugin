@@ -130,7 +130,7 @@ function MangaMenuItem:init()
 end
 
 function MangaMenuItem:buildThumbnail(slot_size)
-    if not self.entry.manga then
+    if not self.entry.thumbnail_placeholder and not self.entry.thumbnail_url and not self.entry.thumbnail_path then
         return HorizontalSpan:new{ width = 0 }
     end
 
@@ -179,11 +179,12 @@ function MangaMenuItem:buildThumbnail(slot_size)
 end
 
 function MangaMenuItem:buildRowWidget(width, height)
+    local has_thumbnail = self.entry.thumbnail_placeholder or self.entry.thumbnail_url or self.entry.thumbnail_path
     local is_manga_row = self.entry.manga ~= nil
-    local left_padding = is_manga_row and 0 or scaled(10)
+    local left_padding = has_thumbnail and 0 or scaled(10)
     local right_padding = scaled(10)
-    local thumbnail_slot = is_manga_row and math.max(1, height) or 0
-    local gap = is_manga_row and scaled(5) or 0
+    local thumbnail_slot = has_thumbnail and math.max(1, height) or 0
+    local gap = has_thumbnail and scaled(5) or 0
     local inner_width = width - left_padding - right_padding
     local mandatory_widget
     local mandatory_width = 0
@@ -238,7 +239,7 @@ function MangaMenuItem:buildRowWidget(width, height)
     local title_items = {
         self:buildThumbnail(thumbnail_slot),
     }
-    if is_manga_row then
+    if has_thumbnail then
         table.insert(title_items, HorizontalSpan:new{ width = gap })
     end
     table.insert(title_items, text_column)

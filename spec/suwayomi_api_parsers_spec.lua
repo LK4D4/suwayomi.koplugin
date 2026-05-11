@@ -13,13 +13,14 @@ describe("suwayomi/api/parsers", function()
     it("parses sources and detects optional metadata schema errors", function()
         local sources = assert(parsers.parseSourcesResponse([[
             { "data": { "sources": { "nodes": [
-                { "id": "local", "name": "Local Source", "displayName": "Local Source", "lang": "localsourcelang", "isNsfw": false, "supportsLatest": true },
+                { "id": "local", "name": "Local Source", "displayName": "Local Source", "lang": "localsourcelang", "iconUrl": "/icons/local.png", "isNsfw": false, "supportsLatest": true },
                 { "id": 42, "name": "MangaDex", "lang": "en" }
             ] } } }
         ]]))
 
         assert.are.equal("local", sources[1].id)
         assert.are.equal("Local Source", sources[1].name)
+        assert.are.equal("/icons/local.png", sources[1].icon_url)
         assert.are.equal(false, sources[1].is_nsfw)
         assert.are.equal(true, sources[1].supports_latest)
         assert.are.equal("42", sources[2].id)
@@ -27,6 +28,9 @@ describe("suwayomi/api/parsers", function()
 
         assert.is_true(parsers.isOptionalSourceMetadataFieldError([[
             { "errors": [ { "message": "Cannot query field \"isNsfw\" on type \"Source\"" } ] }
+        ]]))
+        assert.is_true(parsers.isOptionalSourceMetadataFieldError([[
+            { "errors": [ { "message": "Cannot query field \"iconUrl\" on type \"Source\"" } ] }
         ]]))
         assert.is_false(parsers.isOptionalSourceMetadataFieldError([[
             { "errors": [ { "message": "Authentication failed" } ] }

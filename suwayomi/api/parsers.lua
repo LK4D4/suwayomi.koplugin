@@ -110,6 +110,7 @@ function Parsers.parseSourcesResponse(response_body)
             display_name = source.displayName,
             raw_name = source.name,
             lang = source.lang,
+            icon_url = source.iconUrl,
             is_nsfw = source.isNsfw,
             supports_latest = source.supportsLatest,
         })
@@ -126,7 +127,9 @@ function Parsers.isOptionalSourceMetadataFieldError(response_body)
 
     for _, graph_error in ipairs(payload.errors) do
         local message = tostring(graph_error and graph_error.message or "")
-        local mentions_optional_field = message:match("isNsfw") or message:match("supportsLatest")
+        local mentions_optional_field = message:match("iconUrl")
+            or message:match("isNsfw")
+            or message:match("supportsLatest")
         local looks_like_schema_error = message:match("Cannot query field")
             or message:match("Unknown field")
             or message:match("FieldUndefined")

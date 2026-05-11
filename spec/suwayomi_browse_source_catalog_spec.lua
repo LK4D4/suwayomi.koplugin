@@ -199,6 +199,7 @@ describe("suwayomi/browse/source_catalog", function()
 
         assert.are.equal("https://suwayomi.example", settings_calls.saved_cache.server_url)
         assert.are.same({ "english" }, { ui_calls.shown.sources[1].id })
+        assert.are.same({ server_url = "https://suwayomi.example" }, ui_calls.shown.options.thumbnail_credentials)
         assert.are.equal("sources_loaded", debug_logs[1].event)
         assert.are.equal(2, debug_logs[1].source_count)
         assert.are.equal(1, debug_logs[1].filtered_source_count)
@@ -225,10 +226,13 @@ describe("suwayomi/browse/source_catalog", function()
                 { id = "spanish", lang = "es" },
             },
             updated_at = os.time() - 5,
+        }, {
+            credentials = { server_url = "https://suwayomi.example" },
         })
 
         assert.is_true(rendered)
         assert.are.equal("english", ui_calls.shown.sources[1].id)
+        assert.are.same({ server_url = "https://suwayomi.example" }, ui_calls.shown.options.thumbnail_credentials)
         assert.are.equal("source_cache_hit", debug_logs[1].event)
     end)
 
@@ -251,7 +255,9 @@ describe("suwayomi/browse/source_catalog", function()
         local controller = buildController(catalog)
         controller.current_sources_menu = { kind = "existing-menu" }
 
-        local menu = controller:showSourceList({ { id = "english", lang = "en" } })
+        local menu = controller:showSourceList({ { id = "english", lang = "en" } }, {
+            credentials = { server_url = "https://suwayomi.example" },
+        })
         local search_result = controller.title_menu_options.onSelect(controller.title_menu_options.actions[1])
         local manga_result = controller:showMangaForSource({ id = "english" })
 
@@ -259,6 +265,7 @@ describe("suwayomi/browse/source_catalog", function()
         assert.are.equal("Suwayomi Sources", controller.title_menu_options.title)
         assert.are.equal("global_search", controller.title_menu_options.actions[1].id)
         assert.are.equal("appbar.menu", ui_calls.updated.options.title_bar_left_icon)
+        assert.are.same({ server_url = "https://suwayomi.example" }, ui_calls.updated.options.thumbnail_credentials)
         assert.is_nil(ui_calls.updated.options.on_global_search)
         assert.are.equal("global-search", search_result)
         assert.are.equal("manga-for-source", manga_result)

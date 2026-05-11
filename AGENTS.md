@@ -60,8 +60,8 @@
   - `suwayomi/api/queries.lua`, `suwayomi/api/parsers.lua`, `suwayomi/api/transport.lua`: GraphQL payload builders, defensive response parsing, and HTTP/auth/URL handling.
   - `suwayomi/client.lua`: Library/Browse orchestration that is not KOReader lifecycle glue.
   - `suwayomi/ui.lua`: public KOReader UI facade.
-  - `suwayomi/ui/browse.lua`, `suwayomi/ui/manga_menu.lua`, `suwayomi/ui/downloads.lua`, `suwayomi/ui/directory.lua`, `suwayomi/ui/menu_utils.lua`: Browse/Library manga menus, Downloads menus, directory picking, and shared menu plumbing.
-  - `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua`: private manga thumbnail cache paths and subprocess thumbnail fetches.
+  - `suwayomi/ui/browse.lua`, `suwayomi/ui/list_rows.lua`, `suwayomi/ui/manga_menu.lua`, `suwayomi/ui/downloads.lua`, `suwayomi/ui/directory.lua`, `suwayomi/ui/menu_utils.lua`: Browse/Library manga and source menus, shared list-row formatting, Downloads menus, directory picking, and shared menu plumbing.
+  - `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua`: private manga/source thumbnail cache paths and subprocess thumbnail fetches.
   - `suwayomi/settings.lua`, `suwayomi/paths.lua`, `suwayomi/debug.lua`: settings, source-scoped path layout, and debug logging.
   - `suwayomi/downloads/queue.lua`: public download queue facade, enqueue/retry/cancel/recovery/snapshot/status APIs.
   - `suwayomi/downloads/active_jobs.lua`: bounded active chapter jobs, subprocess launch, polling, watchdog handling, and replacement scheduling.

@@ -20,7 +20,7 @@ end
 
 function Queries._buildSourcesQuery()
     return json.encode({
-        query = "query getSources { sources { nodes { id name displayName lang isNsfw supportsLatest } } }",
+        query = "query getSources { sources { nodes { id name displayName lang iconUrl isNsfw supportsLatest } } }",
     })
 end
 

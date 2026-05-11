@@ -126,7 +126,7 @@ function Methods:browseSuwayomi()
         self:schedulePendingReadSync(credentials)
 
         local cache = self:loadSourceCache(credentials)
-        if cache and #(cache.sources or {}) > 0 and self:showCachedSources(cache) then
+        if cache and #(cache.sources or {}) > 0 and self:showCachedSources(cache, { credentials = credentials }) then
             self:scheduleSourceCacheRefresh(credentials)
             return
         end

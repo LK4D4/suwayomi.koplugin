@@ -94,30 +94,37 @@ describe("suwayomi/ui/browse", function()
         package.preload["suwayomi/ui/manga_menu"] = nil
     end)
 
-    it("shows a sources menu with source callbacks and no global search row", function()
+    it("shows a sources menu with source thumbnails, metadata, callbacks, and no global search row", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}
 
         browse.showSourcesMenu({
-            { id = "s1", name = "MangaDex" },
-            { id = "s2", name = "ComicK" },
+            { id = "s1", name = "MangaDex", lang = "en", icon_url = "/icons/md.png", is_nsfw = true },
+            { id = "s2", name = "ComicK", lang = "ja", icon_url = "/icons/ck.png" },
         }, function(source)
             table.insert(selected, source)
         end, {
             on_global_search = function() end,
+            thumbnail_credentials = { server_url = "http://127.0.0.1:4567" },
         })
 
         assert.are.equal("Suwayomi Sources", shown_dialog.title)
+        assert.are.equal("manga_menu", shown_dialog.renderer)
         assert.are.equal("MangaDex", shown_dialog.item_table[1].text)
+        assert.are.equal("EN", shown_dialog.item_table[1].subtitle)
+        assert.are.equal("18+", shown_dialog.item_table[1].mandatory)
+        assert.are.equal("/icons/md.png", shown_dialog.item_table[1].thumbnail_url)
+        assert.are.same({ server_url = "http://127.0.0.1:4567" }, shown_dialog.thumbnail_credentials)
         assert.are.equal("ComicK", shown_dialog.item_table[2].text)
+        assert.are.equal("JA", shown_dialog.item_table[2].subtitle)
         assert.is_nil(shown_dialog.item_table[3])
 
         shown_dialog.item_table[1].callback()
         shown_dialog.item_table[2].callback()
 
         assert.are.same({
-            { id = "s1", name = "MangaDex" },
-            { id = "s2", name = "ComicK" },
+            { id = "s1", name = "MangaDex", lang = "en", icon_url = "/icons/md.png", is_nsfw = true },
+            { id = "s2", name = "ComicK", lang = "ja", icon_url = "/icons/ck.png" },
         }, selected)
     end)
 
@@ -133,7 +140,7 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
-        assert.is_true(shown_dialog.title_bar_fm_style)
+        assert.are.equal("manga_menu", shown_dialog.renderer)
 
         shown_dialog.close_callback()
 
@@ -296,6 +303,35 @@ describe("suwayomi/ui/browse", function()
 
         assert.is_false(canceled)
         assert.are.equal("s1", selected[1].source.id)
+    end)
+
+    it("updates source rows in place", function()
+        local browse = require("suwayomi/ui/browse")
+        local selected
+        local menu = {
+            title = "Suwayomi Sources",
+            updateItems = function(self)
+                self.updated = true
+            end,
+        }
+
+        browse.updateSourcesMenu(menu, {
+            { id = "s2", name = "ComicK", lang = "ja", icon_url = "/icons/ck.png" },
+        }, function(source)
+            selected = source
+        end, {
+            thumbnail_credentials = { server_url = "http://127.0.0.1:4567" },
+        })
+
+        assert.are.equal("manga_menu", menu.renderer)
+        assert.is_true(menu.updated)
+        assert.are.equal("ComicK", menu.item_table[1].text)
+        assert.are.equal("JA", menu.item_table[1].subtitle)
+        assert.are.equal("/icons/ck.png", menu.item_table[1].thumbnail_url)
+        assert.are.same({ server_url = "http://127.0.0.1:4567" }, menu.updated_options.thumbnail_credentials)
+
+        menu.item_table[1].callback()
+        assert.are.equal("s2", selected.id)
     end)
 
     it("shows compact browse result library status, title, and paging rows", function()

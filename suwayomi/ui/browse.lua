@@ -10,7 +10,7 @@
 local Menu = require("ui/widget/menu")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local _ = require("gettext")
-local MangaRows = require("suwayomi/ui/manga_rows")
+local ListRows = require("suwayomi/ui/list_rows")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local BrowseUI = {}
@@ -24,31 +24,24 @@ local function newPluginMenu(options)
 end
 
 function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
-    local menu_table = {}
     options = options or {}
     if type(onSelectCallback) == "table" then
         options = onSelectCallback
         onSelectCallback = options.onSelect
     end
-    for _, source in ipairs(sources) do
-        table.insert(menu_table, {
-            text = source.name,
-            callback = function()
-                if onSelectCallback then onSelectCallback(source) end
-            end
-        })
-    end
 
-    local menu = newPluginMenu{
+    return getMangaMenu().show{
         title = _("Suwayomi Sources"),
         title_bar_left_icon = options and options.title_bar_left_icon,
-        item_table = menu_table,
+        item_table = ListRows.buildSourceMenuTable(sources, {
+            show_language = true,
+            on_select = onSelectCallback,
+        }),
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+        thumbnail_credentials = options.thumbnail_credentials,
     }
-    menu_utils.applyTitleBarOptions(menu, options)
-    menu_utils.applyCloseCallback(menu, options)
-    local UIManager = require("ui/uimanager")
-    UIManager:show(menu)
-    return menu
 end
 
 function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
@@ -173,20 +166,18 @@ function BrowseUI.updateSourcesMenu(menu, sources, onSelectCallback, options)
         return
     end
 
-    local menu_table = {}
-    for _, source in ipairs(sources or {}) do
-        table.insert(menu_table, {
-            text = source.name,
-            callback = function()
-                if onSelectCallback then onSelectCallback(source) end
-            end
-        })
-    end
-    menu.item_table = menu_table
-    menu_utils.applyTitleBarOptions(menu, options)
-    if menu.updateItems then
-        menu:updateItems()
-    end
+    return getMangaMenu().update(menu, {
+        title = _("Suwayomi Sources"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = ListRows.buildSourceMenuTable(sources, {
+            show_language = true,
+            on_select = onSelectCallback,
+        }),
+        close_callback = options and options.close_callback,
+        on_title_bar_left_tap = options and options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options and options.on_title_bar_left_hold,
+        thumbnail_credentials = options and options.thumbnail_credentials,
+    })
 end
 
 local function getSourceRowName(source)
@@ -276,7 +267,7 @@ local function buildMangaMenuTable(manga_list, onSelectCallback, options)
             callback = options.on_previous_page,
         })
     end
-    for _, row in ipairs(MangaRows.buildMenuTable(manga_list, {
+    for _, row in ipairs(ListRows.buildMangaMenuTable(manga_list, {
         show_in_library = true,
         on_select = onSelectCallback,
     })) do
@@ -351,7 +342,7 @@ function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
 end
 
 local function buildLibraryMangaMenuTable(manga_list, onSelectCallback)
-    return MangaRows.buildMenuTable(manga_list, {
+    return ListRows.buildMangaMenuTable(manga_list, {
         show_in_library = false,
         on_select = onSelectCallback,
     })

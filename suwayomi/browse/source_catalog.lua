@@ -96,6 +96,7 @@ function Methods:showSourceList(sources, options)
                 self.current_sources_menu = nil
             end
         end
+        menu_options.thumbnail_credentials = options.credentials
         return menu_options
     end
 
@@ -148,12 +149,15 @@ function Methods:showFetchedSources(result, options)
         return
     end
 
-    self:showSourceList(filtered_sources)
+    self:showSourceList(filtered_sources, {
+        credentials = options.credentials,
+    })
 end
 
 
-function Methods:showCachedSources(cache)
+function Methods:showCachedSources(cache, options)
     local SuwayomiDebug = getDebug()
+    options = options or {}
     local filtered_sources = self:filterSourcesByLanguage(cache and cache.sources or {})
     SuwayomiDebug.log({
         operation = "browseSuwayomi",
@@ -166,7 +170,10 @@ function Methods:showCachedSources(cache)
         return false
     end
 
-    self:showSourceList(filtered_sources, { force_new = true })
+    self:showSourceList(filtered_sources, {
+        credentials = options.credentials,
+        force_new = true,
+    })
     return true
 end
 
