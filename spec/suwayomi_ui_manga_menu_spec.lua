@@ -397,7 +397,7 @@ describe("suwayomi/ui/manga_menu", function()
         local left_padding = row_group[1]
         assert.are.equal("horizontal_group", row_group.kind)
         assert.are.equal("horizontal_span", left_padding.kind)
-        assert.are.equal(0, left_padding.width)
+        assert.are.equal(10, left_padding.width)
         assert.is_nil(findWidgetByKind(menu.item_group[1], "text"))
         assert.are.equal(0, #started_jobs)
 

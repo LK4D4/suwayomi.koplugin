@@ -188,7 +188,7 @@ end
 
 function ListMenuItem:buildRowWidget(width, height)
     local has_thumbnail = self.entry.thumbnail_placeholder or self.entry.thumbnail_url or self.entry.thumbnail_path
-    local left_padding = 0
+    local left_padding = has_thumbnail and 0 or scaled(10)
     local right_padding = scaled(10)
     local thumbnail_slot = has_thumbnail and math.max(1, height) or 0
     local gap = has_thumbnail and scaled(5) or 0
