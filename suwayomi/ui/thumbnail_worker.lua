@@ -12,7 +12,7 @@ local SubprocessJob = require("suwayomi/subprocess/job")
 local ThumbnailCache = require("suwayomi/ui/thumbnail_cache")
 
 local ThumbnailWorker = {}
-ThumbnailWorker.MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
+ThumbnailWorker.MAX_THUMBNAIL_BYTES = ThumbnailCache.MAX_THUMBNAIL_BYTES or 2 * 1024 * 1024
 ThumbnailWorker.DECODED_THUMBNAIL_SIZE = 96
 
 local SUPPORTED_IMAGE_TYPES = {

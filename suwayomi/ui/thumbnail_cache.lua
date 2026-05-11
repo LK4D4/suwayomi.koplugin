@@ -12,6 +12,7 @@ local FFIUtil = require("ffi/util")
 local lfs = require("lfs")
 
 local ThumbnailCache = {}
+ThumbnailCache.MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
 
 local CACHE_DIR_NAME = "suwayomi_dl_thumbnails"
 local DECODED_EXTENSION = "bb"
@@ -109,6 +110,11 @@ function ThumbnailCache.find(credentials, thumbnail_url)
     for _, extension in ipairs(KNOWN_EXTENSIONS) do
         local path = FFIUtil.joinPath(cache_dir, key .. "." .. extension)
         if lfs.attributes(path, "mode") == "file" then
+            local size = tonumber(lfs.attributes(path, "size"))
+            if size and size > ThumbnailCache.MAX_THUMBNAIL_BYTES then
+                os.remove(path)
+                return nil
+            end
             return path
         end
     end

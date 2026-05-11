@@ -31,8 +31,13 @@ describe("suwayomi/ui/thumbnail_cache", function()
                     if attr == "mode" and directories[path] then
                         return "directory"
                     end
-                    if attr == "mode" and written_files[path] then
-                        return "file"
+                    if written_files[path] then
+                        if attr == "mode" then
+                            return "file"
+                        end
+                        if attr == "size" then
+                            return written_files[path].size or #(written_files[path].body or "")
+                        end
                     end
                     return nil
                 end,
@@ -155,6 +160,20 @@ describe("suwayomi/ui/thumbnail_cache", function()
         }
 
         assert.is_nil(cache.find(credentials, "/cover.webp"))
+    end)
+
+    it("removes oversized cached thumbnails instead of returning them to the UI", function()
+        local cache = require("suwayomi/ui/thumbnail_cache")
+        local credentials = { server_url = "https://suwayomi.example" }
+        local path = cache.getPath(credentials, "/cover.jpg", "image/jpeg")
+        written_files[path] = {
+            mode = "wb",
+            body = "JPGDATA",
+            size = cache.MAX_THUMBNAIL_BYTES + 1,
+        }
+
+        assert.is_nil(cache.find(credentials, "/cover.jpg"))
+        assert.are.same({ path }, removed_files)
     end)
 
     it("writes and loads decoded WebP bitmap thumbnails", function()

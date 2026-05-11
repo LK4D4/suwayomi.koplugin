@@ -88,6 +88,13 @@ local function placeholderText(text)
     return "..."
 end
 
+local function newImageWidget(options)
+    local ok, image = pcall(function()
+        return ImageWidget:new(options)
+    end)
+    return ok and image or nil
+end
+
 function MangaMenuItem:init()
     self.ges_events = {
         TapSelect = {
@@ -132,16 +139,21 @@ function MangaMenuItem:buildThumbnail(slot_size)
     local image
     if self.entry.thumbnail_path then
         local is_decoded_path = ThumbnailCache.isDecodedPath and ThumbnailCache.isDecodedPath(self.entry.thumbnail_path)
-        local decoded_image = is_decoded_path and ThumbnailCache.loadDecoded and ThumbnailCache.loadDecoded(self.entry.thumbnail_path)
+        local decoded_image
+        if is_decoded_path and ThumbnailCache.loadDecoded then
+            local ok
+            ok, decoded_image = pcall(ThumbnailCache.loadDecoded, self.entry.thumbnail_path)
+            decoded_image = ok and decoded_image or nil
+        end
         if decoded_image then
-            image = ImageWidget:new{
+            image = newImageWidget{
                 image = decoded_image,
                 width = image_size,
                 height = image_size,
                 scale_factor = 0,
             }
         elseif not is_decoded_path then
-            image = ImageWidget:new{
+            image = newImageWidget{
                 file = self.entry.thumbnail_path,
                 width = image_size,
                 height = image_size,

@@ -5,6 +5,7 @@ describe("suwayomi/ui/manga_menu", function()
     local canceled_jobs
     local cache_paths
     local decoded_images
+    local image_errors
 
     local function clearModules()
         for _, name in ipairs({
@@ -71,6 +72,7 @@ describe("suwayomi/ui/manga_menu", function()
         canceled_jobs = {}
         cache_paths = {}
         decoded_images = {}
+        image_errors = {}
 
         package.preload["ui/bidi"] = function()
             return { auto = function(text) return text end }
@@ -116,7 +118,18 @@ describe("suwayomi/ui/manga_menu", function()
         package.preload["ui/widget/container/framecontainer"] = function() return widgetModule("frame") end
         package.preload["ui/widget/horizontalgroup"] = function() return widgetModule("horizontal_group") end
         package.preload["ui/widget/horizontalspan"] = function() return widgetModule("horizontal_span") end
-        package.preload["ui/widget/imagewidget"] = function() return widgetModule("image") end
+        package.preload["ui/widget/imagewidget"] = function()
+            return {
+                new = function(_, options)
+                    if image_errors[options and options.file] then
+                        error(image_errors[options.file])
+                    end
+                    options = options or {}
+                    options.kind = "image"
+                    return options
+                end,
+            }
+        end
         package.preload["ui/widget/container/leftcontainer"] = function() return widgetModule("left") end
         package.preload["ui/widget/overlapgroup"] = function() return widgetModule("overlap") end
         package.preload["ui/widget/container/rightcontainer"] = function() return widgetModule("right") end
@@ -418,6 +431,23 @@ describe("suwayomi/ui/manga_menu", function()
             thumbnail_credentials = { server_url = "https://suwayomi.example" },
             item_table = {
                 { text = "Cached", manga = { id = "cached" }, thumbnail_url = "/cached.webp" },
+            },
+        }
+
+        assert.is_nil(findWidgetByKind(menu.item_group[1], "image"))
+        assert.is_not_nil(findWidgetByKind(menu.item_group[1], "text"))
+    end)
+
+    it("uses the placeholder when cached thumbnail decoding raises", function()
+        cache_paths["/cached.jpg"] = "/settings/cached.jpg"
+        image_errors["/settings/cached.jpg"] = "ffi/lru.lua:122: not enough storage for cache"
+        local manga_menu = require("suwayomi/ui/manga_menu")
+
+        local menu = manga_menu.show{
+            title = "Results",
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            item_table = {
+                { text = "Cached", manga = { id = "cached" }, thumbnail_url = "/cached.jpg" },
             },
         }
 
