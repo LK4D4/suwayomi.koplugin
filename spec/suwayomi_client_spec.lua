@@ -34,6 +34,7 @@ describe("suwayomi/client", function()
             ui = options.ui,
             subprocess_job = options.subprocess_job,
             global_search_worker = options.global_search_worker,
+            chapter_count_worker = options.chapter_count_worker,
             ffi_util = options.ffi_util,
             ui_manager = options.ui_manager,
             debug = {
@@ -76,6 +77,7 @@ describe("suwayomi/client", function()
                 global_search_max_active_sources = options.global_search_max_active_sources,
                 global_search_poll_interval_seconds = options.global_search_poll_interval_seconds,
                 global_search_source_timeout_seconds = options.global_search_source_timeout_seconds,
+                chapter_count_max_active = options.chapter_count_max_active,
             },
             gettext = function(text)
                 return text
@@ -358,6 +360,31 @@ describe("suwayomi/client", function()
             if active.on_cancel then
                 active.on_cancel(active)
             end
+        end
+
+        return fake, started, canceled
+    end
+
+    local function buildChapterCountSubprocessFake()
+        local started = {}
+        local canceled = {}
+        local fake = {}
+
+        function fake.buildResultPath(prefix)
+            return "/settings/" .. tostring(prefix) .. "_" .. tostring(#started + 1) .. ".json"
+        end
+
+        function fake.start(options)
+            local active = options.active or {}
+            active.on_finish = options.on_finish
+            active.on_timeout = options.on_timeout
+            table.insert(started, active)
+            return active
+        end
+
+        function fake.cancel(active)
+            active.canceled = true
+            table.insert(canceled, active)
         end
 
         return fake, started, canceled
@@ -992,6 +1019,92 @@ describe("suwayomi/client", function()
 
         assert.are.equal(1, #updated_manga)
         assert.is_true(updated_manga[1].in_library)
+    end)
+
+    it("fetches zero and unknown browse chapter counts in the background", function()
+        local subprocess_job, started = buildChapterCountSubprocessFake()
+        local shown_manga
+        local updated_manga = {}
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            chapter_count_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            chapter_count_max_active = 1,
+            api = {
+                fetchMangaForSource = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Unknown Count", chapter_count = 0 },
+                            { id = "m2", title = "Known Count", chapter_count = 7 },
+                            { id = "m3", title = "Missing Count" },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function(manga)
+                    shown_manga = manga
+                    return { name = "browse-menu" }
+                end,
+                updateMangaMenu = function(_, manga)
+                    table.insert(updated_manga, {
+                        m1 = {
+                            loading = manga[1].chapter_count_loading,
+                            count = manga[1].chapter_count,
+                            verified = manga[1].chapter_count_verified,
+                        },
+                        m2 = {
+                            loading = manga[2].chapter_count_loading,
+                            count = manga[2].chapter_count,
+                        },
+                        m3 = {
+                            loading = manga[3].chapter_count_loading,
+                            count = manga[3].chapter_count,
+                            verified = manga[3].chapter_count_verified,
+                        },
+                    })
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            type = "SEARCH",
+            query = "frieren",
+            skip_mode_menu = true,
+        })
+
+        assert.are.equal(3, #shown_manga)
+        assert.are.equal("m1", started[1].manga_id)
+        assert.are.equal(1, #started)
+        assert.is_true(updated_manga[1].m1.loading)
+        assert.are.equal(0, updated_manga[1].m1.count)
+        assert.is_nil(updated_manga[1].m2.loading)
+        assert.are.equal(7, updated_manga[1].m2.count)
+        assert.is_nil(updated_manga[1].m3.loading)
+
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga_id = "m1",
+            chapter_count = 5,
+        })
+
+        assert.are.equal(5, updated_manga[2].m1.count)
+        assert.is_true(updated_manga[2].m1.verified)
+        assert.is_nil(updated_manga[2].m1.loading)
+        assert.are.equal("m3", started[2].manga_id)
+        assert.is_true(updated_manga[3].m3.loading)
+
+        started[2].on_finish(started[2], {
+            ok = true,
+            manga_id = "m3",
+            chapter_count = 0,
+        })
+
+        assert.are.equal(0, updated_manga[4].m3.count)
+        assert.is_true(updated_manga[4].m3.verified)
+        assert.is_nil(updated_manga[4].m3.loading)
     end)
 
     it("opens browse result manga actions without changing the action surface", function()

@@ -16,6 +16,9 @@ local function formatChapterCount(count)
     if not count then
         return nil
     end
+    if count == 0 then
+        return nil
+    end
     if count == 1 then
         return "1 " .. _("chapter")
     end
@@ -42,7 +45,14 @@ function MangaRows.getMandatory(manga, options)
         table.insert(labels, _("In Library"))
     end
     if type(manga) == "table" then
-        local chapter_count = formatChapterCount(manga.chapter_count)
+        local chapter_count
+        if manga.chapter_count_loading == true then
+            chapter_count = _("Checking chapters")
+        elseif manga.chapter_count_verified == true and tonumber(manga.chapter_count) == 0 then
+            chapter_count = "0 " .. _("chapters")
+        else
+            chapter_count = formatChapterCount(manga.chapter_count)
+        end
         if chapter_count then
             table.insert(labels, chapter_count)
         end

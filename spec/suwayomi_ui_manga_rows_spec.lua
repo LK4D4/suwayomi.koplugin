@@ -38,7 +38,12 @@ describe("suwayomi/ui/manga_rows", function()
 
         assert.are.equal("12 chapters", rows.getMandatory({ chapter_count = 12 }))
         assert.are.equal("1 chapter", rows.getMandatory({ chapter_count = 1 }))
-        assert.are.equal("0 chapters", rows.getMandatory({ chapter_count = 0 }))
+        assert.is_nil(rows.getMandatory({ chapter_count = 0 }))
+        assert.are.equal("Checking chapters", rows.getMandatory({ chapter_count_loading = true }))
+        assert.are.equal("0 chapters", rows.getMandatory({
+            chapter_count = 0,
+            chapter_count_verified = true,
+        }))
         assert.are.equal("In Library · 12 chapters", rows.getMandatory({
             in_library = true,
             chapter_count = 12,
