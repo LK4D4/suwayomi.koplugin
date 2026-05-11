@@ -34,6 +34,7 @@ describe("suwayomi/client", function()
             ui = options.ui,
             subprocess_job = options.subprocess_job,
             global_search_worker = options.global_search_worker,
+            source_manga_worker = options.source_manga_worker,
             chapter_count_worker = options.chapter_count_worker,
             ffi_util = options.ffi_util,
             ui_manager = options.ui_manager,
@@ -157,10 +158,9 @@ describe("suwayomi/client", function()
             ui = {
                 showMangaMenu = function(manga, onSelect, menu_options)
                     assert.are.equal("Sousou no Frieren", manga[1].title)
-                    assert.are.same({
-                        title = "MangaDex (EN) - Popular - Page 1",
-                        title_bar_left_icon = "appbar.menu",
-                    }, menu_options)
+                    assert.are.equal("MangaDex (EN) - Popular - Page 1", menu_options.title)
+                    assert.are.equal("appbar.menu", menu_options.title_bar_left_icon)
+                    assert.is_function(menu_options.close_callback)
                     onSelect(manga[1])
                     return { name = "browse-results-menu" }
                 end,
@@ -365,6 +365,33 @@ describe("suwayomi/client", function()
         return fake, started, canceled
     end
 
+    local function buildSourceMangaSubprocessFake()
+        local started = {}
+        local canceled = {}
+        local fake = {}
+
+        function fake.buildResultPath(prefix)
+            return "/settings/" .. tostring(prefix) .. "_" .. tostring(#started + 1) .. ".json"
+        end
+
+        function fake.start(options)
+            local active = options.active or {}
+            active.on_finish = options.on_finish
+            active.on_timeout = options.on_timeout
+            active.read_result = options.read_result
+            active.run = options.run
+            table.insert(started, active)
+            return active
+        end
+
+        function fake.cancel(active)
+            active.canceled = true
+            table.insert(canceled, active)
+        end
+
+        return fake, started, canceled
+    end
+
     local function buildChapterCountSubprocessFake()
         local started = {}
         local canceled = {}
@@ -561,6 +588,101 @@ describe("suwayomi/client", function()
         assert.are.equal("canceled", updated_summaries[1].status)
         assert.are.equal("canceled", updated_summaries[2].status)
         assert.are.equal(1, #started)
+    end)
+
+    it("starts source search in a cancellable subprocess without blocking the UI", function()
+        local subprocess_job, started, canceled = buildSourceMangaSubprocessFake()
+        local api_called = false
+        local shown_manga
+        local shown_options
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            api = {
+                fetchMangaForSource = function()
+                    api_called = true
+                    return { ok = true, manga = {} }
+                end,
+            },
+            ui = {
+                showMangaMenu = function(manga, _, menu_options)
+                    shown_manga = manga
+                    shown_options = menu_options
+                    return { name = "source-search-menu" }
+                end,
+            },
+            title_menu_options = { title_bar_left_icon = "appbar.menu" },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+            lang = "en",
+        }, {
+            type = "SEARCH",
+            query = "frieren",
+            skip_mode_menu = true,
+        })
+
+        assert.is_false(api_called)
+        assert.are.equal("Loading manga...", shown_manga[1].title)
+        assert.are.equal("MangaDex (EN) - Search: frieren - Page 1", shown_options.title)
+        assert.is_function(shown_options.close_callback)
+        assert.is_function(shown_options.on_cancel_source_manga)
+        assert.are.equal("s1", started[1].source.id)
+        assert.are.same({
+            type = "SEARCH",
+            query = "frieren",
+            page = 1,
+        }, started[1].browse_options)
+
+        shown_options.close_callback()
+
+        assert.are.equal(started[1], canceled[1])
+    end)
+
+    it("updates the source search menu when the subprocess returns manga", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updated_manga
+        local updated_options
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-search-menu" }
+                end,
+                updateMangaMenu = function(_, manga, _, menu_options)
+                    updated_manga = manga
+                    updated_options = menu_options
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+            lang = "en",
+        }, {
+            type = "SEARCH",
+            query = "frieren",
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Frieren" },
+            },
+            has_next_page = true,
+        })
+
+        assert.are.equal("Frieren", updated_manga[1].title)
+        assert.is_function(updated_options.on_next_page)
+        assert.is_nil(updated_options.on_cancel_source_manga)
     end)
 
     it("shows a friendly latest message when unknown support is rejected as unsupported", function()

@@ -49,6 +49,8 @@ local SuwayomiPlugin = WidgetContainer:extend{
     global_search_poll_interval_seconds = 0.5,
     global_search_source_timeout_seconds = 15,
     global_search_max_active_sources = 3,
+    source_manga_poll_interval_seconds = 0.5,
+    source_manga_timeout_seconds = 15,
 }
 
 function SuwayomiPlugin:createDownloadQueue()

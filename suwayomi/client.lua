@@ -16,6 +16,7 @@ function SuwayomiClient:new(options)
         ui = options.ui,
         subprocess_job = options.subprocess_job,
         global_search_worker = options.global_search_worker,
+        source_manga_worker = options.source_manga_worker,
         chapter_count_worker = options.chapter_count_worker,
         ffi_util = options.ffi_util,
         ui_manager = options.ui_manager,
@@ -393,6 +394,13 @@ function SuwayomiClient:getGlobalSearchWorker()
     return self.global_search_worker
 end
 
+function SuwayomiClient:getSourceMangaWorker()
+    if not self.source_manga_worker then
+        self.source_manga_worker = require("suwayomi/browse/source_manga_worker")
+    end
+    return self.source_manga_worker
+end
+
 function SuwayomiClient:getChapterCountWorker()
     if not self.chapter_count_worker then
         self.chapter_count_worker = require("suwayomi/browse/chapter_count_worker")
@@ -428,6 +436,16 @@ end
 
 function SuwayomiClient:getGlobalSearchSourceTimeoutSeconds()
     return (self.plugin and self.plugin.global_search_source_timeout_seconds) or 15
+end
+
+function SuwayomiClient:getSourceMangaPollIntervalSeconds()
+    return (self.plugin and self.plugin.source_manga_poll_interval_seconds)
+        or self:getGlobalSearchPollIntervalSeconds()
+end
+
+function SuwayomiClient:getSourceMangaTimeoutSeconds()
+    return (self.plugin and self.plugin.source_manga_timeout_seconds)
+        or self:getGlobalSearchSourceTimeoutSeconds()
 end
 
 function SuwayomiClient:getChapterCountMaxActive()
@@ -960,6 +978,296 @@ function SuwayomiClient:showSourceModeMenu(source)
     return self:trackScreen("browse-source", mode_menu)
 end
 
+function SuwayomiClient:buildSourceMangaRequestOptions(source, browse_options)
+    local request_options = {
+        source_id = source.id,
+        page = browse_options.page,
+        type = browse_options.type,
+    }
+    if request_options.type == "SEARCH" then
+        request_options.query = browse_options.query
+    end
+    return request_options
+end
+
+function SuwayomiClient:resolveSourceMangaRuntime()
+    local ok_job, job = pcall(function()
+        return self:getSubprocessJob()
+    end)
+    local ok_ffi, ffi_util = pcall(function()
+        return self:getFFIUtil()
+    end)
+    local ok_ui, ui_manager = pcall(function()
+        return self:getUIManager()
+    end)
+    if not self.source_manga_worker
+        and (not ok_ffi or type(ffi_util) ~= "table" or type(ffi_util.runInSubProcess) ~= "function")
+    then
+        return nil
+    end
+    local ok_worker, worker = pcall(function()
+        return self:getSourceMangaWorker()
+    end)
+
+    if not ok_job or not ok_worker or not ok_ffi or not ok_ui then
+        return nil
+    end
+    if type(job) ~= "table" or type(worker) ~= "table" then
+        return nil
+    end
+    return {
+        job = job,
+        worker = worker,
+        ffi_util = ffi_util,
+        ui_manager = ui_manager,
+    }
+end
+
+function SuwayomiClient:buildSourceMangaLoadingMenuOptions(state)
+    local cancel = function()
+        return self:cancelSourceMangaLoad(state)
+    end
+    local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
+        title = state.title,
+        actions = {
+            { id = "cancel_source_manga", text = self:translate("Cancel loading") },
+        },
+        onSelect = function(action)
+            if action and action.id == "cancel_source_manga" then
+                return cancel()
+            end
+        end,
+    }))
+    menu_options.title = state.title
+    menu_options.close_callback = cancel
+    menu_options.on_cancel_source_manga = cancel
+    return menu_options
+end
+
+function SuwayomiClient:showSourceMangaStatus(menu, title, message)
+    if menu and self.ui.updateMangaMenu then
+        local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
+            title = title,
+        }))
+        menu_options.title = title
+        self.ui.updateMangaMenu(menu, {
+            { title = message },
+        }, nil, menu_options)
+        return true
+    end
+    return false
+end
+
+function SuwayomiClient:cancelSourceMangaLoad(state)
+    if not state or state.canceled or state.finished then
+        return
+    end
+    state.canceled = true
+    if state.active and state.runtime and state.runtime.job and state.runtime.job.cancel then
+        state.runtime.job.cancel(state.active)
+    end
+    state.active = nil
+    self:showSourceMangaStatus(state.menu, state.title, self:translate("Loading canceled."))
+end
+
+function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_options, result, existing_menu)
+    if not result then
+        return
+    end
+    if not result.ok then
+        if browse_options.type == "LATEST"
+            and source
+            and source.supports_latest == nil
+            and self:isLatestUnsupportedError(result.error)
+        then
+            self.plugin:showMessage(self:translate("Latest manga is not supported by this source."))
+            self:showSourceMangaStatus(
+                existing_menu,
+                self:buildBrowseResultTitle(source, browse_options),
+                self:translate("Latest manga is not supported by this source.")
+            )
+            return
+        end
+        self.plugin:showMessage(self:translate(result.error))
+        self:showSourceMangaStatus(
+            existing_menu,
+            self:buildBrowseResultTitle(source, browse_options),
+            self:translate(result.error)
+        )
+        return
+    end
+
+    local page = tonumber(browse_options.page) or 1
+    local manga_list = result.manga or {}
+    local visible_manga = self:filterBrowseManga(manga_list)
+    self:log({
+        operation = "showMangaForSource",
+        event = "manga_loaded",
+        source_id = source and source.id,
+        type = browse_options.type,
+        page = page,
+        manga_count = #visible_manga,
+    })
+    local menu_options = self:buildBrowseResultMenuOptions(source, browse_options, result.has_next_page)
+    if existing_menu and menu_options.close_callback == nil then
+        menu_options.close_callback = function() end
+    end
+    if #visible_manga == 0
+        and not menu_options.on_previous_page
+        and not menu_options.on_next_page
+    then
+        if not self:showSourceMangaStatus(
+            existing_menu,
+            menu_options.title,
+            self:translate("This source has no manga.")
+        ) then
+            self.plugin:showMessage(self:translate("This source has no manga."))
+        end
+        return
+    end
+
+    local manga_menu = existing_menu
+    local chapter_count_enrichment
+    local pending_manga_menu_refresh = false
+    local refreshMangaMenu
+    local function selectManga(manga)
+        self:attachSourceToManga(manga, source)
+        if self.plugin.showMangaActions then
+            self.plugin:showMangaActions(manga, {
+                onMangaUpdated = refreshMangaMenu,
+            })
+        else
+            self.plugin:showChaptersForManga(manga)
+        end
+    end
+    refreshMangaMenu = function()
+        visible_manga = self:filterBrowseManga(manga_list)
+        if not manga_menu then
+            pending_manga_menu_refresh = true
+            return
+        end
+        if self.ui.updateMangaMenu then
+            self.ui.updateMangaMenu(manga_menu, visible_manga, selectManga, menu_options)
+        end
+    end
+
+    local chapter_count_runtime = self:resolveChapterCountRuntime()
+    if chapter_count_runtime then
+        local previous_close_callback = menu_options.close_callback
+        menu_options.close_callback = function(...)
+            if chapter_count_enrichment then
+                self:cancelBrowseChapterCountEnrichment(chapter_count_enrichment)
+            end
+            if previous_close_callback then
+                return previous_close_callback(...)
+            end
+        end
+    end
+
+    if existing_menu and self.ui.updateMangaMenu then
+        self.ui.updateMangaMenu(existing_menu, visible_manga, selectManga, menu_options)
+    else
+        manga_menu = self.ui.showMangaMenu(visible_manga, selectManga, menu_options)
+        self:trackScreen("browse-results", manga_menu)
+    end
+    if pending_manga_menu_refresh then
+        refreshMangaMenu()
+    end
+    if chapter_count_runtime then
+        chapter_count_enrichment = self:startBrowseChapterCountEnrichment(
+            credentials,
+            visible_manga,
+            refreshMangaMenu,
+            chapter_count_runtime
+        )
+    end
+    return manga_menu
+end
+
+function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options)
+    if not self.ui.showMangaMenu then
+        return false
+    end
+
+    local runtime = self:resolveSourceMangaRuntime()
+    if not runtime then
+        return false
+    end
+
+    local title = self:buildBrowseResultTitle(source, browse_options)
+    local state = {
+        credentials = credentials,
+        source = source,
+        browse_options = browse_options,
+        title = title,
+        runtime = runtime,
+    }
+
+    local active = runtime.job.start({
+        active = {
+            source = source,
+            browse_options = browse_options,
+            result_path = runtime.job.buildResultPath
+                and runtime.job.buildResultPath("source_manga")
+                or nil,
+        },
+        ffi_util = runtime.ffi_util,
+        ui_manager = runtime.ui_manager,
+        poll_interval_seconds = self:getSourceMangaPollIntervalSeconds(),
+        timeout_seconds = self:getSourceMangaTimeoutSeconds(),
+        run = function(path)
+            runtime.worker:run(credentials, source, browse_options, path)
+        end,
+        read_result = function(path)
+            return runtime.worker:readResult(path)
+        end,
+        on_finish = function(finished_active, result)
+            if state.canceled then
+                return
+            end
+            state.finished = true
+            state.active = nil
+            result = result or {
+                ok = false,
+                error = self:translate("Could not load manga."),
+            }
+            local result_source = result and result.source or finished_active.source or source
+            local result_options = result and result.browse_options or finished_active.browse_options or browse_options
+            self:renderMangaForSourceResult(credentials, result_source, result_options, result, state.menu)
+        end,
+        on_timeout = function(timed_out_active)
+            if state.canceled then
+                return
+            end
+            state.finished = true
+            state.active = nil
+            timed_out_active.canceled = true
+            self.plugin:showMessage(self:translate("Could not load manga."))
+            self:showSourceMangaStatus(state.menu, title, self:translate("Could not load manga."))
+        end,
+    })
+
+    if not active then
+        return false
+    end
+
+    state.active = active
+    state.menu = self.ui.showMangaMenu({
+        { title = self:translate("Loading manga...") },
+    }, nil, self:buildSourceMangaLoadingMenuOptions(state))
+    self:trackScreen("browse-results", state.menu)
+    return true
+end
+
+function SuwayomiClient:fetchMangaForSourceSync(credentials, source, browse_options)
+    return self.plugin:withLoadingMessage("manga", self:translate("Loading manga..."), function()
+        return self.api.fetchMangaForSource(
+            credentials,
+            self:buildSourceMangaRequestOptions(source, browse_options)
+        )
+    end)
+end
+
 function SuwayomiClient:showMangaForSource(source, options)
     options = options or {}
     if not options.skip_mode_menu and not self:isLocalSource(source) and self.ui.showSourceModeMenu then
@@ -971,116 +1279,18 @@ function SuwayomiClient:showMangaForSource(source, options)
         type = options.type or "POPULAR",
     }, function()
         local credentials = self.settings:load()
-        local page = tonumber(options.page) or 1
         local browse_options = {
             type = options.type or "POPULAR",
             query = options.query,
-            page = page,
+            page = tonumber(options.page) or 1,
         }
-        local result = self.plugin:withLoadingMessage("manga", self:translate("Loading manga..."), function()
-            local request_options = {
-                source_id = source.id,
-                page = page,
-                type = browse_options.type,
-            }
-            if request_options.type == "SEARCH" then
-                request_options.query = browse_options.query
-            end
-            return self.api.fetchMangaForSource(credentials, request_options)
-        end)
-        if not result then
-            return
-        end
-        if not result.ok then
-            if browse_options.type == "LATEST"
-                and source
-                and source.supports_latest == nil
-                and self:isLatestUnsupportedError(result.error)
-            then
-                self.plugin:showMessage(self:translate("Latest manga is not supported by this source."))
-                return
-            end
-            self.plugin:showMessage(self:translate(result.error))
+
+        if self:startSourceMangaLoad(credentials, source, browse_options) then
             return
         end
 
-        local manga_list = result.manga or {}
-        local visible_manga = self:filterBrowseManga(manga_list)
-        self:log({
-            operation = "showMangaForSource",
-            event = "manga_loaded",
-            source_id = source and source.id,
-            type = browse_options.type,
-            page = page,
-            manga_count = #visible_manga,
-        })
-        local menu_options = self:buildBrowseResultMenuOptions(source, browse_options, result.has_next_page)
-        if #visible_manga == 0
-            and not menu_options.on_previous_page
-            and not menu_options.on_next_page
-        then
-            self.plugin:showMessage(self:translate("This source has no manga."))
-            return
-        end
-
-        local manga_menu
-        local chapter_count_enrichment
-        local pending_manga_menu_refresh = false
-        local function refreshMangaMenu()
-            visible_manga = self:filterBrowseManga(manga_list)
-            if not manga_menu then
-                pending_manga_menu_refresh = true
-                return
-            end
-            if self.ui.updateMangaMenu then
-                self.ui.updateMangaMenu(manga_menu, visible_manga, function(manga)
-                    self:attachSourceToManga(manga, source)
-                    if self.plugin.showMangaActions then
-                        self.plugin:showMangaActions(manga, {
-                            onMangaUpdated = refreshMangaMenu,
-                        })
-                    else
-                        self.plugin:showChaptersForManga(manga)
-                    end
-                end, menu_options)
-            end
-        end
-
-        manga_menu = self.ui.showMangaMenu(visible_manga, function(manga)
-            self:attachSourceToManga(manga, source)
-            if self.plugin.showMangaActions then
-                self.plugin:showMangaActions(manga, {
-                    onMangaUpdated = refreshMangaMenu,
-                })
-            else
-                self.plugin:showChaptersForManga(manga)
-            end
-        end, menu_options)
-        self:trackScreen("browse-results", manga_menu)
-        if pending_manga_menu_refresh then
-            refreshMangaMenu()
-        end
-        local chapter_count_runtime = self:resolveChapterCountRuntime()
-        if chapter_count_runtime then
-            local previous_close_callback = menu_options.close_callback
-            menu_options.close_callback = function(...)
-                if chapter_count_enrichment then
-                    self:cancelBrowseChapterCountEnrichment(chapter_count_enrichment)
-                end
-                if previous_close_callback then
-                    return previous_close_callback(...)
-                end
-            end
-            chapter_count_enrichment = self:startBrowseChapterCountEnrichment(
-                credentials,
-                visible_manga,
-                refreshMangaMenu,
-                chapter_count_runtime
-            )
-            if not chapter_count_enrichment then
-                menu_options.close_callback = previous_close_callback
-            end
-        end
+        local result = self:fetchMangaForSourceSync(credentials, source, browse_options)
+        return self:renderMangaForSourceResult(credentials, source, browse_options, result)
     end)
 end
 

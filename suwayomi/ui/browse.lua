@@ -310,6 +310,7 @@ function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
     menu.item_table = menu_table
     menu_utils.applyTitleBarOptions(menu, options)
+    menu_utils.applyCloseCallback(menu, options)
     if menu.updateItems then
         menu:updateItems()
     end

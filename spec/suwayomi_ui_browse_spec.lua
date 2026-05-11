@@ -312,6 +312,7 @@ describe("suwayomi/ui/browse", function()
         local browse = require("suwayomi/ui/browse")
         local title_bar_title
         local left_icon
+        local closed = false
         local menu = {
             title = "MangaDex - Popular - Page 1",
             title_bar = {
@@ -332,12 +333,19 @@ describe("suwayomi/ui/browse", function()
         }, function() end, {
             title = "MangaDex - Popular - Page 2",
             title_bar_left_icon = "appbar.menu",
+            close_callback = function()
+                closed = true
+            end,
         })
 
         assert.are.equal("MangaDex - Popular - Page 2", menu.title)
         assert.are.same({ title = "MangaDex - Popular - Page 2", refresh = true }, title_bar_title)
         assert.are.equal("appbar.menu", left_icon)
         assert.is_true(menu.updated)
+
+        menu.close_callback()
+
+        assert.is_true(closed)
     end)
 
     it("shows library category and manga menus", function()
