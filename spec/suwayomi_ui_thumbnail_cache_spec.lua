@@ -10,6 +10,7 @@ describe("suwayomi/ui/thumbnail_cache", function()
         package.loaded.datastorage = nil
         package.loaded.lfs = nil
         package.loaded["ffi/util"] = nil
+        package.loaded["ffi/blitbuffer"] = nil
         package.loaded.bit = nil
 
         written_files = {}
@@ -65,20 +66,38 @@ describe("suwayomi/ui/thumbnail_cache", function()
         original_io_open = io.open
         original_os_remove = os.remove
         io.open = function(path, mode)
-            local chunks = {}
-            return {
-                write = function(_, chunk)
-                    table.insert(chunks, chunk)
-                    return true
-                end,
-                close = function()
-                    written_files[path] = {
-                        mode = mode,
-                        body = table.concat(chunks),
-                    }
-                    return true
-                end,
-            }
+            if mode == "rb" then
+                local file = written_files[path]
+                if not file then
+                    return nil
+                end
+                return {
+                    read = function(_, pattern)
+                        assert.are.equal("*a", pattern)
+                        return file.body
+                    end,
+                    close = function()
+                        return true
+                    end,
+                }
+            end
+            if mode == "wb" then
+                local chunks = {}
+                return {
+                    write = function(_, chunk)
+                        table.insert(chunks, chunk)
+                        return true
+                    end,
+                    close = function()
+                        written_files[path] = {
+                            mode = mode,
+                            body = table.concat(chunks),
+                        }
+                        return true
+                    end,
+                }
+            end
+            error("unexpected io.open mode: " .. tostring(mode))
         end
         os.remove = function(path)
             table.insert(removed_files, path)
@@ -93,6 +112,7 @@ describe("suwayomi/ui/thumbnail_cache", function()
         package.preload.datastorage = nil
         package.preload.lfs = nil
         package.preload["ffi/util"] = nil
+        package.preload["ffi/blitbuffer"] = nil
         package.preload.bit = nil
         package.loaded["suwayomi/ui/thumbnail_cache"] = nil
     end)
@@ -128,12 +148,63 @@ describe("suwayomi/ui/thumbnail_cache", function()
     it("does not reuse stale unsupported WebP thumbnails", function()
         local cache = require("suwayomi/ui/thumbnail_cache")
         local credentials = { server_url = "https://suwayomi.example" }
-        local webp_path = cache.getPath(credentials, "/cover.webp", "image/webp")
+        local webp_path = "/settings/suwayomi_dl_thumbnails/" .. cache.getKey(credentials, "/cover.webp") .. ".webp"
         written_files[webp_path] = {
             mode = "wb",
             body = "WEBPDATA",
         }
 
         assert.is_nil(cache.find(credentials, "/cover.webp"))
+    end)
+
+    it("writes and loads decoded WebP bitmap thumbnails", function()
+        local fromstring_args
+        package.preload["ffi/blitbuffer"] = function()
+            return {
+                tostring = function(bitmap)
+                    assert.are.equal("bitmap", bitmap.kind)
+                    return "RAWDATA"
+                end,
+                fromstring = function(width, height, fmt, data, stride, rotation, inverse)
+                    fromstring_args = {
+                        width = width,
+                        height = height,
+                        fmt = fmt,
+                        data = data,
+                        stride = stride,
+                        rotation = rotation,
+                        inverse = inverse,
+                    }
+                    return { kind = "loaded_bitmap" }
+                end,
+            }
+        end
+
+        local cache = require("suwayomi/ui/thumbnail_cache")
+        local credentials = { server_url = "https://suwayomi.example" }
+        local path = cache.writeDecoded(credentials, "/cover.webp", {
+            kind = "bitmap",
+            w = 12,
+            h = 34,
+            stride = 48,
+            getType = function() return 6 end,
+            getRotation = function() return 0 end,
+            getInverse = function() return 0 end,
+        })
+        local found = cache.find(credentials, "/cover.webp")
+        local loaded = cache.loadDecoded(path)
+
+        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.bb$", path)
+        assert.are.equal(path, found)
+        assert.are.equal("loaded_bitmap", loaded.kind)
+        assert.are.same({
+            width = 12,
+            height = 34,
+            fmt = 6,
+            data = "RAWDATA",
+            stride = 48,
+            rotation = 0,
+            inverse = 0,
+        }, fromstring_args)
     end)
 end)

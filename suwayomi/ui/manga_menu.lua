@@ -115,13 +115,25 @@ function MangaMenuItem:buildThumbnail(slot_size)
     local image_size = math.max(1, slot_size - 2 * border)
     local image
     if self.entry.thumbnail_path then
-        image = ImageWidget:new{
-            file = self.entry.thumbnail_path,
-            width = image_size,
-            height = image_size,
-            scale_factor = 0,
-        }
-    else
+        local is_decoded_path = ThumbnailCache.isDecodedPath and ThumbnailCache.isDecodedPath(self.entry.thumbnail_path)
+        local decoded_image = is_decoded_path and ThumbnailCache.loadDecoded and ThumbnailCache.loadDecoded(self.entry.thumbnail_path)
+        if decoded_image then
+            image = ImageWidget:new{
+                image = decoded_image,
+                width = image_size,
+                height = image_size,
+                scale_factor = 0,
+            }
+        elseif not is_decoded_path then
+            image = ImageWidget:new{
+                file = self.entry.thumbnail_path,
+                width = image_size,
+                height = image_size,
+                scale_factor = 0,
+            }
+        end
+    end
+    if not image then
         image = CenterContainer:new{
             dimen = Geom:new{ w = image_size, h = image_size },
             TextWidget:new{

@@ -4,6 +4,7 @@ describe("suwayomi/ui/manga_menu", function()
     local started_jobs
     local canceled_jobs
     local cache_paths
+    local decoded_images
 
     local function clearModules()
         for _, name in ipairs({
@@ -69,6 +70,7 @@ describe("suwayomi/ui/manga_menu", function()
         started_jobs = {}
         canceled_jobs = {}
         cache_paths = {}
+        decoded_images = {}
 
         package.preload["ui/bidi"] = function()
             return { auto = function(text) return text end }
@@ -204,6 +206,12 @@ describe("suwayomi/ui/manga_menu", function()
                 find = function(_, thumbnail_url)
                     return cache_paths[thumbnail_url]
                 end,
+                isDecodedPath = function(path)
+                    return tostring(path or ""):match("%.bb$") ~= nil
+                end,
+                loadDecoded = function(path)
+                    return decoded_images[path]
+                end,
             }
         end
         package.preload["suwayomi/ui/thumbnail_worker"] = function()
@@ -271,6 +279,27 @@ describe("suwayomi/ui/manga_menu", function()
     before_each(installStubs)
     after_each(clearModules)
 
+    local function findWidgetByKind(widget, kind, seen)
+        if type(widget) ~= "table" then
+            return nil
+        end
+        seen = seen or {}
+        if seen[widget] then
+            return nil
+        end
+        seen[widget] = true
+        if widget.kind == kind then
+            return widget
+        end
+        for _, child in pairs(widget) do
+            local found = findWidgetByKind(child, kind, seen)
+            if found then
+                return found
+            end
+        end
+        return nil
+    end
+
     it("shows menu rows, discovers cached thumbnails, and schedules only visible uncached thumbnails", function()
         cache_paths["/cached.jpg"] = "/settings/cached.jpg"
         local manga_menu = require("suwayomi/ui/manga_menu")
@@ -295,6 +324,41 @@ describe("suwayomi/ui/manga_menu", function()
         assert.are.equal("/b.jpg", started_jobs[2].thumbnail_url)
         assert.are.equal(5, #menu.item_group)
         assert.are.equal(1, dirty_count)
+    end)
+
+    it("renders decoded cached thumbnails as in-memory images", function()
+        local decoded_image = { kind = "decoded_bitmap" }
+        cache_paths["/cached.webp"] = "/settings/cached.bb"
+        decoded_images["/settings/cached.bb"] = decoded_image
+        local manga_menu = require("suwayomi/ui/manga_menu")
+
+        local menu = manga_menu.show{
+            title = "Results",
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            item_table = {
+                { text = "Cached", manga = { id = "cached" }, thumbnail_url = "/cached.webp" },
+            },
+        }
+
+        local image = findWidgetByKind(menu.item_group[1], "image")
+        assert.are.same(decoded_image, image.image)
+        assert.is_nil(image.file)
+    end)
+
+    it("uses the placeholder when decoded cached thumbnails cannot be loaded", function()
+        cache_paths["/cached.webp"] = "/settings/cached.bb"
+        local manga_menu = require("suwayomi/ui/manga_menu")
+
+        local menu = manga_menu.show{
+            title = "Results",
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            item_table = {
+                { text = "Cached", manga = { id = "cached" }, thumbnail_url = "/cached.webp" },
+            },
+        }
+
+        assert.is_nil(findWidgetByKind(menu.item_group[1], "image"))
+        assert.is_not_nil(findWidgetByKind(menu.item_group[1], "text"))
     end)
 
     it("cancels active thumbnail jobs when menu contents are replaced", function()

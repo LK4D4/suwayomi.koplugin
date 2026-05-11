@@ -13,6 +13,7 @@ local ThumbnailCache = require("suwayomi/ui/thumbnail_cache")
 
 local ThumbnailWorker = {}
 ThumbnailWorker.MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
+ThumbnailWorker.DECODED_THUMBNAIL_SIZE = 96
 
 local SUPPORTED_IMAGE_TYPES = {
     ["image/gif"] = true,
@@ -20,6 +21,7 @@ local SUPPORTED_IMAGE_TYPES = {
     ["image/jpg"] = true,
     ["image/png"] = true,
     ["image/svg+xml"] = true,
+    ["image/webp"] = true,
 }
 
 local EXTENSION_IMAGE_TYPES = {
@@ -28,6 +30,7 @@ local EXTENSION_IMAGE_TYPES = {
     jpg = "image/jpeg",
     png = "image/png",
     svg = "image/svg+xml",
+    webp = "image/webp",
 }
 
 local function normalizeContentType(content_type)
@@ -65,6 +68,46 @@ function ThumbnailWorker:readResult(result_path)
         end
         return parsed
     end)
+end
+
+local function freeBitmap(bitmap)
+    if bitmap and bitmap.free then
+        pcall(function()
+            bitmap:free()
+        end)
+    end
+end
+
+function ThumbnailWorker:writeDecodedWebp(credentials, thumbnail_url, body)
+    local ok, RenderImage = pcall(require, "ui/renderimage")
+    if not ok or not RenderImage then
+        return nil, "Could not decode WebP thumbnail."
+    end
+
+    local size = self.DECODED_THUMBNAIL_SIZE
+    local rendered_ok, bitmap = pcall(function()
+        return RenderImage:renderImageData(body, #body, false, size, size)
+    end)
+    if not rendered_ok or not bitmap then
+        freeBitmap(bitmap)
+        return nil, "Could not decode WebP thumbnail."
+    end
+
+    local write_ok, path, write_error = pcall(function()
+        return ThumbnailCache.writeDecoded(credentials, thumbnail_url, bitmap)
+    end)
+    freeBitmap(bitmap)
+    if not write_ok then
+        return nil, tostring(path)
+    end
+    return path, write_error
+end
+
+function ThumbnailWorker:writeThumbnail(credentials, thumbnail_url, body, image_type)
+    if image_type == "image/webp" then
+        return self:writeDecodedWebp(credentials, thumbnail_url, body)
+    end
+    return ThumbnailCache.write(credentials, thumbnail_url, body, image_type)
 end
 
 function ThumbnailWorker:run(credentials, thumbnail_url, result_path)
@@ -106,7 +149,7 @@ function ThumbnailWorker:run(credentials, thumbnail_url, result_path)
                 error = "Thumbnail image is too large.",
             }
         else
-            local path, write_error = ThumbnailCache.write(credentials, thumbnail_url, binary.body, image_type)
+            local path, write_error = self:writeThumbnail(credentials, thumbnail_url, binary.body, image_type)
             result = {
                 ok = path ~= nil,
                 thumbnail_url = thumbnail_url,
