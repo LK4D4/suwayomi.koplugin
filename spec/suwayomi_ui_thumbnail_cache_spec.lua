@@ -137,42 +137,41 @@ describe("suwayomi/ui/thumbnail_cache", function()
         assert.is_nil(path:match("manga/123"))
     end)
 
-    it("writes thumbnails and finds existing cached files by known image extension", function()
+    it("writes thumbnails without leaking server or manga data", function()
         local cache = require("suwayomi/ui/thumbnail_cache")
         local credentials = { server_url = "https://suwayomi.example" }
 
         local path = cache.write(credentials, "/cover.png", "PNGDATA", "image/png")
-        local found = cache.find(credentials, "/cover.png")
 
-        assert.are.equal(path, found)
+        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.png$", path)
         assert.are.equal("PNGDATA", written_files[path].body)
         assert.is_true(directories["/settings/suwayomi_dl_thumbnails"])
-        assert.are.same({}, removed_files)
     end)
 
-    it("does not reuse stale unsupported WebP thumbnails", function()
+    it("removes stale raw image thumbnails instead of returning them to the UI", function()
         local cache = require("suwayomi/ui/thumbnail_cache")
         local credentials = { server_url = "https://suwayomi.example" }
-        local webp_path = "/settings/suwayomi_dl_thumbnails/" .. cache.getKey(credentials, "/cover.webp") .. ".webp"
-        written_files[webp_path] = {
-            mode = "wb",
-            body = "WEBPDATA",
-        }
-
-        assert.is_nil(cache.find(credentials, "/cover.webp"))
-    end)
-
-    it("removes oversized cached thumbnails instead of returning them to the UI", function()
-        local cache = require("suwayomi/ui/thumbnail_cache")
-        local credentials = { server_url = "https://suwayomi.example" }
-        local path = cache.getPath(credentials, "/cover.jpg", "image/jpeg")
-        written_files[path] = {
+        local raw_path = "/settings/suwayomi_dl_thumbnails/" .. cache.getKey(credentials, "/cover.jpg") .. ".jpg"
+        written_files[raw_path] = {
             mode = "wb",
             body = "JPGDATA",
-            size = cache.MAX_THUMBNAIL_BYTES + 1,
         }
 
         assert.is_nil(cache.find(credentials, "/cover.jpg"))
+        assert.are.same({ raw_path }, removed_files)
+    end)
+
+    it("removes oversized decoded thumbnails instead of returning them to the UI", function()
+        local cache = require("suwayomi/ui/thumbnail_cache")
+        local credentials = { server_url = "https://suwayomi.example" }
+        local path = cache.getPath(credentials, "/cover.webp", "image/webp")
+        written_files[path] = {
+            mode = "wb",
+            body = "BBDATA",
+            size = cache.MAX_THUMBNAIL_BYTES + 1,
+        }
+
+        assert.is_nil(cache.find(credentials, "/cover.webp"))
         assert.are.same({ path }, removed_files)
     end)
 

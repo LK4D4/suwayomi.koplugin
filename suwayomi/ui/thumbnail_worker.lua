@@ -78,10 +78,10 @@ local function freeBitmap(bitmap)
     end
 end
 
-function ThumbnailWorker:writeDecodedWebp(credentials, thumbnail_url, body)
+function ThumbnailWorker:writeDecodedThumbnail(credentials, thumbnail_url, body)
     local ok, RenderImage = pcall(require, "ui/renderimage")
     if not ok or not RenderImage then
-        return nil, "Could not decode WebP thumbnail."
+        return nil, "Could not decode thumbnail."
     end
 
     local size = self.DECODED_THUMBNAIL_SIZE
@@ -90,7 +90,7 @@ function ThumbnailWorker:writeDecodedWebp(credentials, thumbnail_url, body)
     end)
     if not rendered_ok or not bitmap then
         freeBitmap(bitmap)
-        return nil, "Could not decode WebP thumbnail."
+        return nil, "Could not decode thumbnail."
     end
 
     local write_ok, path, write_error = pcall(function()
@@ -104,10 +104,7 @@ function ThumbnailWorker:writeDecodedWebp(credentials, thumbnail_url, body)
 end
 
 function ThumbnailWorker:writeThumbnail(credentials, thumbnail_url, body, image_type)
-    if image_type == "image/webp" then
-        return self:writeDecodedWebp(credentials, thumbnail_url, body)
-    end
-    return ThumbnailCache.write(credentials, thumbnail_url, body, image_type)
+    return self:writeDecodedThumbnail(credentials, thumbnail_url, body, image_type)
 end
 
 function ThumbnailWorker:run(credentials, thumbnail_url, result_path)

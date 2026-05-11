@@ -152,13 +152,6 @@ function MangaMenuItem:buildThumbnail(slot_size)
                 height = image_size,
                 scale_factor = 0,
             }
-        elseif not is_decoded_path then
-            image = newImageWidget{
-                file = self.entry.thumbnail_path,
-                width = image_size,
-                height = image_size,
-                scale_factor = 0,
-            }
         end
     end
     if not image then

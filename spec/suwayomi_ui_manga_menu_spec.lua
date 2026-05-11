@@ -438,9 +438,8 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_not_nil(findWidgetByKind(menu.item_group[1], "text"))
     end)
 
-    it("uses the placeholder when cached thumbnail decoding raises", function()
+    it("uses the placeholder instead of rendering raw cached thumbnail files", function()
         cache_paths["/cached.jpg"] = "/settings/cached.jpg"
-        image_errors["/settings/cached.jpg"] = "ffi/lru.lua:122: not enough storage for cache"
         local manga_menu = require("suwayomi/ui/manga_menu")
 
         local menu = manga_menu.show{

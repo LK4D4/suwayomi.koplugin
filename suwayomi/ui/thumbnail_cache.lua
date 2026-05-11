@@ -17,7 +17,7 @@ ThumbnailCache.MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
 local CACHE_DIR_NAME = "suwayomi_dl_thumbnails"
 local DECODED_EXTENSION = "bb"
 local DECODED_MAGIC = "SWTHUMB1"
-local KNOWN_EXTENSIONS = { DECODED_EXTENSION, "jpg", "jpeg", "png", "gif", "svg" }
+local RAW_IMAGE_EXTENSIONS = { "webp", "jpg", "jpeg", "png", "gif", "svg" }
 
 local function rollingHash(text, seed, multiplier)
     local hash = seed
@@ -107,15 +107,19 @@ function ThumbnailCache.find(credentials, thumbnail_url)
     end
     local key = ThumbnailCache.getKey(credentials, thumbnail_url)
     local cache_dir = getCacheDir()
-    for _, extension in ipairs(KNOWN_EXTENSIONS) do
+    local decoded_path = FFIUtil.joinPath(cache_dir, key .. "." .. DECODED_EXTENSION)
+    if lfs.attributes(decoded_path, "mode") == "file" then
+        local size = tonumber(lfs.attributes(decoded_path, "size"))
+        if size and size > ThumbnailCache.MAX_THUMBNAIL_BYTES then
+            os.remove(decoded_path)
+            return nil
+        end
+        return decoded_path
+    end
+    for _, extension in ipairs(RAW_IMAGE_EXTENSIONS) do
         local path = FFIUtil.joinPath(cache_dir, key .. "." .. extension)
         if lfs.attributes(path, "mode") == "file" then
-            local size = tonumber(lfs.attributes(path, "size"))
-            if size and size > ThumbnailCache.MAX_THUMBNAIL_BYTES then
-                os.remove(path)
-                return nil
-            end
-            return path
+            os.remove(path)
         end
     end
     return nil
