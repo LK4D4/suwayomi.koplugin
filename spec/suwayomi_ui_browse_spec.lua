@@ -235,7 +235,7 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal(2, #selected)
     end)
 
-    it("updates global search summaries in place and exposes cancel", function()
+    it("updates global search summaries in place without an inline cancel row", function()
         local browse = require("suwayomi/ui/browse")
         local canceled = false
         local selected = {}
@@ -250,8 +250,7 @@ describe("suwayomi/ui/browse", function()
             end,
         })
 
-        assert.are.equal("Cancel search", shown_dialog.item_table[1].text)
-        assert.are.equal("Local source: searching", shown_dialog.item_table[2].text)
+        assert.are.equal("Local source: searching", shown_dialog.item_table[1].text)
 
         browse.updateGlobalSearchResultsMenu(shown_dialog, {
             { source = { id = "s1", name = "Local source" }, status = "ok", result_count = 1 },
@@ -263,12 +262,10 @@ describe("suwayomi/ui/browse", function()
             end,
         })
 
-        assert.are.equal("Cancel search", shown_dialog.item_table[1].text)
-        assert.are.equal("Local source: 1 result", shown_dialog.item_table[2].text)
+        assert.are.equal("Local source: 1 result", shown_dialog.item_table[1].text)
         shown_dialog.item_table[1].callback()
-        shown_dialog.item_table[2].callback()
 
-        assert.is_true(canceled)
+        assert.is_false(canceled)
         assert.are.equal("s1", selected[1].source.id)
     end)
 

@@ -221,15 +221,8 @@ local function formatGlobalSearchSummary(summary)
     return source_name .. ": " .. tostring(count) .. suffix .. " " .. _("results")
 end
 
-local function buildGlobalSearchMenuTable(summaries, onSelectCallback, options)
-    options = options or {}
+local function buildGlobalSearchMenuTable(summaries, onSelectCallback)
     local menu_table = {}
-    if options.on_cancel_search then
-        table.insert(menu_table, {
-            text = _("Cancel search"),
-            callback = options.on_cancel_search,
-        })
-    end
     for _, summary in ipairs(summaries or {}) do
         table.insert(menu_table, {
             text = formatGlobalSearchSummary(summary),
@@ -248,7 +241,7 @@ function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, optio
     local menu = newPluginMenu{
         title = _("Global search"),
         title_bar_left_icon = options and options.title_bar_left_icon,
-        item_table = buildGlobalSearchMenuTable(summaries, onSelectCallback, options),
+        item_table = buildGlobalSearchMenuTable(summaries, onSelectCallback),
     }
     menu_utils.applyTitleBarOptions(menu, options)
     menu_utils.applyCloseCallback(menu, options)
@@ -262,7 +255,7 @@ function BrowseUI.updateGlobalSearchResultsMenu(menu, summaries, onSelectCallbac
         return
     end
 
-    menu.item_table = buildGlobalSearchMenuTable(summaries, onSelectCallback, options)
+    menu.item_table = buildGlobalSearchMenuTable(summaries, onSelectCallback)
     menu_utils.applyTitleBarOptions(menu, options)
     menu_utils.applyCloseCallback(menu, options)
     if menu.updateItems then
