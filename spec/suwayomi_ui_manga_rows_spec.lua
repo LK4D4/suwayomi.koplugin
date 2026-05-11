@@ -54,7 +54,12 @@ describe("suwayomi/ui/manga_rows", function()
 
     it("builds rows without mutating manga tables", function()
         local rows = require("suwayomi/ui/manga_rows")
-        local manga = { id = "m1", title = "Frieren", in_library = true }
+        local manga = {
+            id = "m1",
+            title = "Frieren",
+            in_library = true,
+            thumbnail_url = "/covers/frieren.jpg",
+        }
         local selected
 
         local row = rows.buildRow(manga, {
@@ -66,6 +71,7 @@ describe("suwayomi/ui/manga_rows", function()
 
         assert.are.equal("Frieren", row.text)
         assert.are.equal("In Library", row.mandatory)
+        assert.are.equal("/covers/frieren.jpg", row.thumbnail_url)
         assert.are.same(manga, row.manga)
         assert.is_nil(manga.menu_text)
 

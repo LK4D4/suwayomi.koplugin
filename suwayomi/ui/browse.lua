@@ -15,6 +15,10 @@ local menu_utils = require("suwayomi/ui/menu_utils")
 
 local BrowseUI = {}
 
+local function getMangaMenu()
+    return require("suwayomi/ui/manga_menu")
+end
+
 local function newPluginMenu(options)
     return Menu:new(menu_utils.applyNativeTitleBarStyle(options))
 end
@@ -289,17 +293,15 @@ end
 
 function BrowseUI.showMangaMenu(manga_list, onSelectCallback, options)
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
-
-    local menu = newPluginMenu{
+    return getMangaMenu().show{
         title = options and options.title or _("Suwayomi Manga"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = menu_table,
+        close_callback = options and options.close_callback,
+        on_title_bar_left_tap = options and options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options and options.on_title_bar_left_hold,
+        thumbnail_credentials = options and options.thumbnail_credentials,
     }
-    menu_utils.applyTitleBarOptions(menu, options)
-    menu_utils.applyCloseCallback(menu, options)
-    local UIManager = require("ui/uimanager")
-    UIManager:show(menu)
-    return menu
 end
 
 function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
@@ -308,12 +310,15 @@ function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
     end
 
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
-    menu.item_table = menu_table
-    menu_utils.applyTitleBarOptions(menu, options)
-    menu_utils.applyCloseCallback(menu, options)
-    if menu.updateItems then
-        menu:updateItems()
-    end
+    return getMangaMenu().update(menu, {
+        title = options and options.title or menu.title,
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = menu_table,
+        close_callback = options and options.close_callback,
+        on_title_bar_left_tap = options and options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options and options.on_title_bar_left_hold,
+        thumbnail_credentials = options and options.thumbnail_credentials,
+    })
 end
 
 function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
@@ -351,16 +356,15 @@ local function buildLibraryMangaMenuTable(manga_list, onSelectCallback)
 end
 
 function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
-    local menu = newPluginMenu{
+    return getMangaMenu().show{
         title = _("Suwayomi Library"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
+        close_callback = options and options.close_callback,
+        on_title_bar_left_tap = options and options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options and options.on_title_bar_left_hold,
+        thumbnail_credentials = options and options.thumbnail_credentials,
     }
-    menu_utils.applyTitleBarOptions(menu, options)
-    menu_utils.applyCloseCallback(menu, options)
-    local UIManager = require("ui/uimanager")
-    UIManager:show(menu)
-    return menu
 end
 
 function BrowseUI.updateLibraryMangaMenu(menu, manga_list, onSelectCallback, options)
@@ -368,11 +372,15 @@ function BrowseUI.updateLibraryMangaMenu(menu, manga_list, onSelectCallback, opt
         return
     end
 
-    menu.item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback)
-    menu_utils.applyTitleBarOptions(menu, options)
-    if menu.updateItems then
-        menu:updateItems()
-    end
+    return getMangaMenu().update(menu, {
+        title = _("Suwayomi Library"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
+        close_callback = options and options.close_callback,
+        on_title_bar_left_tap = options and options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options and options.on_title_bar_left_hold,
+        thumbnail_credentials = options and options.thumbnail_credentials,
+    })
 end
 
 return BrowseUI

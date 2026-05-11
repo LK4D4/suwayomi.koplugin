@@ -20,7 +20,7 @@ Tests, docs, CI files, worktrees, and `AGENTS.md` are development-only and must 
 The public runtime facades are intentionally small and stable:
 
 - `suwayomi/api.lua` exposes Suwayomi GraphQL and binary HTTP helpers. It delegates query construction to `suwayomi/api/queries.lua`, response decoding to `suwayomi/api/parsers.lua`, and HTTP/auth/URL handling to `suwayomi/api/transport.lua`.
-- `suwayomi/ui.lua` exposes KOReader menu/dialog helpers. It delegates Browse menus to `suwayomi/ui/browse.lua`, Downloads menus to `suwayomi/ui/downloads.lua`, directory picking to `suwayomi/ui/directory.lua`, and shared menu plumbing to `suwayomi/ui/menu_utils.lua`.
+- `suwayomi/ui.lua` exposes KOReader menu/dialog helpers. It delegates Browse menus to `suwayomi/ui/browse.lua`, manga row rendering to `suwayomi/ui/manga_menu.lua`, Downloads menus to `suwayomi/ui/downloads.lua`, directory picking to `suwayomi/ui/directory.lua`, and shared menu plumbing to `suwayomi/ui/menu_utils.lua`.
 - `suwayomi/downloads/queue.lua` is the public device-local download queue. It owns enqueue/retry/cancel/recovery/snapshot/status APIs and delegates active subprocess scheduling to `suwayomi/downloads/active_jobs.lua`, persistence to `suwayomi/downloads/job_store.lua`, progress-file IO to `suwayomi/downloads/progress_file.lua`, and chapter-row status text to `suwayomi/downloads/status_formatter.lua`.
 - `suwayomi/client.lua` coordinates Library and Browse flows that are not KOReader lifecycle glue.
 - `suwayomi/chapters/actions.lua` is the chapter action facade for download, delete, read/unread, selected/bulk, and manga-level chapter actions.
@@ -47,6 +47,8 @@ API:
 Browse and Library:
 
 - `suwayomi/client.lua`: user-flow orchestration for Library, Browse, source search, pagination, and manga actions.
+- `suwayomi/ui/manga_menu.lua`: KOReader Menu-compatible manga rows with cached thumbnail slots for Library and Browse/Search results.
+- `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua`: private thumbnail cache pathing and bounded background thumbnail fetch support.
 - `suwayomi/browse/controller.lua`: Browse entry flow, source fetch worker lifecycle, polling, and source-cache refresh.
 - `suwayomi/browse/source_catalog.lua`: source filtering, source cache IO, and source-list rendering.
 - `suwayomi/browse/source_fetch_worker.lua`: subprocess worker for fetching sources into a result file.

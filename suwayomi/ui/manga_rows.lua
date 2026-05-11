@@ -68,6 +68,7 @@ function MangaRows.buildRow(manga, options)
     return {
         text = MangaRows.getTitle(manga),
         mandatory = MangaRows.getMandatory(manga, options),
+        thumbnail_url = type(manga) == "table" and manga.thumbnail_url or nil,
         manga = manga,
         callback = function()
             if options.on_select then

@@ -572,7 +572,8 @@ function SuwayomiClient:showLibraryManga(category, credentials)
     local library_manga = manga
     local menu_options = self:getTitleBarMenuOptions({
         title = self:translate("Suwayomi Library"),
-    })
+    }) or {}
+    menu_options.thumbnail_credentials = credentials
     local library_menu
     local pending_library_menu_refresh = false
     local function refreshLibraryMangaMenu()
@@ -1109,6 +1110,7 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
         manga_count = #visible_manga,
     })
     local menu_options = self:buildBrowseResultMenuOptions(source, browse_options, result.has_next_page)
+    menu_options.thumbnail_credentials = credentials
     if existing_menu and menu_options.close_callback == nil then
         menu_options.close_callback = function() end
     end

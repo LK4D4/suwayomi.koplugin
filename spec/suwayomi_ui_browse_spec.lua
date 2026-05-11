@@ -18,6 +18,7 @@ describe("suwayomi/ui/browse", function()
         package.loaded["ui/widget/menu"] = nil
         package.loaded["ui/widget/multiinputdialog"] = nil
         package.loaded["ui/uimanager"] = nil
+        package.loaded["suwayomi/ui/manga_menu"] = nil
 
         package.preload.gettext = function()
             return function(text)
@@ -56,6 +57,32 @@ describe("suwayomi/ui/browse", function()
                 end,
             }
         end
+
+        package.preload["suwayomi/ui/manga_menu"] = function()
+            return {
+                show = function(options)
+                    options.renderer = "manga_menu"
+                    shown_dialog = options
+                    return options
+                end,
+                update = function(menu, options)
+                    menu.renderer = "manga_menu"
+                    menu.updated_options = options
+                    menu.item_table = options.item_table
+                    menu.title = options.title or menu.title
+                    menu.close_callback = options.close_callback
+                    if menu.title_bar and menu.title_bar.setTitle and options.title then
+                        menu.title_bar:setTitle(options.title, true)
+                    end
+                    if menu.setTitleBarLeftIcon then
+                        menu:setTitleBarLeftIcon(options.title_bar_left_icon)
+                    end
+                    if menu.updateItems then
+                        menu:updateItems()
+                    end
+                end,
+            }
+        end
     end)
 
     after_each(function()
@@ -63,6 +90,7 @@ describe("suwayomi/ui/browse", function()
         package.preload["ui/widget/menu"] = nil
         package.preload["ui/widget/multiinputdialog"] = nil
         package.preload["ui/uimanager"] = nil
+        package.preload["suwayomi/ui/manga_menu"] = nil
     end)
 
     it("shows a sources menu with source callbacks and no global search row", function()
@@ -291,6 +319,7 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_dialog.title)
+        assert.are.equal("manga_menu", shown_dialog.renderer)
         assert.are.equal("Previous page", shown_dialog.item_table[1].text)
         assert.are.equal("Already Added", shown_dialog.item_table[2].text)
         assert.are.equal("In Library", shown_dialog.item_table[2].mandatory)
@@ -339,6 +368,7 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.are.equal("MangaDex - Popular - Page 2", menu.title)
+        assert.are.equal("manga_menu", menu.renderer)
         assert.are.same({ title = "MangaDex - Popular - Page 2", refresh = true }, title_bar_title)
         assert.are.equal("appbar.menu", left_icon)
         assert.is_true(menu.updated)
@@ -373,6 +403,7 @@ describe("suwayomi/ui/browse", function()
         end)
 
         assert.are.equal("Suwayomi Library", shown_dialog.title)
+        assert.are.equal("manga_menu", shown_dialog.renderer)
         assert.are.equal("Sousou no Frieren", shown_dialog.item_table[1].text)
         assert.is_nil(shown_dialog.item_table[1].mandatory)
         shown_dialog.item_table[1].callback()

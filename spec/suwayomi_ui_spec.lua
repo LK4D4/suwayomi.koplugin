@@ -25,6 +25,7 @@ describe("suwayomi/ui", function()
         package.loaded["ui/widget/radiomark"] = nil
         package.loaded["ui/widget/pathchooser"] = nil
         package.loaded["ui/uimanager"] = nil
+        package.loaded["suwayomi/ui/manga_menu"] = nil
 
         package.preload.gettext = function()
             return function(text)
@@ -160,6 +161,21 @@ describe("suwayomi/ui", function()
                 end,
             }
         end
+
+        package.preload["suwayomi/ui/manga_menu"] = function()
+            return {
+                show = function(options)
+                    options.renderer = "manga_menu"
+                    shown_dialog = options
+                    return options
+                end,
+                update = function(menu, options)
+                    menu.renderer = "manga_menu"
+                    menu.item_table = options.item_table
+                    menu.title = options.title or menu.title
+                end,
+            }
+        end
     end)
 
     after_each(function()
@@ -173,6 +189,7 @@ describe("suwayomi/ui", function()
         package.preload["ui/widget/radiomark"] = nil
         package.preload["ui/widget/pathchooser"] = nil
         package.preload["ui/uimanager"] = nil
+        package.preload["suwayomi/ui/manga_menu"] = nil
     end)
 
     it("preserves facade access to browse menus", function()
@@ -186,6 +203,7 @@ describe("suwayomi/ui", function()
         end)
 
         assert.are.equal("Suwayomi Manga", shown_dialog.title)
+        assert.are.equal("manga_menu", shown_dialog.renderer)
         assert.are.equal("One Piece", shown_dialog.item_table[1].text)
         assert.is_nil(shown_dialog.item_table[1].mandatory)
 
