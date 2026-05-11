@@ -52,6 +52,18 @@ describe("suwayomi/ui/manga_rows", function()
         }))
     end)
 
+    it("uses source names as the secondary row text", function()
+        local rows = require("suwayomi/ui/manga_rows")
+
+        assert.are.equal("MangaDex", rows.getSubtitle({
+            source = { displayName = "MangaDex", name = "mangadex" },
+        }))
+        assert.are.equal("Local Source", rows.getSubtitle({
+            source = { name = "Local Source" },
+        }))
+        assert.is_nil(rows.getSubtitle({}))
+    end)
+
     it("builds rows without mutating manga tables", function()
         local rows = require("suwayomi/ui/manga_rows")
         local manga = {
@@ -59,6 +71,7 @@ describe("suwayomi/ui/manga_rows", function()
             title = "Frieren",
             in_library = true,
             thumbnail_url = "/covers/frieren.jpg",
+            source = { displayName = "MangaDex" },
         }
         local selected
 
@@ -70,6 +83,7 @@ describe("suwayomi/ui/manga_rows", function()
         })
 
         assert.are.equal("Frieren", row.text)
+        assert.are.equal("MangaDex", row.subtitle)
         assert.are.equal("In Library", row.mandatory)
         assert.are.equal("/covers/frieren.jpg", row.thumbnail_url)
         assert.are.same(manga, row.manga)

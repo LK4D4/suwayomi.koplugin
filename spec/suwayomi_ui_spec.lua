@@ -14,6 +14,7 @@ describe("suwayomi/ui", function()
         package.loaded["suwayomi/ui/browse"] = nil
         package.loaded["suwayomi/ui/directory"] = nil
         package.loaded["suwayomi/ui/downloads"] = nil
+        package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
@@ -192,6 +193,15 @@ describe("suwayomi/ui", function()
         package.preload["suwayomi/ui/manga_menu"] = nil
     end)
 
+    local function assertFileManagerListStyle(menu)
+        assert.is_true(menu.is_borderless)
+        assert.is_false(menu.is_popout)
+        assert.is_true(menu.title_bar_fm_style)
+        assert.are.equal(3, menu.items_max_lines)
+        assert.is_true(menu.multilines_show_more_text)
+        assert.is_nil(menu.items_mandatory_font_size)
+    end
+
     it("preserves facade access to browse menus", function()
         local ui = require("suwayomi/ui")
         local selected
@@ -292,6 +302,7 @@ describe("suwayomi/ui", function()
         end)
 
         assert.are.equal("Sousou no Frieren", shown_dialog.title)
+        assertFileManagerListStyle(shown_dialog)
         assert.are.equal("Chapter 1", shown_dialog.item_table[1].text)
         assert.are.equal("Read · Downloaded", shown_dialog.item_table[1].mandatory)
         assert.are.equal("Chapter 2", shown_dialog.item_table[2].text)
@@ -328,8 +339,7 @@ describe("suwayomi/ui", function()
 
         assert.is_nil(shown_dialog.custom_title_bar)
         assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
-        assert.is_true(shown_dialog.title_bar_fm_style)
-        assert.is_false(shown_dialog.is_popout)
+        assertFileManagerListStyle(shown_dialog)
 
         shown_dialog.onLeftButtonTap()
 

@@ -63,10 +63,22 @@ function MangaRows.getMandatory(manga, options)
     return table.concat(labels, _(" · "))
 end
 
+function MangaRows.getSubtitle(manga)
+    if type(manga) ~= "table" or type(manga.source) ~= "table" then
+        return nil
+    end
+    return manga.source.displayName
+        or manga.source.display_name
+        or manga.source.name
+        or manga.source.raw_name
+        or manga.source.id
+end
+
 function MangaRows.buildRow(manga, options)
     options = options or {}
     return {
         text = MangaRows.getTitle(manga),
+        subtitle = MangaRows.getSubtitle(manga),
         mandatory = MangaRows.getMandatory(manga, options),
         thumbnail_url = type(manga) == "table" and manga.thumbnail_url or nil,
         manga = manga,

@@ -42,6 +42,10 @@ local Screen = Device.screen
 local MangaMenu = {}
 
 local THUMBNAIL_MAX_ACTIVE = 2
+local ROW_HEIGHT_BASE = 64
+local scale_by_size = Screen and Screen.scaleBySize
+    and Screen:scaleBySize(1000000) * (1 / 1000000)
+    or 1
 
 local MangaMenuItem = InputContainer:extend{
     entry = nil,
@@ -62,6 +66,18 @@ end
 
 local function fontFace(name, size)
     return Font:getFace(name, size)
+end
+
+local function fontSizeForRow(nominal, max_size, row_height)
+    local font_size = math.floor(nominal * row_height * (1 / ROW_HEIGHT_BASE) / scale_by_size)
+    if max_size and font_size >= max_size then
+        return max_size
+    end
+    return math.max(1, font_size)
+end
+
+local function round(value)
+    return math.floor(value + 0.5)
 end
 
 local function placeholderText(text)
@@ -158,18 +174,19 @@ function MangaMenuItem:buildThumbnail(slot_size)
 end
 
 function MangaMenuItem:buildRowWidget(width, height)
-    local horizontal_padding = Size.padding.fullscreen
-    local inner_width = width - 2 * horizontal_padding
     local is_manga_row = self.entry.manga ~= nil
-    local thumbnail_slot = is_manga_row and math.max(1, height - 2 * scaled(4)) or 0
-    local gap = is_manga_row and Size.span.horizontal_default or 0
+    local left_padding = is_manga_row and 0 or scaled(10)
+    local right_padding = scaled(10)
+    local thumbnail_slot = is_manga_row and math.max(1, height) or 0
+    local gap = is_manga_row and scaled(5) or 0
+    local inner_width = width - left_padding - right_padding
     local mandatory_widget
     local mandatory_width = 0
 
     if self.mandatory then
         mandatory_widget = TextBoxWidget:new{
             text = tostring(self.mandatory),
-            face = fontFace("cfont", math.max(10, self.menu.font_size - 5)),
+            face = fontFace("cfont", fontSizeForRow(14, 18, height)),
             width = math.floor(inner_width * 0.28),
             alignment = "right",
             height = height,
@@ -184,16 +201,34 @@ function MangaMenuItem:buildRowWidget(width, height)
         1,
         inner_width - thumbnail_slot - gap - mandatory_width - (mandatory_widget and Size.span.horizontal_default or 0)
     )
+    local subtitle = self.entry.subtitle
+    local title_height = subtitle and math.max(1, math.floor(height * 0.58)) or height
     local title = TextBoxWidget:new{
         text = BD.auto(tostring(self.text or "")),
-        face = fontFace("cfont", math.max(12, self.menu.font_size)),
+        face = fontFace("cfont", fontSizeForRow(20, 24, height)),
         width = title_width,
-        height = height,
+        height = title_height,
         height_adjust = true,
         height_overflow_show_ellipsis = true,
         alignment = "left",
         bold = is_manga_row,
     }
+    local text_column = title
+    if subtitle then
+        text_column = VerticalGroup:new{
+            title,
+            TextBoxWidget:new{
+                text = BD.auto(tostring(subtitle)),
+                face = fontFace("cfont", fontSizeForRow(18, 22, height)),
+                width = title_width,
+                height = math.max(1, height - title_height),
+                height_adjust = true,
+                height_overflow_show_ellipsis = true,
+                alignment = "left",
+                fgcolor = Blitbuffer.COLOR_DARK_GRAY,
+            },
+        }
+    end
 
     local title_items = {
         self:buildThumbnail(thumbnail_slot),
@@ -201,7 +236,7 @@ function MangaMenuItem:buildRowWidget(width, height)
     if is_manga_row then
         table.insert(title_items, HorizontalSpan:new{ width = gap })
     end
-    table.insert(title_items, title)
+    table.insert(title_items, text_column)
 
     local main = LeftContainer:new{
         dimen = Geom:new{ w = inner_width, h = height },
@@ -220,12 +255,12 @@ function MangaMenuItem:buildRowWidget(width, height)
 
     return HorizontalGroup:new{
         align = "center",
-        HorizontalSpan:new{ width = horizontal_padding },
+        HorizontalSpan:new{ width = left_padding },
         VerticalGroup:new{
             VerticalSpan:new{ width = math.floor((self.dimen.h - height) / 2) },
             row,
         },
-        HorizontalSpan:new{ width = horizontal_padding },
+        HorizontalSpan:new{ width = right_padding },
     }
 end
 
@@ -254,6 +289,59 @@ local function getItemText(item)
         return Menu.getMenuText(item)
     end
     return item and item.text or ""
+end
+
+function MangaMenu.recalculateDimen(menu, no_recalculate_dimen)
+    if no_recalculate_dimen and menu.item_dimen then
+        return
+    end
+    if not menu.inner_dimen or not Screen or not Screen.getWidth or not Screen.getHeight then
+        if menu._suwayomi_original_recalculate_dimen then
+            return menu._suwayomi_original_recalculate_dimen(menu, no_recalculate_dimen)
+        end
+        return
+    end
+
+    menu.portrait_mode = Screen:getWidth() <= Screen:getHeight()
+    local others_height = 0
+    if menu.title_bar then
+        if not menu.is_borderless then
+            others_height = others_height + 2
+        end
+        if not menu.no_title then
+            others_height = others_height + menu.title_bar.dimen.h
+        end
+        if menu.page_info then
+            others_height = others_height + menu.page_info:getSize().h
+        end
+    end
+
+    local available_height = menu.inner_dimen.h - others_height - Size.line.thin
+    if menu._suwayomi_files_per_page == nil then
+        menu._suwayomi_files_per_page = menu.items_per_page
+            or math.max(1, math.floor(available_height / scale_by_size / ROW_HEIGHT_BASE))
+    end
+
+    menu.perpage = menu._suwayomi_files_per_page
+    if not menu.portrait_mode then
+        local portrait_available_height = Screen:getWidth() - others_height - Size.line.thin
+        local portrait_item_height = math.floor(portrait_available_height / menu.perpage) - Size.line.thin
+        menu.perpage = math.max(1, round(available_height / portrait_item_height))
+    end
+
+    menu.page_num = math.ceil(#menu.item_table / menu.perpage)
+    if menu.page_num > 0 and menu.page > menu.page_num then
+        menu.page = menu.page_num
+    end
+
+    menu.item_height = math.floor(available_height / menu.perpage) - Size.line.thin
+    menu.item_width = menu.inner_dimen.w
+    menu.item_dimen = Geom:new{
+        x = 0,
+        y = 0,
+        w = menu.item_width,
+        h = menu.item_height,
+    }
 end
 
 function MangaMenu.prepareThumbnail(menu, item)
@@ -435,6 +523,10 @@ function MangaMenu.install(menu, options)
 
     if not menu._suwayomi_manga_menu_installed then
         local original_on_close_widget = menu.onCloseWidget
+        menu._suwayomi_original_recalculate_dimen = menu._recalculateDimen
+        menu._recalculateDimen = function(self, no_recalculate_dimen)
+            return MangaMenu.recalculateDimen(self, no_recalculate_dimen)
+        end
         menu.updateItems = function(self, select_number, no_recalculate_dimen)
             return MangaMenu.updateItems(self, select_number, no_recalculate_dimen)
         end
@@ -461,6 +553,9 @@ function MangaMenu.show(options)
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = options.item_table or {},
         items_per_page = options.items_per_page,
+        is_borderless = true,
+        is_popout = false,
+        title_bar_fm_style = true,
     })
     MangaMenu.install(menu, options)
     applyOptions(menu, options)

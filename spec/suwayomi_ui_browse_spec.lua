@@ -13,6 +13,7 @@ describe("suwayomi/ui/browse", function()
         events = {}
 
         package.loaded["suwayomi/ui/browse"] = nil
+        package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil

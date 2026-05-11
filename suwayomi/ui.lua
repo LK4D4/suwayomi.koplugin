@@ -16,6 +16,7 @@ local _ = require("gettext")
 local BrowseUI = require("suwayomi/ui/browse")
 local DirectoryUI = require("suwayomi/ui/directory")
 local DownloadsUI = require("suwayomi/ui/downloads")
+local ListMenu = require("suwayomi/ui/list_menu")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local SuwayomiUI = {}
@@ -81,7 +82,7 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
         item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback),
         close_callback = options.close_callback,
     }
-    local menu = Menu:new(menu_utils.applyNativeTitleBarStyle(menu_options))
+    local menu = ListMenu.new(menu_utils.applyNativeTitleBarStyle(menu_options))
     if options.on_title_bar_left_tap then
         menu.onLeftButtonTap = function(...)
             return options.on_title_bar_left_tap(menu, ...)

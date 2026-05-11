@@ -85,12 +85,14 @@ describe("suwayomi/ui/manga_menu", function()
             return {
                 screen = {
                     scaleBySize = function(_, value) return value end,
+                    getWidth = function() return 480 end,
+                    getHeight = function() return 800 end,
                 },
             }
         end
         package.preload["ui/font"] = function()
             return {
-                getFace = function(name, size)
+                getFace = function(_, name, size)
                     return { name = name, size = size }
                 end,
             }
@@ -239,7 +241,11 @@ describe("suwayomi/ui/manga_menu", function()
                 options.perpage = options.items_per_page or 10
                 options.itemnumber = 1
                 options.item_group = newGroup()
-                options.page_info = { resetLayout = function() end }
+                options.inner_dimen = { w = 480, h = 641 }
+                options.page_info = {
+                    resetLayout = function() end,
+                    getSize = function() return { h = 0 } end,
+                }
                 options.return_button = { resetLayout = function() end }
                 options.content_group = { resetLayout = function() end }
                 options.item_dimen = {
@@ -299,6 +305,64 @@ describe("suwayomi/ui/manga_menu", function()
         end
         return nil
     end
+
+    local function collectWidgetsByKind(widget, kind, widgets, seen)
+        if type(widget) ~= "table" then
+            return widgets
+        end
+        widgets = widgets or {}
+        seen = seen or {}
+        if seen[widget] then
+            return widgets
+        end
+        seen[widget] = true
+        if widget.kind == kind then
+            table.insert(widgets, widget)
+        end
+        for _, child in pairs(widget) do
+            collectWidgetsByKind(child, kind, widgets, seen)
+        end
+        return widgets
+    end
+
+    it("uses KOReader detailed-list sizing and cfont row text", function()
+        local manga_menu = require("suwayomi/ui/manga_menu")
+
+        local menu = manga_menu.show{
+            title = "Results",
+            item_table = {
+                {
+                    text = "A long manga title",
+                    subtitle = "MangaDex",
+                    mandatory = "12 chapters",
+                    manga = { id = "m1" },
+                },
+            },
+        }
+
+        assert.is_true(menu.is_borderless)
+        assert.is_false(menu.is_popout)
+        assert.is_true(menu.title_bar_fm_style)
+        assert.are.equal(10, menu.perpage)
+        assert.are.equal(63, menu.item_dimen.h)
+
+        local textboxes = collectWidgetsByKind(menu.item_group[1], "textbox")
+        local saw_title = false
+        local saw_subtitle = false
+        local saw_metadata = false
+        for _, widget in ipairs(textboxes) do
+            if widget.text == "A long manga title" then
+                saw_title = widget.bold == true and widget.face.name == "cfont" and widget.face.size == 19
+            elseif widget.text == "MangaDex" then
+                saw_subtitle = widget.face.name == "cfont" and widget.face.size == 17
+            elseif widget.text == "12 chapters" then
+                saw_metadata = widget.face.name == "cfont" and widget.face.size == 13
+            end
+        end
+        assert.is_true(saw_title)
+        assert.is_true(saw_subtitle)
+        assert.is_true(saw_metadata)
+    end)
 
     it("shows menu rows, discovers cached thumbnails, and schedules only visible uncached thumbnails", function()
         cache_paths["/cached.jpg"] = "/settings/cached.jpg"
