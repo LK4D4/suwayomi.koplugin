@@ -223,6 +223,7 @@ describe("suwayomi/chapters/actions", function()
             "openChapter",
             "markChapterRead",
             "downloadSelectedChapters",
+            "confirmDeleteChapterFromDevice",
             "performBulkChapterAction",
         })
     end)
@@ -341,6 +342,47 @@ describe("suwayomi/chapters/actions", function()
         assert.is_nil(plugin.ledger["m1:c1"])
         assert.are.equal(1, #plugin.saved_ledgers)
         assert.are.equal(1, #queue.cleared)
+        assert.are.same({
+            "/downloads/Manga/Chapter 1.cbz",
+            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
+            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
+            "/downloads/Manga/Chapter 1.cbz.sdr",
+        }, removed_paths)
+    end)
+
+    it("confirms before deleting a single chapter from device actions", function()
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+            ledger = {
+                ["m1:c1"] = {
+                    manga_id = "m1",
+                    chapter_id = "c1",
+                    path = "/downloads/Manga/Chapter 1.cbz",
+                    read = false,
+                },
+            },
+        })
+        function plugin:showBulkActionConfirmation(text, ok_text, callback)
+            self.confirmation = {
+                text = text,
+                ok_text = ok_text,
+                callback = callback,
+            }
+            return true
+        end
+
+        assert.is_true(plugin:performChapterAction(manga, chapter, "delete"))
+
+        assert.are.equal("Delete downloaded file for Chapter 1 from this device?", plugin.confirmation.text)
+        assert.are.equal("Delete", plugin.confirmation.ok_text)
+        assert.are.same({}, removed_paths)
+        assert.is_table(plugin.ledger["m1:c1"])
+
+        plugin.confirmation.callback()
+
+        assert.is_nil(plugin.ledger["m1:c1"])
         assert.are.same({
             "/downloads/Manga/Chapter 1.cbz",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",

@@ -80,7 +80,7 @@ function Methods:performChapterAction(manga, chapter, action_id)
         return true
     end
     if action_id == "delete" then
-        return self:deleteChapterFromDevice(manga, chapter)
+        return self:confirmDeleteChapterFromDevice(manga, chapter)
     end
     if action_id == "mark_read" then
         return self:markChapterRead(manga, chapter)
@@ -95,6 +95,21 @@ function Methods:performChapterAction(manga, chapter, action_id)
         return self:markChapterUnread(manga, chapter)
     end
     return false
+end
+
+
+function Methods:confirmDeleteChapterFromDevice(manga, chapter)
+    local chapter_name = chapter and chapter.name or _("this chapter")
+    if self.showBulkActionConfirmation then
+        return self:showBulkActionConfirmation(
+            T(_("Delete downloaded file for %1 from this device?"), chapter_name),
+            _("Delete"),
+            function()
+                self:deleteChapterFromDevice(manga, chapter)
+            end
+        )
+    end
+    return self:deleteChapterFromDevice(manga, chapter)
 end
 
 
