@@ -5,9 +5,61 @@ describe("suwayomi/client", function()
         package.loaded["suwayomi/client"] = nil
     end)
 
+    local buildImmediateSourceMangaRuntime
+
     local function newClient(options)
         local Client = require("suwayomi/client")
         options = options or {}
+        if not options.disable_source_manga_runtime
+            and not options.source_manga_worker
+            and options.api
+            and options.api.fetchMangaForSource
+        then
+            local source_manga_job, source_manga_worker = buildImmediateSourceMangaRuntime(options.api)
+            if options.subprocess_job then
+                local original_job = options.subprocess_job
+                options.subprocess_job = {
+                    buildResultPath = original_job.buildResultPath or source_manga_job.buildResultPath,
+                    start = function(job_options)
+                        local active = job_options and job_options.active or {}
+                        if tostring(active.result_path or ""):match("source_manga") then
+                            return source_manga_job.start(job_options)
+                        end
+                        return original_job.start(job_options)
+                    end,
+                    cancel = function(active)
+                        if tostring(active and active.result_path or ""):match("source_manga") then
+                            return source_manga_job.cancel(active)
+                        end
+                        if original_job.cancel then
+                            return original_job.cancel(active)
+                        end
+                    end,
+                }
+            else
+                options.subprocess_job = source_manga_job
+            end
+            options.source_manga_worker = source_manga_worker
+            options.ffi_util = options.ffi_util or {}
+            options.ui_manager = options.ui_manager or {}
+            options.chapter_count_worker = options.chapter_count_worker or "disabled"
+            if options.ui and options.ui.showMangaMenu then
+                local original_show_manga_menu = options.ui.showMangaMenu
+                options.ui.showMangaMenu = function(manga, onSelectCallback, menu_options)
+                    if manga
+                        and #manga == 1
+                        and manga[1]
+                        and manga[1].title == "Loading manga..."
+                    then
+                        return { name = "source-manga-loading" }
+                    end
+                    return original_show_manga_menu(manga, onSelectCallback, menu_options)
+                end
+                options.ui.updateMangaMenu = options.ui.updateMangaMenu or function(_, manga, onSelectCallback, menu_options)
+                    return original_show_manga_menu(manga, onSelectCallback, menu_options)
+                end
+            end
+        end
         local loading_messages = {}
         local shown_messages = {}
         local opened_manga
@@ -129,17 +181,7 @@ describe("suwayomi/client", function()
     end)
 
     it("loads manga for a source and opens the selected manga actions through the plugin", function()
-        local Client = require("suwayomi/client")
-        local shown_manga_actions
-        local loading_messages = {}
-        local log_events = {}
-        local tracked = {}
-        local client = Client:new{
-            settings = {
-                load = function()
-                    return { server_url = "https://suwayomi.example" }
-                end,
-            },
+        local client, state = newClient({
             api = {
                 fetchMangaForSource = function(_, options)
                     assert.are.same({
@@ -160,41 +202,12 @@ describe("suwayomi/client", function()
                     assert.are.equal("Sousou no Frieren", manga[1].title)
                     assert.are.equal("MangaDex (EN) - Popular - Page 1", menu_options.title)
                     assert.are.equal("appbar.menu", menu_options.title_bar_left_icon)
-                    assert.is_function(menu_options.close_callback)
                     onSelect(manga[1])
                     return { name = "browse-results-menu" }
                 end,
             },
-            debug = {
-                time = function(_, _, callback)
-                    return callback()
-                end,
-                log = function(event)
-                    table.insert(log_events, event)
-                end,
-            },
-            plugin = {
-                withLoadingMessage = function(_, key, message, callback)
-                    table.insert(loading_messages, key .. ":" .. message)
-                    return callback()
-                end,
-                showMessage = function(_, message)
-                    error("unexpected message: " .. tostring(message))
-                end,
-                showMangaActions = function(_, manga)
-                    shown_manga_actions = manga
-                end,
-                getTitleBarMenuOptions = function()
-                    return { title_bar_left_icon = "appbar.menu" }
-                end,
-                trackSuwayomiScreen = function(_, route_id, widget)
-                    table.insert(tracked, { route_id = route_id, widget = widget })
-                end,
-            },
-            gettext = function(text)
-                return text
-            end,
-        }
+            title_menu_options = { title_bar_left_icon = "appbar.menu" },
+        })
 
         client:showMangaForSource({
             id = "s1",
@@ -203,17 +216,17 @@ describe("suwayomi/client", function()
             lang = "en",
         })
 
-        assert.are.same({ "manga:Loading manga..." }, loading_messages)
+        assert.are.same({}, state.loading_messages)
         assert.are.same({
             id = "s1",
             displayName = "MangaDex (EN)",
             name = "MangaDex",
             lang = "en",
-        }, shown_manga_actions.source)
-        assert.are.equal("manga_loaded", log_events[1].event)
-        assert.are.equal(1, log_events[1].manga_count)
-        assert.are.equal("browse-results", tracked[1].route_id)
-        assert.are.equal("browse-results-menu", tracked[1].widget.name)
+        }, state.shown_manga_actions().source)
+        assert.are.equal("manga_loaded", state.log_events[1].event)
+        assert.are.equal(1, state.log_events[1].manga_count)
+        assert.are.equal("browse-results", state.tracked_screens[1].route_id)
+        assert.are.equal("source-manga-loading", state.tracked_screens[1].widget.name)
     end)
 
     it("opens a source mode menu for non-local sources and fetches popular manga from it", function()
@@ -244,7 +257,7 @@ describe("suwayomi/client", function()
         client:showMangaForSource({ id = "s1", name = "MangaDex", lang = "en" })
 
         assert.are.same({ source_id = "s1", page = 1, type = "POPULAR" }, fetched_options)
-        assert.are.same({ "manga:Loading manga..." }, state.loading_messages)
+        assert.are.same({}, state.loading_messages)
     end)
 
     it("keeps local sources on the direct manga listing flow", function()
@@ -390,6 +403,68 @@ describe("suwayomi/client", function()
         end
 
         return fake, started, canceled
+    end
+
+    buildImmediateSourceMangaRuntime = function(api)
+        local results = {}
+        local fake = {}
+        local worker = {}
+
+        function fake.buildResultPath(prefix)
+            return "/settings/" .. tostring(prefix) .. ".json"
+        end
+
+        function fake.start(options)
+            local active = options.active or {}
+            active.on_finish = options.on_finish
+            active.on_timeout = options.on_timeout
+            active.read_result = options.read_result
+            active.run = options.run
+            if not tostring(active.result_path or ""):match("source_manga") then
+                return active
+            end
+            if options.run then
+                options.run(active.result_path, active)
+            end
+            if options.on_finish then
+                options.on_finish(active, options.read_result and options.read_result(active.result_path, active) or nil)
+            end
+            return active
+        end
+
+        function fake.cancel(active)
+            if active then
+                active.canceled = true
+            end
+        end
+
+        function worker:run(credentials, source, browse_options, result_path)
+            source = type(source) == "table" and source or {}
+            browse_options = type(browse_options) == "table" and browse_options or {}
+            local request_options = {
+                source_id = source.id,
+                page = tonumber(browse_options.page) or 1,
+                type = browse_options.type or "POPULAR",
+            }
+            if request_options.type == "SEARCH" then
+                request_options.query = browse_options.query
+            end
+            local api_result = api.fetchMangaForSource(credentials, request_options)
+            results[result_path] = {
+                ok = api_result and api_result.ok == true,
+                source = source,
+                browse_options = browse_options,
+                manga = api_result and api_result.manga or {},
+                has_next_page = api_result and api_result.has_next_page == true,
+                error = api_result and api_result.error or nil,
+            }
+        end
+
+        function worker:readResult(result_path)
+            return results[result_path]
+        end
+
+        return fake, worker
     end
 
     local function buildChapterCountSubprocessFake()
@@ -643,6 +718,89 @@ describe("suwayomi/client", function()
         assert.are.equal(started[1], canceled[1])
     end)
 
+    it("does not fall back to UI-thread source manga requests when the worker cannot start", function()
+        local api_called = false
+        local client, state = newClient({
+            disable_source_manga_runtime = true,
+            api = {
+                fetchMangaForSource = function()
+                    api_called = true
+                    return { ok = true, manga = {} }
+                end,
+            },
+            ui = {
+                showMangaMenu = function()
+                    error("unexpected manga menu")
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+            lang = "en",
+        }, {
+            skip_mode_menu = true,
+        })
+
+        assert.is_false(api_called)
+        assert.are.same({ "Could not start manga loading." }, state.shown_messages)
+    end)
+
+    it("does not fall back to UI-thread source manga requests when subprocess startup fails", function()
+        local api_called = false
+        local updated_manga
+        local updated_options
+        local client, state = newClient({
+            api = {
+                fetchMangaForSource = function()
+                    api_called = true
+                    return { ok = true, manga = {} }
+                end,
+            },
+            subprocess_job = {
+                buildResultPath = function(prefix)
+                    return "/settings/" .. tostring(prefix) .. ".json"
+                end,
+                start = function()
+                    return nil
+                end,
+            },
+            source_manga_worker = {
+                run = function()
+                    api_called = true
+                end,
+                readResult = function()
+                    return { ok = true, manga = {} }
+                end,
+            },
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-manga-loading" }
+                end,
+                updateMangaMenu = function(_, manga, _, menu_options)
+                    updated_manga = manga
+                    updated_options = menu_options
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+            lang = "en",
+        }, {
+            skip_mode_menu = true,
+        })
+
+        assert.is_false(api_called)
+        assert.are.same({}, state.shown_messages)
+        assert.are.equal("Could not start manga loading.", updated_manga[1].title)
+        assert.are.equal("MangaDex (EN) - Popular - Page 1", updated_options.title)
+    end)
+
     it("updates the source search menu when the subprocess returns manga", function()
         local subprocess_job, started = buildSourceMangaSubprocessFake()
         local updated_manga
@@ -695,7 +853,12 @@ describe("suwayomi/client", function()
                     return { ok = false, error = "GraphQL error: latest not supported" }
                 end,
             },
-            ui = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-manga-loading" }
+                end,
+                updateMangaMenu = function() end,
+            },
         })
 
         client:showMangaForSource({ id = "s1", name = "MangaDex", lang = "en" }, { type = "LATEST" })
@@ -719,7 +882,12 @@ describe("suwayomi/client", function()
                         return { ok = false, error = error_message }
                     end,
                 },
-                ui = {},
+                ui = {
+                    showMangaMenu = function()
+                        return { name = "source-manga-loading" }
+                    end,
+                    updateMangaMenu = function() end,
+                },
             })
 
             client:showMangaForSource({ id = "s1", name = "MangaDex", lang = "en" }, { type = "LATEST" })
@@ -1110,6 +1278,7 @@ describe("suwayomi/client", function()
 
     it("keeps browsed manga visible and refreshes row state after library changes", function()
         local updated_manga
+        local selected = false
         local client = newClient({
             api = {
                 fetchMangaForSource = function()
@@ -1126,8 +1295,12 @@ describe("suwayomi/client", function()
                     onSelect(manga[1])
                     return { name = "browse-menu" }
                 end,
-                updateMangaMenu = function(_, manga)
+                updateMangaMenu = function(_, manga, onSelect)
                     updated_manga = manga
+                    if not selected then
+                        selected = true
+                        onSelect(manga[1])
+                    end
                 end,
             },
         })
@@ -1171,6 +1344,7 @@ describe("suwayomi/client", function()
                     return { name = "browse-menu" }
                 end,
                 updateMangaMenu = function(_, manga)
+                    shown_manga = manga
                     table.insert(updated_manga, {
                         m1 = {
                             loading = manga[1].chapter_count_loading,
@@ -1200,11 +1374,11 @@ describe("suwayomi/client", function()
         assert.are.equal(3, #shown_manga)
         assert.are.equal("m1", started[1].manga_id)
         assert.are.equal(1, #started)
-        assert.is_true(updated_manga[1].m1.loading)
-        assert.are.equal(0, updated_manga[1].m1.count)
-        assert.is_nil(updated_manga[1].m2.loading)
-        assert.are.equal(7, updated_manga[1].m2.count)
-        assert.is_nil(updated_manga[1].m3.loading)
+        assert.is_true(updated_manga[2].m1.loading)
+        assert.are.equal(0, updated_manga[2].m1.count)
+        assert.is_nil(updated_manga[2].m2.loading)
+        assert.are.equal(7, updated_manga[2].m2.count)
+        assert.is_nil(updated_manga[2].m3.loading)
 
         started[1].on_finish(started[1], {
             ok = true,
@@ -1212,11 +1386,11 @@ describe("suwayomi/client", function()
             chapter_count = 5,
         })
 
-        assert.are.equal(5, updated_manga[2].m1.count)
-        assert.is_true(updated_manga[2].m1.verified)
-        assert.is_nil(updated_manga[2].m1.loading)
+        assert.are.equal(5, updated_manga[3].m1.count)
+        assert.is_true(updated_manga[3].m1.verified)
+        assert.is_nil(updated_manga[3].m1.loading)
         assert.are.equal("m3", started[2].manga_id)
-        assert.is_true(updated_manga[3].m3.loading)
+        assert.is_true(updated_manga[4].m3.loading)
 
         started[2].on_finish(started[2], {
             ok = true,
@@ -1224,9 +1398,9 @@ describe("suwayomi/client", function()
             chapter_count = 0,
         })
 
-        assert.are.equal(0, updated_manga[4].m3.count)
-        assert.is_true(updated_manga[4].m3.verified)
-        assert.is_nil(updated_manga[4].m3.loading)
+        assert.are.equal(0, updated_manga[5].m3.count)
+        assert.is_true(updated_manga[5].m3.verified)
+        assert.is_nil(updated_manga[5].m3.loading)
     end)
 
     it("opens browse result manga actions without changing the action surface", function()

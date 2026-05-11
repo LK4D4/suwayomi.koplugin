@@ -144,8 +144,9 @@ Direct GraphQL probing against the same Suwayomi server is useful when a live so
 
 ## Known weak spots from the first investigation
 
-- `browseSuwayomi`, `showMangaForSource`, and `showChaptersForManga` perform synchronous GraphQL requests on the UI path.
-- Global search is now partial and cancellable; keep validating that slow-source failures stay isolated. Source-specific search can still wait on the selected source: in the May 2026 Phase 8 run, a Comick text search held the UI for about 60 seconds before surfacing `Could not reach the Suwayomi server: wantread`; direct GraphQL returned HTTP 504 for the same request.
+- `showMangaForSource` now uses a cancellable subprocess worker; keep validating cancel, timeout, and immediate-result behavior on Android source search/latest/popular flows.
+- `browseSuwayomi` and `showChaptersForManga` still perform synchronous GraphQL requests on the UI path.
+- Global search is now partial and cancellable; keep validating that slow-source failures stay isolated. Source-specific result pages should also stay cancellable through the source manga worker.
 - Pending read sync now starts a subprocess worker from `schedulePendingReadSync`; verify that worker startup, polling, timeout, and retry handling remain non-blocking on Android.
 - Against the provided Suwayomi test instance, 10 sequential read-state mutations took 16.6 to 22.5 seconds total in direct GraphQL probing, with single requests ranging roughly 0.6 to 4.5 seconds.
 - A 70-chapter local batch is still useful as a stress case because it exercises the read-sync worker, result polling, and retry scheduling.

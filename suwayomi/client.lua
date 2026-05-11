@@ -1203,6 +1203,11 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
         runtime = runtime,
     }
 
+    state.menu = self.ui.showMangaMenu({
+        { title = self:translate("Loading manga...") },
+    }, nil, self:buildSourceMangaLoadingMenuOptions(state))
+    self:trackScreen("browse-results", state.menu)
+
     local active = runtime.job.start({
         active = {
             source = source,
@@ -1248,24 +1253,13 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
     })
 
     if not active then
-        return false
+        state.finished = true
+        self:showSourceMangaStatus(state.menu, title, self:translate("Could not start manga loading."))
+        return true
     end
 
     state.active = active
-    state.menu = self.ui.showMangaMenu({
-        { title = self:translate("Loading manga...") },
-    }, nil, self:buildSourceMangaLoadingMenuOptions(state))
-    self:trackScreen("browse-results", state.menu)
     return true
-end
-
-function SuwayomiClient:fetchMangaForSourceSync(credentials, source, browse_options)
-    return self.plugin:withLoadingMessage("manga", self:translate("Loading manga..."), function()
-        return self.api.fetchMangaForSource(
-            credentials,
-            self:buildSourceMangaRequestOptions(source, browse_options)
-        )
-    end)
 end
 
 function SuwayomiClient:showMangaForSource(source, options)
@@ -1289,8 +1283,7 @@ function SuwayomiClient:showMangaForSource(source, options)
             return
         end
 
-        local result = self:fetchMangaForSourceSync(credentials, source, browse_options)
-        return self:renderMangaForSourceResult(credentials, source, browse_options, result)
+        self.plugin:showMessage(self:translate("Could not start manga loading."))
     end)
 end
 
