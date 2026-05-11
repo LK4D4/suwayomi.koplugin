@@ -37,9 +37,6 @@ function Methods:performTitleBarAction(menu, action, screen_options, action_cont
         return false
     end
     if action.id == "home" then
-        if self.closeSuwayomiPlugin then
-            self:closeSuwayomiPlugin()
-        end
         if self.showHome then
             self:showHome()
         end

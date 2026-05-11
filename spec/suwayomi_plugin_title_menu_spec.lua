@@ -130,7 +130,7 @@ describe("suwayomi/plugin/title_menu", function()
         assert.is_true(shown_action_menu.actions[#shown_action_menu.actions].destructive)
     end)
 
-    it("handles home centrally by closing plugin screens and showing the hub", function()
+    it("handles home centrally without closing the current plugin screen", function()
         local TitleMenu = require("suwayomi/plugin/title_menu")
         local events = {}
         local plugin = {
@@ -147,6 +147,6 @@ describe("suwayomi/plugin/title_menu", function()
 
         plugin:performTitleBarAction({ name = "menu" }, { id = "home" }, {})
 
-        assert.are.same({ "close", "home" }, events)
+        assert.are.same({ "home" }, events)
     end)
 end)
