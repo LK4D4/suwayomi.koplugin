@@ -219,12 +219,6 @@ function Methods:updateMangaFromLibraryStateResponse(manga, updated_manga, in_li
             manga.in_library = in_library == true
         end
     end
-    if self.getClient then
-        local client = self:getClient()
-        if client and client.formatLibraryMangaRow then
-            manga.menu_text = client:formatLibraryMangaRow(manga)
-        end
-    end
 end
 
 

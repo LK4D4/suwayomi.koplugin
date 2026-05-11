@@ -272,7 +272,7 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("s1", selected[1].source.id)
     end)
 
-    it("shows compact browse result markers, title, and paging rows", function()
+    it("shows compact browse result library status, title, and paging rows", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}
         local paging = {}
@@ -295,9 +295,12 @@ describe("suwayomi/ui/browse", function()
 
         assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_dialog.title)
         assert.are.equal("Previous page", shown_dialog.item_table[1].text)
-        assert.are.equal("[+] Already Added", shown_dialog.item_table[2].text)
-        assert.are.equal("[ ] New Find", shown_dialog.item_table[3].text)
-        assert.are.equal("[ ] Unknown State", shown_dialog.item_table[4].text)
+        assert.are.equal("Already Added", shown_dialog.item_table[2].text)
+        assert.are.equal("In Library", shown_dialog.item_table[2].mandatory)
+        assert.are.equal("New Find", shown_dialog.item_table[3].text)
+        assert.is_nil(shown_dialog.item_table[3].mandatory)
+        assert.are.equal("Unknown State", shown_dialog.item_table[4].text)
+        assert.is_nil(shown_dialog.item_table[4].mandatory)
         assert.are.equal("Next page", shown_dialog.item_table[5].text)
 
         shown_dialog.item_table[1].callback()
@@ -359,14 +362,15 @@ describe("suwayomi/ui/browse", function()
         assert.are.same({ id = 0, name = "Default", manga_count = 2 }, selected_category)
 
         browse.showLibraryMangaMenu({
-            { id = "m1", title = "Sousou no Frieren", menu_text = "Frieren [12 unread]" },
+            { id = "m1", title = "Sousou no Frieren", unread_count = 12 },
         }, function(manga)
             selected_manga = manga
         end)
 
         assert.are.equal("Suwayomi Library", shown_dialog.title)
-        assert.are.equal("Frieren [12 unread]", shown_dialog.item_table[1].text)
+        assert.are.equal("Sousou no Frieren", shown_dialog.item_table[1].text)
+        assert.is_nil(shown_dialog.item_table[1].mandatory)
         shown_dialog.item_table[1].callback()
-        assert.are.same({ id = "m1", title = "Sousou no Frieren", menu_text = "Frieren [12 unread]" }, selected_manga)
+        assert.are.same({ id = "m1", title = "Sousou no Frieren", unread_count = 12 }, selected_manga)
     end)
 end)

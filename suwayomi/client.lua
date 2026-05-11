@@ -76,32 +76,6 @@ function SuwayomiClient:attachSourceToManga(manga, source)
     return manga
 end
 
-function SuwayomiClient:formatLibraryMangaRow(manga)
-    local parts = {
-        manga.title or tostring(manga.id),
-    }
-    local details = {}
-    if manga.unread_count ~= nil then
-        table.insert(details, tostring(manga.unread_count) .. " unread")
-    end
-    local source = manga.source
-    local source_name = source and (source.displayName or source.name or source.lang)
-    if source_name and source_name ~= "" then
-        table.insert(details, source_name)
-    end
-    if #details > 0 then
-        table.insert(parts, "(" .. table.concat(details, " / ") .. ")")
-    end
-    return table.concat(parts, " ")
-end
-
-function SuwayomiClient:withLibraryMenuText(manga_list)
-    for _, manga in ipairs(manga_list or {}) do
-        manga.menu_text = self:formatLibraryMangaRow(manga)
-    end
-    return manga_list
-end
-
 function SuwayomiClient:mangaBelongsToCategory(manga, category)
     if not category or not category.id then
         return true
@@ -367,7 +341,7 @@ function SuwayomiClient:showLibraryManga(category, credentials)
         return
     end
 
-    local library_manga = self:withLibraryMenuText(manga)
+    local library_manga = manga
     local menu_options = self:getTitleBarMenuOptions({
         title = self:translate("Suwayomi Library"),
     })
@@ -379,7 +353,6 @@ function SuwayomiClient:showLibraryManga(category, credentials)
                 table.remove(library_manga, index)
             end
         end
-        self:withLibraryMenuText(library_manga)
         if not library_menu then
             pending_library_menu_refresh = true
             return

@@ -130,9 +130,6 @@ local function installController(options)
                 manga.source = source
                 return manga
             end,
-            formatLibraryMangaRow = function(_, manga)
-                return manga.title .. " row"
-            end,
         }
     end
     function plugin:isChapterDownloaded()
@@ -264,6 +261,7 @@ describe("suwayomi/manga/controller", function()
         }))
         assert.are.same({ { manga_id = "m1", in_library = true } }, state.update_calls)
         assert.is_true(manga.in_library)
+        assert.is_nil(manga.menu_text)
         assert.are.equal(manga, updated_manga)
         assert.are.equal("Added to library.", state.messages[#state.messages])
 
@@ -276,6 +274,7 @@ describe("suwayomi/manga/controller", function()
             { manga_id = "m1", in_library = false },
         }, state.update_calls)
         assert.is_false(manga.in_library)
+        assert.is_nil(manga.menu_text)
         assert.are.equal("Removed from library.", state.messages[#state.messages])
     end)
 

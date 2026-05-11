@@ -186,7 +186,8 @@ describe("suwayomi/ui", function()
         end)
 
         assert.are.equal("Suwayomi Manga", shown_dialog.title)
-        assert.are.equal("[ ] One Piece", shown_dialog.item_table[1].text)
+        assert.are.equal("One Piece", shown_dialog.item_table[1].text)
+        assert.is_nil(shown_dialog.item_table[1].mandatory)
 
         shown_dialog.item_table[1].callback()
 

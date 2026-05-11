@@ -761,28 +761,6 @@ describe("suwayomi/client", function()
         assert.are.equal(0, #state.shown_messages)
     end)
 
-    it("formats compact library manga rows", function()
-        local Client = require("suwayomi/client")
-        local client = Client:new{}
-
-        assert.are.equal(
-            "Sousou no Frieren (12 unread / MangaDex EN)",
-            client:formatLibraryMangaRow({
-                title = "Sousou no Frieren",
-                unread_count = 12,
-                source = { displayName = "MangaDex EN" },
-            })
-        )
-        assert.are.equal(
-            "Chainsaw Man (0 unread / Local source)",
-            client:formatLibraryMangaRow({
-                title = "Chainsaw Man",
-                unread_count = 0,
-                source = { name = "Local source" },
-            })
-        )
-    end)
-
     it("shows an empty library message", function()
         local client, state = newClient({
             api = {
@@ -872,7 +850,9 @@ describe("suwayomi/client", function()
 
         client:showLibrary()
 
-        assert.are.equal("Sousou no Frieren (12 unread / MangaDex EN)", shown_manga[1].menu_text)
+        assert.are.equal("Sousou no Frieren", shown_manga[1].title)
+        assert.are.equal(12, shown_manga[1].unread_count)
+        assert.is_nil(shown_manga[1].menu_text)
         assert.are.equal("appbar.menu", shown_menu_options.title_bar_left_icon)
         assert.are.equal("m1", state.shown_manga_actions().id)
         assert.are.equal("library_manga_loaded", state.log_events[#state.log_events].event)
@@ -927,7 +907,9 @@ describe("suwayomi/client", function()
         client:showLibrary()
 
         assert.are.equal("library-menu", updated_menu.name)
-        assert.are.equal("Sousou no Frieren (0 unread / MangaDex EN)", updated_manga[1].menu_text)
+        assert.are.equal("Sousou no Frieren", updated_manga[1].title)
+        assert.are.equal(0, updated_manga[1].unread_count)
+        assert.is_nil(updated_manga[1].menu_text)
     end)
 
     it("removes a manga from the visible library list after library removal", function()
@@ -1101,7 +1083,9 @@ describe("suwayomi/client", function()
         assert.are.equal("Default", shown_categories[2].name)
         assert.are.equal("Reading", shown_categories[3].name)
         assert.are.equal("appbar.menu", shown_category_menu_options.title_bar_left_icon)
-        assert.are.same({ "Reading Manga (3 unread)" }, { shown_manga[1].menu_text })
+        assert.are.equal("Reading Manga", shown_manga[1].title)
+        assert.are.equal(3, shown_manga[1].unread_count)
+        assert.is_nil(shown_manga[1].menu_text)
     end)
 
     it("can always show the category picker even for a single category", function()
@@ -1229,7 +1213,8 @@ describe("suwayomi/client", function()
         client:showLibrary()
 
         assert.are.same({ 0, 100 }, fetch_offsets)
-        assert.are.equal("Reading Manga", shown_manga[1].menu_text)
+        assert.are.equal("Reading Manga", shown_manga[1].title)
+        assert.is_nil(shown_manga[1].menu_text)
     end)
 
     it("shows a selected-category empty message", function()

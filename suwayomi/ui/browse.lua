@@ -10,6 +10,7 @@
 local Menu = require("ui/widget/menu")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local _ = require("gettext")
+local MangaRows = require("suwayomi/ui/manga_rows")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local BrowseUI = {}
@@ -269,11 +270,6 @@ function BrowseUI.updateGlobalSearchResultsMenu(menu, summaries, onSelectCallbac
     end
 end
 
-local function formatBrowseMangaRow(manga)
-    local marker = manga and manga.in_library == true and "[+] " or "[ ] "
-    return marker .. tostring(manga and (manga.title or manga.id) or "")
-end
-
 local function buildMangaMenuTable(manga_list, onSelectCallback, options)
     options = options or {}
     local menu_table = {}
@@ -283,13 +279,11 @@ local function buildMangaMenuTable(manga_list, onSelectCallback, options)
             callback = options.on_previous_page,
         })
     end
-    for _, manga in ipairs(manga_list or {}) do
-        table.insert(menu_table, {
-            text = formatBrowseMangaRow(manga),
-            callback = function()
-                if onSelectCallback then onSelectCallback(manga) end
-            end
-        })
+    for _, row in ipairs(MangaRows.buildMenuTable(manga_list, {
+        show_in_library = true,
+        on_select = onSelectCallback,
+    })) do
+        table.insert(menu_table, row)
     end
     if options.on_next_page then
         table.insert(menu_table, {
@@ -356,16 +350,10 @@ function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
 end
 
 local function buildLibraryMangaMenuTable(manga_list, onSelectCallback)
-    local menu_table = {}
-    for _, manga in ipairs(manga_list or {}) do
-        table.insert(menu_table, {
-            text = manga.menu_text or manga.title,
-            callback = function()
-                if onSelectCallback then onSelectCallback(manga) end
-            end,
-        })
-    end
-    return menu_table
+    return MangaRows.buildMenuTable(manga_list, {
+        show_in_library = false,
+        on_select = onSelectCallback,
+    })
 end
 
 function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
