@@ -85,6 +85,46 @@ describe("suwayomi/ui/thumbnail_worker", function()
         assert.are.same(result, written_results["/tmp/result.json"])
     end)
 
+    it("rejects unsupported image content types", function()
+        api.downloadBinary = function()
+            return {
+                ok = true,
+                body = "bitmap bytes",
+                content_type = "image/bmp",
+            }
+        end
+        cache.write = function()
+            error("cache.write should not be called")
+        end
+
+        local worker = require("suwayomi/ui/thumbnail_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, "/thumb.bmp", "/tmp/result.json")
+
+        assert.is_false(result.ok)
+        assert.are.equal("Unsupported thumbnail image type.", result.error)
+        assert.are.same(result, written_results["/tmp/result.json"])
+    end)
+
+    it("rejects oversized thumbnail responses", function()
+        api.downloadBinary = function()
+            return {
+                ok = true,
+                body = ("x"):rep((2 * 1024 * 1024) + 1),
+                content_type = "image/jpeg",
+            }
+        end
+        cache.write = function()
+            error("cache.write should not be called")
+        end
+
+        local worker = require("suwayomi/ui/thumbnail_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, "/thumb.jpg", "/tmp/result.json")
+
+        assert.is_false(result.ok)
+        assert.are.equal("Thumbnail image is too large.", result.error)
+        assert.are.same(result, written_results["/tmp/result.json"])
+    end)
+
     it("normalizes failed worker results when reading result files", function()
         written_results["/tmp/result.json"] = {
             ok = false,

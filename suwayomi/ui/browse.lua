@@ -292,15 +292,16 @@ local function buildMangaMenuTable(manga_list, onSelectCallback, options)
 end
 
 function BrowseUI.showMangaMenu(manga_list, onSelectCallback, options)
+    options = options or {}
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
     return getMangaMenu().show{
-        title = options and options.title or _("Suwayomi Manga"),
-        title_bar_left_icon = options and options.title_bar_left_icon,
+        title = options.title or _("Suwayomi Manga"),
+        title_bar_left_icon = options.title_bar_left_icon,
         item_table = menu_table,
-        close_callback = options and options.close_callback,
-        on_title_bar_left_tap = options and options.on_title_bar_left_tap,
-        on_title_bar_left_hold = options and options.on_title_bar_left_hold,
-        thumbnail_credentials = options and options.thumbnail_credentials,
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+        thumbnail_credentials = options.thumbnail_credentials,
     }
 end
 
@@ -309,15 +310,16 @@ function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
         return
     end
 
+    options = options or {}
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
     return getMangaMenu().update(menu, {
-        title = options and options.title or menu.title,
-        title_bar_left_icon = options and options.title_bar_left_icon,
+        title = options.title or menu.title,
+        title_bar_left_icon = options.title_bar_left_icon,
         item_table = menu_table,
-        close_callback = options and options.close_callback,
-        on_title_bar_left_tap = options and options.on_title_bar_left_tap,
-        on_title_bar_left_hold = options and options.on_title_bar_left_hold,
-        thumbnail_credentials = options and options.thumbnail_credentials,
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+        thumbnail_credentials = options.thumbnail_credentials,
     })
 end
 
@@ -356,14 +358,15 @@ local function buildLibraryMangaMenuTable(manga_list, onSelectCallback)
 end
 
 function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
+    options = options or {}
     return getMangaMenu().show{
         title = _("Suwayomi Library"),
-        title_bar_left_icon = options and options.title_bar_left_icon,
+        title_bar_left_icon = options.title_bar_left_icon,
         item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
-        close_callback = options and options.close_callback,
-        on_title_bar_left_tap = options and options.on_title_bar_left_tap,
-        on_title_bar_left_hold = options and options.on_title_bar_left_hold,
-        thumbnail_credentials = options and options.thumbnail_credentials,
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+        thumbnail_credentials = options.thumbnail_credentials,
     }
 end
 
@@ -372,14 +375,15 @@ function BrowseUI.updateLibraryMangaMenu(menu, manga_list, onSelectCallback, opt
         return
     end
 
+    options = options or {}
     return getMangaMenu().update(menu, {
         title = _("Suwayomi Library"),
-        title_bar_left_icon = options and options.title_bar_left_icon,
+        title_bar_left_icon = options.title_bar_left_icon,
         item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
-        close_callback = options and options.close_callback,
-        on_title_bar_left_tap = options and options.on_title_bar_left_tap,
-        on_title_bar_left_hold = options and options.on_title_bar_left_hold,
-        thumbnail_credentials = options and options.thumbnail_credentials,
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+        thumbnail_credentials = options.thumbnail_credentials,
     })
 end
 

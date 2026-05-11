@@ -12,9 +12,45 @@ local SubprocessJob = require("suwayomi/subprocess/job")
 local ThumbnailCache = require("suwayomi/ui/thumbnail_cache")
 
 local ThumbnailWorker = {}
+ThumbnailWorker.MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
+
+local SUPPORTED_IMAGE_TYPES = {
+    ["image/gif"] = true,
+    ["image/jpeg"] = true,
+    ["image/jpg"] = true,
+    ["image/png"] = true,
+    ["image/svg+xml"] = true,
+    ["image/webp"] = true,
+}
+
+local EXTENSION_IMAGE_TYPES = {
+    gif = "image/gif",
+    jpeg = "image/jpeg",
+    jpg = "image/jpeg",
+    png = "image/png",
+    svg = "image/svg+xml",
+    webp = "image/webp",
+}
+
+local function normalizeContentType(content_type)
+    return tostring(content_type or ""):lower():match("^%s*([^;%s]+)") or ""
+end
+
+local function getUrlImageType(thumbnail_url)
+    local suffix = tostring(thumbnail_url or ""):lower():match("%.([%w]+)%??[^/]*$")
+    return EXTENSION_IMAGE_TYPES[suffix or ""]
+end
+
+local function getImageType(content_type, thumbnail_url)
+    content_type = normalizeContentType(content_type)
+    if content_type ~= "" then
+        return content_type
+    end
+    return getUrlImageType(thumbnail_url) or ""
+end
 
 local function isImageContentType(content_type)
-    return tostring(content_type or ""):lower():match("^image/") ~= nil
+    return tostring(content_type or ""):match("^image/") ~= nil
 end
 
 function ThumbnailWorker:writeResult(result_path, result)
@@ -51,20 +87,35 @@ function ThumbnailWorker:run(credentials, thumbnail_url, result_path)
             thumbnail_url = thumbnail_url,
             error = binary and binary.error or "Could not load thumbnail.",
         }
-    elseif not binary.body or binary.body == "" or not isImageContentType(binary.content_type) then
-        result = {
-            ok = false,
-            thumbnail_url = thumbnail_url,
-            error = "Downloaded thumbnail was not an image.",
-        }
     else
-        local path, write_error = ThumbnailCache.write(credentials, thumbnail_url, binary.body, binary.content_type)
-        result = {
-            ok = path ~= nil,
-            thumbnail_url = thumbnail_url,
-            path = path,
-            error = write_error,
-        }
+        local image_type = getImageType(binary.content_type, thumbnail_url)
+        if not binary.body or binary.body == "" or not isImageContentType(image_type) then
+            result = {
+                ok = false,
+                thumbnail_url = thumbnail_url,
+                error = "Downloaded thumbnail was not an image.",
+            }
+        elseif not SUPPORTED_IMAGE_TYPES[image_type] then
+            result = {
+                ok = false,
+                thumbnail_url = thumbnail_url,
+                error = "Unsupported thumbnail image type.",
+            }
+        elseif #binary.body > ThumbnailWorker.MAX_THUMBNAIL_BYTES then
+            result = {
+                ok = false,
+                thumbnail_url = thumbnail_url,
+                error = "Thumbnail image is too large.",
+            }
+        else
+            local path, write_error = ThumbnailCache.write(credentials, thumbnail_url, binary.body, image_type)
+            result = {
+                ok = path ~= nil,
+                thumbnail_url = thumbnail_url,
+                path = path,
+                error = write_error,
+            }
+        end
     end
 
     self:writeResult(result_path, result)

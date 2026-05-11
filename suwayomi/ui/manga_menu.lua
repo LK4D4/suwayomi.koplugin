@@ -64,12 +64,12 @@ local function fontFace(name, size)
     return Font:getFace(name, size)
 end
 
-local function firstLetter(text)
+local function placeholderText(text)
     text = tostring(text or ""):gsub("^%s+", "")
     if text == "" then
         return "..."
     end
-    return text:sub(1, 1)
+    return "..."
 end
 
 function MangaMenuItem:init()
@@ -125,7 +125,7 @@ function MangaMenuItem:buildThumbnail(slot_size)
         image = CenterContainer:new{
             dimen = Geom:new{ w = image_size, h = image_size },
             TextWidget:new{
-                text = firstLetter(self.text),
+                text = placeholderText(self.text),
                 face = fontFace("cfont", math.max(10, math.floor(image_size / 2))),
                 fgcolor = Blitbuffer.COLOR_DARK_GRAY,
             },
@@ -252,9 +252,15 @@ function MangaMenu.prepareThumbnail(menu, item)
         or ThumbnailCache.find(menu._suwayomi_thumbnail_credentials, item.thumbnail_url)
 end
 
-local function markThumbnailResult(menu, thumbnail_url, path)
+local function getThumbnailKey(credentials, thumbnail_url)
+    return ThumbnailCache.getKey(credentials, thumbnail_url)
+end
+
+local function markThumbnailResult(menu, thumbnail_key, path)
     for _, item in ipairs(menu.item_table or {}) do
-        if item.thumbnail_url == thumbnail_url then
+        if item.thumbnail_url
+            and getThumbnailKey(menu._suwayomi_thumbnail_credentials, item.thumbnail_url) == thumbnail_key
+        then
             item.thumbnail_loading = nil
             if path then
                 item.thumbnail_path = path
@@ -264,13 +270,16 @@ local function markThumbnailResult(menu, thumbnail_url, path)
 end
 
 function MangaMenu.startThumbnailJob(menu, item)
+    local credentials = menu._suwayomi_thumbnail_credentials
+    local thumbnail_url = item.thumbnail_url
+    local thumbnail_key = thumbnail_url and getThumbnailKey(credentials, thumbnail_url)
     if not item.thumbnail_url
         or item.thumbnail_path
         or item.thumbnail_loading
-        or (menu._suwayomi_thumbnail_active and menu._suwayomi_thumbnail_active[item.thumbnail_url])
-        or not menu._suwayomi_thumbnail_credentials
-        or not menu._suwayomi_thumbnail_credentials.server_url
-        or menu._suwayomi_thumbnail_credentials.server_url == ""
+        or (menu._suwayomi_thumbnail_active and menu._suwayomi_thumbnail_active[thumbnail_key])
+        or not credentials
+        or not credentials.server_url
+        or credentials.server_url == ""
     then
         return false
     end
@@ -279,11 +288,12 @@ function MangaMenu.startThumbnailJob(menu, item)
     end
 
     item.thumbnail_loading = true
-    local thumbnail_url = item.thumbnail_url
     menu._suwayomi_thumbnail_active = menu._suwayomi_thumbnail_active or {}
     local active = SubprocessJob.start({
         active = {
             thumbnail_url = thumbnail_url,
+            thumbnail_key = thumbnail_key,
+            generation = menu._suwayomi_thumbnail_generation or 0,
             result_path = SubprocessJob.buildResultPath and SubprocessJob.buildResultPath("thumbnail") or nil,
         },
         ffi_util = FFIUtil,
@@ -291,27 +301,37 @@ function MangaMenu.startThumbnailJob(menu, item)
         poll_interval_seconds = 0.5,
         timeout_seconds = 15,
         run = function(path)
-            ThumbnailWorker:run(menu._suwayomi_thumbnail_credentials, thumbnail_url, path)
+            ThumbnailWorker:run(credentials, thumbnail_url, path)
         end,
         read_result = function(path)
             return ThumbnailWorker:readResult(path)
         end,
         on_finish = function(finished_active, result)
+            if finished_active.generation ~= menu._suwayomi_thumbnail_generation
+                or menu._suwayomi_thumbnail_active[finished_active.thumbnail_key] ~= finished_active
+            then
+                return
+            end
             menu._suwayomi_thumbnail_active_count = math.max((menu._suwayomi_thumbnail_active_count or 1) - 1, 0)
-            menu._suwayomi_thumbnail_active[finished_active.thumbnail_url] = nil
-            markThumbnailResult(menu, finished_active.thumbnail_url, result and result.ok and result.path or nil)
+            menu._suwayomi_thumbnail_active[finished_active.thumbnail_key] = nil
+            markThumbnailResult(menu, finished_active.thumbnail_key, result and result.ok and result.path or nil)
             if menu.updateItems then
                 menu:updateItems(nil, true)
             end
         end,
         on_timeout = function(timed_out_active)
+            if timed_out_active.generation ~= menu._suwayomi_thumbnail_generation
+                or menu._suwayomi_thumbnail_active[timed_out_active.thumbnail_key] ~= timed_out_active
+            then
+                return
+            end
             menu._suwayomi_thumbnail_active_count = math.max((menu._suwayomi_thumbnail_active_count or 1) - 1, 0)
-            menu._suwayomi_thumbnail_active[timed_out_active.thumbnail_url] = nil
-            markThumbnailResult(menu, timed_out_active.thumbnail_url, nil)
+            menu._suwayomi_thumbnail_active[timed_out_active.thumbnail_key] = nil
+            markThumbnailResult(menu, timed_out_active.thumbnail_key, nil)
         end,
     })
     if active then
-        menu._suwayomi_thumbnail_active[thumbnail_url] = active
+        menu._suwayomi_thumbnail_active[thumbnail_key] = active
         menu._suwayomi_thumbnail_active_count = (menu._suwayomi_thumbnail_active_count or 0) + 1
         return true
     end
@@ -374,6 +394,9 @@ function MangaMenu.updateItems(menu, select_number, no_recalculate_dimen)
 end
 
 local function cancelThumbnailJobs(menu)
+    for _, item in ipairs(menu.item_table or {}) do
+        item.thumbnail_loading = nil
+    end
     for _, active in pairs(menu._suwayomi_thumbnail_active or {}) do
         if SubprocessJob.cancel then
             SubprocessJob.cancel(active)
@@ -381,12 +404,14 @@ local function cancelThumbnailJobs(menu)
     end
     menu._suwayomi_thumbnail_active = {}
     menu._suwayomi_thumbnail_active_count = 0
+    menu._suwayomi_thumbnail_generation = (menu._suwayomi_thumbnail_generation or 0) + 1
 end
 
 function MangaMenu.install(menu, options)
     menu._suwayomi_thumbnail_credentials = options and options.thumbnail_credentials
     menu._suwayomi_thumbnail_active = menu._suwayomi_thumbnail_active or {}
     menu._suwayomi_thumbnail_active_count = menu._suwayomi_thumbnail_active_count or 0
+    menu._suwayomi_thumbnail_generation = menu._suwayomi_thumbnail_generation or 0
 
     if not menu._suwayomi_manga_menu_installed then
         local original_on_close_widget = menu.onCloseWidget
@@ -430,6 +455,7 @@ function MangaMenu.update(menu, options)
     end
     options = options or {}
     MangaMenu.install(menu, options)
+    cancelThumbnailJobs(menu)
     menu.item_table = options.item_table or {}
     menu.title = options.title or menu.title
     applyOptions(menu, options)

@@ -105,6 +105,9 @@ describe("suwayomi/ui/thumbnail_cache", function()
         }, "/api/v1/manga/123/thumbnail", "image/webp")
 
         assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.webp$", path)
+        assert.are.equal(16, cache.getKey({
+            server_url = "https://suwayomi.example",
+        }, "/api/v1/manga/123/thumbnail"):len())
         assert.is_nil(path:match("suwayomi%.example"))
         assert.is_nil(path:match("manga/123"))
     end)

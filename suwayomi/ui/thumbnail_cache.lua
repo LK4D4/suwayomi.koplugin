@@ -16,12 +16,23 @@ local ThumbnailCache = {}
 local CACHE_DIR_NAME = "suwayomi_dl_thumbnails"
 local KNOWN_EXTENSIONS = { "jpg", "jpeg", "png", "webp", "gif", "svg" }
 
+local function rollingHash(text, seed, multiplier)
+    local hash = seed
+    multiplier = multiplier or 131
+    for index = 1, #text do
+        hash = (hash * multiplier + text:byte(index)) % 4294967296
+    end
+    return hash
+end
+
 local function hashText(text)
     local hash = 2166136261
-    for index = 1, #text do
-        hash = (hash * 131 + text:byte(index)) % 4294967296
-    end
-    return string.format("%08x", hash)
+    local alternate_hash = 16777619
+    return string.format(
+        "%08x%08x",
+        rollingHash(text, hash, 131),
+        rollingHash(text, alternate_hash, 65599)
+    )
 end
 
 local function getCacheDir()
