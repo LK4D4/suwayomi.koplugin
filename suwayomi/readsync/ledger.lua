@@ -176,11 +176,9 @@ function Methods:markLedgerEntryRead(entry)
     ledger_entry.pending_read_sync = true
     ledger_entry.pending_read_state = true
     self:markCurrentContextChapterReadFromLedger(ledger_entry)
-    self:autoDeleteReadLocalDownloadFromLedgerEntry(ledger_entry, ledger)
     self:saveChapterLedger(ledger)
 
     self:schedulePendingReadSync()
-    self:applyKeepNextUnreadDownloadsPolicy()
     return true
 end
 

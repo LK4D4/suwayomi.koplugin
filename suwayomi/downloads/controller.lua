@@ -1,6 +1,6 @@
 -- Boundary: DownloadsController.
 --
--- Responsibility: Owns the Downloads hub UI, retry/cancel actions, and keep-next-unread queue policy.
+-- Responsibility: Owns the Downloads hub UI, retry/cancel actions, and downloaded-read reconciliation.
 -- Owned state: Uses the device-local queue only; it must not call Suwayomi server download mutations.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -208,43 +208,6 @@ function Methods:showDownloads()
 end
 
 
-function Methods:getKeepNextUnreadDownloadsPolicyLimit()
-    if not SuwayomiSettings.loadKeepNextUnreadDownloads then
-        return 0
-    end
-    local limit = tonumber(SuwayomiSettings:loadKeepNextUnreadDownloads()) or 0
-    if limit == 5 or limit == 10 or limit == 50 then
-        return limit
-    end
-    return 0
-end
-
-
-function Methods:applyKeepNextUnreadDownloadsPolicy()
-    if not self.current_chapter_context then
-        return 0
-    end
-
-    local limit = self:getKeepNextUnreadDownloadsPolicyLimit()
-    if limit <= 0 then
-        return 0
-    end
-
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        return 0
-    end
-
-    local manga = self.current_chapter_context.manga
-    local chapters = self:getUnreadDownloadBufferCandidates(manga, limit)
-    if #chapters == 0 then
-        return 0
-    end
-
-    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
-end
-
-
 function Methods:reconcileDownloadedChapterLedger(ledger)
     ledger = ledger or self:loadChapterLedger()
     local history_paths = self:loadKoreaderHistoryPaths()
@@ -262,14 +225,12 @@ function Methods:reconcileDownloadedChapterLedger(ledger)
                 changed = true
                 read_count = read_count + 1
                 self:markCurrentContextChapterReadFromLedger(entry)
-                self:autoDeleteReadLocalDownloadFromLedgerEntry(entry, ledger)
             end
         end
     end
 
     if changed then
         self:saveChapterLedger(ledger)
-        self:applyKeepNextUnreadDownloadsPolicy()
     end
 
     return read_count

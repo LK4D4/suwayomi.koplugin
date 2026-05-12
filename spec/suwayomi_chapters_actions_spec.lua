@@ -131,7 +131,6 @@ describe("suwayomi/chapters/actions", function()
             saved_ledgers = {},
             metadata_updates = {},
             scheduled_count = 0,
-            keep_policy_count = 0,
             getDownloadQueue = function(self)
                 return self.queue
             end,
@@ -167,9 +166,6 @@ describe("suwayomi/chapters/actions", function()
                 table.insert(self.metadata_updates, { path = chapter_path, read = read_state })
                 return true
             end,
-            getKeepNextUnreadDownloadsPolicyLimit = function()
-                return options.keep_limit or 0
-            end,
             showMessage = function(self, message)
                 table.insert(self.messages, message)
             end,
@@ -178,9 +174,6 @@ describe("suwayomi/chapters/actions", function()
             end,
             schedulePendingReadSync = function(self)
                 self.scheduled_count = self.scheduled_count + 1
-            end,
-            applyKeepNextUnreadDownloadsPolicy = function(self)
-                self.keep_policy_count = self.keep_policy_count + 1
             end,
             saveReaderReturnContext = function(self, target_manga, target_chapter, chapter_path)
                 table.insert(self.reader_return_contexts, {
@@ -436,34 +429,8 @@ describe("suwayomi/chapters/actions", function()
         assert.is_nil(plugin.ledger.legacy)
     end)
 
-    it("auto-deletes read local downloads from ledger entries without loading settings ledger", function()
-        local plugin, queue = build_plugin({ keep_limit = 5 })
-        local entry = {
-            manga_id = "m1",
-            manga_title = "Manga",
-            chapter_id = "c1",
-            chapter_name = "Chapter 1",
-            read = true,
-            path = "/downloads/Manga/Chapter 1.cbz",
-        }
-
-        local ok, state = plugin:autoDeleteReadLocalDownloadFromLedgerEntry(entry, {})
-
-        assert.is_true(ok)
-        assert.are.equal("deleted", state)
-        assert.is_nil(entry.path)
-        assert.are.equal(1, #queue.cleared)
-        assert.are.same({
-            "/downloads/Manga/Chapter 1.cbz",
-            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
-            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
-            "/downloads/Manga/Chapter 1.cbz.sdr",
-        }, removed_paths)
-    end)
-
     it("marks a downloaded chapter read and schedules sync by default", function()
         local plugin = build_plugin({
-            keep_limit = 0,
             existing = {
                 ["/downloads/Manga/Chapter 1.cbz"] = true,
             },
@@ -483,12 +450,10 @@ describe("suwayomi/chapters/actions", function()
         assert.is_true(plugin.current_chapter_context.chapters[1].is_read)
         assert.are.equal(1, #plugin.refreshes)
         assert.are.equal(1, plugin.scheduled_count)
-        assert.are.equal(1, plugin.keep_policy_count)
     end)
 
     it("honors mark-read skip flags", function()
         local plugin = build_plugin({
-            keep_limit = 0,
             existing = {
                 ["/downloads/Manga/Chapter 1.cbz"] = true,
             },
@@ -497,12 +462,10 @@ describe("suwayomi/chapters/actions", function()
         assert.is_true(plugin:markChapterRead(manga, chapter, {
             skip_refresh = true,
             skip_schedule = true,
-            skip_keep_policy = true,
         }))
 
         assert.are.equal(0, #plugin.refreshes)
         assert.are.equal(0, plugin.scheduled_count)
-        assert.are.equal(0, plugin.keep_policy_count)
     end)
 
     it("keeps burger action origin when opening nested bulk action menus", function()
@@ -555,7 +518,6 @@ describe("suwayomi/chapters/actions", function()
             { id = "c2", name = "Chapter 2" },
         }
         local plugin = build_plugin({
-            keep_limit = 0,
             current_chapter_context = {
                 chapters = chapters,
             },
@@ -568,6 +530,5 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(1, #plugin.saved_ledgers)
         assert.are.equal(1, #plugin.refreshes)
         assert.are.equal(1, plugin.scheduled_count)
-        assert.are.equal(1, plugin.keep_policy_count)
     end)
 end)

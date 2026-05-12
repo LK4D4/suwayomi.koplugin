@@ -211,42 +211,6 @@ function Methods:showParallelDownloadsDialog(touchmenu_instance)
 end
 
 
-function Methods:getKeepNextUnreadDownloadsSummary()
-    local value = SuwayomiSettings:loadKeepNextUnreadDownloads()
-    if value == 0 then
-        return _("off")
-    end
-    return T(self:pluralize(value, _("%1 chapter"), _("%1 chapters")), value)
-end
-
-
-function Methods:showKeepNextUnreadDownloadsDialog(touchmenu_instance)
-    local keep_menu
-    local choices = { 0, 5, 10, 50 }
-    local function onSelect(value)
-        local saved_value = SuwayomiSettings:saveKeepNextUnreadDownloads(value)
-        self:refreshSettingsMenu(touchmenu_instance)
-        self:showMessage(T(
-            _("Keep next unread downloaded: %1"),
-            saved_value == 0 and _("off") or T(self:pluralize(saved_value, _("%1 chapter"), _("%1 chapters")), saved_value)
-        ))
-        if SuwayomiUI.updateKeepNextUnreadDownloadsMenu then
-            SuwayomiUI.updateKeepNextUnreadDownloadsMenu(keep_menu, {
-                current = saved_value,
-                choices = choices,
-                onSelect = onSelect,
-            })
-        end
-    end
-
-    keep_menu = SuwayomiUI.showKeepNextUnreadDownloadsMenu({
-        current = SuwayomiSettings:loadKeepNextUnreadDownloads(),
-        choices = choices,
-        onSelect = onSelect,
-    })
-end
-
-
 function Methods:getLibraryCategoryPickerBehaviorSummary()
     if SuwayomiSettings.loadLibraryCategoryPickerBehavior then
         return SuwayomiSettings:loadLibraryCategoryPickerBehavior()
@@ -371,18 +335,6 @@ function Methods:buildSettingsMenu()
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:showParallelDownloadsDialog(touchmenu_instance)
-                    end,
-                },
-                {
-                    text_func = function()
-                        return T(
-                            _("Keep next unread downloaded: %1"),
-                            self:getKeepNextUnreadDownloadsSummary()
-                        )
-                    end,
-                    keep_menu_open = true,
-                    callback = function(touchmenu_instance)
-                        self:showKeepNextUnreadDownloadsDialog(touchmenu_instance)
                     end,
                 },
             },

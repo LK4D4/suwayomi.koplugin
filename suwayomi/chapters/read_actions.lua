@@ -1,6 +1,6 @@
 -- Boundary: ChapterReadActions.
 --
--- Responsibility: Mark chapters read/unread and coordinate local metadata, ledger, read-sync, and keep-next policy side effects.
+-- Responsibility: Mark chapters read/unread and coordinate local metadata, ledger, and read-sync side effects.
 -- Owned state: Mutates current chapter context and settings-backed read ledger through plugin methods.
 -- Dependencies: Plugin mixin methods and Suwayomi debug timing.
 -- External data: Manga/chapter tables may come from API responses or cached UI state and are matched by stable ids.
@@ -47,19 +47,11 @@ function Methods:markChapterRead(manga, chapter, options)
             end
         end
     end
-    self:autoDeleteReadLocalDownload(manga, chapter, {
-        assume_read = true,
-        ledger = options.ledger,
-        skip_refresh = true,
-    })
     if not options.skip_refresh then
         self:refreshChapterMenu()
     end
     if not options.skip_schedule then
         self:schedulePendingReadSync()
-    end
-    if not options.skip_keep_policy then
-        self:applyKeepNextUnreadDownloadsPolicy()
     end
     if not options.skip_refresh or not options.skip_schedule then
         SuwayomiDebug.log({
@@ -147,7 +139,6 @@ function Methods:markChapterListRead(manga, chapters)
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
-    self:applyKeepNextUnreadDownloadsPolicy()
     SuwayomiDebug.log({
         operation = "markChapterListRead",
         event = "end",

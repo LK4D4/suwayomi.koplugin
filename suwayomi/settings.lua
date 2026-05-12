@@ -37,13 +37,6 @@ local DEFAULT_DOWNLOAD_DIRECTORY = ""
 local DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS = 2
 local MIN_PARALLEL_CHAPTER_DOWNLOADS = 1
 local MAX_PARALLEL_CHAPTER_DOWNLOADS = 4
-local DEFAULT_KEEP_NEXT_UNREAD_DOWNLOADS = 0
-local KEEP_NEXT_UNREAD_DOWNLOAD_OPTIONS = {
-    [0] = true,
-    [5] = true,
-    [10] = true,
-    [50] = true,
-}
 
 local function copyTable(source)
     local target = {}
@@ -63,15 +56,6 @@ function SuwayomiSettings:normalizeMaxParallelChapterDownloads(value)
         return MAX_PARALLEL_CHAPTER_DOWNLOADS
     end
     return normalized
-end
-
-function SuwayomiSettings:normalizeKeepNextUnreadDownloads(value)
-    local normalized = tonumber(value) or DEFAULT_KEEP_NEXT_UNREAD_DOWNLOADS
-    normalized = math.floor(normalized)
-    if KEEP_NEXT_UNREAD_DOWNLOAD_OPTIONS[normalized] then
-        return normalized
-    end
-    return DEFAULT_KEEP_NEXT_UNREAD_DOWNLOADS
 end
 
 function SuwayomiSettings:open()
@@ -227,18 +211,6 @@ end
 function SuwayomiSettings:saveMaxParallelChapterDownloads(value)
     local normalized = self:normalizeMaxParallelChapterDownloads(value)
     self:open():saveSetting("max_parallel_chapter_downloads", normalized):flush()
-    return normalized
-end
-
-function SuwayomiSettings:loadKeepNextUnreadDownloads()
-    return self:normalizeKeepNextUnreadDownloads(
-        self:open():readSetting("keep_next_unread_downloads", DEFAULT_KEEP_NEXT_UNREAD_DOWNLOADS)
-    )
-end
-
-function SuwayomiSettings:saveKeepNextUnreadDownloads(value)
-    local normalized = self:normalizeKeepNextUnreadDownloads(value)
-    self:open():saveSetting("keep_next_unread_downloads", normalized):flush()
     return normalized
 end
 

@@ -47,9 +47,6 @@ local function installController(options)
     end
     package.preload["suwayomi/settings"] = function()
         return {
-            loadKeepNextUnreadDownloads = function()
-                return options.keep_next or 0
-            end,
             loadDownloadDirectory = function()
                 return options.download_directory or "/books"
             end,
@@ -164,9 +161,6 @@ local function installController(options)
     function plugin:markCurrentContextChapterReadFromLedger(entry)
         state.marked_entry = entry
     end
-    function plugin:autoDeleteReadLocalDownloadFromLedgerEntry(entry)
-        state.auto_deleted_entry = entry
-    end
     function plugin:saveChapterLedger(ledger)
         state.saved_ledger = ledger
     end
@@ -176,11 +170,10 @@ end
 describe("suwayomi/downloads/controller", function()
     after_each(clearModules)
 
-    it("exports downloads hub and queue policy methods", function()
+    it("exports downloads hub and ledger reconciliation methods", function()
         helper.assertControllerModule("suwayomi/downloads/controller", {
             "showDownloads",
             "getDownloadJobTitle",
-            "applyKeepNextUnreadDownloadsPolicy",
             "reconcileDownloadedChapterLedger",
         })
     end)
@@ -287,7 +280,7 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(0, state.downloads_count)
     end)
 
-    it("reconciles read ledger entries and applies keep-next unread policy", function()
+    it("reconciles read ledger entries without queueing downloads", function()
         local ledger = {
             ["m1:c1"] = {
                 chapter_id = "c1",
@@ -296,7 +289,6 @@ describe("suwayomi/downloads/controller", function()
             },
         }
         local plugin, state = installController({
-            keep_next = 5,
             ledger = ledger,
             finished_paths = {
                 ["/books/Frieren/Ch. 1.cbz"] = true,
@@ -315,7 +307,6 @@ describe("suwayomi/downloads/controller", function()
         assert.is_true(ledger["m1:c1"].read)
         assert.is_true(ledger["m1:c1"].pending_read_sync)
         assert.are.equal(ledger, state.saved_ledger)
-        assert.are.equal(ledger["m1:c1"], state.auto_deleted_entry)
-        assert.are.equal("c2", state.enqueued_chapters[1].id)
+        assert.is_nil(state.enqueued_chapters)
     end)
 end)

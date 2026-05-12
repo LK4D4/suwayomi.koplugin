@@ -23,8 +23,8 @@ For the first remote-source release, prioritize this scenario:
 4. The reader filters the chapter list by scanlator/translation group when duplicate translations exist.
 5. The reader marks already-read chapters as read, either selected chapters or everything before/through a chapter.
 6. The reader downloads the whole manga, all unread chapters, or the next unread chapters.
-7. The reader enables a KOReader-local "keep next unread downloaded" policy.
-8. After reading, the plugin best-effort syncs read state and removes read local downloads when the user enabled that policy.
+7. The reader queues missing downloads for the next unread chapters.
+8. After reading, the plugin best-effort syncs read state.
 
 ## Reading Boundary
 
@@ -53,7 +53,7 @@ Already implemented:
 - [x] Chapter actions: open local CBZ in KOReader, download, delete from device, mark read/unread
 - [x] Chapter selection mode
 - [x] Bulk chapter actions
-- [x] Bulk policies: download next unread, keep next unread downloaded, delete read downloaded chapters
+- [x] Bulk policies: download next unread, queue missing downloads for the next unread chapters, delete read downloaded chapters
 - [x] Read-state reconciliation from Suwayomi, KOReader metadata, and the plugin ledger
 - [x] Background retry for pending read/unread sync
 - [x] Manual read-state sync action
@@ -67,7 +67,7 @@ Current limitations:
 - Library membership can be managed from KOReader through manga actions.
 - Manga-level actions expose chapter-list, refresh, library membership, and existing download/read helpers.
 - Chapter API requests preserve scanlator data, and chapter lists can be filtered by scanlator/translation group.
-- Automatic read-download cleanup is tied to the local keep-next-unread policy rather than a separate delete-while-reading toggle.
+- Read-download cleanup is available as an explicit local action rather than an automatic delete-while-reading toggle.
 - Full dynamic source filter editing is deferred.
 - Remote source workflow verification has started. A Boox Palma live pass verified Comick Latest -> chapter list -> scanlator filter -> read-state toggles -> local CBZ download/open. Source-specific search timeout behavior remains a release-readiness risk even though global search is now partial and cancellable.
 - The codebase is now split into facades/controllers/submodules; the next risk is validating the unit-covered remote-source flows on real sources and devices.
@@ -290,13 +290,9 @@ Goal: add WebUI-inspired manga and chapter actions that fit the Library, Browse,
 - [x] Add `Download next 5/10/50 unread`, preserving the existing queue cap behavior
 - [x] Add `Download all unread` with confirmation and queue cap/chunking feedback
 - [x] Add `Download all chapters` / whole manga with confirmation and queue cap/chunking feedback
-- [x] Add `Keep next 5/10/50 unread downloaded`
-- [x] Add a configurable `Keep next unread downloaded` setting under Settings -> Downloads so the policy can be maintained after read-state sync
+- [x] Add `Keep next 5/10/50 unread` queue actions
 - [x] Add `Delete read downloaded chapters from device`
-- [x] Add best-effort automatic removal of read local downloads when enabled:
-  - after manual mark-read actions
-  - after KOReader metadata/history reconciliation marks chapters read
-  - without deleting active downloads
+- [x] Add explicit removal of read local downloads without deleting active downloads
 - [x] Preserve scanlator on parsed chapter nodes
 - [x] Add chapter-list filter by scanlator/translation group
 - [x] Keep existing selected-chapter and mark previous/through-here actions available because they cover the "already read this far" setup flow
@@ -312,8 +308,8 @@ Tests:
 - [x] First-unread actions select the expected chapter
 - [x] Existing bulk policies can be triggered from manga-level actions
 - [x] `Download all unread` and whole-manga downloads respect confirmation and queue cap/chunking behavior
-- [x] `Keep next unread downloaded` setting persists and is applied after read-state reconciliation
-- [x] Best-effort automatic removal deletes only read KOReader-local files and skips active downloads
+- [x] `Keep next` actions queue missing downloads for the current manga
+- [x] Explicit read-download removal deletes only read KOReader-local files and skips active downloads
 - [x] Chapter parser preserves scanlator
 - [x] Chapter-list scanlator filter hides only matching translation groups
 
@@ -321,7 +317,7 @@ Exit criteria:
 
 - [x] Library and Browse entries are useful without drilling into individual chapters first.
 - [x] Library membership can be managed from KOReader.
-- [x] The basic release flow can set read state, filter duplicate translations, queue offline reading, keep the next unread chapters available, and clean up read local files.
+- [x] The basic release flow can set read state, filter duplicate translations, queue offline reading, and clean up read local files.
 - [x] Reader-like behavior remains limited to opening already-downloaded local files in KOReader.
 
 ## Phase 7: Browse And Search Surface
@@ -393,9 +389,9 @@ Goal: prove the client MVP works with real remote source flows and the first rel
   - [x] mark individual chapters read/unread
   - [ ] mark selected/previous chapters read
   - [ ] download whole manga or all unread chapters
-  - [ ] keep next unread downloaded
+  - [ ] queue missing downloads for next unread chapters
   - [x] read/open local CBZ in KOReader
-  - [ ] best-effort read sync and automatic local cleanup when enabled
+  - [ ] best-effort read sync
 - [ ] Verify MangaDex search, library add/remove, refresh, chapter listing, and download
   - [x] Search returned results quickly on the tested server.
   - [x] Add/remove library worked for the tested MangaDex result.

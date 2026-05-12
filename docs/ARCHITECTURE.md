@@ -65,7 +65,7 @@ Browse and Library:
 
 Downloads:
 
-- `suwayomi/downloads/controller.lua`: top-level Downloads hub, active/queued/failed actions, retry/clear/cancel, and keep-next-unread policy application.
+- `suwayomi/downloads/controller.lua`: top-level Downloads hub, active/queued/failed actions, retry/clear/cancel, and downloaded-read reconciliation.
 - `suwayomi/downloads/directory.lua`: download-directory chooser, summary, persistence callback flow, and default directory probing.
 - `suwayomi/downloads/queue.lua`: public KOReader-local queue facade.
 - `suwayomi/downloads/active_jobs.lua`: bounded active chapter jobs, subprocess launch, progress polling, watchdog handling, and replacement scheduling.

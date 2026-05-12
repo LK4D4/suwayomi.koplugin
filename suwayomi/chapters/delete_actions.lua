@@ -20,7 +20,7 @@ end
 local Methods = {}
 
 -- Return states are part of the actions facade contract:
--- deleted, queued, missing, downloading, disabled, and unread.
+-- deleted, queued, missing, and downloading.
 function Methods:deleteChapterFromDevice(manga, chapter)
     return self:deleteChapterFromDeviceWithOptions(manga, chapter)
 end
@@ -86,62 +86,6 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
     if not options.skip_refresh then
         self:refreshChapterMenu()
     end
-    return true, cancelled and "queued" or "deleted"
-end
-
-function Methods:autoDeleteReadLocalDownload(manga, chapter, options)
-    options = options or {}
-    if self:getKeepNextUnreadDownloadsPolicyLimit() <= 0 then
-        return false, "disabled"
-    end
-    if not chapter or (chapter.is_read ~= true and options.assume_read ~= true) then
-        return false, "unread"
-    end
-
-    return self:deleteChapterFromDeviceWithOptions(manga, chapter, {
-        ledger = options.ledger,
-        quiet_active = true,
-        quiet_missing = true,
-        skip_refresh = options.skip_refresh ~= false,
-    })
-end
-
-function Methods:autoDeleteReadLocalDownloadFromLedgerEntry(entry)
-    if self:getKeepNextUnreadDownloadsPolicyLimit() <= 0 then
-        return false, "disabled"
-    end
-    if type(entry) ~= "table" or entry.read ~= true then
-        return false, "unread"
-    end
-    local manga = {
-        id = entry.manga_id,
-        title = entry.manga_title,
-    }
-    local chapter = {
-        id = entry.chapter_id,
-        name = entry.chapter_name,
-        is_read = true,
-    }
-    local status = self:getDownloadQueue():getStatus(manga, chapter)
-    if status and status.state == "downloading" then
-        return false, "downloading"
-    end
-
-    local cancelled, queue_state = self:getDownloadQueue():cancelPending(manga, chapter)
-    if queue_state == "downloading" then
-        return false, "downloading"
-    end
-
-    local chapter_path = entry.path
-    if type(chapter_path) ~= "string" or chapter_path == "" then
-        return false, cancelled and "queued" or "missing"
-    end
-
-    local metadata_path = self:getKoreaderMetadataPathForDocument(chapter_path)
-    self:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
-
-    entry.path = nil
-    self:getDownloadQueue():clearStatus(manga, chapter, { quiet = true })
     return true, cancelled and "queued" or "deleted"
 end
 

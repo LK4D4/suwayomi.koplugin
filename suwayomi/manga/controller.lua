@@ -352,7 +352,6 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
             { id = "keep_next_5_unread", text = _("Keep next 5 unread") },
             { id = "keep_next_10_unread", text = _("Keep next 10 unread") },
             { id = "keep_next_50_unread", text = _("Keep next 50 unread") },
-            { id = "stop_keep_unread", text = _("Stop keeping unread") },
         },
         on_back = function()
             self:showMoreMangaActions(manga, options)
@@ -417,11 +416,6 @@ function Methods:performMangaAction(manga, action_id, options)
     local keep_unread_count = tostring(action_id or ""):match("^keep_next_(%d+)_unread$")
     if keep_unread_count then
         return self:keepNextUnreadChaptersForManga(manga, tonumber(keep_unread_count))
-    end
-    if action_id == "stop_keep_unread" then
-        SuwayomiSettings:saveKeepNextUnreadDownloads(0)
-        self:showMessage(_("Stopped keeping unread chapters downloaded."))
-        return true
     end
     if action_id == "delete_read_downloaded" then
         if self:ensureMangaChapterContext(manga) then
@@ -579,23 +573,13 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
     end
 
     local requested_limit = tonumber(limit) or 0
-    local saved_limit
-
-    local function savePolicy()
-        saved_limit = SuwayomiSettings:saveKeepNextUnreadDownloads(requested_limit)
-        self:showMessage(T(_("Keep next unread downloaded: %1 chapters"), saved_limit))
-        return saved_limit
-    end
-
     if requested_limit <= 0 then
-        savePolicy()
         return true
     end
 
     local function queue(download_directory)
         local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
         if #chapters == 0 then
-            savePolicy()
             self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
             return 0
         end
@@ -613,13 +597,11 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
                 ),
                 _("Queue"),
                 function()
-                    savePolicy()
                     self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
                 end
             )
         end
 
-        savePolicy()
         return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
     end
 

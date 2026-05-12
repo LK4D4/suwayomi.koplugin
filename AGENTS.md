@@ -69,7 +69,7 @@
   - `suwayomi/downloads/directory.lua`: download-directory chooser, persistence callback flow, and default directory probing.
   - `suwayomi/downloads/job_store.lua`, `suwayomi/downloads/progress_file.lua`, `suwayomi/downloads/status_formatter.lua`: persisted queue schema, progress-file IO, and chapter download status text.
   - `suwayomi/downloads/downloader.lua`: one-chapter downloads, page validation, ordered CBZ writing, `.part` cleanup, and final rename.
-  - `suwayomi/downloads/controller.lua`: top-level Downloads hub/menu orchestration, retry/clear/cancel actions, and keep-next-unread policy application.
+  - `suwayomi/downloads/controller.lua`: top-level Downloads hub/menu orchestration, retry/clear/cancel actions, and downloaded-read reconciliation.
   - `suwayomi/browse/controller.lua`, `suwayomi/browse/source_catalog.lua`, and `suwayomi/browse/source_fetch_worker.lua`: Browse entry flow, source filtering/cache/rendering, and source fetch worker lifecycle.
   - `suwayomi/manga/controller.lua`: manga action menu orchestration, library membership, refresh, first-unread helpers, and manga-level download/read actions.
   - `suwayomi/chapters/context.lua`, `suwayomi/chapters/menu.lua`, `suwayomi/chapters/actions.lua`: chapter context, menu construction, and the public chapter action facade.

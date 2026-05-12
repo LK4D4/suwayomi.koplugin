@@ -372,7 +372,6 @@ describe("suwayomi/chapters/menu", function()
         end
 
         local ChapterMenu = require("suwayomi/chapters/menu")
-        local delete_count = 0
         local plugin = {
             loadKoreaderHistoryPaths = function()
                 return {}
@@ -382,10 +381,6 @@ describe("suwayomi/chapters/menu", function()
             end,
             setKoreaderChapterReadState = function() end,
             upsertChapterLedgerEntry = function() end,
-            autoDeleteReadLocalDownload = function()
-                delete_count = delete_count + 1
-                return false
-            end,
             getChapterDownloadStatus = function()
                 return nil
             end,
@@ -419,7 +414,6 @@ describe("suwayomi/chapters/menu", function()
         package.loaded["suwayomi/settings"] = nil
         package.loaded["suwayomi/downloads/downloader"] = nil
 
-        assert.are.equal(0, delete_count)
         assert.are.equal("Read · Downloaded", items[1].menu_status)
         assert.are.equal("Read · Downloaded", items[2].menu_status)
     end)

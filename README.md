@@ -24,7 +24,7 @@ This plugin is experimental and still under active development.
 - Source-scoped download layout: `<download directory>/<source>/<manga>/<chapter>.cbz`
 - Download individual chapters as `.cbz`
 - Chapter actions menu with `Open`, `Download`, `Delete from device`, and `Mark as read` / `Mark as unread`
-- Bulk chapter menu actions for selected chapters, `Download next 5/10/50 unread`, `Keep next 5/10/50 unread downloaded`, and deleting read chapters
+- Bulk chapter menu actions for selected chapters, `Download next 5/10/50 unread`, `Keep next 5/10/50 unread`, and deleting read chapters
 - Chapter action to mark the selected chapter and all previous chapters as read, useful for setting up a clean device from an existing reading position
 - Batch downloads queue chapters in the visible chapter-list order
 - Queued chapter downloads run in parallel with a conservative default of 2 active chapters

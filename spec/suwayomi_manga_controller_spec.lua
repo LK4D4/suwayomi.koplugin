@@ -27,7 +27,6 @@ local function installController(options)
         update_calls = {},
         refresh_calls = {},
         tracked_screens = {},
-        saved_keep_next = 5,
     }
 
     package.preload.gettext = function()
@@ -77,10 +76,6 @@ local function installController(options)
         return {
             load = function()
                 return { server_url = "https://suwayomi.example" }
-            end,
-            saveKeepNextUnreadDownloads = function(_, value)
-                state.saved_keep_next = value
-                return value
             end,
         }
     end
@@ -325,7 +320,7 @@ describe("suwayomi/manga/controller", function()
         assert.is_nil(plugin.current_chapter_menu)
     end)
 
-    it("persists keep-next policy and confirms broad queue actions", function()
+    it("queues keep-next downloads without persisting a background policy", function()
         local plugin, state = installController({
             context_chapters = {
                 { id = "c1", name = "Ch. 1", is_read = false },
@@ -335,13 +330,11 @@ describe("suwayomi/manga/controller", function()
         local manga = { id = "m1", title = "Frieren" }
 
         assert.is_true(plugin:performMangaAction(manga, "keep_next_5_unread"))
-        assert.are.equal(5, state.saved_keep_next)
         assert.are.equal(2, #plugin.enqueued[1].chapters)
 
         assert.is_true(plugin:performMangaAction(manga, "keep_next_50_unread"))
         assert.are.equal("Queue", state.bulk_confirmation.ok_text)
         state.bulk_confirmation.callback()
-        assert.are.equal(50, state.saved_keep_next)
         assert.are.equal(2, #plugin.enqueued[2].chapters)
 
         assert.is_true(plugin:performMangaAction(manga, "delete_read_downloaded"))

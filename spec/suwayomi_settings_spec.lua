@@ -237,34 +237,6 @@ describe("suwayomi/settings", function()
         assert.are.equal(4, stored_data.max_parallel_chapter_downloads)
     end)
 
-    it("loads keep-next unread downloads as off by default", function()
-        local settings = require("suwayomi/settings")
-
-        assert.are.equal(0, settings:loadKeepNextUnreadDownloads())
-    end)
-
-    it("normalizes unsupported keep-next unread download values to off", function()
-        local settings = require("suwayomi/settings")
-
-        stored_data.keep_next_unread_downloads = 17
-        assert.are.equal(0, settings:loadKeepNextUnreadDownloads())
-
-        stored_data.keep_next_unread_downloads = "10"
-        assert.are.equal(10, settings:loadKeepNextUnreadDownloads())
-
-        assert.are.equal(0, settings:saveKeepNextUnreadDownloads("mystery"))
-    end)
-
-    it("saves supported keep-next unread download settings", function()
-        local settings = require("suwayomi/settings")
-
-        local saved = settings:saveKeepNextUnreadDownloads(50)
-
-        assert.is_true(flushed)
-        assert.are.equal(50, saved)
-        assert.are.equal(50, stored_data.keep_next_unread_downloads)
-    end)
-
     it("loads an empty chapter ledger by default", function()
         local settings = require("suwayomi/settings")
 

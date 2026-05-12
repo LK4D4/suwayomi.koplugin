@@ -30,7 +30,6 @@ local function installController(options)
             hide_in_library_results = false,
         },
         saved_parallel = options.parallel or 2,
-        saved_keep_next = options.keep_next or 0,
         saved_category_behavior = options.category_behavior or "automatic",
     }
 
@@ -90,13 +89,6 @@ local function installController(options)
                 state.saved_parallel = value
                 return value
             end,
-            loadKeepNextUnreadDownloads = function()
-                return state.saved_keep_next
-            end,
-            saveKeepNextUnreadDownloads = function(_, value)
-                state.saved_keep_next = value
-                return value
-            end,
             loadLibraryCategoryPickerBehavior = function()
                 return state.saved_category_behavior
             end,
@@ -135,10 +127,6 @@ local function installController(options)
             updateParallelDownloadsMenu = function(menu, menu_options)
                 state.parallel_menu_options = menu_options
                 state.parallel_menu_options.menu = menu
-            end,
-            showKeepNextUnreadDownloadsMenu = function(menu_options)
-                state.keep_next_menu_options = menu_options
-                return { name = "keep-next-unread-downloads-menu" }
             end,
             updateKeepNextUnreadDownloadsMenu = function(menu, menu_options)
                 state.keep_next_menu_options = menu_options
@@ -250,8 +238,8 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("Suwayomi Browse setting saved.", state.messages[#state.messages])
     end)
 
-    it("saves parallel download and keep-next settings from downloads settings", function()
-        local plugin, state = installController({ keep_next = 10 })
+    it("saves parallel download settings from downloads settings", function()
+        local plugin, state = installController()
         local download_items = plugin:buildSettingsMenu()[4].sub_item_table
 
         assert.are.equal("Parallel downloads: 2", download_items[2].text_func())
@@ -263,15 +251,7 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.is_nil(plugin.download_queue)
         assert.are.equal("parallel-downloads-menu", state.parallel_menu_options.menu.name)
         assert.are.equal("Suwayomi parallel chapter downloads saved: 3", state.messages[#state.messages])
-
-        assert.are.equal("Keep next unread downloaded: 10 chapters", download_items[3].text_func())
-        download_items[3].callback(state.touchmenu)
-        assert.are.same({ 0, 5, 10, 50 }, state.keep_next_menu_options.choices)
-        state.keep_next_menu_options.onSelect(5)
-
-        assert.are.equal(5, state.saved_keep_next)
-        assert.are.equal("keep-next-unread-downloads-menu", state.keep_next_menu_options.menu.name)
-        assert.are.equal("Keep next unread downloaded: 5 chapters", state.messages[#state.messages])
+        assert.is_nil(download_items[3])
     end)
 
     it("saves category picker behavior and reports unavailable persistence", function()
