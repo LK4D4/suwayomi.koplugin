@@ -161,22 +161,46 @@ describe("suwayomi/ui/manga_menu", function()
                 span = {
                     horizontal_default = 3,
                     horizontal_small = 1,
+                    vertical_default = 3,
                 },
             }
         end
         package.preload["ui/widget/textboxwidget"] = function()
             return {
+                getFontSizeToFitHeight = function(_, height, lines)
+                    return math.floor((height or 0) / math.max(lines or 1, 1))
+                end,
                 new = function(_, options)
                     options = options or {}
                     options.kind = "textbox"
+                    local font_size = options.face and options.face.size or 12
                     function options:getSize()
-                        return { w = math.min(options.width or 0, #(options.text or "")), h = options.height or 0 }
+                        local width = options.width or #(options.text or "")
+                        local chars_per_line = math.max(1, math.floor(width / math.max(font_size, 1)))
+                        local lines = math.max(1, math.ceil(#(options.text or "") / chars_per_line))
+                        local height = options.height or lines * font_size
+                        return { w = math.min(width, #(options.text or "") * font_size), h = height }
                     end
                     return options
                 end,
             }
         end
-        package.preload["ui/widget/textwidget"] = function() return widgetModule("text") end
+        package.preload["ui/widget/textwidget"] = function()
+            return {
+                new = function(_, options)
+                    options = options or {}
+                    options.kind = "text"
+                    local font_size = options.face and options.face.size or 12
+                    function options:getSize()
+                        return { w = #(options.text or "") * font_size, h = font_size }
+                    end
+                    function options:getWidth()
+                        return self:getSize().w
+                    end
+                    return options
+                end,
+            }
+        end
         package.preload["ui/uimanager"] = function()
             return {
                 show = function(_, menu)
@@ -346,7 +370,7 @@ describe("suwayomi/ui/manga_menu", function()
             title = "Results",
             item_table = {
                 {
-                    text = "A long manga title",
+                    text = "Manga title",
                     subtitle = "MangaDex",
                     mandatory = "12 chapters",
                     manga = { id = "m1" },
@@ -365,7 +389,7 @@ describe("suwayomi/ui/manga_menu", function()
         local saw_subtitle = false
         local saw_metadata = false
         for _, widget in ipairs(textboxes) do
-            if widget.text == "A long manga title" then
+            if widget.text == "Manga title" then
                 saw_title = widget.bold ~= true and widget.face.name == "cfont" and widget.face.size == 19
             elseif widget.text == "MangaDex" then
                 saw_subtitle = widget.face.name == "cfont" and widget.face.size == 17
@@ -376,6 +400,33 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_true(saw_title)
         assert.is_true(saw_subtitle)
         assert.is_true(saw_metadata)
+    end)
+
+    it("gives long names more row height like File Manager multiline rows", function()
+        local manga_menu = require("suwayomi/ui/manga_menu")
+
+        local menu = manga_menu.show{
+            title = "Results",
+            item_table = {
+                {
+                    text = "A very long manga title that needs wrapping instead of being cut short",
+                    mandatory = "12 chapters",
+                    thumbnail_placeholder = true,
+                    manga = { id = "long" },
+                },
+                {
+                    text = "Short",
+                    mandatory = "1 chapter",
+                    thumbnail_placeholder = true,
+                    manga = { id = "short" },
+                },
+            },
+        }
+
+        assert.is_true(menu.items_max_lines >= 2)
+        assert.is_true(menu.item_table[1].height > menu.item_table[2].height)
+        assert.are.equal(menu.item_table[1].height, menu.item_group[1].dimen.h)
+        assert.are.equal(menu.item_table[2].height, menu.item_group[2].dimen.h)
     end)
 
     it("renders chapter rows with the shared row widget and no thumbnail gutter", function()

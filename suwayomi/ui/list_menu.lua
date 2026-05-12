@@ -88,6 +88,62 @@ local function round(value)
     return math.floor(value + 0.5)
 end
 
+local function verticalDefaultSpan()
+    return Size.span and Size.span.vertical_default or Size.line.thin
+end
+
+local function widgetWidth(widget)
+    if not widget then
+        return 0
+    end
+    if widget.getWidth then
+        return widget:getWidth()
+    end
+    if widget.getSize then
+        local size = widget:getSize()
+        return size and size.w or 0
+    end
+    return 0
+end
+
+local function widgetHeight(widget)
+    if not widget then
+        return 0
+    end
+    if widget.getSize then
+        local size = widget:getSize()
+        return size and size.h or 0
+    end
+    return 0
+end
+
+local function freeWidget(widget)
+    if widget and widget.free then
+        widget:free()
+    end
+end
+
+local function textWidth(text, face, bold)
+    local widget = TextWidget:new{
+        text = tostring(text or ""),
+        face = face,
+        bold = bold,
+    }
+    local width = widgetWidth(widget)
+    freeWidget(widget)
+    return width
+end
+
+local function textBoxLineHeight(face)
+    local widget = TextBoxWidget:new{
+        text = "A",
+        face = face,
+    }
+    local height = widgetHeight(widget)
+    freeWidget(widget)
+    return math.max(1, height)
+end
+
 local function placeholderText(text)
     text = tostring(text or ""):gsub("^%s+", "")
     if text == "" then
@@ -188,9 +244,10 @@ end
 
 function ListMenuItem:buildRowWidget(width, height)
     local has_thumbnail = self.entry.thumbnail_placeholder or self.entry.thumbnail_url or self.entry.thumbnail_path
+    local font_height = self.menu and self.menu._suwayomi_base_item_height or height
     local left_padding = has_thumbnail and 0 or scaled(10)
     local right_padding = scaled(10)
-    local thumbnail_slot = has_thumbnail and math.max(1, height) or 0
+    local thumbnail_slot = has_thumbnail and math.max(1, math.min(height, font_height)) or 0
     local gap = has_thumbnail and scaled(5) or 0
     local inner_width = width - left_padding - right_padding
     local mandatory_widget
@@ -199,7 +256,7 @@ function ListMenuItem:buildRowWidget(width, height)
     if self.mandatory then
         mandatory_widget = TextBoxWidget:new{
             text = tostring(self.mandatory),
-            face = fontFace("cfont", fontSizeForRow(14, 18, height)),
+            face = fontFace("cfont", fontSizeForRow(14, 18, font_height)),
             width = math.floor(inner_width * 0.28),
             alignment = "right",
             height = height,
@@ -215,10 +272,18 @@ function ListMenuItem:buildRowWidget(width, height)
         inner_width - thumbnail_slot - gap - mandatory_width - (mandatory_widget and Size.span.horizontal_default or 0)
     )
     local subtitle = self.entry.subtitle
-    local title_height = subtitle and math.max(1, math.floor(height * 0.58)) or height
+    local subtitle_height = 0
+    if subtitle then
+        local subtitle_face = fontFace("cfont", fontSizeForRow(18, 22, font_height))
+        subtitle_height = math.min(
+            math.max(1, height - 1),
+            textBoxLineHeight(subtitle_face) + verticalDefaultSpan()
+        )
+    end
+    local title_height = subtitle and math.max(1, height - subtitle_height) or height
     local title = TextBoxWidget:new{
         text = BD.auto(tostring(self.text or "")),
-        face = fontFace("cfont", fontSizeForRow(20, 24, height)),
+        face = fontFace("cfont", fontSizeForRow(20, 24, font_height)),
         width = title_width,
         height = title_height,
         height_adjust = true,
@@ -232,9 +297,9 @@ function ListMenuItem:buildRowWidget(width, height)
             title,
             TextBoxWidget:new{
                 text = BD.auto(tostring(subtitle)),
-                face = fontFace("cfont", fontSizeForRow(18, 22, height)),
+                face = fontFace("cfont", fontSizeForRow(18, 22, font_height)),
                 width = title_width,
-                height = math.max(1, height - title_height),
+                height = subtitle_height,
                 height_adjust = true,
                 height_overflow_show_ellipsis = true,
                 alignment = "left",
@@ -321,6 +386,83 @@ function ListMenu.new(options)
     return Menu:new(applyDefaults(options))
 end
 
+function ListMenu.getPageNumber(menu, item_number)
+    if #menu.item_table == 0 or item_number == 0 then
+        return 1
+    end
+    if menu.items_max_lines and menu.page_items then
+        for page, items in ipairs(menu.page_items) do
+            if item_number <= items[#items] then
+                return page
+            end
+        end
+        return #menu.page_items
+    end
+    return math.ceil(math.min(item_number, #menu.item_table) / menu.perpage)
+end
+
+function ListMenu.estimateItemTitleWidth(menu, item, base_height)
+    local has_thumbnail = item.thumbnail_placeholder or item.thumbnail_url or item.thumbnail_path
+    local left_padding = has_thumbnail and 0 or scaled(10)
+    local right_padding = scaled(10)
+    local thumbnail_slot = has_thumbnail and math.max(1, base_height) or 0
+    local gap = has_thumbnail and scaled(5) or 0
+    local inner_width = math.max(1, menu.item_width - left_padding - right_padding)
+    local mandatory_width = 0
+    if item.mandatory then
+        local mandatory_face = fontFace("cfont", fontSizeForRow(14, 18, base_height))
+        mandatory_width = math.min(
+            textWidth(item.mandatory, mandatory_face),
+            math.floor(inner_width * 0.28)
+        )
+    end
+    return math.max(
+        1,
+        inner_width
+            - thumbnail_slot
+            - gap
+            - mandatory_width
+            - (item.mandatory and Size.span.horizontal_default or 0)
+    )
+end
+
+function ListMenu.setupItemHeights(menu)
+    if #menu.item_table == 0 then
+        menu.page_items = {{}}
+        return
+    end
+
+    local base_height = menu._suwayomi_base_item_height or menu.item_dimen.h
+    local title_face = fontFace("cfont", fontSizeForRow(20, 24, base_height))
+    local line_height = textBoxLineHeight(title_face)
+    local row_padding = 2 * verticalDefaultSpan() + Size.line.thin
+    menu.page_items = {}
+
+    local page_items = {}
+    local page_height = 0
+    for index, item in ipairs(menu.item_table) do
+        local title_width = ListMenu.estimateItemTitleWidth(menu, item, base_height)
+        local title_width_px = textWidth(getItemText(item), title_face, item.title_bold == true) * 1.08
+        local subtitle_lines = item.subtitle and 1 or 0
+        local max_title_lines = math.max(1, (menu.items_max_lines or 1) - subtitle_lines)
+        local title_lines = math.min(math.max(1, math.ceil(title_width_px / title_width)), max_title_lines)
+        local lines = title_lines + subtitle_lines
+        item.height = math.max(base_height, lines * line_height + row_padding)
+
+        page_height = page_height + item.height
+        if page_height <= menu.available_height or #page_items == 0 then
+            table.insert(page_items, index)
+        else
+            table.insert(menu.page_items, page_items)
+            page_items = { index }
+            page_height = item.height
+        end
+        if index == #menu.item_table then
+            table.insert(menu.page_items, page_items)
+        end
+    end
+end
+
 function ListMenu.recalculateDimen(menu, no_recalculate_dimen)
     if no_recalculate_dimen and menu.item_dimen then
         return
@@ -347,6 +489,7 @@ function ListMenu.recalculateDimen(menu, no_recalculate_dimen)
     end
 
     local available_height = menu.inner_dimen.h - others_height - Size.line.thin
+    menu.available_height = available_height
     if menu._suwayomi_files_per_page == nil then
         menu._suwayomi_files_per_page = menu.items_per_page
             or math.max(1, math.floor(available_height / scale_by_size / ROW_HEIGHT_BASE))
@@ -366,12 +509,20 @@ function ListMenu.recalculateDimen(menu, no_recalculate_dimen)
 
     menu.item_height = math.floor(available_height / menu.perpage) - Size.line.thin
     menu.item_width = menu.inner_dimen.w
+    menu._suwayomi_base_item_height = menu.item_height
     menu.item_dimen = Geom:new{
         x = 0,
         y = 0,
         w = menu.item_width,
         h = menu.item_height,
     }
+    if menu.items_max_lines then
+        ListMenu.setupItemHeights(menu)
+        menu.page_num = ListMenu.getPageNumber(menu, #menu.item_table)
+        if menu.page_num > 0 and menu.page > menu.page_num then
+            menu.page = menu.page_num
+        end
+    end
 end
 
 function ListMenu.prepareThumbnail(menu, item)
@@ -492,11 +643,17 @@ function ListMenu.updateItems(menu, select_number, no_recalculate_dimen)
     menu.content_group:resetLayout()
     menu:_recalculateDimen(no_recalculate_dimen)
 
-    local items_nb = menu.perpage
-    local idx_offset = (menu.page - 1) * items_nb
+    local items_nb
+    local idx_offset
+    if menu.items_max_lines and menu.page_items then
+        items_nb = #(menu.page_items[menu.page] or {})
+    else
+        items_nb = menu.perpage
+        idx_offset = (menu.page - 1) * items_nb
+    end
     local visible_items = {}
     for idx = 1, items_nb do
-        local index = idx_offset + idx
+        local index = menu.items_max_lines and menu.page_items and menu.page_items[menu.page][idx] or idx_offset + idx
         local item = menu.item_table[index]
         if item == nil then
             break
@@ -506,6 +663,9 @@ function ListMenu.updateItems(menu, select_number, no_recalculate_dimen)
             select_number = idx
         end
         ListMenu.prepareThumbnail(menu, item)
+        if menu.items_max_lines and item.height then
+            menu.item_dimen.h = item.height
+        end
         local item_widget = ListMenuItem:new{
             entry = item,
             text = getItemText(item),
