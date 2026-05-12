@@ -58,7 +58,8 @@
 - Current preferred layout for new/extracted code:
   - `suwayomi/api.lua`: public API facade and API debug logging.
   - `suwayomi/api/queries.lua`, `suwayomi/api/parsers.lua`, `suwayomi/api/transport.lua`: GraphQL payload builders, defensive response parsing, and HTTP/auth/URL handling.
-  - `suwayomi/client.lua`: Library/Browse orchestration that is not KOReader lifecycle glue.
+  - `suwayomi/client.lua`: public Library/Browse client facade and dependency container.
+  - `suwayomi/client/runtime.lua`, `suwayomi/client/source_manga.lua`, `suwayomi/client/global_search.lua`, `suwayomi/client/library.lua`, `suwayomi/client/browse_chapter_counts.lua`, `suwayomi/client/util.lua`: client runtime lookups, source manga flow, global search flow, library flow, browse chapter-count enrichment, and tiny shared client helpers.
   - `suwayomi/ui.lua`: public KOReader UI facade.
   - `suwayomi/ui/browse.lua`, `suwayomi/ui/list_rows.lua`, `suwayomi/ui/list_menu.lua`, `suwayomi/ui/manga_menu.lua`, `suwayomi/ui/downloads.lua`, `suwayomi/ui/directory.lua`, `suwayomi/ui/menu_utils.lua`: Browse/Library manga and source menus, shared list-row formatting, KOReader thumbnail list rendering, the `manga_menu` compatibility alias, Downloads menus, directory picking, and shared menu plumbing.
   - `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua`: private manga/source thumbnail cache paths and subprocess thumbnail fetches.
