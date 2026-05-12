@@ -78,6 +78,7 @@
   - `suwayomi/plugin/title_menu.lua`: shared title-bar burger action menus and the universal Suwayomi home title action for full-screen plugin menus.
 - Do not add compatibility wrappers for old top-level `suwayomi_*.lua` module names; update callers and tests to the slash-style module names instead.
 - Runtime Lua files should start with a short line-comment `-- Boundary:` header matching the current module convention. Use regular `--` comments for explanatory notes; avoid top-of-file `--[[ ... ]]` documentation blocks unless a future file has a specific reason to differ.
+- When orienting in an existing runtime Lua module, read the first ten lines first and use the top-of-file `-- Boundary:` summary to understand the file's responsibility before making changes. If that summary is missing, misleading, or no longer matches the module after your edit, update it as part of the same change.
 - Document any code whose purpose is not immediately obvious with a short comment explaining why it exists; avoid comments that merely restate what the code says.
 - Keep lint policy centralized in `.luacheckrc`. Do not add inline `-- luacheck:` directives for routine repo-wide conventions such as unused `self`; update `.luacheckrc` instead when the rule should apply broadly.
 - Path layout is source-scoped through the paths module: `<download_directory>/<source_label>/<manga_title>/<chapter_name>.cbz`. Do not add old unscoped path detection unless explicitly requested.
