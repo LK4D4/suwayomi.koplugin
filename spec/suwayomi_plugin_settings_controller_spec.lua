@@ -214,33 +214,24 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("Suwayomi login settings saved for https://new.example.", state.messages[#state.messages])
     end)
 
-    it("tracks source language state and refreshes settings when the language menu closes", function()
+    it("keeps source language filtering out of plugin settings", function()
         local plugin, state = installController()
         local browse_items = plugin:buildSettingsMenu()[3].sub_item_table
 
-        assert.are.equal("Source languages: EN, RU", browse_items[1].text_func())
-        browse_items[1].callback(state.touchmenu)
-        assert.is_true(state.language_menu_options.languages[1].enabled)
-        assert.is_false(state.language_menu_options.languages[3].enabled)
-
-        state.language_menu_options.onToggle("de", true)
-        assert.are.same({ "en", "ru", "de" }, state.saved_languages)
-        assert.are.equal("language-menu", state.language_menu_options.menu.name)
-
-        state.language_menu_options.onClose()
-        assert.are.equal(1, state.refresh_count)
-        assert.are.equal("Suwayomi source languages saved: EN, RU, DE", state.messages[#state.messages])
+        assert.are.equal("Show NSFW sources: no", browse_items[1].text_func())
+        assert.are.equal("Hide in-library results: no", browse_items[2].text_func())
+        assert.is_nil(state.language_menu_options)
     end)
 
     it("toggles browse settings through menu callbacks", function()
         local plugin, state = installController()
         local browse_items = plugin:buildSettingsMenu()[3].sub_item_table
 
-        assert.are.equal("Show NSFW sources: no", browse_items[2].text_func())
-        assert.are.equal("Hide in-library results: no", browse_items[3].text_func())
+        assert.are.equal("Show NSFW sources: no", browse_items[1].text_func())
+        assert.are.equal("Hide in-library results: no", browse_items[2].text_func())
 
+        browse_items[1].callback(state.touchmenu)
         browse_items[2].callback(state.touchmenu)
-        browse_items[3].callback(state.touchmenu)
 
         assert.are.same({
             show_nsfw_sources = true,
