@@ -6,12 +6,14 @@ local helper = require("spec/support/controller_module_spec_helper")
 
 local settings_calls
 local ui_calls
+local next_tick_callbacks
 local debug_logs
 
 local function resetModules()
     package.loaded["suwayomi/browse/source_catalog"] = nil
     package.loaded["suwayomi/settings"] = nil
     package.loaded["suwayomi/ui"] = nil
+    package.loaded["ui/uimanager"] = nil
     package.loaded["suwayomi/debug"] = nil
 end
 
@@ -19,7 +21,16 @@ local function stubDependencies()
     helper.stubControllerDependencies()
     settings_calls = {}
     ui_calls = {}
+    next_tick_callbacks = {}
     debug_logs = {}
+
+    package.preload["ui/uimanager"] = function()
+        return {
+            nextTick = function(_, callback)
+                table.insert(next_tick_callbacks, callback)
+            end,
+        }
+    end
 
     package.preload["suwayomi/settings"] = function()
         return {
@@ -270,6 +281,21 @@ describe("suwayomi/browse/source_catalog", function()
         assert.are.equal("global-search", search_result)
         assert.are.equal("manga-for-source", manga_result)
         assert.are.equal("english", controller.global_search_sources[1].id)
+        assert.are.equal("english", controller.selected_source.id)
+    end)
+
+    it("defers source row selection until the sources menu finishes handling the tap", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        controller:showSourceList({ { id = "english", lang = "en" } })
+        ui_calls.shown.onSelect({ id = "english" })
+
+        assert.is_nil(controller.selected_source)
+        assert.are.equal(1, #next_tick_callbacks)
+
+        next_tick_callbacks[1]()
+
         assert.are.equal("english", controller.selected_source.id)
     end)
 

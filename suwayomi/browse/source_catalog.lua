@@ -20,8 +20,20 @@ local function getDebug()
     return require("suwayomi/debug")
 end
 
+local function getUIManager()
+    return require("ui/uimanager")
+end
+
 local function _(text)
     return require("gettext")(text)
+end
+
+local function nextTick(callback)
+    local UIManager = getUIManager()
+    if UIManager and UIManager.nextTick then
+        return UIManager:nextTick(callback)
+    end
+    return callback()
 end
 
 function Methods:sourceMatchesBrowseSettings(source, selected_languages, browse_settings)
@@ -73,6 +85,11 @@ function Methods:showSourceList(sources, options)
     local SuwayomiUI = getUI()
     options = options or {}
     local menu
+    local function selectSource(source)
+        return nextTick(function()
+            return self:showMangaForSource(source)
+        end)
+    end
     local function buildSourceMenuOptions()
         local menu_options = {}
         local function showGlobalSearch()
@@ -102,13 +119,13 @@ function Methods:showSourceList(sources, options)
 
     if not options.force_new and self.current_sources_menu and SuwayomiUI.updateSourcesMenu then
         SuwayomiUI.updateSourcesMenu(self.current_sources_menu, sources, function(source)
-            self:showMangaForSource(source)
+            return selectSource(source)
         end, buildSourceMenuOptions())
         return self.current_sources_menu
     end
 
     menu = SuwayomiUI.showSourcesMenu(sources, function(source)
-        self:showMangaForSource(source)
+        return selectSource(source)
     end, buildSourceMenuOptions())
     self.current_sources_menu = menu
     if self.trackSuwayomiScreen then
