@@ -169,7 +169,7 @@ local function buildBackActionButton(options, dialogProvider, UIManager)
     end
     return {
         id = "back",
-        text = _("Back"),
+        text = "< " .. _("Back"),
         callback = function()
             UIManager:close(dialogProvider())
             options.on_back()
@@ -217,6 +217,7 @@ local function buildActionMenuButtons(options, dialogProvider, UIManager, onSele
 
     if back_button then
         table.insert(buttons, { back_button })
+        table.insert(buttons, {})
     end
 
     if options.destructive_actions_at_bottom then

@@ -464,8 +464,9 @@ describe("suwayomi/ui", function()
             selected = action
         end)
 
-        assert.are.equal("Back", shown_dialog.buttons[1][1].text)
-        assert.are.equal("Download 5 unread", shown_dialog.buttons[2][1].text)
+        assert.are.equal("< Back", shown_dialog.buttons[1][1].text)
+        assert.are.same({}, shown_dialog.buttons[2])
+        assert.are.equal("Download 5 unread", shown_dialog.buttons[3][1].text)
 
         shown_dialog.buttons[1][1].callback()
 
