@@ -179,6 +179,40 @@ describe("suwayomi/chapters/menu", function()
         assert.is_true(bulk_actions[#bulk_actions].destructive)
     end)
 
+    it("marks bulk chapter actions that open submenus", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local plugin = {
+            current_chapter_context = {
+                chapters = {
+                    { id = "c1", name = "Chapter 1" },
+                },
+            },
+        }
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+        function plugin:getSelectedChapterCount()
+            return 0
+        end
+        function plugin:getVisibleChapters(chapters)
+            return chapters
+        end
+        function plugin:getChapterScanlatorChoices()
+            return { "Official" }
+        end
+
+        local bulk_actions = plugin:getBulkChapterActions()
+
+        assert.are.equal("select_all", bulk_actions[1].id)
+        assert.is_nil(bulk_actions[1].submenu)
+        assert.are.equal("bulk_downloads", bulk_actions[2].id)
+        assert.is_true(bulk_actions[2].submenu)
+        assert.are.equal("scanlator_filter", bulk_actions[3].id)
+        assert.is_true(bulk_actions[3].submenu)
+    end)
+
     it("quick refresh reflects updated read state instead of stale cached row status", function()
         helper.stubControllerDependencies()
         package.loaded["suwayomi/chapters/menu"] = nil

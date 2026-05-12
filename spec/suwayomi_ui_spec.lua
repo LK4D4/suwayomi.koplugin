@@ -424,6 +424,30 @@ describe("suwayomi/ui", function()
         assert.is_true(closed)
     end)
 
+    it("marks submenu action buttons without changing the selected action", function()
+        local ui = require("suwayomi/ui")
+        local selected
+
+        ui.showActionMenu({
+            title = "Title actions",
+            actions = {
+                { id = "select_all", text = "Select all" },
+                { id = "bulk_downloads", text = "Bulk downloads", submenu = true },
+            },
+        }, function(action)
+            selected = action
+        end)
+
+        assert.are.equal("Select all", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Bulk downloads >", shown_dialog.buttons[1][2].text)
+
+        shown_dialog.buttons[1][2].callback()
+
+        assert.are.equal("bulk_downloads", selected.id)
+        assert.are.equal("Bulk downloads", selected.text)
+        assert.is_true(selected.submenu)
+    end)
+
     it("passes action menu anchors through to ButtonDialog", function()
         local ui = require("suwayomi/ui")
         local anchor = function()
@@ -474,13 +498,13 @@ describe("suwayomi/ui", function()
         ui.showMangaActionsMenu({
             actions = {
                 { id = "open_chapters", text = "Open chapters" },
-                { id = "more", text = "More..." },
+                { id = "more", text = "More...", submenu = true },
                 { id = "remove_from_library", text = "Remove from library", destructive = true },
             },
         })
 
         assert.are.equal("Open chapters", shown_dialog.buttons[1][1].text)
-        assert.are.equal("More...", shown_dialog.buttons[2][1].text)
+        assert.are.equal("More... >", shown_dialog.buttons[2][1].text)
         assert.are.same({}, shown_dialog.buttons[3])
         assert.are.equal("Remove from library", shown_dialog.buttons[4][1].text)
         assert.is_true(shown_dialog.buttons[4][1].destructive)

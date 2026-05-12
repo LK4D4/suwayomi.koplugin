@@ -141,10 +141,18 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
     return dialog
 end
 
+local function formatActionButtonText(action)
+    local text = action and action.text or ""
+    if action and action.submenu == true then
+        return tostring(text) .. " >"
+    end
+    return text
+end
+
 local function buildActionMenuButton(action, dialogProvider, UIManager, onSelectCallback)
     return {
         id = action.id,
-        text = action.text,
+        text = formatActionButtonText(action),
         destructive = action.destructive == true or nil,
         callback = function()
             UIManager:close(dialogProvider())

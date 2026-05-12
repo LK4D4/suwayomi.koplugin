@@ -272,7 +272,7 @@ function Methods:getBulkChapterActions()
         table.insert(actions, { id = "mark_unread_selected", text = _("Mark unread") })
         table.insert(actions, { id = "clear_selection", text = _("Clear selection") })
         if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
-            table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter") })
+            table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter"), submenu = true })
         end
         table.insert(actions, { id = "delete_selected", text = _("Delete downloads"), destructive = true })
         return actions
@@ -282,9 +282,9 @@ function Methods:getBulkChapterActions()
         table.insert(actions, { id = "select_all", text = _("Select all") })
     end
 
-    table.insert(actions, { id = "bulk_downloads", text = _("Bulk downloads") })
+    table.insert(actions, { id = "bulk_downloads", text = _("Bulk downloads"), submenu = true })
     if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
-        table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter") })
+        table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter"), submenu = true })
     end
     table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read downloads"), destructive = true })
 

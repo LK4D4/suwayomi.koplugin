@@ -175,7 +175,7 @@ function Methods:getMangaActions(manga)
     end
     table.insert(actions, { id = "download_first_unread", text = _("Download first unread") })
     table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
-    table.insert(actions, { id = "more", text = _("More...") })
+    table.insert(actions, { id = "more", text = _("More..."), submenu = true })
     if destructive_action then
         table.insert(actions, destructive_action)
     end
@@ -322,7 +322,7 @@ function Methods:showMoreMangaActions(manga, options)
             { id = "download_next_50_unread", text = _("Download next 50 unread") },
             { id = "download_all_unread", text = _("Download all unread") },
             { id = "download_all_chapters", text = _("Download all chapters") },
-            { id = "keep_downloaded", text = _("Keep downloaded") },
+            { id = "keep_downloaded", text = _("Keep downloaded"), submenu = true },
             { id = "delete_read_downloaded", text = _("Delete read downloads"), destructive = true },
         },
     }, function(action)
