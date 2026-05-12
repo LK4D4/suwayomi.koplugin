@@ -163,6 +163,20 @@ local function buildActionMenuButton(action, dialogProvider, UIManager, onSelect
     }
 end
 
+local function buildBackActionButton(options, dialogProvider, UIManager)
+    if type(options.on_back) ~= "function" then
+        return nil
+    end
+    return {
+        id = "back",
+        text = _("Back"),
+        callback = function()
+            UIManager:close(dialogProvider())
+            options.on_back()
+        end,
+    }
+end
+
 
 local function appendActionButtonRows(buttons, actions, columns, dialogProvider, UIManager, onSelectCallback)
     local row = {}
@@ -199,6 +213,11 @@ local function buildActionMenuButtons(options, dialogProvider, UIManager, onSele
     local columns = options.vertical and 1 or (options.columns or 2)
     local normal_actions = options.actions or {}
     local destructive_actions = {}
+    local back_button = buildBackActionButton(options, dialogProvider, UIManager)
+
+    if back_button then
+        table.insert(buttons, { back_button })
+    end
 
     if options.destructive_actions_at_bottom then
         normal_actions, destructive_actions = splitActionGroups(options.actions)

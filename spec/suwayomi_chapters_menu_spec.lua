@@ -84,7 +84,20 @@ describe("suwayomi/chapters/menu", function()
             return { x = 3, y = 4, w = 32, h = 32 }
         end
         local plugin = {
-            current_chapter_context = { chapters = {} },
+            current_chapter_context = {
+                chapters = {
+                    { id = "c1", name = "Chapter 1" },
+                },
+            },
+            getSelectedChapterCount = function()
+                return 0
+            end,
+            getVisibleChapters = function(_, chapters)
+                return chapters
+            end,
+            getChapterScanlatorChoices = function()
+                return { "Official" }
+            end,
             getScanlatorFilterActions = function()
                 return { { id = "scanlator_filter_all", text = "All" } }
             end,
@@ -101,6 +114,14 @@ describe("suwayomi/chapters/menu", function()
 
         assert.are.equal(anchor, shown_menus[1].anchor)
         assert.are.equal(anchor, shown_menus[2].anchor)
+        assert.is_function(shown_menus[1].on_back)
+        assert.is_function(shown_menus[2].on_back)
+
+        shown_menus[2].on_back()
+
+        assert.are.equal("Chapter downloads", shown_menus[3].title)
+        assert.are.equal(anchor, shown_menus[3].anchor)
+        assert.are.equal("bulk_downloads", shown_menus[3].actions[2].id)
 
         package.preload["suwayomi/ui"] = nil
         package.loaded["suwayomi/ui"] = nil

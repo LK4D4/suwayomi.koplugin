@@ -246,10 +246,22 @@ describe("suwayomi/manga/controller", function()
         assert.is_true(state.manga_actions_options.actions[5].submenu)
         assert.are.equal("Delete read downloads", state.manga_actions_options.actions[#state.manga_actions_options.actions].text)
         assert.is_true(state.manga_actions_options.actions[#state.manga_actions_options.actions].destructive)
+        assert.is_function(state.manga_actions_options.on_back)
+
+        state.manga_actions_options.on_back()
+        assert.are.equal("Frieren", state.manga_actions_options.title)
+        assert.are.equal("more", state.manga_actions_options.actions[#state.manga_actions_options.actions - 1].id)
+
+        state.manga_actions_callback({ id = "more" })
 
         state.manga_actions_callback({ id = "keep_downloaded" })
         assert.are.equal("Keep downloaded", state.manga_actions_options.title)
         assert.are.equal("Keep next 50 unread", state.manga_actions_options.actions[3].text)
+        assert.is_function(state.manga_actions_options.on_back)
+
+        state.manga_actions_options.on_back()
+        assert.are.equal("More...", state.manga_actions_options.title)
+        assert.are.equal("Keep downloaded", state.manga_actions_options.actions[5].text)
     end)
 
     it("adds and removes library manga through API and confirmation wiring", function()

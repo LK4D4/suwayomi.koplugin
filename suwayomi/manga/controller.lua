@@ -312,6 +312,7 @@ end
 
 
 function Methods:showMoreMangaActions(manga, options)
+    options = options or {}
     if not SuwayomiUI.showMangaActionsMenu then
         return false
     end
@@ -325,6 +326,9 @@ function Methods:showMoreMangaActions(manga, options)
             { id = "keep_downloaded", text = _("Keep downloaded"), submenu = true },
             { id = "delete_read_downloaded", text = _("Delete read downloads"), destructive = true },
         },
+        on_back = function()
+            self:showMangaActions(manga, options)
+        end,
     }, function(action)
         if action then
             self:performMangaAction(manga, action.id, options)
@@ -338,6 +342,7 @@ end
 
 
 function Methods:showKeepDownloadedMangaActions(manga, options)
+    options = options or {}
     if not SuwayomiUI.showMangaActionsMenu then
         return false
     end
@@ -349,6 +354,9 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
             { id = "keep_next_50_unread", text = _("Keep next 50 unread") },
             { id = "stop_keep_unread", text = _("Stop keeping unread") },
         },
+        on_back = function()
+            self:showMoreMangaActions(manga, options)
+        end,
     }, function(action)
         if action then
             self:performMangaAction(manga, action.id, options)

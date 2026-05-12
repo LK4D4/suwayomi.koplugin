@@ -329,6 +329,9 @@ function Methods:showScanlatorFilterActions(menu_context)
         title = _("Scanlator filter"),
         actions = self:getScanlatorFilterActions(),
         anchor = menu_context and menu_context.anchor,
+        on_back = function()
+            self:showBulkChapterActions(menu_context)
+        end,
     }, function(action)
         if action.id == "scanlator_filter_all" then
             self:setScanlatorFilter(nil)
@@ -349,13 +352,16 @@ function Methods:showBulkDownloadActions(menu_context)
         title = _("Bulk downloads"),
         actions = self:getBulkDownloadActions(),
         anchor = menu_context and menu_context.anchor,
+        on_back = function()
+            self:showBulkChapterActions(menu_context)
+        end,
     }, function(action)
         self:performBulkChapterAction(action.id)
     end)
 end
 
 
-function Methods:showBulkChapterActions()
+function Methods:showBulkChapterActions(menu_context)
     if not SuwayomiUI.showChapterActionsMenu then
         self:downloadSelectedChapters()
         return
@@ -372,10 +378,11 @@ function Methods:showBulkChapterActions()
     local options = {
         title = title,
         actions = self:getBulkChapterActions(),
+        anchor = menu_context and menu_context.anchor,
     }
 
     SuwayomiUI.showChapterActionsMenu(options, function(action)
-        self:performBulkChapterAction(action.id)
+        self:performBulkChapterAction(action.id, menu_context)
     end)
 end
 

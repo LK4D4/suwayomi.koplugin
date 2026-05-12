@@ -448,6 +448,32 @@ describe("suwayomi/ui", function()
         assert.is_true(selected.submenu)
     end)
 
+    it("adds a shared back action for nested action menus", function()
+        local ui = require("suwayomi/ui")
+        local selected
+
+        ui.showActionMenu({
+            title = "Bulk downloads",
+            actions = {
+                { id = "download_next_5_unread", text = "Download 5 unread" },
+            },
+            on_back = function()
+                table.insert(events, "back")
+            end,
+        }, function(action)
+            selected = action
+        end)
+
+        assert.are.equal("Back", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Download 5 unread", shown_dialog.buttons[2][1].text)
+
+        shown_dialog.buttons[1][1].callback()
+
+        assert.are.same({ "close", "back" }, events)
+        assert.are.equal(shown_dialog, closed_dialog)
+        assert.is_nil(selected)
+    end)
+
     it("passes action menu anchors through to ButtonDialog", function()
         local ui = require("suwayomi/ui")
         local anchor = function()
