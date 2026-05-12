@@ -26,13 +26,15 @@ The public runtime facades are intentionally small and stable:
 - `suwayomi/chapters/actions.lua` is the chapter action facade for download, delete, read/unread, selected/bulk, and manga-level chapter actions.
 - `suwayomi/readsync/controller.lua` is the read-sync orchestration facade, with ledger and KOReader sidecar/history behavior split into sibling modules.
 
-Callers should require these slash-style modules, for example `require("suwayomi/api")`. Do not add compatibility wrappers for old top-level `suwayomi_*.lua` names.
+Callers should require slash-style modules under `suwayomi/`, for example `require("suwayomi/api")`. New runtime modules should stay in that namespace instead of adding top-level `suwayomi_*.lua` files.
 
 ## Module Ownership
 
 Core plugin shell:
 
 - `main.lua`: KOReader lifecycle, dependency construction, action/menu registration, queue recovery, and controller method installation.
+- `suwayomi/navigation.lua`: route-aware stack for Suwayomi-owned KOReader widgets.
+- `suwayomi/reader_return.lua`: reader-menu shortcut state for returning from an opened CBZ to the originating Suwayomi chapter list.
 - `suwayomi/plugin/home.lua`: Suwayomi hub and main-menu entry behavior.
 - `suwayomi/plugin/title_menu.lua`: shared title-bar burger menus for full-screen plugin screens, including the universal Suwayomi home action.
 - `suwayomi/plugin/settings_controller.lua`: grouped Settings menus and settings action routing.
@@ -55,12 +57,14 @@ Browse and Library:
 - `suwayomi/client/util.lua`: tiny shared helpers used by client flow modules.
 - `suwayomi/ui/list_rows.lua`: pure shared row formatting for manga and source records, including subtitles, status markers, and thumbnail metadata.
 - `suwayomi/ui/list_menu.lua`: KOReader Menu-compatible thumbnail rows with cached thumbnail slots for Library, Browse/Search, source results, and chapter-like lists.
-- `suwayomi/ui/manga_menu.lua`: compatibility alias for `suwayomi/ui/list_menu.lua`; keep new renderer behavior in `list_menu.lua`.
+- `suwayomi/ui/manga_menu.lua`: thin alias for `suwayomi/ui/list_menu.lua`; keep renderer behavior in `list_menu.lua`.
 - `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua`: private thumbnail cache pathing and bounded background thumbnail fetch support.
 - `suwayomi/browse/controller.lua`: Browse entry flow, source fetch worker lifecycle, polling, and source-cache refresh.
 - `suwayomi/browse/source_catalog.lua`: source filtering, source cache IO, and source-list rendering.
 - `suwayomi/browse/source_fetch_worker.lua`: subprocess worker for fetching sources into a result file.
 - `suwayomi/browse/global_search_worker.lua`: subprocess worker for fetching one source's first search page into a result file for partial global search.
+- `suwayomi/browse/source_manga_worker.lua`: subprocess worker for source Popular/Latest/Search manga result pages.
+- `suwayomi/browse/chapter_count_worker.lua`: subprocess worker for browse-result chapter-count enrichment.
 - `suwayomi/manga/controller.lua`: manga actions, refresh, library membership, first-unread helpers, and manga-level download/read actions.
 
 Downloads:

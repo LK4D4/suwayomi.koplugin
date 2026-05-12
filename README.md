@@ -35,7 +35,7 @@ This plugin is experimental and still under active development.
 - Manual `Sync` action for flushing pending read/unread changes immediately
 
 Current limitations:
-- Remote source browse/latest workflows can be usable. Global search now keeps per-source failures isolated and can be cancelled, but source-specific search still depends on the selected source and may time out before showing a result or error.
+- Remote source browse/latest workflows can be usable. Global search now keeps per-source failures isolated and can be cancelled, and source-specific result loading is cancellable, but source-specific search still depends on the selected source and may end in a timeout or source error instead of results.
 - Some Suwayomi extensions mark broadly used sources, including MangaDex and Comick in the tested server setup, as NSFW. Enable **Settings** > **Browse** > **Show NSFW sources** if expected sources are missing.
 - Source-specific quirks are expected. In the May 2026 live test, MangaDex search returned results quickly, but one tested result had no chapters from Suwayomi; Comick Latest returned manga and chapters, while Comick text search timed out at the server.
 - Full source filter editing is still deferred; source-specific search currently uses text search without dynamic source filters.

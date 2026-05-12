@@ -69,7 +69,7 @@ Current limitations:
 - Chapter API requests preserve scanlator data, and chapter lists can be filtered by scanlator/translation group.
 - Read-download cleanup is available as an explicit local action rather than an automatic delete-while-reading toggle.
 - Full dynamic source filter editing is deferred.
-- Remote source workflow verification has started. A Boox Palma live pass verified Comick Latest -> chapter list -> scanlator filter -> read-state toggles -> local CBZ download/open. Source-specific search timeout behavior remains a release-readiness risk even though global search is now partial and cancellable.
+- Remote source workflow verification has started. A Boox Palma live pass verified Comick Latest -> chapter list -> scanlator filter -> read-state toggles -> local CBZ download/open. Source-specific result loading is now cancellable in unit-covered flows, but slow source/search behavior still needs device validation against real extensions.
 - The codebase is now split into facades/controllers/submodules; the next risk is validating the unit-covered remote-source flows on real sources and devices.
 
 ## Suwayomi-WebUI Alignment Review
@@ -376,7 +376,7 @@ Tests:
 
 Exit criteria:
 
-- A user can search across sources or within one source, page results, add a manga to the library, and open its chapter list in unit-covered flows. Global search is cancellable and isolates per-source failures. Live remote-source verification found usable browse/latest flows and a source-specific search timeout hardening gap.
+- A user can search across sources or within one source, page results, add a manga to the library, and open its chapter list in unit-covered flows. Global search is cancellable and isolates per-source failures. Source-specific result loading is also cancellable in unit-covered flows, while live remote-source verification still needs to cover slow extensions.
 
 ## Phase 8: Remote Source Verification
 
@@ -470,7 +470,6 @@ These are intentionally outside the client MVP:
 - Server-side chapter bookmark/unbookmark actions
 - Full Library filter/sort/display parity with WebUI
 - Cover grid UI
-- Thumbnail caching
 - OPDS support
 - Custom in-plugin manga reader
 - Page streaming reader
@@ -492,4 +491,4 @@ These are intentionally outside the client MVP:
 
 ## Current Next Step
 
-Harden source-specific remote search timeout behavior and keep validating cancellable global search against slow extensions. One source timeout should not block the KOReader UI for about a minute. Keep full source filters deferred until the tested remote-source behavior is stable.
+Validate source-specific remote search timeout and cancellation behavior on device with slow extensions, and keep validating cancellable global search. One source timeout should not block the KOReader UI for about a minute. Keep full source filters deferred until the tested remote-source behavior is stable.
