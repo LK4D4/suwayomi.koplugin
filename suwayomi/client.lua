@@ -749,6 +749,7 @@ function SuwayomiClient:buildGlobalSearchMenuOptions(search)
         menu_options.close_callback = cancel
         menu_options.on_cancel_search = cancel
     end
+    menu_options.thumbnail_credentials = search and search.credentials
     return menu_options
 end
 

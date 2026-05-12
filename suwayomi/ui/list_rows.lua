@@ -189,29 +189,26 @@ end
 function ListRows.buildGlobalSearchSummaryRow(summary, options)
     options = options or {}
     local source = type(summary) == "table" and summary.source or nil
-    local source_title = ListRows.getSourceTitle(source)
-    if source_title == "" then
-        source_title = _("Source")
+    local row = ListRows.buildSourceRow(source, {
+        show_language = true,
+    })
+    if row.text == "" then
+        row.text = _("Source")
     end
-    return {
-        text = source_title,
-        subtitle = summary and summary.status == "error"
-            and tostring(summary.error or _("Unknown error"))
-            or ListRows.getSourceSubtitle(source, { show_language = true }),
-        mandatory = ListRows.getGlobalSearchSummaryMandatory(summary),
-        thumbnail_url = type(source) == "table" and source.icon_url or nil,
-        thumbnail_placeholder = true,
-        source = source,
-        summary = summary,
-        callback = function()
-            if summary
-                and (summary.status == "ok" or summary.status == "pageable_empty")
-                and options.on_select
-            then
-                options.on_select(summary)
-            end
-        end,
-    }
+    row.subtitle = summary and summary.status == "error"
+        and tostring(summary.error or _("Unknown error"))
+        or row.subtitle
+    row.mandatory = ListRows.getGlobalSearchSummaryMandatory(summary)
+    row.summary = summary
+    row.callback = function()
+        if summary
+            and (summary.status == "ok" or summary.status == "pageable_empty")
+            and options.on_select
+        then
+            options.on_select(summary)
+        end
+    end
+    return row
 end
 
 function ListRows.buildGlobalSearchSummaryMenuTable(summaries, options)

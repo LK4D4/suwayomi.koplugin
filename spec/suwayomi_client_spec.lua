@@ -516,12 +516,19 @@ describe("suwayomi/client", function()
         })
 
         client:showGlobalSearch({
-            { id = "s1", display_name = "MangaDex (EN)", name = "MangaDex", lang = "en" },
-            { id = "local", name = "Local source", lang = "localsourcelang" },
-            { id = "s2", name = "Comick", lang = "en" },
+            {
+                id = "s1",
+                display_name = "MangaDex (EN)",
+                name = "MangaDex",
+                lang = "en",
+                icon_url = "/icons/md.png",
+            },
+            { id = "local", name = "Local source", lang = "localsourcelang", icon_url = "/icons/local.png" },
+            { id = "s2", name = "Comick", lang = "en", icon_url = "/icons/comick.png" },
         })
 
         assert.are.equal("local", shown_summaries[1].source.id)
+        assert.are.equal("/icons/local.png", shown_summaries[1].source.icon_url)
         assert.are.equal("searching", shown_summaries[1].status)
         assert.are.equal("s1", shown_summaries[2].source.id)
         assert.are.equal("s2", shown_summaries[3].source.id)
@@ -529,6 +536,7 @@ describe("suwayomi/client", function()
         assert.are.equal("s1", started[2].source.id)
         assert.are.equal("s2", started[3].source.id)
         assert.are.equal("appbar.menu", shown_options.title_bar_left_icon)
+        assert.are.equal("https://suwayomi.example", shown_options.thumbnail_credentials.server_url)
         assert.is_function(shown_options.close_callback)
         assert.is_function(shown_options.on_cancel_search)
     end)
@@ -536,6 +544,7 @@ describe("suwayomi/client", function()
     it("updates partial global search results and opens successful rows", function()
         local subprocess_job, started = buildGlobalSearchSubprocessFake()
         local updated_summaries
+        local updated_options
         local selected_callback
         local opened_options
         local client = newClient({
@@ -563,9 +572,10 @@ describe("suwayomi/client", function()
                     selected_callback = onSelect
                     return { name = "global-search" }
                 end,
-                updateGlobalSearchResultsMenu = function(_, summaries, onSelect)
+                updateGlobalSearchResultsMenu = function(_, summaries, onSelect, menu_options)
                     updated_summaries = summaries
                     selected_callback = onSelect
+                    updated_options = menu_options
                 end,
                 showMangaMenu = function(_, _, options)
                     opened_options = options
@@ -591,6 +601,7 @@ describe("suwayomi/client", function()
         assert.is_true(updated_summaries[1].has_next_page)
         assert.are.equal("searching", updated_summaries[2].status)
         assert.are.equal("s1", started[2].source.id)
+        assert.are.equal("https://suwayomi.example", updated_options.thumbnail_credentials.server_url)
 
         selected_callback(updated_summaries[1])
         assert.are.equal("Local source - Search: frieren - Page 1", opened_options.title)
