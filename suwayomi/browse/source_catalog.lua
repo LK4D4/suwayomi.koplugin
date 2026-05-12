@@ -9,6 +9,49 @@ local SourceCatalog = {}
 local Methods = {}
 local DEFAULT_SOURCE_LANGUAGE = "en"
 local LOCAL_SOURCE_LANGUAGE = "localsourcelang"
+local LANGUAGE_LABELS = {
+    all = "All",
+    ar = "Arabic",
+    bg = "Bulgarian",
+    bn = "Bengali",
+    ca = "Catalan",
+    cs = "Czech",
+    da = "Danish",
+    de = "German",
+    el = "Greek",
+    en = "English",
+    es = "Spanish",
+    fa = "Persian",
+    fi = "Finnish",
+    fil = "Filipino",
+    fr = "French",
+    he = "Hebrew",
+    hi = "Hindi",
+    hu = "Hungarian",
+    id = "Indonesian",
+    it = "Italian",
+    ja = "Japanese",
+    ko = "Korean",
+    lt = "Lithuanian",
+    ms = "Malay",
+    my = "Burmese",
+    nl = "Dutch",
+    no = "Norwegian",
+    pl = "Polish",
+    pt = "Portuguese",
+    ["pt-BR"] = "Portuguese (Brazil)",
+    ro = "Romanian",
+    ru = "Russian",
+    sh = "Serbo-Croatian",
+    sv = "Swedish",
+    th = "Thai",
+    tr = "Turkish",
+    uk = "Ukrainian",
+    vi = "Vietnamese",
+    zh = "Chinese",
+    ["zh-Hans"] = "Chinese (Simplified)",
+    ["zh-Hant"] = "Chinese (Traditional)",
+}
 
 local function getSettings()
     return require("suwayomi/settings")
@@ -50,21 +93,68 @@ local function normalizeLanguage(lang)
 end
 
 local function formatLanguageLabel(lang)
-    return string.upper(tostring(lang or ""))
+    lang = normalizeLanguage(lang)
+    if not lang then
+        return ""
+    end
+    return LANGUAGE_LABELS[lang] or LANGUAGE_LABELS[lang:lower()] or tostring(lang)
 end
 
 local function sortLanguages(left, right)
-    return tostring(left):lower() < tostring(right):lower()
+    return formatLanguageLabel(left):lower() < formatLanguageLabel(right):lower()
+end
+
+local function copyDefaultSourceLanguageFilter()
+    return {
+        [DEFAULT_SOURCE_LANGUAGE] = true,
+    }
+end
+
+function Methods:getSourceLanguageFilterSet()
+    if type(self.current_source_language_filters) == "table" then
+        return self.current_source_language_filters
+    end
+
+    local selected = copyDefaultSourceLanguageFilter()
+    local legacy_filter = normalizeLanguage(self.current_source_language_filter)
+    if legacy_filter then
+        selected = {
+            [legacy_filter] = true,
+        }
+    end
+    self.current_source_language_filters = selected
+    self.current_source_language_filter = nil
+    return self.current_source_language_filters
 end
 
 function Methods:getSourceLanguageFilter()
-    return normalizeLanguage(self.current_source_language_filter) or DEFAULT_SOURCE_LANGUAGE
+    for lang, selected in pairs(self:getSourceLanguageFilterSet()) do
+        if selected then
+            return lang
+        end
+    end
+    return DEFAULT_SOURCE_LANGUAGE
 end
 
 
-function Methods:getSourceLanguageFilterActions(sources)
+function Methods:getSourceLanguageFilterSummary()
+    local selected_labels = {}
+    for lang, selected in pairs(self:getSourceLanguageFilterSet()) do
+        if selected then
+            table.insert(selected_labels, formatLanguageLabel(lang))
+        end
+    end
+    table.sort(selected_labels, function(left, right)
+        return left:lower() < right:lower()
+    end)
+    return #selected_labels > 0 and table.concat(selected_labels, ", ") or _("none")
+end
+
+
+function Methods:getSourceLanguageFilterChoices(sources)
     local seen = {}
     local languages = {}
+    local selected_languages = self:getSourceLanguageFilterSet()
     for _, source in ipairs(sources or {}) do
         local lang = normalizeLanguage(source and source.lang)
         if lang and not seen[lang] then
@@ -77,17 +167,18 @@ function Methods:getSourceLanguageFilterActions(sources)
     local actions = {}
     for _, lang in ipairs(languages) do
         table.insert(actions, {
-            id = "source_language_filter_value",
-            text = formatLanguageLabel(lang),
-            language = lang,
+            code = lang,
+            label = formatLanguageLabel(lang),
+            enabled = selected_languages[lang] == true,
         })
     end
     return actions
 end
 
-function Methods:sourceMatchesBrowseSettings(source, selected_language, browse_settings)
+
+function Methods:sourceMatchesBrowseSettings(source, selected_languages, browse_settings)
     local lang = normalizeLanguage(source and source.lang)
-    if lang and lang ~= selected_language then
+    if lang and not selected_languages[lang] then
         return false
     end
     if source.is_nsfw == true and not browse_settings.show_nsfw_sources then
@@ -98,12 +189,12 @@ end
 
 
 function Methods:filterSourcesByLanguage(sources)
-    local selected_language = self:getSourceLanguageFilter()
+    local selected_languages = self:getSourceLanguageFilterSet()
     local browse_settings = self:loadBrowseSettings()
     local filtered = {}
 
     for _, source in ipairs(sources or {}) do
-        if self:sourceMatchesBrowseSettings(source, selected_language, browse_settings) then
+        if self:sourceMatchesBrowseSettings(source, selected_languages, browse_settings) then
             table.insert(filtered, source)
         end
     end
@@ -124,26 +215,54 @@ end
 
 
 function Methods:setSourceLanguageFilter(language)
-    self.current_source_language_filter = normalizeLanguage(language) or DEFAULT_SOURCE_LANGUAGE
+    local lang = normalizeLanguage(language) or DEFAULT_SOURCE_LANGUAGE
+    self.current_source_language_filters = {
+        [lang] = true,
+    }
     self:refreshSourceLanguageFilter()
     return true
 end
 
 
-function Methods:showSourceLanguageFilterActions(actions, menu_context)
-    local SuwayomiUI = getUI()
-    if not SuwayomiUI.showChapterActionsMenu then
+function Methods:toggleSourceLanguageFilter(language, enabled)
+    local lang = normalizeLanguage(language)
+    if not lang then
         return false
     end
-    SuwayomiUI.showChapterActionsMenu({
-        title = _("Source language"),
-        actions = actions or {},
-        anchor = menu_context and menu_context.anchor,
-    }, function(action)
-        if action and action.language then
-            self:setSourceLanguageFilter(action.language)
+    local selected_languages = self:getSourceLanguageFilterSet()
+    selected_languages[lang] = enabled == true or nil
+    self:refreshSourceLanguageFilter()
+    return true
+end
+
+
+function Methods:showSourceLanguageFilterActions(choices, menu_context)
+    local SuwayomiUI = getUI()
+    if not SuwayomiUI.showLanguageMenu then
+        return false
+    end
+    local language_menu
+    local function refreshLanguageMenu()
+        if SuwayomiUI.updateLanguageMenu then
+            SuwayomiUI.updateLanguageMenu(language_menu, {
+                title = _("Source languages"),
+                languages = self:getSourceLanguageFilterChoices(self.current_source_list_sources),
+                anchor = menu_context and menu_context.anchor,
+            }, function(code, enabled)
+                self:toggleSourceLanguageFilter(code, enabled)
+                refreshLanguageMenu()
+            end)
         end
-    end)
+    end
+    language_menu = SuwayomiUI.showLanguageMenu({
+        title = _("Source languages"),
+        languages = choices or {},
+        anchor = menu_context and menu_context.anchor,
+        onToggle = function(code, enabled)
+            self:toggleSourceLanguageFilter(code, enabled)
+            refreshLanguageMenu()
+        end,
+    })
     return true
 end
 
@@ -170,7 +289,7 @@ function Methods:showSourceList(sources, options)
     local SuwayomiUI = getUI()
     options = options or {}
     local all_sources = options.all_sources or sources
-    local source_language_actions = self:getSourceLanguageFilterActions(all_sources)
+    local source_language_choices = self:getSourceLanguageFilterChoices(all_sources)
     local menu
     local function selectSource(source)
         return nextTick(function()
@@ -185,10 +304,10 @@ function Methods:showSourceList(sources, options)
         local actions = {
             { id = "global_search", text = _("Global search") },
         }
-        if #source_language_actions > 0 then
+        if #source_language_choices > 0 then
             table.insert(actions, {
                 id = "source_language_filter",
-                text = _("Source language: ") .. formatLanguageLabel(self:getSourceLanguageFilter()),
+                text = _("Source languages: ") .. self:getSourceLanguageFilterSummary(),
                 submenu = true,
             })
         end
@@ -201,7 +320,7 @@ function Methods:showSourceList(sources, options)
                         return showGlobalSearch()
                     end
                     if action and action.id == "source_language_filter" then
-                        return self:showSourceLanguageFilterActions(source_language_actions, menu_context)
+                        return self:showSourceLanguageFilterActions(source_language_choices, menu_context)
                     end
                 end,
             }) or {}
@@ -260,7 +379,7 @@ function Methods:showFetchedSources(result, options)
         source_count = #(result.sources or {}),
         filtered_source_count = #filtered_sources,
     })
-    if #filtered_sources == 0 and #self:getSourceLanguageFilterActions(result.sources) == 0 then
+    if #filtered_sources == 0 and #self:getSourceLanguageFilterChoices(result.sources) == 0 then
         if not options.silent then
             self:showMessage(_("No Suwayomi sources match the selected languages."))
         end
@@ -285,7 +404,7 @@ function Methods:showCachedSources(cache, options)
         filtered_source_count = #filtered_sources,
         cache_age_seconds = math.max(0, os.time() - (tonumber(cache and cache.updated_at) or os.time())),
     })
-    if #filtered_sources == 0 and #self:getSourceLanguageFilterActions(cache and cache.sources or {}) == 0 then
+    if #filtered_sources == 0 and #self:getSourceLanguageFilterChoices(cache and cache.sources or {}) == 0 then
         return false
     end
 

@@ -373,7 +373,7 @@ function SuwayomiUI.showLanguageMenu(options)
     end
 
     menu = Menu:new{
-        title = _("Suwayomi source languages"),
+        title = options.title or _("Suwayomi source languages"),
         item_table = SuwayomiUI.buildLanguageMenuTable(menu_options, options.onToggle),
         state_w = getStateMarkWidth(),
         close_callback = function()

@@ -682,16 +682,17 @@ describe("suwayomi/ui", function()
         local ui = require("suwayomi/ui")
 
         ui.showLanguageMenu({
+            title = "Source languages",
             languages = {
-                { code = "en", label = "EN", enabled = true },
-                { code = "ru", label = "RU", enabled = false },
+                { code = "en", label = "English", enabled = true },
+                { code = "ru", label = "Russian", enabled = false },
             },
             onClose = function()
                 table.insert(events, "summary")
             end,
         })
 
-        assert.are.equal("Suwayomi source languages", shown_dialog.title)
+        assert.are.equal("Source languages", shown_dialog.title)
         assert.are.equal(32, shown_dialog.state_w)
         assert.are.equal("check", shown_dialog.item_table[1].state.mark_type)
         assert.is_true(shown_dialog.item_table[1].state.checked)
