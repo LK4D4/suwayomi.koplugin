@@ -3,11 +3,12 @@
 -- Responsibility: convert source, manga, chapter, search summary, category, and
 -- download-adjacent tables into KOReader Menu row tables for content screens.
 -- Owned state: none.
--- Dependencies: gettext only.
+-- Dependencies: gettext and source language label helpers.
 -- External data: manga and source tables come from API/client layers and are
 -- treated as optional-field records.
 
 local _ = require("gettext")
+local SourceLanguages = require("suwayomi/source_languages")
 
 local ListRows = {}
 
@@ -120,7 +121,7 @@ function ListRows.getSourceSubtitle(source, options)
     if lang == nil or lang == "" or lang == "localsourcelang" then
         return nil
     end
-    return string.upper(tostring(lang))
+    return SourceLanguages.formatLabel(lang)
 end
 
 function ListRows.getSourceMandatory(source)

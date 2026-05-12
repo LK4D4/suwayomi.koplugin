@@ -12,6 +12,7 @@ local debug_logs
 local function resetModules()
     for _, name in ipairs({
         "suwayomi/browse/source_catalog",
+        "suwayomi/source_languages",
         "suwayomi/settings",
         "suwayomi/ui",
         "ui/uimanager",
@@ -201,8 +202,8 @@ describe("suwayomi/browse/source_catalog", function()
 
         assert.are.same({
             { code = "en", label = "English", enabled = true },
-            { code = "ja", label = "Japanese", enabled = false },
-            { code = "es", label = "Spanish", enabled = false },
+            { code = "es", label = "Español", enabled = false },
+            { code = "ja", label = "日本語", enabled = false },
         }, choices)
     end)
 
@@ -223,10 +224,11 @@ describe("suwayomi/browse/source_catalog", function()
 
         controller.title_menu_options.onSelect({ id = "source_language_filter" }, nil, { anchor = "anchor" })
         assert.are.equal("Source languages", ui_calls.language_menu.options.title)
+        assert.is_false(ui_calls.language_menu.options.show_done)
         assert.are.same({
             { code = "en", label = "English", enabled = true },
-            { code = "ja", label = "Japanese", enabled = false },
-            { code = "es", label = "Spanish", enabled = false },
+            { code = "es", label = "Español", enabled = false },
+            { code = "ja", label = "日本語", enabled = false },
         }, ui_calls.language_menu.options.languages)
 
         ui_calls.language_menu.options.onToggle("es", true)
@@ -237,9 +239,10 @@ describe("suwayomi/browse/source_catalog", function()
         })
         assert.are.same({
             { code = "en", label = "English", enabled = true },
-            { code = "ja", label = "Japanese", enabled = false },
-            { code = "es", label = "Spanish", enabled = true },
+            { code = "es", label = "Español", enabled = true },
+            { code = "ja", label = "日本語", enabled = false },
         }, ui_calls.updated_language_menu.options.languages)
+        assert.is_false(ui_calls.updated_language_menu.options.show_done)
 
         ui_calls.updated_language_menu.onToggle("en", false)
 

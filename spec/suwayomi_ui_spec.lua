@@ -704,6 +704,23 @@ describe("suwayomi/ui", function()
         assert.are.equal(shown_dialog, closed_dialog)
     end)
 
+    it("can show a language menu without a Done row", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showLanguageMenu({
+            title = "Source languages",
+            show_done = false,
+            languages = {
+                { code = "en", label = "English", enabled = true },
+                { code = "es", label = "Español", enabled = false },
+            },
+        })
+
+        assert.are.equal(2, #shown_dialog.item_table)
+        assert.are.equal("English", shown_dialog.item_table[1].text)
+        assert.are.equal("Español", shown_dialog.item_table[2].text)
+    end)
+
     it("does not run the language close callback during an in-place menu refresh", function()
         local ui = require("suwayomi/ui")
         local summary_count = 0

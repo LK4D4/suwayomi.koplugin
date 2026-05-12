@@ -1,6 +1,7 @@
 describe("suwayomi/ui/list_rows", function()
     before_each(function()
         package.loaded["suwayomi/ui/list_rows"] = nil
+        package.loaded["suwayomi/source_languages"] = nil
         package.preload["gettext"] = function()
             return function(text) return text end
         end
@@ -9,6 +10,7 @@ describe("suwayomi/ui/list_rows", function()
     after_each(function()
         package.preload["gettext"] = nil
         package.loaded["suwayomi/ui/list_rows"] = nil
+        package.loaded["suwayomi/source_languages"] = nil
     end)
 
     it("uses manga title, id, then an empty title fallback", function()
@@ -138,7 +140,7 @@ describe("suwayomi/ui/list_rows", function()
         })
 
         assert.are.equal("MangaDex", row.text)
-        assert.are.equal("EN", row.subtitle)
+        assert.are.equal("English", row.subtitle)
         assert.are.equal("18+", row.mandatory)
         assert.are.equal("/icons/mangadex.png", row.thumbnail_url)
         assert.is_true(row.thumbnail_placeholder)
@@ -146,6 +148,21 @@ describe("suwayomi/ui/list_rows", function()
 
         row.callback()
         assert.are.same(source, selected)
+    end)
+
+    it("uses language names for source row subtitles", function()
+        local rows = require("suwayomi/ui/list_rows")
+
+        assert.are.equal("Español", rows.getSourceSubtitle({
+            lang = "es",
+        }, {
+            show_language = true,
+        }))
+        assert.are.equal("日本語", rows.getSourceSubtitle({
+            lang = "ja",
+        }, {
+            show_language = true,
+        }))
     end)
 
     it("hides local source language and absent adult markers", function()

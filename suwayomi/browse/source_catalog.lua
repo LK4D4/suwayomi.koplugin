@@ -9,49 +9,7 @@ local SourceCatalog = {}
 local Methods = {}
 local DEFAULT_SOURCE_LANGUAGE = "en"
 local LOCAL_SOURCE_LANGUAGE = "localsourcelang"
-local LANGUAGE_LABELS = {
-    all = "All",
-    ar = "Arabic",
-    bg = "Bulgarian",
-    bn = "Bengali",
-    ca = "Catalan",
-    cs = "Czech",
-    da = "Danish",
-    de = "German",
-    el = "Greek",
-    en = "English",
-    es = "Spanish",
-    fa = "Persian",
-    fi = "Finnish",
-    fil = "Filipino",
-    fr = "French",
-    he = "Hebrew",
-    hi = "Hindi",
-    hu = "Hungarian",
-    id = "Indonesian",
-    it = "Italian",
-    ja = "Japanese",
-    ko = "Korean",
-    lt = "Lithuanian",
-    ms = "Malay",
-    my = "Burmese",
-    nl = "Dutch",
-    no = "Norwegian",
-    pl = "Polish",
-    pt = "Portuguese",
-    ["pt-BR"] = "Portuguese (Brazil)",
-    ro = "Romanian",
-    ru = "Russian",
-    sh = "Serbo-Croatian",
-    sv = "Swedish",
-    th = "Thai",
-    tr = "Turkish",
-    uk = "Ukrainian",
-    vi = "Vietnamese",
-    zh = "Chinese",
-    ["zh-Hans"] = "Chinese (Simplified)",
-    ["zh-Hant"] = "Chinese (Traditional)",
-}
+local SourceLanguages = require("suwayomi/source_languages")
 
 local function getSettings()
     return require("suwayomi/settings")
@@ -97,11 +55,11 @@ local function formatLanguageLabel(lang)
     if not lang then
         return ""
     end
-    return LANGUAGE_LABELS[lang] or LANGUAGE_LABELS[lang:lower()] or tostring(lang)
+    return SourceLanguages.formatLabel(lang)
 end
 
 local function sortLanguages(left, right)
-    return formatLanguageLabel(left):lower() < formatLanguageLabel(right):lower()
+    return SourceLanguages.compare(left, right)
 end
 
 local function copyDefaultSourceLanguageFilter()
@@ -246,6 +204,7 @@ function Methods:showSourceLanguageFilterActions(choices, menu_context)
         if SuwayomiUI.updateLanguageMenu then
             SuwayomiUI.updateLanguageMenu(language_menu, {
                 title = _("Source languages"),
+                show_done = false,
                 languages = self:getSourceLanguageFilterChoices(self.current_source_list_sources),
                 anchor = menu_context and menu_context.anchor,
             }, function(code, enabled)
@@ -256,6 +215,7 @@ function Methods:showSourceLanguageFilterActions(choices, menu_context)
     end
     language_menu = SuwayomiUI.showLanguageMenu({
         title = _("Source languages"),
+        show_done = false,
         languages = choices or {},
         anchor = menu_context and menu_context.anchor,
         onToggle = function(code, enabled)

@@ -330,14 +330,16 @@ function SuwayomiUI.buildLanguageMenuTable(options, onToggleCallback)
         })
     end
 
-    table.insert(menu_table, {
-        text = _("Done"),
-        callback = function()
-            if options.onClose then
-                options.onClose()
-            end
-        end,
-    })
+    if options.show_done ~= false then
+        table.insert(menu_table, {
+            text = _("Done"),
+            callback = function()
+                if options.onClose then
+                    options.onClose()
+                end
+            end,
+        })
+    end
 
     return menu_table
 end
