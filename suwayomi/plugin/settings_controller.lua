@@ -12,14 +12,6 @@ local _ = require("gettext")
 local FFIUtil = require("ffi/util")
 local T = FFIUtil.template
 
-local SOURCE_LANGUAGE_OPTIONS = {
-    { code = "en", label = "EN" },
-    { code = "ru", label = "RU" },
-    { code = "de", label = "DE" },
-    { code = "es", label = "ES" },
-    { code = "fr", label = "FR" },
-}
-
 local SettingsController = {}
 SettingsController.__index = SettingsController
 
@@ -67,15 +59,6 @@ function Methods:showLoginDialog(touchmenu_instance)
 end
 
 
-function Methods:buildSourceLanguageSet(source_languages)
-    local selected = {}
-    for _, lang in ipairs(source_languages or {}) do
-        selected[lang] = true
-    end
-    return selected
-end
-
-
 function Methods:loadBrowseSettings()
     if SuwayomiSettings.loadBrowseSettings then
         return SuwayomiSettings:loadBrowseSettings()
@@ -84,80 +67,6 @@ function Methods:loadBrowseSettings()
         show_nsfw_sources = false,
         hide_in_library_results = false,
     }
-end
-
-
-function Methods:showSourceLanguageDialog(touchmenu_instance)
-    local selected = self:buildSourceLanguageSet(SuwayomiSettings:loadSourceLanguages())
-    local language_menu
-
-    local function buildLanguages()
-        local languages = {}
-        for _, language in ipairs(SOURCE_LANGUAGE_OPTIONS) do
-            table.insert(languages, {
-                code = language.code,
-                label = language.label,
-                enabled = selected[language.code] == true,
-            })
-        end
-        return languages
-    end
-
-    local function saveSelectedLanguages()
-        local saved_languages = {}
-        for _, language in ipairs(SOURCE_LANGUAGE_OPTIONS) do
-            if selected[language.code] then
-                table.insert(saved_languages, language.code)
-            end
-        end
-        SuwayomiSettings:saveSourceLanguages(saved_languages)
-    end
-
-    local function showSavedSummary()
-        local labels = {}
-        for _, language in ipairs(SOURCE_LANGUAGE_OPTIONS) do
-            if selected[language.code] then
-                table.insert(labels, language.label)
-            end
-        end
-        local summary = #labels > 0 and table.concat(labels, ", ") or _("none")
-        self:showMessage(T(_("Suwayomi source languages saved: %1"), summary))
-        self:refreshSettingsMenu(touchmenu_instance)
-    end
-
-    local function onToggle(code, enabled)
-        if enabled then
-            selected[code] = true
-        else
-            selected[code] = nil
-        end
-
-        saveSelectedLanguages()
-        if SuwayomiUI.updateLanguageMenu then
-            SuwayomiUI.updateLanguageMenu(language_menu, {
-                languages = buildLanguages(),
-                onClose = showSavedSummary,
-            }, onToggle)
-        end
-    end
-
-    language_menu = SuwayomiUI.showLanguageMenu({
-        languages = buildLanguages(),
-        onToggle = onToggle,
-        onClose = showSavedSummary,
-    })
-end
-
-
-function Methods:getSourceLanguageSummary()
-    local selected = self:buildSourceLanguageSet(SuwayomiSettings:loadSourceLanguages())
-    local labels = {}
-    for _, language in ipairs(SOURCE_LANGUAGE_OPTIONS) do
-        if selected[language.code] then
-            table.insert(labels, language.label)
-        end
-    end
-    return #labels > 0 and table.concat(labels, ", ") or _("none")
 end
 
 
@@ -281,15 +190,6 @@ function Methods:buildSettingsMenu()
         {
             text = _("Browse"),
             sub_item_table = {
-                {
-                    text_func = function()
-                        return T(_("Source languages: %1"), self:getSourceLanguageSummary())
-                    end,
-                    keep_menu_open = true,
-                    callback = function(touchmenu_instance)
-                        self:showSourceLanguageDialog(touchmenu_instance)
-                    end,
-                },
                 {
                     text_func = function()
                         return T(_("Show NSFW sources: %1"), self:getBrowseSettingSummary("show_nsfw_sources"))

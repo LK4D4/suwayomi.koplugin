@@ -728,16 +728,17 @@ describe("suwayomi/ui", function()
         local ui = require("suwayomi/ui")
 
         ui.showLanguageMenu({
+            title = "Source languages",
             languages = {
-                { code = "en", label = "EN", enabled = true },
-                { code = "ru", label = "RU", enabled = false },
+                { code = "en", label = "English", enabled = true },
+                { code = "ru", label = "Russian", enabled = false },
             },
             onClose = function()
                 table.insert(events, "summary")
             end,
         })
 
-        assert.are.equal("Suwayomi source languages", shown_dialog.title)
+        assert.are.equal("Source languages", shown_dialog.title)
         assert.are.equal(32, shown_dialog.state_w)
         assert.are.equal("check", shown_dialog.item_table[1].state.mark_type)
         assert.is_true(shown_dialog.item_table[1].state.checked)
@@ -747,6 +748,23 @@ describe("suwayomi/ui", function()
 
         assert.are.same({ "close", "summary" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
+    end)
+
+    it("can show a language menu without a Done row", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showLanguageMenu({
+            title = "Source languages",
+            show_done = false,
+            languages = {
+                { code = "en", label = "English", enabled = true },
+                { code = "es", label = "Español", enabled = false },
+            },
+        })
+
+        assert.are.equal(2, #shown_dialog.item_table)
+        assert.are.equal("English", shown_dialog.item_table[1].text)
+        assert.are.equal("Español", shown_dialog.item_table[2].text)
     end)
 
     it("does not run the language close callback during an in-place menu refresh", function()

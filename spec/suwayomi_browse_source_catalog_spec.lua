@@ -10,11 +10,17 @@ local next_tick_callbacks
 local debug_logs
 
 local function resetModules()
-    package.loaded["suwayomi/browse/source_catalog"] = nil
-    package.loaded["suwayomi/settings"] = nil
-    package.loaded["suwayomi/ui"] = nil
-    package.loaded["ui/uimanager"] = nil
-    package.loaded["suwayomi/debug"] = nil
+    for _, name in ipairs({
+        "suwayomi/browse/source_catalog",
+        "suwayomi/source_languages",
+        "suwayomi/settings",
+        "suwayomi/ui",
+        "ui/uimanager",
+        "suwayomi/debug",
+    }) do
+        package.loaded[name] = nil
+        package.preload[name] = nil
+    end
 end
 
 local function stubDependencies()
@@ -71,6 +77,19 @@ local function stubDependencies()
                     options = options,
                 }
                 return menu
+            end,
+            showLanguageMenu = function(options)
+                ui_calls.language_menu = {
+                    options = options,
+                }
+                return { kind = "language-menu" }
+            end,
+            updateLanguageMenu = function(menu, options, onToggle)
+                ui_calls.updated_language_menu = {
+                    menu = menu,
+                    options = options,
+                    onToggle = onToggle,
+                }
             end,
         }
     end
@@ -135,12 +154,17 @@ local function buildController(catalog, overrides)
 end
 
 describe("suwayomi/browse/source_catalog", function()
+    after_each(resetModules)
+
     it("exports plugin-bound source catalog methods", function()
         local catalog = loadCatalog()
 
         assert(type(catalog) == "table")
         assert(type(catalog.methods) == "table")
         assert(type(catalog.methods.sourceMatchesBrowseSettings) == "function")
+        assert(type(catalog.methods.getSourceLanguageFilterChoices) == "function")
+        assert(type(catalog.methods.setSourceLanguageFilter) == "function")
+        assert(type(catalog.methods.toggleSourceLanguageFilter) == "function")
         assert(type(catalog.methods.filterSourcesByLanguage) == "function")
         assert(type(catalog.methods.loadSourceCache) == "function")
         assert(type(catalog.methods.saveSourceCache) == "function")
@@ -150,7 +174,7 @@ describe("suwayomi/browse/source_catalog", function()
         assert(type(catalog.methods.showMangaForSource) == "function")
     end)
 
-    it("filters sources by selected language while always allowing local source language", function()
+    it("filters sources to english by default while always allowing local source language", function()
         local catalog = loadCatalog()
         local controller = buildController(catalog)
 
@@ -162,6 +186,88 @@ describe("suwayomi/browse/source_catalog", function()
         })
 
         assert.are.same({ "english", "local" }, { filtered[1].id, filtered[2].id })
+    end)
+
+    it("builds named source language choices from available sources", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        local choices = controller:getSourceLanguageFilterChoices({
+            { id = "english", lang = "en" },
+            { id = "local", lang = "localsourcelang" },
+            { id = "spanish", lang = "es" },
+            { id = "japanese", lang = "ja" },
+            { id = "duplicate", lang = "en" },
+        })
+
+        assert.are.same({
+            { code = "en", label = "English", enabled = true },
+            { code = "es", label = "Español", enabled = false },
+            { code = "ja", label = "日本語", enabled = false },
+        }, choices)
+    end)
+
+    it("refreshes the source list when Browse language filters change", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        controller:showFetchedSources({
+            ok = true,
+            sources = {
+                { id = "english", lang = "en" },
+                { id = "spanish", lang = "es" },
+                { id = "japanese", lang = "ja" },
+            },
+        }, { credentials = { server_url = "https://suwayomi.example" } })
+
+        assert.are.same({ "english" }, { ui_calls.shown.sources[1].id })
+
+        controller.title_menu_options.onSelect({ id = "source_language_filter" }, nil, { anchor = "anchor" })
+        assert.are.equal("Source languages", ui_calls.language_menu.options.title)
+        assert.is_false(ui_calls.language_menu.options.show_done)
+        assert.are.same({
+            { code = "en", label = "English", enabled = true },
+            { code = "es", label = "Español", enabled = false },
+            { code = "ja", label = "日本語", enabled = false },
+        }, ui_calls.language_menu.options.languages)
+
+        ui_calls.language_menu.options.onToggle("es", true)
+
+        assert.are.same({ "english", "spanish" }, {
+            ui_calls.updated.sources[1].id,
+            ui_calls.updated.sources[2].id,
+        })
+        assert.are.same({
+            { code = "en", label = "English", enabled = true },
+            { code = "es", label = "Español", enabled = true },
+            { code = "ja", label = "日本語", enabled = false },
+        }, ui_calls.updated_language_menu.options.languages)
+        assert.is_false(ui_calls.updated_language_menu.options.show_done)
+
+        ui_calls.updated_language_menu.onToggle("en", false)
+
+        assert.are.same({ "spanish" }, { ui_calls.updated.sources[1].id })
+        assert.are.same({ server_url = "https://suwayomi.example" }, ui_calls.updated.options.thumbnail_credentials)
+    end)
+
+    it("filters multiple selected source languages plus local source", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        controller:toggleSourceLanguageFilter("es", true)
+
+        local filtered = controller:filterSourcesByLanguage({
+            { id = "english", lang = "en" },
+            { id = "spanish", lang = "es" },
+            { id = "japanese", lang = "ja" },
+            { id = "local", lang = "localsourcelang" },
+        })
+
+        assert.are.same({ "english", "spanish", "local" }, {
+            filtered[1].id,
+            filtered[2].id,
+            filtered[3].id,
+        })
     end)
 
     it("allows nsfw sources when browse settings opt in", function()
@@ -216,6 +322,42 @@ describe("suwayomi/browse/source_catalog", function()
         assert.are.equal(1, debug_logs[1].filtered_source_count)
     end)
 
+    it("keeps the Browse source menu reachable when the default language has no matches", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        controller:showFetchedSources({
+            ok = true,
+            sources = {
+                { id = "spanish", lang = "es" },
+            },
+        }, { credentials = { server_url = "https://suwayomi.example" } })
+
+        assert.are.equal(0, #ui_calls.shown.sources)
+        assert.are.equal("source_language_filter", controller.title_menu_options.actions[2].id)
+        assert.are.equal("Source languages: English", controller.title_menu_options.actions[2].text)
+
+        controller.title_menu_options.onSelect({ id = "source_language_filter" })
+        ui_calls.language_menu.options.onToggle("es", true)
+
+        assert.are.same({ "spanish" }, { ui_calls.updated.sources[1].id })
+    end)
+
+    it("omits the Browse language action when no source languages exist", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        controller:showFetchedSources({
+            ok = true,
+            sources = {
+                { id = "local", lang = "localsourcelang" },
+            },
+        })
+
+        assert.are.equal("global_search", controller.title_menu_options.actions[1].id)
+        assert.is_nil(controller.title_menu_options.actions[2])
+    end)
+
     it("reports fetched source failures unless silent", function()
         local catalog = loadCatalog()
         local controller = buildController(catalog)
@@ -247,7 +389,7 @@ describe("suwayomi/browse/source_catalog", function()
         assert.are.equal("source_cache_hit", debug_logs[1].event)
     end)
 
-    it("does not render cached sources when filtering removes all sources", function()
+    it("renders cached source menu controls when the current language removes all sources", function()
         local catalog = loadCatalog()
         local controller = buildController(catalog)
 
@@ -257,8 +399,9 @@ describe("suwayomi/browse/source_catalog", function()
             },
         })
 
-        assert.is_false(rendered)
-        assert.is_nil(ui_calls.shown)
+        assert.is_true(rendered)
+        assert.are.equal(0, #ui_calls.shown.sources)
+        assert.are.equal("source_language_filter", controller.title_menu_options.actions[2].id)
     end)
 
     it("updates an existing source menu and keeps global search in the title menu", function()
@@ -275,6 +418,8 @@ describe("suwayomi/browse/source_catalog", function()
         assert.are.same(controller.current_sources_menu, menu)
         assert.are.equal("Suwayomi Sources", controller.title_menu_options.title)
         assert.are.equal("global_search", controller.title_menu_options.actions[1].id)
+        assert.are.equal("source_language_filter", controller.title_menu_options.actions[2].id)
+        assert.are.equal("Source languages: English", controller.title_menu_options.actions[2].text)
         assert.are.equal("appbar.menu", ui_calls.updated.options.title_bar_left_icon)
         assert.are.same({ server_url = "https://suwayomi.example" }, ui_calls.updated.options.thumbnail_credentials)
         assert.is_nil(ui_calls.updated.options.on_global_search)
