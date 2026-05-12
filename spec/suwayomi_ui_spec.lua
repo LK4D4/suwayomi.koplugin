@@ -4,11 +4,13 @@ describe("suwayomi/ui", function()
     local shown_dialog
     local closed_dialog
     local events
+    local record_next_tick
 
     before_each(function()
         shown_dialog = nil
         closed_dialog = nil
         events = {}
+        record_next_tick = false
 
         package.loaded["suwayomi/ui"] = nil
         package.loaded["suwayomi/ui/browse"] = nil
@@ -159,6 +161,14 @@ describe("suwayomi/ui", function()
                 close = function(_, widget)
                     closed_dialog = widget
                     table.insert(events, "close")
+                end,
+                nextTick = function(_, callback)
+                    if record_next_tick then
+                        table.insert(events, "next-tick")
+                    end
+                    if callback then
+                        callback()
+                    end
                 end,
             }
         end
@@ -424,6 +434,25 @@ describe("suwayomi/ui", function()
         assert.is_true(closed)
     end)
 
+    it("runs generic action callbacks after the action dialog close tick", function()
+        local ui = require("suwayomi/ui")
+        record_next_tick = true
+
+        ui.showActionMenu({
+            title = "Title actions",
+            actions = {
+                { id = "home", text = "Suwayomi home" },
+            },
+        }, function(action)
+            table.insert(events, action.id)
+        end)
+
+        shown_dialog.buttons[1][1].callback()
+
+        assert.are.same({ "close", "next-tick", "home" }, events)
+        assert.are.equal(shown_dialog, closed_dialog)
+    end)
+
     it("marks submenu action buttons without changing the selected action", function()
         local ui = require("suwayomi/ui")
         local selected
@@ -588,6 +617,23 @@ describe("suwayomi/ui", function()
         assert.are.same({ "close", "home-close", "browse" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
         assert.are.same({ "browse" }, selected)
+    end)
+
+    it("can leave Suwayomi home open so the action can close the plugin stack", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showHomeDialog({
+            actions = {
+                { id = "close", text = "Close plugin", close_before_select = false },
+            },
+        }, function(action)
+            table.insert(events, action.id)
+        end)
+
+        shown_dialog.buttons[1][1].callback()
+
+        assert.are.same({ "close" }, events)
+        assert.is_nil(closed_dialog)
     end)
 
     it("passes menu close callbacks through chapter menus", function()

@@ -103,6 +103,7 @@ function Methods:buildHomeActions()
         {
             id = "close",
             text = _("Close plugin"),
+            close_before_select = false,
             callback = function()
                 if self.closeSuwayomiPlugin then
                     self:closeSuwayomiPlugin()
@@ -114,13 +115,23 @@ end
 
 
 function Methods:showHome()
-    return SuwayomiUI.showHomeDialog({
+    local dialog
+    dialog = SuwayomiUI.showHomeDialog({
         actions = self:buildHomeActions(),
+        onClose = function()
+            if self.suwayomi_navigation then
+                self.suwayomi_navigation:pop(dialog)
+            end
+        end,
     }, function(action)
         if action and action.callback then
             action.callback()
         end
     end)
+    if dialog and self.trackSuwayomiScreen then
+        self:trackSuwayomiScreen("home", dialog)
+    end
+    return dialog
 end
 
 
@@ -220,7 +231,8 @@ function Methods:addToMainMenu(menu_items)
     menu_items.suwayomi_dl = {
         text = _("Suwayomi"),
         sorting_hint = "search",
-        callback = function()
+        callback = function(menu)
+            self:closeMenu(menu)
             self:showHome()
         end,
     }

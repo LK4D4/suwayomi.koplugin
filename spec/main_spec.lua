@@ -80,6 +80,18 @@ describe("suwayomi plugin", function()
         assert.are.equal("Close plugin", runtime.shown_home_dialog.actions[6].text)
     end)
 
+    it("closes the launching KOReader menu before opening the Suwayomi hub", function()
+        local menu_items = {}
+        local plugin = build_plugin()
+        local parent_menu = { name = "search-menu" }
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi_dl.callback(parent_menu)
+
+        assert.are.same({ parent_menu }, runtime.closed_widgets)
+        assert.is_table(runtime.shown_home_dialog)
+    end)
+
     it("adds only the reader return action in book mode when the document is from Suwayomi", function()
         runtime_helper.teardown()
         runtime = runtime_helper.install({
@@ -288,5 +300,33 @@ describe("suwayomi plugin", function()
         runtime.shown_home_dialog.actions[6].callback()
 
         assert.is_true(plugin.closed_plugin)
+    end)
+
+    it("tracks Suwayomi home so Close plugin closes home and the active plugin screen", function()
+        local plugin = build_plugin()
+        local library = { name = "library" }
+
+        plugin:trackSuwayomiScreen("library", library)
+        plugin:showHome()
+
+        assert.is_true(plugin:isSuwayomiScreenActive(runtime.shown_home_dialog))
+        assert.is_false(runtime.shown_home_dialog.actions[6].close_before_select)
+
+        runtime.shown_home_dialog.actions[6].callback()
+
+        assert.are.same({ runtime.shown_home_dialog, library }, runtime.closed_widgets)
+        assert.is_false(plugin:isSuwayomiScreenActive(runtime.shown_home_dialog))
+        assert.is_false(plugin:isSuwayomiScreenActive(library))
+    end)
+
+    it("untracks Suwayomi home when a normal home action closes the dialog", function()
+        local plugin = build_plugin()
+
+        plugin:showHome()
+        assert.is_true(plugin:isSuwayomiScreenActive(runtime.shown_home_dialog))
+
+        runtime.shown_home_dialog.onClose()
+
+        assert.is_false(plugin:isSuwayomiScreenActive(runtime.shown_home_dialog))
     end)
 end)

@@ -112,9 +112,11 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
         table.insert(row, {
             text = action.text,
             callback = function()
-                UIManager:close(dialog)
-                if options.onClose then
-                    options.onClose()
+                if action.close_before_select ~= false then
+                    UIManager:close(dialog)
+                    if options.onClose then
+                        options.onClose()
+                    end
                 end
                 if onSelectCallback then
                     onSelectCallback(action)
@@ -155,9 +157,16 @@ local function buildActionMenuButton(action, dialogProvider, UIManager, onSelect
         text = formatActionButtonText(action),
         destructive = action.destructive == true or nil,
         callback = function()
+            local function selectAction()
+                if onSelectCallback then
+                    onSelectCallback(action)
+                end
+            end
             UIManager:close(dialogProvider())
-            if onSelectCallback then
-                onSelectCallback(action)
+            if UIManager.nextTick then
+                UIManager:nextTick(selectAction)
+            else
+                selectAction()
             end
         end,
     }

@@ -1,7 +1,6 @@
 -- Boundary: standalone navigation stack for KOReader widget routes.
 --
--- Responsibility: track route widgets, coordinate branch replacement, and keep
--- navigator state in sync when widgets close themselves.
+-- Responsibility: track route widgets and coordinate branch replacement.
 -- Owned state: ordered route entries for one navigator instance.
 -- Dependencies: injected UIManager close method.
 -- External data: route ids, widgets, and route options are stored opaquely.
@@ -50,8 +49,7 @@ function Navigator:_wrapCloseCallback(entry)
             return nil
         end
 
-        local removed = navigator:pop(widget)
-        if removed and original_close_callback then
+        if original_close_callback then
             return original_close_callback(...)
         end
         return nil

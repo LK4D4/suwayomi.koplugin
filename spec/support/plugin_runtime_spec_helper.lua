@@ -231,6 +231,7 @@ function Helper.install(options)
         return {
             showHomeDialog = function(dialog_options)
                 state.shown_home_dialog = dialog_options
+                return dialog_options
             end,
         }
     end
