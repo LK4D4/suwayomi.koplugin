@@ -180,69 +180,19 @@ function BrowseUI.updateSourcesMenu(menu, sources, onSelectCallback, options)
     })
 end
 
-local function getSourceRowName(source)
-    if type(source) ~= "table" then
-        return _("Source")
-    end
-    return source.display_name
-        or source.displayName
-        or source.name
-        or source.raw_name
-        or tostring(source.id)
-end
-
-local function formatGlobalSearchSummary(summary)
-    local source_name = getSourceRowName(summary and summary.source)
-    if not summary or summary.status == "empty" then
-        return source_name .. ": " .. _("No results")
-    end
-    if summary.status == "searching" then
-        return source_name .. ": " .. _("searching")
-    end
-    if summary.status == "timed_out" then
-        return source_name .. ": " .. _("timed out")
-    end
-    if summary.status == "canceled" then
-        return source_name .. ": " .. _("canceled")
-    end
-    if summary.status == "error" then
-        return source_name .. ": " .. _("Error") .. " - " .. tostring(summary.error or _("Unknown error"))
-    end
-    local count = tonumber(summary.result_count) or #(summary.manga or {})
-    local suffix = summary.has_next_page and "+" or ""
-    if count == 1 and not summary.has_next_page then
-        return source_name .. ": " .. _("1 result")
-    end
-    return source_name .. ": " .. tostring(count) .. suffix .. " " .. _("results")
-end
-
-local function buildGlobalSearchMenuTable(summaries, onSelectCallback)
-    local menu_table = {}
-    for _, summary in ipairs(summaries or {}) do
-        table.insert(menu_table, {
-            text = formatGlobalSearchSummary(summary),
-            callback = function()
-                if (summary.status == "ok" or summary.status == "pageable_empty") and onSelectCallback then
-                    onSelectCallback(summary)
-                end
-            end,
-        })
-    end
-    return menu_table
-end
-
 function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, options)
     options = options or {}
-    local menu = newPluginMenu{
+    return getListMenu().show{
         title = _("Global search"),
         title_bar_left_icon = options and options.title_bar_left_icon,
-        item_table = buildGlobalSearchMenuTable(summaries, onSelectCallback),
+        item_table = ListRows.buildGlobalSearchSummaryMenuTable(summaries, {
+            on_select = onSelectCallback,
+        }),
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+        thumbnail_credentials = options.thumbnail_credentials,
     }
-    menu_utils.applyTitleBarOptions(menu, options)
-    menu_utils.applyCloseCallback(menu, options)
-    local UIManager = require("ui/uimanager")
-    UIManager:show(menu)
-    return menu
 end
 
 function BrowseUI.updateGlobalSearchResultsMenu(menu, summaries, onSelectCallback, options)
@@ -250,12 +200,18 @@ function BrowseUI.updateGlobalSearchResultsMenu(menu, summaries, onSelectCallbac
         return
     end
 
-    menu.item_table = buildGlobalSearchMenuTable(summaries, onSelectCallback)
-    menu_utils.applyTitleBarOptions(menu, options)
-    menu_utils.applyCloseCallback(menu, options)
-    if menu.updateItems then
-        menu:updateItems(nil, true)
-    end
+    options = options or {}
+    return getListMenu().update(menu, {
+        title = _("Global search"),
+        title_bar_left_icon = options.title_bar_left_icon,
+        item_table = ListRows.buildGlobalSearchSummaryMenuTable(summaries, {
+            on_select = onSelectCallback,
+        }),
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+        thumbnail_credentials = options.thumbnail_credentials,
+    })
 end
 
 local function buildMangaMenuTable(manga_list, onSelectCallback, options)
@@ -315,30 +271,17 @@ function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
 end
 
 function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
-    local menu_table = {}
-    for _, category in ipairs(categories or {}) do
-        local suffix = ""
-        if category.manga_count ~= nil then
-            suffix = " (" .. tostring(category.manga_count) .. ")"
-        end
-        table.insert(menu_table, {
-            text = (category.name or tostring(category.id)) .. suffix,
-            callback = function()
-                if onSelectCallback then onSelectCallback(category) end
-            end,
-        })
-    end
-
-    local menu = newPluginMenu{
+    options = options or {}
+    return getListMenu().show{
         title = _("Suwayomi Library"),
-        title_bar_left_icon = options and options.title_bar_left_icon,
-        item_table = menu_table,
+        title_bar_left_icon = options.title_bar_left_icon,
+        item_table = ListRows.buildLibraryCategoryMenuTable(categories, {
+            on_select = onSelectCallback,
+        }),
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
     }
-    menu_utils.applyTitleBarOptions(menu, options)
-    menu_utils.applyCloseCallback(menu, options)
-    local UIManager = require("ui/uimanager")
-    UIManager:show(menu)
-    return menu
 end
 
 local function buildLibraryMangaMenuTable(manga_list, onSelectCallback)

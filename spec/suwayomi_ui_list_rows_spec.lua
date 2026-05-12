@@ -166,6 +166,69 @@ describe("suwayomi/ui/list_rows", function()
         assert.is_true(row.thumbnail_placeholder)
     end)
 
+    it("builds global search summary rows with source columns and result status", function()
+        local rows = require("suwayomi/ui/list_rows")
+        local selected = {}
+        local summaries = {
+            {
+                source = { id = "s1", name = "MangaDex", icon_url = "/icons/md.png" },
+                status = "ok",
+                result_count = 1,
+            },
+            {
+                source = { id = "s2", name = "Slow Source" },
+                status = "error",
+                error = "Timed out",
+            },
+            {
+                source = { id = "s3", name = "More Source" },
+                status = "pageable_empty",
+                result_count = 2,
+                has_next_page = true,
+            },
+        }
+
+        local menu_table = rows.buildGlobalSearchSummaryMenuTable(summaries, {
+            on_select = function(summary)
+                table.insert(selected, summary.source.id)
+            end,
+        })
+
+        assert.are.equal("MangaDex", menu_table[1].text)
+        assert.are.equal("1 result", menu_table[1].mandatory)
+        assert.are.equal("/icons/md.png", menu_table[1].thumbnail_url)
+        assert.is_true(menu_table[1].thumbnail_placeholder)
+        assert.are.equal("Slow Source", menu_table[2].text)
+        assert.are.equal("Error", menu_table[2].mandatory)
+        assert.are.equal("Timed out", menu_table[2].subtitle)
+        assert.are.equal("More Source", menu_table[3].text)
+        assert.are.equal("2+ results", menu_table[3].mandatory)
+
+        menu_table[1].callback()
+        menu_table[2].callback()
+        menu_table[3].callback()
+        assert.are.same({ "s1", "s3" }, selected)
+    end)
+
+    it("builds library category rows with manga counts in the status column", function()
+        local rows = require("suwayomi/ui/list_rows")
+        local selected
+        local row = rows.buildLibraryCategoryRow({
+            id = 7,
+            name = "Favorites",
+            manga_count = 2,
+        }, {
+            on_select = function(category)
+                selected = category
+            end,
+        })
+
+        assert.are.equal("Favorites", row.text)
+        assert.are.equal("2 manga", row.mandatory)
+        row.callback()
+        assert.are.same({ id = 7, name = "Favorites", manga_count = 2 }, selected)
+    end)
+
     it("builds chapter rows with shared text columns and no thumbnail slot", function()
         local rows = require("suwayomi/ui/list_rows")
         local chapter = {

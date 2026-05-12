@@ -9,6 +9,7 @@ describe("suwayomi/ui/downloads", function()
         shown_dialog = nil
 
         package.loaded["suwayomi/ui/downloads"] = nil
+        package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
@@ -44,6 +45,23 @@ describe("suwayomi/ui/downloads", function()
                 end,
             }
         end
+
+        package.preload["suwayomi/ui/list_menu"] = function()
+            return {
+                show = function(options)
+                    options.renderer = "list_menu"
+                    options.title_bar_fm_style = true
+                    options.is_popout = false
+                    if options.on_title_bar_left_tap then
+                        options.onLeftButtonTap = function()
+                            return options.on_title_bar_left_tap(options)
+                        end
+                    end
+                    shown_dialog = options
+                    return options
+                end,
+            }
+        end
     end)
 
     after_each(function()
@@ -51,6 +69,7 @@ describe("suwayomi/ui/downloads", function()
         package.preload["ui/widget/menu"] = nil
         package.preload["ui/widget/titlebar"] = nil
         package.preload["ui/uimanager"] = nil
+        package.preload["suwayomi/ui/list_menu"] = nil
     end)
 
     it("builds downloads menu rows for active queued and failed items", function()
@@ -82,9 +101,13 @@ describe("suwayomi/ui/downloads", function()
             },
         }, {})
 
-        assert.are.equal("Downloading 3/24  Frieren / Ch. 144", rows[1].text)
-        assert.are.equal("Queued  Dandadan / Ch. 192", rows[2].text)
-        assert.are.equal("Failed  Chainsaw Man / Ch. 205 - network timeout", rows[3].text)
+        assert.are.equal("Frieren / Ch. 144", rows[1].text)
+        assert.are.equal("Downloading 3/24", rows[1].mandatory)
+        assert.are.equal("Dandadan / Ch. 192", rows[2].text)
+        assert.are.equal("Queued", rows[2].mandatory)
+        assert.are.equal("Chainsaw Man / Ch. 205", rows[3].text)
+        assert.are.equal("Failed", rows[3].mandatory)
+        assert.are.equal("network timeout", rows[3].subtitle)
         assert.are.equal("Clear failed", rows[4].text)
     end)
 
@@ -99,8 +122,10 @@ describe("suwayomi/ui/downloads", function()
             download_directory_summary = "Books/Manga",
         })
 
-        assert.are.equal("Download folder: Books/Manga", rows[1].text)
-        assert.are.equal("Queue: 0 active, 0 queued, 0 failed", rows[2].text)
+        assert.are.equal("Download folder", rows[1].text)
+        assert.are.equal("Books/Manga", rows[1].subtitle)
+        assert.are.equal("Queue", rows[2].text)
+        assert.are.equal("0 active, 0 queued, 0 failed", rows[2].subtitle)
         assert.are.equal("No downloads queued.", rows[3].text)
         assert.is_nil(rows[1].callback)
         assert.is_nil(rows[2].callback)
@@ -162,6 +187,7 @@ describe("suwayomi/ui/downloads", function()
         })
 
         assert.are.equal("Suwayomi Downloads", shown_dialog.title)
+        assert.are.equal("list_menu", shown_dialog.renderer)
 
         shown_dialog.item_table[1].callback()
         shown_dialog.item_table[2].callback()

@@ -3,15 +3,18 @@
 -- Responsibility: format active, queued, failed, and completed download rows and
 -- wire row callbacks to the downloads controller.
 -- Owned state: none.
--- Dependencies: KOReader Menu widget, gettext, and shared menu utilities.
+-- Dependencies: shared list menu widget, gettext, and shared menu utilities.
 -- External data: queue snapshots are display-only here; controller actions own
 -- retries, cancellation, deletion, and navigation.
 
-local Menu = require("ui/widget/menu")
 local _ = require("gettext")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local DownloadsUI = {}
+
+local function getListMenu()
+    return require("suwayomi/ui/list_menu")
+end
 
 local function shortenMenuText(text, max_chars)
     text = tostring(text or "")
@@ -43,12 +46,11 @@ local function formatDownloadProgress(job)
 end
 
 local function formatFailedDownloadText(job)
-    local text = "Failed  " .. formatDownloadJobLabel(job)
     local error_message = job and job.progress and job.progress.error or nil
     if error_message and error_message ~= "" then
-        text = text .. " - " .. tostring(error_message)
+        return shortenMenuText(error_message)
     end
-    return shortenMenuText(text)
+    return nil
 end
 
 local function isDownloadsSnapshotEmpty(snapshot)
@@ -66,10 +68,13 @@ local function appendEmptyStateRows(menu_table, snapshot, options)
         folder = _("not set")
     end
 
-    table.insert(menu_table, { text = _("Download folder: ") .. folder })
     table.insert(menu_table, {
-        text = "Queue: "
-            .. tostring(active_count) .. " active, "
+        text = _("Download folder"),
+        subtitle = folder,
+    })
+    table.insert(menu_table, {
+        text = _("Queue"),
+        subtitle = tostring(active_count) .. " active, "
             .. tostring(queued_count) .. " queued, "
             .. tostring(failed_count) .. " failed",
     })
@@ -91,16 +96,19 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
         local progress = formatDownloadProgress(job)
         local prefix = progress ~= "" and ("Downloading " .. progress) or "Downloading"
         table.insert(menu_table, {
-            text = shortenMenuText(prefix .. "  " .. formatDownloadJobLabel(job)),
+            text = shortenMenuText(formatDownloadJobLabel(job)),
+            mandatory = prefix,
             callback = callbacks.onSelectActive and function(menu)
                 callbacks.onSelectActive(job, menu)
             end or nil,
         })
     end
 
+    local queued_label = _("Queued")
     for _, job in ipairs(snapshot.queued or {}) do
         table.insert(menu_table, {
-            text = shortenMenuText("Queued  " .. formatDownloadJobLabel(job)),
+            text = shortenMenuText(formatDownloadJobLabel(job)),
+            mandatory = queued_label,
             callback = function(menu)
                 if callbacks.onSelectQueued then
                     callbacks.onSelectQueued(job, menu)
@@ -109,9 +117,12 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
         })
     end
 
+    local failed_label = _("Failed")
     for _, job in ipairs(snapshot.failed or {}) do
         table.insert(menu_table, {
-            text = formatFailedDownloadText(job),
+            text = shortenMenuText(formatDownloadJobLabel(job)),
+            subtitle = formatFailedDownloadText(job),
+            mandatory = failed_label,
             callback = function(menu)
                 if callbacks.onRetryFailed then
                     callbacks.onRetryFailed(job, menu)
@@ -140,13 +151,12 @@ function DownloadsUI.showDownloadsMenu(snapshot, callbacks, options)
         title = options.title or _("Suwayomi Downloads"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options),
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
     }
-    local menu = Menu:new(menu_utils.applyNativeTitleBarStyle(menu_options))
-    menu_utils.applyTitleBarOptions(menu, options)
-    menu_utils.applyCloseCallback(menu, options)
+    local menu = getListMenu().show(menu_options)
     menu_utils.bindMenuCallbacks(menu.item_table, menu)
-    local UIManager = require("ui/uimanager")
-    UIManager:show(menu)
     return menu
 end
 

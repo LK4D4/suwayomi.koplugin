@@ -1,7 +1,7 @@
 -- Boundary: shared file-manager-like list row formatting.
 --
--- Responsibility: convert source, manga, and chapter tables into KOReader Menu
--- row tables for Library, Browse, source search, and chapter screens.
+-- Responsibility: convert source, manga, chapter, search summary, category, and
+-- download-adjacent tables into KOReader Menu row tables for content screens.
 -- Owned state: none.
 -- Dependencies: gettext only.
 -- External data: manga and source tables come from API/client layers and are
@@ -151,6 +151,109 @@ function ListRows.buildSourceMenuTable(sources, options)
     local menu_table = {}
     for _, source in ipairs(sources or {}) do
         table.insert(menu_table, ListRows.buildSourceRow(source, options))
+    end
+    return menu_table
+end
+
+local function formatResultCount(summary)
+    local count = 0
+    if type(summary) == "table" then
+        count = tonumber(summary.result_count) or #(summary.manga or {})
+    end
+    local suffix = type(summary) == "table" and summary.has_next_page and "+" or ""
+    if count == 1 and suffix == "" then
+        return _("1 result")
+    end
+    return tostring(count) .. suffix .. " " .. _("results")
+end
+
+function ListRows.getGlobalSearchSummaryMandatory(summary)
+    if not summary or summary.status == "empty" then
+        return _("No results")
+    end
+    if summary.status == "searching" then
+        return _("searching")
+    end
+    if summary.status == "timed_out" then
+        return _("timed out")
+    end
+    if summary.status == "canceled" then
+        return _("canceled")
+    end
+    if summary.status == "error" then
+        return _("Error")
+    end
+    return formatResultCount(summary)
+end
+
+function ListRows.buildGlobalSearchSummaryRow(summary, options)
+    options = options or {}
+    local source = type(summary) == "table" and summary.source or nil
+    local source_title = ListRows.getSourceTitle(source)
+    if source_title == "" then
+        source_title = _("Source")
+    end
+    return {
+        text = source_title,
+        subtitle = summary and summary.status == "error"
+            and tostring(summary.error or _("Unknown error"))
+            or ListRows.getSourceSubtitle(source, { show_language = true }),
+        mandatory = ListRows.getGlobalSearchSummaryMandatory(summary),
+        thumbnail_url = type(source) == "table" and source.icon_url or nil,
+        thumbnail_placeholder = true,
+        source = source,
+        summary = summary,
+        callback = function()
+            if summary
+                and (summary.status == "ok" or summary.status == "pageable_empty")
+                and options.on_select
+            then
+                options.on_select(summary)
+            end
+        end,
+    }
+end
+
+function ListRows.buildGlobalSearchSummaryMenuTable(summaries, options)
+    local menu_table = {}
+    for _, summary in ipairs(summaries or {}) do
+        table.insert(menu_table, ListRows.buildGlobalSearchSummaryRow(summary, options))
+    end
+    return menu_table
+end
+
+function ListRows.getLibraryCategoryTitle(category)
+    if type(category) ~= "table" then
+        return ""
+    end
+    return category.name or (category.id ~= nil and tostring(category.id)) or ""
+end
+
+function ListRows.getLibraryCategoryMandatory(category)
+    if type(category) ~= "table" or category.manga_count == nil then
+        return nil
+    end
+    return tostring(category.manga_count) .. " " .. _("manga")
+end
+
+function ListRows.buildLibraryCategoryRow(category, options)
+    options = options or {}
+    return {
+        text = ListRows.getLibraryCategoryTitle(category),
+        mandatory = ListRows.getLibraryCategoryMandatory(category),
+        category = category,
+        callback = function()
+            if options.on_select then
+                options.on_select(category)
+            end
+        end,
+    }
+end
+
+function ListRows.buildLibraryCategoryMenuTable(categories, options)
+    local menu_table = {}
+    for _, category in ipairs(categories or {}) do
+        table.insert(menu_table, ListRows.buildLibraryCategoryRow(category, options))
     end
     return menu_table
 end

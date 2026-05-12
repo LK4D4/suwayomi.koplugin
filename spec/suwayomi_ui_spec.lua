@@ -257,7 +257,9 @@ describe("suwayomi/ui", function()
         })
 
         assert.are.equal("Suwayomi Downloads", shown_dialog.title)
-        assert.are.equal("Failed  Chainsaw Man / Ch. 205", shown_dialog.item_table[1].text)
+        assert.are.equal("list_menu", shown_dialog.renderer)
+        assert.are.equal("Chainsaw Man / Ch. 205", shown_dialog.item_table[1].text)
+        assert.are.equal("Failed", shown_dialog.item_table[1].mandatory)
 
         shown_dialog.item_table[1].callback()
 
