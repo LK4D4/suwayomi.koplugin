@@ -76,6 +76,11 @@ function SuwayomiPlugin:createDownloadQueue()
         onMessage = function(message)
             self:showMessage(message)
         end,
+        onChapterArchiveReady = function(manga, chapter, chapter_path)
+            if self.saveReaderReturnContext then
+                self:saveReaderReturnContext(manga, chapter, chapter_path)
+            end
+        end,
     }
 end
 

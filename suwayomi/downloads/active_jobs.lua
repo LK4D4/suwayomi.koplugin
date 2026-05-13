@@ -256,15 +256,22 @@ function ActiveJobs:finishFromProgress(active, progress)
     os.remove(active.progress_path)
     if progress and (progress.state == "downloaded" or progress.state == "skipped") then
         queue:removePersistentJob(active.key or queue:getKey(active.manga, active.chapter))
+        queue:notifyChapterArchiveReady(
+            active.manga,
+            active.chapter,
+            queue:getCompletedArchivePath(active, progress)
+        )
     elseif progress and progress.state == "failed" and queue:jobArchiveExists(active, progress) then
         -- A downloader may report failure after writing a valid CBZ. Keep the
         -- user-facing state aligned with the archive that now exists on disk.
+        local archive_path = queue:getExistingArchivePath(active, progress)
         queue:removePersistentJob(active.key or queue:getKey(active.manga, active.chapter))
         queue:setStatus(active.manga, active.chapter, {
             state = "downloaded",
             current = progress.current,
             total = progress.total,
         })
+        queue:notifyChapterArchiveReady(active.manga, active.chapter, archive_path)
     elseif progress and progress.state == "failed" then
         local message = queue:formatFailureMessage(
             active.manga,
@@ -291,13 +298,15 @@ function ActiveJobs:finishWithoutProgress(active)
     local queue = self.queue
     self:removeJob(active)
     os.remove(active.progress_path)
-    if queue:jobArchiveExists(active) then
+    local archive_path = queue:getExistingArchivePath(active)
+    if archive_path then
         queue:removePersistentJob(active.key or queue:getKey(active.manga, active.chapter))
         queue:setStatus(active.manga, active.chapter, {
             state = "downloaded",
             current = active.last_progress_current,
             total = active.last_progress_total,
         })
+        queue:notifyChapterArchiveReady(active.manga, active.chapter, archive_path)
         return
     end
 

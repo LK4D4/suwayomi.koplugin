@@ -47,6 +47,7 @@ function DownloadQueue:new(options)
         now = options.now or os.time,
         onStatusChanged = options.onStatusChanged or function() end,
         onMessage = options.onMessage or function() end,
+        onChapterArchiveReady = options.onChapterArchiveReady or function() end,
         debug_logger = options.debug_logger or function() end,
         getCredentials = options.getCredentials,
         items = {},
@@ -214,6 +215,56 @@ function DownloadQueue:setStatus(manga, chapter, status)
     self.onStatusChanged()
 end
 
+function DownloadQueue:getTargetChapterPath(job)
+    if not job or not job.download_directory or not job.manga or not job.chapter or not self.downloader.getTargetPath then
+        return nil
+    end
+    local _, chapter_path = self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter)
+    return chapter_path
+end
+
+function DownloadQueue:getCompletedArchivePath(job, progress)
+    local path = progress and progress.path
+    if path and path ~= "" then
+        return path
+    end
+    return self:getTargetChapterPath(job)
+end
+
+function DownloadQueue:getExistingArchivePath(job, progress)
+    if not self.downloader or not self.downloader.chapterExists then
+        return nil
+    end
+
+    local path = progress and progress.path
+    if path and path ~= "" and self.downloader:chapterExists(path) then
+        return path
+    end
+
+    local chapter_path = self:getTargetChapterPath(job)
+    if chapter_path and self.downloader:chapterExists(chapter_path) == true then
+        return chapter_path
+    end
+    return nil
+end
+
+function DownloadQueue:notifyChapterArchiveReady(manga, chapter, path)
+    if not path or path == "" or not self.onChapterArchiveReady then
+        return false
+    end
+
+    local ok, err = pcall(self.onChapterArchiveReady, manga, chapter, path)
+    if not ok then
+        self:logDebug({
+            operation = "downloadQueue.archiveReady",
+            event = "callback_error",
+            error = tostring(err),
+        })
+        return false
+    end
+    return true
+end
+
 function DownloadQueue:clearStatus(manga, chapter, options)
     options = options or {}
     local key = self:getKey(manga, chapter)
@@ -225,20 +276,7 @@ function DownloadQueue:clearStatus(manga, chapter, options)
 end
 
 function DownloadQueue:jobArchiveExists(job, progress)
-    if not self.downloader or not self.downloader.chapterExists then
-        return false
-    end
-
-    local path = progress and progress.path
-    if path and path ~= "" and self.downloader:chapterExists(path) then
-        return true
-    end
-
-    if not job or not job.download_directory or not job.manga or not job.chapter or not self.downloader.getTargetPath then
-        return false
-    end
-    local _, chapter_path = self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter)
-    return self.downloader:chapterExists(chapter_path) == true
+    return self:getExistingArchivePath(job, progress) ~= nil
 end
 
 function DownloadQueue:cancelPending(manga, chapter)

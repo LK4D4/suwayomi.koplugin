@@ -212,6 +212,28 @@ describe("suwayomi plugin", function()
         assert.are.equal(1, #runtime.queue_instances)
     end)
 
+    it("wires completed download archives into reader return context", function()
+        local plugin = build_plugin()
+        local saved_context
+        plugin.saveReaderReturnContext = function(_, manga, chapter, path)
+            saved_context = {
+                manga = manga,
+                chapter = chapter,
+                path = path,
+            }
+        end
+
+        local queue = plugin:getDownloadQueue()
+        local manga = { id = "m1", title = "Manga" }
+        local chapter = { id = "c1", name = "Chapter 1" }
+
+        queue.options.onChapterArchiveReady(manga, chapter, "/downloads/Manga/Chapter 1.cbz")
+
+        assert.are.equal(manga, saved_context.manga)
+        assert.are.equal(chapter, saved_context.chapter)
+        assert.are.equal("/downloads/Manga/Chapter 1.cbz", saved_context.path)
+    end)
+
     it("constructs navigation lazily and closes tracked Suwayomi screens", function()
         local plugin = build_plugin()
         local first = { name = "sources" }

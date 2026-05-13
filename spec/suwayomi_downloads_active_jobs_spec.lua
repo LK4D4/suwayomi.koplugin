@@ -84,6 +84,7 @@ describe("suwayomi/downloads/active_jobs", function()
         local messages = {}
         local status_changes = 0
         local download_calls = 0
+        local archive_ready_calls = {}
         local next_pid = 1233
         local subprocess_done = options.subprocess_done
 
@@ -165,6 +166,13 @@ describe("suwayomi/downloads/active_jobs", function()
             onMessage = function(message)
                 table.insert(messages, message)
             end,
+            onChapterArchiveReady = function(manga, chapter, path)
+                table.insert(archive_ready_calls, {
+                    manga = manga,
+                    chapter = chapter,
+                    path = path,
+                })
+            end,
         }
 
         local context
@@ -174,6 +182,7 @@ describe("suwayomi/downloads/active_jobs", function()
             saved_queue = function() return saved_queue end,
             save_count = function() return save_count end,
             messages = messages,
+            archive_ready_calls = archive_ready_calls,
             status_changes = function() return status_changes end,
             download_calls = function() return download_calls end,
             progress_files = progress_files,
@@ -426,6 +435,54 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.equal("downloaded", context.queue:getStatus(manga, chapters[1]).state)
         assert.are.equal("downloading", context.queue:getStatus(manga, chapters[2]).state)
         assert.are.equal("downloading", context.queue:getStatus(manga, chapters[3]).state)
+    end)
+
+    it("records reader return context when a download finishes with a CBZ path", function()
+        local context = build_queue()
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        context.run_scheduled()
+
+        assert.are.equal(1, #context.archive_ready_calls)
+        assert.are.equal(manga, context.archive_ready_calls[1].manga)
+        assert.are.equal(chapter, context.archive_ready_calls[1].chapter)
+        assert.are.equal(
+            "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+            context.archive_ready_calls[1].path
+        )
+    end)
+
+    it("records reader return context when the downloader skips an existing CBZ", function()
+        local context = build_queue({
+            downloader = {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                startChapterDownload = function(_, _, download_directory, manga, chapter)
+                    return {
+                        ok = true,
+                        skipped = true,
+                        path = download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz",
+                    }
+                end,
+                chapterExists = function() return true end,
+            },
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        context.run_scheduled()
+
+        assert.are.equal(1, #context.archive_ready_calls)
+        assert.are.equal(
+            "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+            context.archive_ready_calls[1].path
+        )
     end)
 
     it("persists chapter details when the downloader reports failure", function()
