@@ -1,6 +1,6 @@
 -- Boundary: DownloadsController.
 --
--- Responsibility: Owns the Downloads hub UI, retry/cancel actions, and downloaded-read reconciliation.
+-- Responsibility: Owns the Downloads hub UI, retry/cancel actions, keep-next refills, and downloaded-read reconciliation.
 -- Owned state: Uses the device-local queue only; it must not call Suwayomi server download mutations.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -212,6 +212,7 @@ function Methods:reconcileDownloadedChapterLedger(ledger)
     ledger = ledger or self:loadChapterLedger()
     local history_paths = self:loadKoreaderHistoryPaths()
     local changed = false
+    local current_context_changed = false
     local read_count = 0
 
     for _, entry in pairs(ledger or {}) do
@@ -224,13 +225,18 @@ function Methods:reconcileDownloadedChapterLedger(ledger)
                 entry.pending_read_state = true
                 changed = true
                 read_count = read_count + 1
-                self:markCurrentContextChapterReadFromLedger(entry)
+                if self:markCurrentContextChapterReadFromLedger(entry) then
+                    current_context_changed = true
+                end
             end
         end
     end
 
     if changed then
         self:saveChapterLedger(ledger)
+    end
+    if current_context_changed then
+        self:applyMangaKeepNextUnreadDownloadsPolicy()
     end
 
     return read_count
@@ -295,20 +301,82 @@ function Methods:getUnreadDownloadBufferCandidates(manga, limit)
 end
 
 
+function Methods:getMangaKeepNextUnreadDownloadsLimit(manga)
+    if not SuwayomiSettings.loadMangaKeepNextUnreadDownloads then
+        return 0
+    end
+    return tonumber(SuwayomiSettings:loadMangaKeepNextUnreadDownloads(manga)) or 0
+end
+
+
+function Methods:saveMangaKeepNextUnreadDownloadsLimit(manga, limit)
+    if not SuwayomiSettings.saveMangaKeepNextUnreadDownloads then
+        return tonumber(limit) or 0
+    end
+    return SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, limit)
+end
+
+
+function Methods:normalizeMangaKeepNextUnreadDownloadsLimit(limit)
+    if SuwayomiSettings.normalizeMangaKeepNextUnreadDownloads then
+        return SuwayomiSettings:normalizeMangaKeepNextUnreadDownloads(limit)
+    end
+    return tonumber(limit) or 0
+end
+
+
+function Methods:applyMangaKeepNextUnreadDownloadsPolicy(manga)
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    manga = manga or self.current_chapter_context.manga
+    if not manga then
+        return 0
+    end
+    if self.isCurrentChapterContextForManga and not self:isCurrentChapterContextForManga(manga) then
+        return 0
+    end
+
+    local limit = self:getMangaKeepNextUnreadDownloadsLimit(manga)
+    if limit <= 0 then
+        return 0
+    end
+
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        return 0
+    end
+
+    local chapters = self:getUnreadDownloadBufferCandidates(manga, limit)
+    if #chapters == 0 then
+        return 0
+    end
+
+    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+end
+
+
 function Methods:keepNextUnreadChaptersDownloaded(limit)
     if not self.current_chapter_context then
         return 0
     end
 
     local manga = self.current_chapter_context.manga
+    local requested_limit = self:normalizeMangaKeepNextUnreadDownloadsLimit(limit)
+    if requested_limit <= 0 then
+        return 0
+    end
+
     local download_directory = self:getDownloadDirectoryOrChoose(function()
-            self:keepNextUnreadChaptersDownloaded(limit)
+            self:keepNextUnreadChaptersDownloaded(requested_limit)
     end)
     if not download_directory then
         return 0
     end
 
-    local chapters = self:getUnreadDownloadBufferCandidates(manga, limit)
+    self:saveMangaKeepNextUnreadDownloadsLimit(manga, requested_limit)
+    local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
     if #chapters == 0 then
         self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
         return 0

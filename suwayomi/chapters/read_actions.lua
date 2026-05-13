@@ -53,6 +53,9 @@ function Methods:markChapterRead(manga, chapter, options)
     if not options.skip_schedule then
         self:schedulePendingReadSync()
     end
+    if not options.skip_keep_policy and self.applyMangaKeepNextUnreadDownloadsPolicy then
+        self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
+    end
     if not options.skip_refresh or not options.skip_schedule then
         SuwayomiDebug.log({
             operation = "markChapterRead",
@@ -139,6 +142,9 @@ function Methods:markChapterListRead(manga, chapters)
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
+    if self.applyMangaKeepNextUnreadDownloadsPolicy then
+        self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
+    end
     SuwayomiDebug.log({
         operation = "markChapterListRead",
         event = "end",

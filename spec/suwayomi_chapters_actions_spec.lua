@@ -208,6 +208,10 @@ describe("suwayomi/chapters/actions", function()
             schedulePendingReadSync = function(self)
                 self.scheduled_count = self.scheduled_count + 1
             end,
+            applyMangaKeepNextUnreadDownloadsPolicy = function(self, target_manga)
+                self.keep_next_policy_manga = target_manga
+                return options.keep_next_queued or 0
+            end,
             saveReaderReturnContext = function(self, target_manga, target_chapter, chapter_path)
                 table.insert(self.reader_return_contexts, {
                     manga = target_manga,
@@ -579,6 +583,7 @@ describe("suwayomi/chapters/actions", function()
         assert.is_true(plugin.current_chapter_context.chapters[1].is_read)
         assert.are.equal(1, #plugin.refreshes)
         assert.are.equal(1, plugin.scheduled_count)
+        assert.are.equal(manga, plugin.keep_next_policy_manga)
     end)
 
     it("honors mark-read skip flags", function()
@@ -595,6 +600,20 @@ describe("suwayomi/chapters/actions", function()
 
         assert.are.equal(0, #plugin.refreshes)
         assert.are.equal(0, plugin.scheduled_count)
+    end)
+
+    it("honors mark-read keep policy skip flag", function()
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+        })
+
+        assert.is_true(plugin:markChapterRead(manga, chapter, {
+            skip_keep_policy = true,
+        }))
+
+        assert.is_nil(plugin.keep_next_policy_manga)
     end)
 
     it("keeps burger action origin when opening nested bulk action menus", function()
@@ -659,5 +678,6 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(1, #plugin.saved_ledgers)
         assert.are.equal(1, #plugin.refreshes)
         assert.are.equal(1, plugin.scheduled_count)
+        assert.are.equal(manga, plugin.keep_next_policy_manga)
     end)
 end)

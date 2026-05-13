@@ -427,6 +427,9 @@ function Methods:markSelectedChaptersRead()
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
     self:schedulePendingReadSync()
+    if self.applyMangaKeepNextUnreadDownloadsPolicy then
+        self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
+    end
     SuwayomiDebug.log({
         operation = "markSelectedChaptersRead",
         event = "end",

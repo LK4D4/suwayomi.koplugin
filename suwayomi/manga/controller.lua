@@ -382,6 +382,7 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
             { id = "keep_next_5_unread", text = _("Keep next 5 unread") },
             { id = "keep_next_10_unread", text = _("Keep next 10 unread") },
             { id = "keep_next_50_unread", text = _("Keep next 50 unread") },
+            { id = "keep_next_0_unread", text = _("Stop keeping unread") },
         },
         on_back = function()
             self:showMoreMangaActions(manga, options)
@@ -445,7 +446,13 @@ function Methods:performMangaAction(manga, action_id, options)
     end
     local keep_unread_count = tostring(action_id or ""):match("^keep_next_(%d+)_unread$")
     if keep_unread_count then
-        return self:keepNextUnreadChaptersForManga(manga, tonumber(keep_unread_count))
+        local limit = tonumber(keep_unread_count)
+        if limit == 0 then
+            SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, 0)
+            self:showMessage(_("Keep-next buffer disabled."))
+            return true
+        end
+        return self:keepNextUnreadChaptersForManga(manga, limit)
     end
     if action_id == "delete_read_downloaded" then
         if self:ensureMangaChapterContext(manga) then
@@ -566,15 +573,21 @@ function Methods:confirmKeepNextUnreadChaptersDownloaded(limit)
     end
 
     local manga = self.current_chapter_context.manga
+    local requested_limit = SuwayomiSettings:normalizeMangaKeepNextUnreadDownloads(limit)
+    if requested_limit <= 0 then
+        return 0
+    end
+
     local download_directory = self:getDownloadDirectoryOrChoose(function()
-            self:confirmKeepNextUnreadChaptersDownloaded(limit)
+            self:confirmKeepNextUnreadChaptersDownloaded(requested_limit)
     end)
     if not download_directory then
         return 0
     end
 
-    local chapters = self:getUnreadDownloadBufferCandidates(manga, limit)
+    local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
     if #chapters == 0 then
+        SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
         self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
         return 0
     end
@@ -587,10 +600,11 @@ function Methods:confirmKeepNextUnreadChaptersDownloaded(limit)
                 _("Queue %1 missing downloads to keep the next %2 unread chapters available?")
             ),
             #chapters,
-            limit
+            requested_limit
         ),
         _("Queue"),
         function()
+            SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
             self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
         end
     )
@@ -602,19 +616,14 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
         return false
     end
 
-    local requested_limit = tonumber(limit) or 0
+    local requested_limit = SuwayomiSettings:normalizeMangaKeepNextUnreadDownloads(limit)
     if requested_limit <= 0 then
         return true
     end
 
     local function queue(download_directory)
         local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
-        if #chapters == 0 then
-            self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
-            return 0
-        end
-
-        if requested_limit >= 50 then
+        if requested_limit >= 50 and #chapters > 0 then
             return self:showBulkActionConfirmation(
                 T(
                     self:pluralize(
@@ -627,9 +636,16 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
                 ),
                 _("Queue"),
                 function()
+                    SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
                     self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
                 end
             )
+        end
+
+        SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
+        if #chapters == 0 then
+            self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
+            return 0
         end
 
         return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)

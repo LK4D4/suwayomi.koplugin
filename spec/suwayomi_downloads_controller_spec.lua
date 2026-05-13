@@ -50,6 +50,9 @@ local function installController(options)
             loadDownloadDirectory = function()
                 return options.download_directory or "/books"
             end,
+            loadMangaKeepNextUnreadDownloads = function(_, manga)
+                return (options.keep_next_limits or {})[tostring(manga and manga.id)] or 0
+            end,
         }
     end
     package.preload["suwayomi/ui"] = function()
@@ -160,6 +163,17 @@ local function installController(options)
     end
     function plugin:markCurrentContextChapterReadFromLedger(entry)
         state.marked_entry = entry
+        local context_manga = self.current_chapter_context and self.current_chapter_context.manga
+        if entry.manga_id and tostring(context_manga and context_manga.id or "") ~= tostring(entry.manga_id) then
+            return false
+        end
+        for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+            if tostring(chapter.id or "") == tostring(entry.chapter_id or "") then
+                chapter.is_read = true
+                return true
+            end
+        end
+        return false
     end
     function plugin:saveChapterLedger(ledger)
         state.saved_ledger = ledger
@@ -280,9 +294,49 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(0, state.downloads_count)
     end)
 
-    it("reconciles read ledger entries without queueing downloads", function()
+    it("reconciles read ledger entries and refills enabled manga keep-next buffers", function()
         local ledger = {
             ["m1:c1"] = {
+                manga_id = "m1",
+                chapter_id = "c1",
+                path = "/books/Frieren/Ch. 1.cbz",
+                read = false,
+            },
+        }
+        local plugin, state = installController({
+            ledger = ledger,
+            keep_next_limits = {
+                m1 = 5,
+            },
+            finished_paths = {
+                ["/books/Frieren/Ch. 1.cbz"] = true,
+            },
+            current_chapter_context = {
+                manga = { id = "m1", title = "Frieren" },
+                chapters = {
+                    { id = "c1", name = "Ch. 1", downloaded = true },
+                    { id = "c2", name = "Ch. 2", downloaded = true },
+                    { id = "c3", name = "Ch. 3", downloaded = true },
+                    { id = "c4", name = "Ch. 4", downloaded = true },
+                    { id = "c5", name = "Ch. 5", downloaded = true },
+                    { id = "c6", name = "Ch. 6", downloaded = false },
+                    { id = "c7", name = "Ch. 7", downloaded = false },
+                },
+            },
+        })
+
+        assert.are.equal(1, plugin:reconcileDownloadedChapterLedger(ledger))
+
+        assert.is_true(ledger["m1:c1"].read)
+        assert.is_true(ledger["m1:c1"].pending_read_sync)
+        assert.are.equal(ledger, state.saved_ledger)
+        assert.are.same({ { id = "c6", name = "Ch. 6", downloaded = false } }, state.enqueued_chapters)
+    end)
+
+    it("does not refill keep-next buffers when no manga policy is enabled", function()
+        local ledger = {
+            ["m1:c1"] = {
+                manga_id = "m1",
                 chapter_id = "c1",
                 path = "/books/Frieren/Ch. 1.cbz",
                 read = false,
@@ -305,7 +359,39 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(1, plugin:reconcileDownloadedChapterLedger(ledger))
 
         assert.is_true(ledger["m1:c1"].read)
-        assert.is_true(ledger["m1:c1"].pending_read_sync)
+        assert.are.equal(ledger, state.saved_ledger)
+        assert.is_nil(state.enqueued_chapters)
+    end)
+
+    it("does not refill the current manga when reconciliation marks another manga read", function()
+        local ledger = {
+            ["m2:c1"] = {
+                manga_id = "m2",
+                chapter_id = "c1",
+                path = "/books/Other/Ch. 1.cbz",
+                read = false,
+            },
+        }
+        local plugin, state = installController({
+            ledger = ledger,
+            keep_next_limits = {
+                m1 = 5,
+            },
+            finished_paths = {
+                ["/books/Other/Ch. 1.cbz"] = true,
+            },
+            current_chapter_context = {
+                manga = { id = "m1", title = "Frieren" },
+                chapters = {
+                    { id = "c1", name = "Ch. 1", downloaded = true },
+                    { id = "c2", name = "Ch. 2", downloaded = false },
+                },
+            },
+        })
+
+        assert.are.equal(1, plugin:reconcileDownloadedChapterLedger(ledger))
+
+        assert.is_true(ledger["m2:c1"].read)
         assert.are.equal(ledger, state.saved_ledger)
         assert.is_nil(state.enqueued_chapters)
     end)

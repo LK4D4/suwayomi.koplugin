@@ -237,6 +237,25 @@ describe("suwayomi/settings", function()
         assert.are.equal(4, stored_data.max_parallel_chapter_downloads)
     end)
 
+    it("loads and saves per-manga keep-next unread download limits", function()
+        local settings = require("suwayomi/settings")
+        local manga = { id = "m1", title = "Frieren" }
+
+        assert.are.equal(0, settings:loadMangaKeepNextUnreadDownloads(manga))
+
+        assert.are.equal(5, settings:saveMangaKeepNextUnreadDownloads(manga, 5))
+        assert.is_true(flushed)
+        assert.are.equal(5, stored_data.manga_keep_next_unread_downloads.m1)
+        assert.are.equal(5, settings:loadMangaKeepNextUnreadDownloads(manga))
+
+        assert.are.equal(0, settings:saveMangaKeepNextUnreadDownloads(manga, "7"))
+        assert.is_nil(stored_data.manga_keep_next_unread_downloads.m1)
+
+        stored_data.manga_keep_next_unread_downloads = { m1 = "10", m2 = 9 }
+        assert.are.equal(10, settings:loadMangaKeepNextUnreadDownloads(manga))
+        assert.are.equal(0, settings:loadMangaKeepNextUnreadDownloads({ id = "m2" }))
+    end)
+
     it("loads an empty chapter ledger by default", function()
         local settings = require("suwayomi/settings")
 

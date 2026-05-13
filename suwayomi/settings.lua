@@ -37,6 +37,13 @@ local DEFAULT_DOWNLOAD_DIRECTORY = ""
 local DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS = 2
 local MIN_PARALLEL_CHAPTER_DOWNLOADS = 1
 local MAX_PARALLEL_CHAPTER_DOWNLOADS = 4
+local DEFAULT_MANGA_KEEP_NEXT_UNREAD_DOWNLOADS = 0
+local MANGA_KEEP_NEXT_UNREAD_DOWNLOAD_LIMITS = {
+    [0] = true,
+    [5] = true,
+    [10] = true,
+    [50] = true,
+}
 
 local function copyTable(source)
     local target = {}
@@ -56,6 +63,26 @@ function SuwayomiSettings:normalizeMaxParallelChapterDownloads(value)
         return MAX_PARALLEL_CHAPTER_DOWNLOADS
     end
     return normalized
+end
+
+function SuwayomiSettings:normalizeMangaKeepNextUnreadDownloads(value)
+    local normalized = tonumber(value) or DEFAULT_MANGA_KEEP_NEXT_UNREAD_DOWNLOADS
+    normalized = math.floor(normalized)
+    if MANGA_KEEP_NEXT_UNREAD_DOWNLOAD_LIMITS[normalized] then
+        return normalized
+    end
+    return DEFAULT_MANGA_KEEP_NEXT_UNREAD_DOWNLOADS
+end
+
+function SuwayomiSettings:getMangaKeepNextUnreadDownloadsKey(manga)
+    if type(manga) ~= "table" then
+        return nil
+    end
+    local key = manga.id or manga.title
+    if key == nil or tostring(key) == "" then
+        return nil
+    end
+    return tostring(key)
 end
 
 function SuwayomiSettings:open()
@@ -211,6 +238,38 @@ end
 function SuwayomiSettings:saveMaxParallelChapterDownloads(value)
     local normalized = self:normalizeMaxParallelChapterDownloads(value)
     self:open():saveSetting("max_parallel_chapter_downloads", normalized):flush()
+    return normalized
+end
+
+function SuwayomiSettings:loadMangaKeepNextUnreadDownloads(manga)
+    local key = self:getMangaKeepNextUnreadDownloadsKey(manga)
+    if not key then
+        return DEFAULT_MANGA_KEEP_NEXT_UNREAD_DOWNLOADS
+    end
+    local limits = self:open():readSetting("manga_keep_next_unread_downloads", {})
+    if type(limits) ~= "table" then
+        return DEFAULT_MANGA_KEEP_NEXT_UNREAD_DOWNLOADS
+    end
+    return self:normalizeMangaKeepNextUnreadDownloads(limits[key])
+end
+
+function SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, limit)
+    local key = self:getMangaKeepNextUnreadDownloadsKey(manga)
+    local normalized = self:normalizeMangaKeepNextUnreadDownloads(limit)
+    if not key then
+        return normalized
+    end
+
+    local limits = self:open():readSetting("manga_keep_next_unread_downloads", {})
+    if type(limits) ~= "table" then
+        limits = {}
+    end
+    if normalized > 0 then
+        limits[key] = normalized
+    else
+        limits[key] = nil
+    end
+    self:open():saveSetting("manga_keep_next_unread_downloads", limits):flush()
     return normalized
 end
 

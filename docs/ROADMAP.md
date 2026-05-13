@@ -308,7 +308,7 @@ Tests:
 - [x] First-unread actions select the expected chapter
 - [x] Existing bulk policies can be triggered from manga-level actions
 - [x] `Download all unread` and whole-manga downloads respect confirmation and queue cap/chunking behavior
-- [x] `Keep next` actions queue missing downloads for the current manga
+- [x] `Keep next` actions persist per manga and refill missing unread-buffer downloads after chapters are marked read
 - [x] Explicit read-download removal deletes only read KOReader-local files and skips active downloads
 - [x] Chapter parser preserves scanlator
 - [x] Chapter-list scanlator filter hides only matching translation groups

@@ -27,6 +27,7 @@ local function installController(options)
         update_calls = {},
         refresh_calls = {},
         tracked_screens = {},
+        keep_next_saves = {},
     }
 
     package.preload.gettext = function()
@@ -76,6 +77,21 @@ local function installController(options)
         return {
             load = function()
                 return { server_url = "https://suwayomi.example" }
+            end,
+            loadMangaKeepNextUnreadDownloads = function(_, target_manga)
+                return (options.keep_next_limits or {})[tostring(target_manga and target_manga.id)]
+                    or 0
+            end,
+            normalizeMangaKeepNextUnreadDownloads = function(_, limit)
+                local normalized = tonumber(limit) or 0
+                if normalized == 5 or normalized == 10 or normalized == 50 then
+                    return normalized
+                end
+                return 0
+            end,
+            saveMangaKeepNextUnreadDownloads = function(_, target_manga, limit)
+                table.insert(state.keep_next_saves, { manga = target_manga, limit = limit })
+                return limit
             end,
         }
     end
@@ -252,6 +268,7 @@ describe("suwayomi/manga/controller", function()
         state.manga_actions_callback({ id = "keep_downloaded" })
         assert.are.equal("Keep downloaded", state.manga_actions_options.title)
         assert.are.equal("Keep next 50 unread", state.manga_actions_options.actions[3].text)
+        assert.are.equal("Stop keeping unread", state.manga_actions_options.actions[4].text)
         assert.is_function(state.manga_actions_options.on_back)
 
         state.manga_actions_options.on_back()
@@ -360,7 +377,7 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal(2, state.chapter_menu_options.itemnumber)
     end)
 
-    it("queues keep-next downloads without persisting a background policy", function()
+    it("saves per-manga keep-next policy and queues the current buffer", function()
         local plugin, state = installController({
             context_chapters = {
                 { id = "c1", name = "Ch. 1", is_read = false },
@@ -371,13 +388,29 @@ describe("suwayomi/manga/controller", function()
 
         assert.is_true(plugin:performMangaAction(manga, "keep_next_5_unread"))
         assert.are.equal(2, #plugin.enqueued[1].chapters)
+        assert.are.same({ { manga = manga, limit = 5 } }, state.keep_next_saves)
 
         assert.is_true(plugin:performMangaAction(manga, "keep_next_50_unread"))
         assert.are.equal("Queue", state.bulk_confirmation.ok_text)
+        assert.is_nil(state.keep_next_saves[2])
         state.bulk_confirmation.callback()
+        assert.are.equal(50, state.keep_next_saves[2].limit)
         assert.are.equal(2, #plugin.enqueued[2].chapters)
 
         assert.is_true(plugin:performMangaAction(manga, "delete_read_downloaded"))
         assert.is_true(state.confirm_delete_read)
+    end)
+
+    it("clears a per-manga keep-next policy without loading chapters", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Frieren" }
+        function plugin:ensureMangaChapterContext()
+            error("stop action should not load chapters")
+        end
+
+        assert.is_true(plugin:performMangaAction(manga, "keep_next_0_unread"))
+
+        assert.are.same({ { manga = manga, limit = 0 } }, state.keep_next_saves)
+        assert.are.equal("Keep-next buffer disabled.", state.messages[#state.messages])
     end)
 end)
