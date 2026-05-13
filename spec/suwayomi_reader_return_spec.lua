@@ -139,6 +139,7 @@ describe("suwayomi/reader_return", function()
     it("exports reader return methods", function()
         helper.assertControllerModule("suwayomi/reader_return", {
             "saveReaderReturnContext",
+            "saveReaderReturnContextsForChapters",
             "getCurrentReaderReturnContext",
             "returnToSuwayomiChapters",
         })
@@ -163,6 +164,33 @@ describe("suwayomi/reader_return", function()
         }, state.contexts["/downloads/Local/Manga/Chapter 1.cbz"])
     end)
 
+    it("saves return contexts for downloaded chapter paths in one settings write", function()
+        local plugin = build_plugin()
+
+        plugin:saveReaderReturnContextsForChapters({
+            id = "m1",
+            title = "Manga",
+            source = { id = "local", name = "Local source" },
+        }, {
+            {
+                chapter = { id = "c1", name = "Chapter 1" },
+                path = "/downloads/Local/Manga/Chapter 1.cbz",
+            },
+            {
+                chapter = { id = "c2", name = "Chapter 2" },
+                path = "/downloads/Local/Manga/Chapter 2.cbz",
+            },
+        })
+
+        assert.are.same({ "save-contexts" }, state.events)
+        assert.are.equal("c1", state.contexts["/downloads/Local/Manga/Chapter 1.cbz"].chapter_id)
+        assert.are.equal("c2", state.contexts["/downloads/Local/Manga/Chapter 2.cbz"].chapter_id)
+        assert.are.same(
+            { id = "local", name = "Local source" },
+            state.contexts["/downloads/Local/Manga/Chapter 2.cbz"].source
+        )
+    end)
+
     it("finds current reader context from persisted contexts", function()
         local plugin = build_plugin({
             contexts = {
@@ -180,6 +208,24 @@ describe("suwayomi/reader_return", function()
 
         assert.are.equal("m1", context.manga_id)
         assert.are.equal("Chapter 1", context.chapter_name)
+    end)
+
+    it("finds current reader context from KOReader switched document path fields", function()
+        local plugin = build_plugin({
+            contexts = {
+                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Manga",
+                },
+            },
+        })
+        plugin.ui.document = nil
+        plugin.ui.document_path = "/downloads/Local/Manga/Chapter 1.cbz"
+
+        local context = plugin:getCurrentReaderReturnContext()
+
+        assert.are.equal("m1", context.manga_id)
     end)
 
     it("falls back to chapter ledger path entries", function()
@@ -200,6 +246,48 @@ describe("suwayomi/reader_return", function()
 
         assert.are.equal("m1", context.manga_id)
         assert.are.equal("/downloads/Local/Manga/Chapter 1.cbz", context.path)
+    end)
+
+    it("infers the current reader context from linked sibling chapter files", function()
+        local plugin = build_plugin({
+            document_path = "/downloads/Local/Manga/Chapter 2.cbz",
+            contexts = {
+                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Manga",
+                    source = { id = "local", name = "Local source" },
+                },
+            },
+        })
+
+        local context = plugin:getCurrentReaderReturnContext()
+
+        assert.are.equal("m1", context.manga_id)
+        assert.are.equal("Manga", context.manga_title)
+        assert.are.equal("/downloads/Local/Manga/Chapter 2.cbz", context.path)
+        assert.is_nil(context.chapter_id)
+        assert.are.same({ id = "local", name = "Local source" }, context.source)
+    end)
+
+    it("does not infer sibling context from ambiguous manga folders", function()
+        local plugin = build_plugin({
+            document_path = "/downloads/Local/Manga/Chapter 3.cbz",
+            contexts = {
+                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Manga",
+                },
+                ["/downloads/Local/Manga/Chapter 2.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 2.cbz",
+                    manga_id = "m2",
+                    manga_title = "Other Manga",
+                },
+            },
+        })
+
+        assert.is_nil(plugin:getCurrentReaderReturnContext())
     end)
 
     it("fetches chapters before closing reader and restores the chapter list", function()

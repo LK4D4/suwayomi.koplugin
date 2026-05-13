@@ -45,13 +45,16 @@ local function present(value)
     return value
 end
 
-function Methods:saveReaderReturnContext(manga, chapter, chapter_path)
+local function parentDirectory(path)
+    return type(path) == "string" and path:match("^(.*)[/\\][^/\\]+$") or nil
+end
+
+local function buildContext(manga, chapter, chapter_path)
     if not chapter_path or chapter_path == "" or type(manga) ~= "table" or type(chapter) ~= "table" then
         return nil
     end
 
-    local contexts = SuwayomiSettings:loadReaderReturnContexts() or {}
-    local context = {
+    return {
         path = chapter_path,
         manga_id = present(manga.id),
         manga_title = manga.title,
@@ -59,14 +62,147 @@ function Methods:saveReaderReturnContext(manga, chapter, chapter_path)
         chapter_name = chapter.name,
         source = copyTable(manga.source),
     }
+end
+
+local function sourceMatches(left, right)
+    if left == right then
+        return true
+    end
+    if type(left) ~= "table" or type(right) ~= "table" then
+        return false
+    end
+    for key, value in pairs(left) do
+        if right[key] ~= value then
+            return false
+        end
+    end
+    for key, value in pairs(right) do
+        if left[key] ~= value then
+            return false
+        end
+    end
+    return true
+end
+
+local function contextMatches(left, right)
+    if type(left) ~= "table" or type(right) ~= "table" then
+        return false
+    end
+    return left.path == right.path
+        and left.manga_id == right.manga_id
+        and left.manga_title == right.manga_title
+        and left.chapter_id == right.chapter_id
+        and left.chapter_name == right.chapter_name
+        and sourceMatches(left.source, right.source)
+end
+
+local function candidateFromLedgerEntry(entry)
+    if type(entry) ~= "table" or not entry.path then
+        return nil
+    end
+    return {
+        path = entry.path,
+        manga_id = present(entry.manga_id),
+        manga_title = entry.manga_title,
+        chapter_id = present(entry.chapter_id),
+        chapter_name = entry.chapter_name,
+    }
+end
+
+local function inferSiblingContext(path, contexts, ledger)
+    local current_dir = parentDirectory(path)
+    if not current_dir then
+        return nil
+    end
+
+    local inferred_manga_id
+    local inferred_manga_title
+    local inferred_source
+    local function consider(candidate)
+        if type(candidate) ~= "table" or parentDirectory(candidate.path) ~= current_dir then
+            return true
+        end
+        local manga_id = present(candidate.manga_id)
+        if not manga_id then
+            return true
+        end
+        if inferred_manga_id and inferred_manga_id ~= manga_id then
+            return false
+        end
+        inferred_manga_id = manga_id
+        if not inferred_source and candidate.source then
+            inferred_source = candidate.source
+        end
+        if not inferred_manga_title and candidate.manga_title then
+            inferred_manga_title = candidate.manga_title
+        end
+        return true
+    end
+
+    for _, context in pairs(contexts or {}) do
+        if consider(context) == false then
+            return nil
+        end
+    end
+    for _, entry in pairs(ledger or {}) do
+        if consider(candidateFromLedgerEntry(entry)) == false then
+            return nil
+        end
+    end
+
+    if not inferred_manga_id then
+        return nil
+    end
+    return {
+        path = path,
+        manga_id = inferred_manga_id,
+        manga_title = inferred_manga_title,
+        source = copyTable(inferred_source),
+    }
+end
+
+function Methods:saveReaderReturnContext(manga, chapter, chapter_path)
+    local context = buildContext(manga, chapter, chapter_path)
+    if not context then
+        return nil
+    end
+
+    local contexts = SuwayomiSettings:loadReaderReturnContexts() or {}
     contexts[chapter_path] = context
     SuwayomiSettings:saveReaderReturnContexts(contexts)
     return context
 end
 
+function Methods:saveReaderReturnContextsForChapters(manga, entries)
+    if type(manga) ~= "table" or type(entries) ~= "table" or #entries == 0 then
+        return {}
+    end
+
+    local contexts = SuwayomiSettings:loadReaderReturnContexts() or {}
+    local saved = {}
+    local changed = false
+    for _, entry in ipairs(entries) do
+        local context = entry and buildContext(manga, entry.chapter, entry.path)
+        if context then
+            saved[#saved + 1] = context
+            if not contextMatches(contexts[context.path], context) then
+                contexts[context.path] = context
+                changed = true
+            end
+        end
+    end
+
+    if changed then
+        SuwayomiSettings:saveReaderReturnContexts(contexts)
+    end
+    return saved
+end
+
 function Methods:getCurrentReaderDocumentPath()
     local document = self.document or (self.ui and self.ui.document)
-    return document and document.file or nil
+    return (self.ui and (self.ui.document_path or self.ui.document_pathname))
+        or (document and (document.file or document.filename or document.path))
+        or nil
 end
 
 function Methods:getReaderReturnContextForPath(path)
@@ -91,7 +227,7 @@ function Methods:getReaderReturnContextForPath(path)
             }
         end
     end
-    return nil
+    return inferSiblingContext(path, contexts, ledger)
 end
 
 function Methods:getCurrentReaderReturnContext()

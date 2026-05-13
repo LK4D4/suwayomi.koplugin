@@ -70,6 +70,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
     local history_read_count = 0
     local metadata_write_count = 0
     local ledger_upsert_count = 0
+    local reader_return_entries = {}
 
     for _, chapter in ipairs(chapters or {}) do
         local item = {}
@@ -116,6 +117,10 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
             else
                 self:upsertChapterLedgerEntry(manga, item, updates)
             end
+            reader_return_entries[#reader_return_entries + 1] = {
+                chapter = item,
+                path = chapter_path,
+            }
             ledger_upsert_count = ledger_upsert_count + 1
         end
 
@@ -142,6 +147,10 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         end
 
         table.insert(items, item)
+    end
+
+    if self.saveReaderReturnContextsForChapters then
+        self:saveReaderReturnContextsForChapters(manga, reader_return_entries)
     end
 
     SuwayomiDebug.log({
