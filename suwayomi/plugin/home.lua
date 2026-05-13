@@ -215,7 +215,7 @@ function Methods:addToMainMenu(menu_items)
         if context then
             ensureReaderReturnMenuOrder()
             menu_items[READER_RETURN_MENU_ID] = {
-                text = _("Back to Suwayomi chapters"),
+                text = _("Go to Suwayomi"),
                 sorting_hint = "main",
                 callback = function()
                     self:returnToSuwayomiChapters()

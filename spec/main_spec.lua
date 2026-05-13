@@ -120,7 +120,7 @@ describe("suwayomi plugin", function()
 
         assert.is_nil(menu_items.suwayomi_dl)
         assert.is_table(menu_items.suwayomi_reader_return)
-        assert.are.equal("Back to Suwayomi chapters", menu_items.suwayomi_reader_return.text)
+        assert.are.equal("Go to Suwayomi", menu_items.suwayomi_reader_return.text)
         assert.are.equal("main", menu_items.suwayomi_reader_return.sorting_hint)
         assert.are.equal("suwayomi_reader_return", runtime.reader_menu_order.main[1])
         assert.are.equal("history", runtime.reader_menu_order.main[2])
