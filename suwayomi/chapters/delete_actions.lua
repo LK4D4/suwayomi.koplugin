@@ -52,7 +52,13 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
     end
 
     local metadata_path = self:getKoreaderMetadataPathForDocument(chapter_path)
-    self:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
+    local removed = self:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
+    if not removed then
+        if not options.quiet_delete_failed then
+            self:showMessage(_("Could not delete this chapter from device."))
+        end
+        return false, "delete_failed"
+    end
 
     local ledger = options.ledger or self:loadChapterLedger()
     local key = self:getChapterLedgerKey(manga, chapter)

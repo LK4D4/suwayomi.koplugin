@@ -306,20 +306,22 @@ function Methods:deleteReadChaptersFromDevice()
     end
 
     local manga = self.current_chapter_context.manga
-    local read_chapters = self:getReadChaptersFromCurrentContext()
+    local read_chapters = self:getReadDownloadedChaptersFromCurrentContext()
 
     if #read_chapters == 0 then
-        self:showMessage(_("No read chapters to delete."))
+        self:showMessage(self:formatReadDownloadDeleteMessage(0))
         return 0
     end
 
     local deleted = 0
     local missing = 0
     local active = 0
+    local failed = 0
     self:withChapterMenuRefreshSuppressed(function()
         for _, chapter in ipairs(read_chapters) do
             local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
                 quiet_active = true,
+                quiet_delete_failed = true,
                 quiet_missing = true,
                 skip_refresh = true,
             })
@@ -329,15 +331,14 @@ function Methods:deleteReadChaptersFromDevice()
                 active = active + 1
             elseif state == "missing" then
                 missing = missing + 1
+            elseif state == "delete_failed" then
+                failed = failed + 1
             end
         end
     end)
 
     self:refreshChapterMenu()
-
-    if deleted == 0 or active > 0 then
-        self:showMessage(self:formatBulkDeleteMessage(deleted, 0, missing, active))
-    end
+    self:showMessage(self:formatReadDownloadDeleteMessage(deleted))
     SuwayomiDebug.log({
         operation = "deleteReadChaptersFromDevice",
         event = "end",
@@ -345,6 +346,7 @@ function Methods:deleteReadChaptersFromDevice()
         deleted_count = deleted,
         missing_count = missing,
         active_count = active,
+        failed_count = failed,
         elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
     })
     return deleted
@@ -356,9 +358,9 @@ function Methods:confirmDeleteReadChaptersFromDevice()
         return 0
     end
 
-    local read_chapters = self:getReadChaptersFromCurrentContext()
+    local read_chapters = self:getReadDownloadedChaptersFromCurrentContext()
     if #read_chapters == 0 then
-        self:showMessage(_("No read chapters to delete."))
+        self:showMessage(self:formatReadDownloadDeleteMessage(0))
         return 0
     end
 
@@ -366,8 +368,8 @@ function Methods:confirmDeleteReadChaptersFromDevice()
         T(
             self:pluralize(
                 #read_chapters,
-                _("Delete downloaded files for %1 read chapter?"),
-                _("Delete downloaded files for %1 read chapters?")
+                _("Delete %1 read download from device?"),
+                _("Delete %1 read downloads from device?")
             ),
             #read_chapters
         ),
@@ -375,6 +377,25 @@ function Methods:confirmDeleteReadChaptersFromDevice()
         function()
             self:deleteReadChaptersFromDevice()
         end
+    )
+end
+
+function Methods:getReadDownloadedChaptersFromCurrentContext()
+    local manga = self.current_chapter_context and self.current_chapter_context.manga
+    local chapters = {}
+    for _, chapter in ipairs(self:getReadChaptersFromCurrentContext()) do
+        local downloaded = self:isChapterDownloaded(manga, chapter)
+        if downloaded then
+            table.insert(chapters, chapter)
+        end
+    end
+    return chapters
+end
+
+function Methods:formatReadDownloadDeleteMessage(deleted)
+    return T(
+        self:pluralize(deleted, _("Deleted %1 chapter from device."), _("Deleted %1 chapters from device.")),
+        deleted
     )
 end
 

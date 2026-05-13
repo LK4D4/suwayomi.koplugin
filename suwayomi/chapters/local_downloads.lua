@@ -42,6 +42,11 @@ end
 
 function Methods:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
     os.remove(chapter_path)
+    local SuwayomiDownloader = require("suwayomi/downloads/downloader")
+    if SuwayomiDownloader:chapterExists(chapter_path) then
+        return false
+    end
+
     if metadata_path then
         os.remove(metadata_path)
         os.remove(metadata_path .. ".old")
@@ -53,6 +58,7 @@ function Methods:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
             os.remove(metadata_dir)
         end
     end
+    return true
 end
 
 ChapterLocalDownloads.methods = Methods
