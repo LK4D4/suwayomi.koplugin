@@ -119,10 +119,11 @@ describe("suwayomi/reader_return", function()
             showMessage = function(self, message)
                 table.insert(self.messages, message)
             end,
-            showChapterResultForManga = function(_, manga, result)
+            showChapterResultForManga = function(_, manga, result, show_options)
                 table.insert(state.events, "show-chapters")
                 state.shown_manga = manga
                 state.shown_result = result
+                state.shown_options = show_options
                 return true
             end,
         }
@@ -317,6 +318,8 @@ describe("suwayomi/reader_return", function()
         assert.are.equal("m1", state.shown_manga.id)
         assert.are.equal("Manga", state.shown_manga.title)
         assert.are.same({ id = "local", name = "Local source" }, state.shown_manga.source)
+        assert.are.equal("c1", state.shown_options.return_context.chapter_id)
+        assert.are.equal("Chapter 1", state.shown_options.return_context.chapter_name)
     end)
 
     it("keeps reader open when chapter lookup fails", function()

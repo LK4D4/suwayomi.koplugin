@@ -75,6 +75,7 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
         title = options.title or _("Suwayomi Chapters"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback),
+        itemnumber = options.itemnumber,
         close_callback = options.close_callback,
     }
     menu_options.on_title_bar_left_tap = options.on_title_bar_left_tap
@@ -313,6 +314,7 @@ function SuwayomiUI.updateChapterMenu(menu, options, onSelectCallback, onHoldCal
         title = options.title or menu.title,
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = item_table,
+        itemnumber = options.itemnumber,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
     })
 end

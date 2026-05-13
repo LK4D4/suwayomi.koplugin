@@ -298,7 +298,9 @@ function Methods:returnToSuwayomiChapters(context)
         source = copyTable(context.source),
     }
     self:closeReaderToFileManager(function()
-        self:showChapterResultForManga(manga, result)
+        self:showChapterResultForManga(manga, result, {
+            return_context = context,
+        })
     end)
     return true
 end

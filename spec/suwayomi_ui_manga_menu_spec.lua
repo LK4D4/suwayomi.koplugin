@@ -429,6 +429,28 @@ describe("suwayomi/ui/manga_menu", function()
         assert.are.equal(menu.item_table[2].height, menu.item_group[2].dimen.h)
     end)
 
+    it("opens the page containing the requested initial item", function()
+        local list_menu = require("suwayomi/ui/list_menu")
+
+        local menu = list_menu.show{
+            title = "Chapters",
+            itemnumber = 5,
+            items_per_page = 2,
+            item_table = {
+                { text = "Chapter 1" },
+                { text = "Chapter 2" },
+                { text = "Chapter 3" },
+                { text = "Chapter 4" },
+                { text = "Chapter 5" },
+            },
+        }
+
+        assert.are.equal(3, menu.page)
+        assert.are.equal(5, menu.itemnumber)
+        assert.are.equal(1, menu.updated_select_number)
+        assert.are.equal("Chapter 5", menu.item_group[1].entry.text)
+    end)
+
     it("renders chapter rows with the shared row widget and no thumbnail gutter", function()
         local list_menu = require("suwayomi/ui/list_menu")
 

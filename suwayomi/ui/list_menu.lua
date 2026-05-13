@@ -401,6 +401,25 @@ function ListMenu.getPageNumber(menu, item_number)
     return math.ceil(math.min(item_number, #menu.item_table) / menu.perpage)
 end
 
+local function normalizeItemNumber(menu, item_number)
+    item_number = tonumber(item_number)
+    if not item_number or item_number < 1 or #menu.item_table == 0 then
+        return nil
+    end
+    return math.min(math.floor(item_number), #menu.item_table)
+end
+
+function ListMenu.consumePendingItemNumber(menu)
+    local item_number = normalizeItemNumber(menu, menu._suwayomi_pending_itemnumber)
+    menu._suwayomi_pending_itemnumber = nil
+    if not item_number then
+        return nil
+    end
+    menu.itemnumber = item_number
+    menu.page = ListMenu.getPageNumber(menu, item_number)
+    return item_number
+end
+
 function ListMenu.estimateItemTitleWidth(menu, item, base_height)
     local has_thumbnail = item.thumbnail_placeholder or item.thumbnail_url or item.thumbnail_path
     local left_padding = has_thumbnail and 0 or scaled(10)
@@ -642,6 +661,7 @@ function ListMenu.updateItems(menu, select_number, no_recalculate_dimen)
     menu.return_button:resetLayout()
     menu.content_group:resetLayout()
     menu:_recalculateDimen(no_recalculate_dimen)
+    ListMenu.consumePendingItemNumber(menu)
 
     local items_nb
     local idx_offset
@@ -743,6 +763,7 @@ function ListMenu.show(options)
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = options.item_table or {},
         items_per_page = options.items_per_page,
+        itemnumber = options.itemnumber,
         is_borderless = true,
         is_popout = false,
         title_bar_fm_style = true,
@@ -751,6 +772,7 @@ function ListMenu.show(options)
     })
     ListMenu.install(menu, options)
     applyOptions(menu, options)
+    menu._suwayomi_pending_itemnumber = options.itemnumber
     menu:updateItems()
     UIManager:show(menu)
     return menu
@@ -765,6 +787,7 @@ function ListMenu.update(menu, options)
     cancelThumbnailJobs(menu)
     menu.item_table = options.item_table or {}
     menu.title = options.title or menu.title
+    menu._suwayomi_pending_itemnumber = options.itemnumber
     applyOptions(menu, options)
     if menu.updateItems then
         menu:updateItems()

@@ -374,6 +374,21 @@ describe("suwayomi/ui", function()
         assert.is_true(tapped)
     end)
 
+    it("passes an initial chapter row to the shared list menu", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showChapterMenu({
+            title = "Sousou no Frieren",
+            itemnumber = 2,
+            chapters = {
+                { id = "c1", name = "Chapter 1" },
+                { id = "c2", name = "Chapter 2" },
+            },
+        })
+
+        assert.are.equal(2, shown_dialog.itemnumber)
+    end)
+
     it("keeps chapter menus current when selecting a row", function()
         local ui = require("suwayomi/ui")
         local selected

@@ -320,6 +320,46 @@ describe("suwayomi/manga/controller", function()
         assert.is_nil(plugin.current_chapter_menu)
     end)
 
+    it("focuses the returned chapter when showing chapters from reader return", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Frieren" }
+
+        assert.is_true(plugin:showChapterResultForManga(manga, {
+            ok = true,
+            chapters = {
+                { id = "c1", name = "Ch. 1" },
+                { id = "c2", name = "Ch. 2" },
+                { id = "c3", name = "Ch. 3" },
+            },
+        }, {
+            return_context = {
+                chapter_id = "c2",
+                chapter_name = "Ch. 2",
+            },
+        }))
+
+        assert.are.equal(2, state.chapter_menu_options.itemnumber)
+    end)
+
+    it("falls back to returned chapter name when the context has no chapter id", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Frieren" }
+
+        assert.is_true(plugin:showChapterResultForManga(manga, {
+            ok = true,
+            chapters = {
+                { id = "c1", name = "Ch. 1" },
+                { id = "c2", name = "Ch. 2" },
+            },
+        }, {
+            return_context = {
+                chapter_name = "Ch. 2",
+            },
+        }))
+
+        assert.are.equal(2, state.chapter_menu_options.itemnumber)
+    end)
+
     it("queues keep-next downloads without persisting a background policy", function()
         local plugin, state = installController({
             context_chapters = {

@@ -26,6 +26,34 @@ end
 
 local Methods = {}
 
+local function findReturnedChapterItemNumber(chapters, context)
+    if type(chapters) ~= "table" or type(context) ~= "table" then
+        return nil
+    end
+
+    local chapter_id = context.chapter_id
+    if chapter_id ~= nil and chapter_id ~= "" then
+        chapter_id = tostring(chapter_id)
+        for index, chapter in ipairs(chapters) do
+            if tostring(chapter and chapter.id) == chapter_id then
+                return index
+            end
+        end
+    end
+
+    local chapter_name = context.chapter_name
+    if chapter_name ~= nil and chapter_name ~= "" then
+        chapter_name = tostring(chapter_name)
+        for index, chapter in ipairs(chapters) do
+            if tostring(chapter and chapter.name) == chapter_name then
+                return index
+            end
+        end
+    end
+
+    return nil
+end
+
 function Methods:attachSourceToManga(manga, source)
     return self:getClient():attachSourceToManga(manga, source)
 end
@@ -77,7 +105,8 @@ function Methods:refreshUninitializedMangaForChapters(manga)
 end
 
 
-function Methods:showChapterResultForManga(manga, result)
+function Methods:showChapterResultForManga(manga, result, options)
+    options = options or {}
     if not result then
         return
     end
@@ -107,6 +136,7 @@ function Methods:showChapterResultForManga(manga, result)
 
     local chapter_menu
     self.current_chapter_options = self:buildChapterMenuOptions(manga, chapters)
+    self.current_chapter_options.itemnumber = findReturnedChapterItemNumber(chapters, options.return_context)
     self.current_chapter_options.close_callback = function()
         if self.current_chapter_menu == chapter_menu then
             self.current_chapter_menu = nil
