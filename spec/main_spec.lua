@@ -319,6 +319,25 @@ describe("suwayomi plugin", function()
         assert.is_false(plugin:isSuwayomiScreenActive(library))
     end)
 
+    it("preserves previous screens when navigating from the hub", function()
+        local library = { name = "library" }
+        local browse = { name = "browse" }
+        local plugin = build_plugin({
+            showLibrary = function()
+                return library
+            end,
+        })
+
+        plugin:trackSuwayomiScreen("browse", browse)
+        plugin:showHome()
+        runtime.shown_home_dialog.onClose()
+        runtime.shown_home_dialog.actions[1].callback()
+
+        assert.are.same({}, runtime.closed_widgets)
+        assert.is_true(plugin:isSuwayomiScreenActive(browse))
+        assert.is_true(plugin:isSuwayomiScreenActive(library))
+    end)
+
     it("untracks Suwayomi home when a normal home action closes the dialog", function()
         local plugin = build_plugin()
 

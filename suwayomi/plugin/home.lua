@@ -44,9 +44,6 @@ end
 
 
 function Methods:showTopLevelScreen(route_id, callback)
-    if self.closeSuwayomiPlugin then
-        self:closeSuwayomiPlugin()
-    end
     local widget = callback()
     if widget and self.trackSuwayomiScreen then
         self:trackSuwayomiScreen(route_id, widget)

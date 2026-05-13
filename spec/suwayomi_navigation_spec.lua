@@ -78,7 +78,7 @@ describe("suwayomi/navigation", function()
         assert.is_false(navigator:contains(third))
     end)
 
-    it("widget close_callback preserves navigation tracking and calls original callback", function()
+    it("current widget close_callback removes the widget and calls original callback", function()
         local Navigation = load_navigation()
         local navigator = Navigation.new(ui_manager)
         local original_calls = 0
@@ -93,8 +93,30 @@ describe("suwayomi/navigation", function()
 
         assert.are.equal(0, #closed)
         assert.are.equal(1, original_calls)
-        assert.is_true(navigator:contains(widget))
-        assert.is_true(navigator:isCurrent(widget))
+        assert.is_false(navigator:contains(widget))
+        assert.is_false(navigator:isCurrent(widget))
+    end)
+
+    it("non-current widget close_callback preserves navigation tracking", function()
+        local Navigation = load_navigation()
+        local navigator = Navigation.new(ui_manager)
+        local original_calls = 0
+        local parent = {
+            close_callback = function()
+                original_calls = original_calls + 1
+            end,
+        }
+        local child = {}
+
+        navigator:push("library", parent)
+        navigator:push("manga-actions", child)
+        parent.close_callback()
+
+        assert.are.equal(0, #closed)
+        assert.are.equal(1, original_calls)
+        assert.is_true(navigator:contains(parent))
+        assert.is_true(navigator:contains(child))
+        assert.is_false(navigator:isCurrent(parent))
     end)
 
     it("closeAll still closes a parent widget after KOReader fires its close_callback", function()
