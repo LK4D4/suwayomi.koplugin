@@ -92,6 +92,18 @@ local function installController(options)
         self.cancelled = { manga = manga, chapter = chapter }
         return options.cancel_pending_ok ~= false, options.cancel_pending_state
     end
+    function queue:getStatus(manga, chapter)
+        self.status = self.status or {}
+        return self.status[tostring(manga.id) .. ":" .. tostring(chapter.id)]
+    end
+    function queue:enqueueBatch(manga, chapters)
+        self.enqueued = { manga = manga, chapters = chapters }
+        self.status = self.status or {}
+        for _, chapter in ipairs(chapters or {}) do
+            self.status[tostring(manga.id) .. ":" .. tostring(chapter.id)] = { state = "queued" }
+        end
+        return #(chapters or {})
+    end
 
     local plugin = {
         queue = queue,
@@ -148,7 +160,11 @@ local function installController(options)
     function plugin:isChapterDownloadAvailable(_, chapter)
         return chapter.downloaded == true
     end
+    function plugin:isChapterDownloaded(_, chapter)
+        return chapter.downloaded == true
+    end
     function plugin:enqueueSelectedChapterDownloads(_, chapters)
+        state.interactive_enqueue_count = (state.interactive_enqueue_count or 0) + 1
         state.enqueued_chapters = chapters
         return #chapters
     end
@@ -177,6 +193,12 @@ local function installController(options)
     end
     function plugin:saveChapterLedger(ledger)
         state.saved_ledger = ledger
+    end
+    function plugin:withChapterMenuRefreshSuppressed(callback)
+        return callback()
+    end
+    function plugin:refreshChapterMenu(refresh_options)
+        state.refresh_options = refresh_options
     end
     return plugin, state
 end
@@ -303,7 +325,9 @@ describe("suwayomi/downloads/controller", function()
                 read = false,
             },
         }
+        local queue = {}
         local plugin, state = installController({
+            queue = queue,
             ledger = ledger,
             keep_next_limits = {
                 m1 = 5,
@@ -330,7 +354,7 @@ describe("suwayomi/downloads/controller", function()
         assert.is_true(ledger["m1:c1"].read)
         assert.is_true(ledger["m1:c1"].pending_read_sync)
         assert.are.equal(ledger, state.saved_ledger)
-        assert.are.same({ { id = "c6", name = "Ch. 6", downloaded = false } }, state.enqueued_chapters)
+        assert.are.same({ { id = "c6", name = "Ch. 6", downloaded = false } }, queue.enqueued.chapters)
     end)
 
     it("does not refill keep-next buffers when no manga policy is enabled", function()
@@ -394,5 +418,44 @@ describe("suwayomi/downloads/controller", function()
         assert.is_true(ledger["m2:c1"].read)
         assert.are.equal(ledger, state.saved_ledger)
         assert.is_nil(state.enqueued_chapters)
+    end)
+
+    it("queues automatic keep-next refills without the interactive bulk-download side effects", function()
+        local queue = {
+            status = {},
+            getStatus = function(self, target_manga, target_chapter)
+                return self.status[tostring(target_manga.id) .. ":" .. tostring(target_chapter.id)]
+            end,
+            enqueueBatch = function(self, target_manga, chapters)
+                self.enqueued = { manga = target_manga, chapters = chapters }
+                for _, chapter in ipairs(chapters) do
+                    self.status[tostring(target_manga.id) .. ":" .. tostring(chapter.id)] = { state = "queued" }
+                end
+                return #chapters
+            end,
+        }
+        local plugin, state = installController({
+            queue = queue,
+            keep_next_limits = {
+                m1 = 5,
+            },
+            current_chapter_context = {
+                manga = { id = "m1", title = "Frieren" },
+                chapters = {
+                    { id = "c1", name = "Ch. 1", is_read = true, downloaded = true },
+                    { id = "c2", name = "Ch. 2", downloaded = true },
+                    { id = "c3", name = "Ch. 3", downloaded = true },
+                    { id = "c4", name = "Ch. 4", downloaded = true },
+                    { id = "c5", name = "Ch. 5", downloaded = true },
+                    { id = "c6", name = "Ch. 6", downloaded = false },
+                },
+            },
+        })
+
+        assert.are.equal(1, plugin:applyMangaKeepNextUnreadDownloadsPolicy())
+
+        assert.is_nil(state.interactive_enqueue_count)
+        assert.are.same({ { id = "c6", name = "Ch. 6", downloaded = false } }, queue.enqueued.chapters)
+        assert.are.same({ quick = true }, state.refresh_options)
     end)
 end)

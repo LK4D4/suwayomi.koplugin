@@ -325,6 +325,45 @@ function Methods:normalizeMangaKeepNextUnreadDownloadsLimit(limit)
 end
 
 
+function Methods:getQueueableKeepNextUnreadDownloads(manga, chapters)
+    local queueable = {}
+    local max_chapters = tonumber(self.max_batch_queue_chapters) or 50
+    for _, chapter in ipairs(chapters or {}) do
+        local status = self:getDownloadQueue():getStatus(manga, chapter)
+        local downloaded = self:isChapterDownloaded(manga, chapter)
+        if not downloaded and not (status and (
+            status.state == "queued"
+                or status.state == "downloading"
+                or status.state == "downloaded"
+                or status.state == "skipped"
+        )) then
+            if #queueable >= max_chapters then
+                break
+            end
+            table.insert(queueable, chapter)
+        end
+    end
+    return queueable
+end
+
+
+function Methods:enqueueKeepNextUnreadDownloads(manga, chapters, download_directory)
+    local queueable = self:getQueueableKeepNextUnreadDownloads(manga, chapters)
+    if #queueable == 0 then
+        return 0
+    end
+
+    local queued = 0
+    self:withChapterMenuRefreshSuppressed(function()
+        queued = self:getDownloadQueue():enqueueBatch(manga, queueable, download_directory, { quiet_duplicate = true })
+    end)
+    if queued > 0 then
+        self:refreshChapterMenu({ quick = true })
+    end
+    return queued
+end
+
+
 function Methods:applyMangaKeepNextUnreadDownloadsPolicy(manga)
     if not self.current_chapter_context then
         return 0
@@ -353,7 +392,7 @@ function Methods:applyMangaKeepNextUnreadDownloadsPolicy(manga)
         return 0
     end
 
-    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+    return self:enqueueKeepNextUnreadDownloads(manga, chapters, download_directory)
 end
 
 
