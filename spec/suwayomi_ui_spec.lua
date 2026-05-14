@@ -339,7 +339,7 @@ describe("suwayomi/ui", function()
             end,
         })
 
-        assert.are.equal("Suwayomi setup: connection", shown_dialog.title)
+        assert.are.equal("Suwayomi setup: connection (not tested)", shown_dialog.title)
         assert.are.equal("Server URL", shown_dialog.fields[1].hint)
         assert.are.equal("https://saved.example", shown_dialog.fields[1].text)
         assert.are.equal("Username", shown_dialog.fields[2].hint)
@@ -373,6 +373,25 @@ describe("suwayomi/ui", function()
         shown_dialog.buttons[2][1].callback()
 
         assert.is_nil(closed_dialog)
+    end)
+
+    it("keeps onboarding connection test status visible", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showOnboardingConnectionDialog({
+            credentials = {
+                server_url = "https://saved.example",
+            },
+            connection_status = "testing",
+        })
+
+        assert.are.equal("Suwayomi setup: connection (testing...)", shown_dialog.title)
+
+        ui.updateOnboardingConnectionDialogStatus(shown_dialog, "passed")
+        assert.are.equal("Suwayomi setup: connection (tested)", shown_dialog.title)
+
+        ui.updateOnboardingConnectionDialogStatus(shown_dialog, "failed")
+        assert.are.equal("Suwayomi setup: connection (failed)", shown_dialog.title)
     end)
 
     it("shows a chapter menu", function()

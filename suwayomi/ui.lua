@@ -669,6 +669,27 @@ local function getCredentialsFromDialog(dialog)
     }
 end
 
+local function formatOnboardingConnectionTitle(status)
+    local suffixes = {
+        testing = _("testing..."),
+        passed = _("tested"),
+        failed = _("failed"),
+        untested = _("not tested"),
+    }
+    return _("Suwayomi setup: connection") .. " (" .. (suffixes[status] or suffixes.untested) .. ")"
+end
+
+function SuwayomiUI.updateOnboardingConnectionDialogStatus(dialog, status)
+    if not dialog then
+        return
+    end
+    local title = formatOnboardingConnectionTitle(status)
+    dialog.title = title
+    if dialog.title_bar and dialog.title_bar.setTitle then
+        dialog.title_bar:setTitle(title, true)
+    end
+end
+
 function SuwayomiUI.showOnboardingConnectionDialog(options)
     options = options or {}
     local credentials = options.credentials or {}
@@ -676,7 +697,7 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
     local dialog
 
     dialog = MultiInputDialog:new{
-        title = _("Suwayomi setup: connection"),
+        title = formatOnboardingConnectionTitle(options.connection_status),
         fields = {
             {
                 hint = _("Server URL"),

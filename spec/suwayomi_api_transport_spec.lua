@@ -134,6 +134,22 @@ describe("suwayomi/api/transport", function()
         assert.are.equal("Could not reach the Suwayomi server: connection refused", failed.error)
     end)
 
+    it("maps transient TLS wait errors to a user-facing timeout", function()
+        install_ltn12()
+        package.preload["ssl.https"] = function()
+            return {
+                request = function()
+                    return nil, "wantread"
+                end,
+            }
+        end
+
+        local result = transport.performGraphQLRequest(valid_credentials(), "{}", "failure")
+
+        assert.are.equal(false, result.ok)
+        assert.are.equal("Connection timed out while waiting for Suwayomi.", result.error)
+    end)
+
     it("returns binary download errors for missing URLs before loading HTTP helpers", function()
         forbid_ltn12()
         local missing = transport.downloadBinary({}, "/api/v1/page/1")

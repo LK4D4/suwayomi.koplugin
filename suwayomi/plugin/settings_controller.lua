@@ -93,6 +93,7 @@ function Methods:startOnboardingConnectionTest(credentials)
         return false
     end
 
+    SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "testing")
     local active = {
         credentials = credentials,
         result_path = self:getOnboardingConnectionResultPath(),
@@ -103,7 +104,7 @@ function Methods:startOnboardingConnectionTest(credentials)
         ffi_util = FFIUtil,
         ui_manager = UIManager,
         poll_interval_seconds = self.onboarding_connection_poll_interval_seconds or 0.5,
-        timeout_seconds = self.onboarding_connection_timeout_seconds or 60,
+        timeout_seconds = self.onboarding_connection_timeout_seconds or 25,
         run = function(path)
             OnboardingConnectionWorker:run(credentials, path)
         end,
@@ -113,12 +114,20 @@ function Methods:startOnboardingConnectionTest(credentials)
         on_finish = function(finished_active, result)
             self:finishOnboardingConnectionTest(finished_active, result)
         end,
-        on_timeout = function()
+        on_timeout = function(timed_out_active)
+            self.onboarding_connection_test_active = nil
+            self:closeLoadingMessage(timed_out_active and timed_out_active.loading_message)
+            SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
             self:showMessage(_("Suwayomi connection test timed out."))
+            if timed_out_active then
+                timed_out_active.canceled = true
+                SubprocessJob.cleanup(timed_out_active)
+            end
         end,
         on_error = function(err)
             self.onboarding_connection_test_active = nil
             self:closeLoadingMessage(active.loading_message)
+            SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
             self:showMessage(T(_("Could not start connection test: %1"), err or _("unknown error")))
         end,
     })
@@ -132,9 +141,12 @@ function Methods:finishOnboardingConnectionTest(active, result)
     self:closeLoadingMessage(active and active.loading_message)
     if result and result.ok == true then
         self.onboarding_connection_test_key = self:getOnboardingCredentialsKey(active and active.credentials)
-        self:showMessage(result.message or _("Connection test passed."))
+        SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "passed")
+        local message = result.message or _("Connection test passed.")
+        self:showMessage(message .. " " .. _("You can continue."))
         return
     end
+    SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
     self:showMessage((result and result.error) or _("Could not connect to Suwayomi."))
 end
 
@@ -172,8 +184,9 @@ end
 
 function Methods:showOnboardingConnectionStep(options)
     options = options or {}
-    return SuwayomiUI.showOnboardingConnectionDialog({
+    self.onboarding_connection_dialog = SuwayomiUI.showOnboardingConnectionDialog({
         credentials = self:getOnboardingDialogCredentials(),
+        connection_status = "untested",
         onTestConnection = function(credentials)
             self:startOnboardingConnectionTest(credentials)
         end,
@@ -200,6 +213,7 @@ function Methods:showOnboardingConnectionStep(options)
             return true
         end,
     })
+    return self.onboarding_connection_dialog
 end
 
 

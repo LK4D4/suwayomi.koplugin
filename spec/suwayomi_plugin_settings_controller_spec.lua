@@ -130,6 +130,11 @@ local function installController(options)
             end,
             showOnboardingConnectionDialog = function(dialog_options)
                 state.onboarding_connection_options = dialog_options
+                return state.onboarding_connection_dialog or { name = "connection-dialog" }
+            end,
+            updateOnboardingConnectionDialogStatus = function(dialog, status)
+                state.connection_status_updates = state.connection_status_updates or {}
+                table.insert(state.connection_status_updates, { dialog = dialog, status = status })
             end,
             showLanguageMenu = function(menu_options)
                 state.language_menu_options = menu_options
@@ -325,7 +330,39 @@ describe("suwayomi/plugin/settings_controller", function()
             auth_method = "basic_auth",
         })
 
-        assert.are.equal(60, state.started_connection_job.timeout_seconds)
+        assert.are.equal(25, state.started_connection_job.timeout_seconds)
+    end)
+
+    it("marks onboarding connection status during and after tests", function()
+        local plugin, state = installController()
+        state.onboarding_connection_dialog = { name = "connection-dialog" }
+        plugin.onboarding_connection_dialog = state.onboarding_connection_dialog
+        plugin:startOnboardingConnectionTest({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        })
+
+        assert.are.same({
+            { dialog = plugin.onboarding_connection_dialog, status = "testing" },
+        }, state.connection_status_updates)
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = {
+                server_url = "https://suwayomi.example",
+                username = "alice",
+                password = "secret",
+                auth_method = "basic_auth",
+            },
+            loading_message = state.loading_message,
+        }, {
+            ok = true,
+            message = "Connection test passed. Found 85 sources.",
+        })
+
+        assert.are.equal("passed", state.connection_status_updates[#state.connection_status_updates].status)
+        assert.are.equal("Connection test passed. Found 85 sources. You can continue.", state.messages[#state.messages])
     end)
 
     it("keeps source language filtering out of plugin settings", function()

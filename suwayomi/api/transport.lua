@@ -90,6 +90,13 @@ local function logDebugEvent(log_debug_event, event)
     end
 end
 
+local function formatReachabilityError(code)
+    if code == "wantread" or code == "wantwrite" or code == "timeout" or code == RESPONSE_TIMEOUT_ERROR then
+        return "Connection timed out while waiting for Suwayomi."
+    end
+    return "Could not reach the Suwayomi server: " .. tostring(code)
+end
+
 local function buildGuardedTableSink(target, options)
     options = options or {}
     target = target or {}
@@ -215,7 +222,7 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
         logDebugEvent(log_debug_event, { operation = operation_name, event = "transport_failure", error = code })
         return {
             ok = false,
-            error = "Could not reach the Suwayomi server: " .. tostring(code),
+            error = formatReachabilityError(code),
         }
     end
 
@@ -223,7 +230,7 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
         logDebugEvent(log_debug_event, { operation = operation_name, event = "non_numeric_status", code = code })
         return {
             ok = false,
-            error = "Could not reach the Suwayomi server: " .. tostring(code),
+            error = formatReachabilityError(code),
         }
     end
 
@@ -302,14 +309,14 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event, reques
     if not ok then
         return {
             ok = false,
-            error = "Could not reach the Suwayomi server: " .. tostring(code),
+            error = formatReachabilityError(code),
         }
     end
 
     if type(code) ~= "number" then
         return {
             ok = false,
-            error = "Could not reach the Suwayomi server: " .. tostring(code),
+            error = formatReachabilityError(code),
         }
     end
 
@@ -412,13 +419,13 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
     if not ok then
         return {
             ok = false,
-            error = "Could not reach the Suwayomi server: " .. tostring(code),
+            error = formatReachabilityError(code),
         }
     end
     if type(code) ~= "number" then
         return {
             ok = false,
-            error = "Could not reach the Suwayomi server: " .. tostring(code),
+            error = formatReachabilityError(code),
         }
     end
 
