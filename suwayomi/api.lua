@@ -20,6 +20,7 @@ local debug_logger
 -- These lists intentionally define the compatibility surface exported by the
 -- facade. Add new helpers here only when they are meant to be public API.
 local query_exports = {
+    "_buildConnectionTestQuery",
     "_buildSourcesQuery",
     "_buildLegacySourcesQuery",
     "_buildMangaQuery",
@@ -80,12 +81,27 @@ local function logDebugEvent(event)
     end
 end
 
-local function performGraphQLRequest(credentials, request_body, operation_name)
-    return transport.performGraphQLRequest(credentials, request_body, operation_name, logDebugEvent)
+local function performGraphQLRequest(credentials, request_body, operation_name, options)
+    return transport.performGraphQLRequest(credentials, request_body, operation_name, logDebugEvent, options)
 end
 
 function SuwayomiAPI.setDebugLogger(logger)
     debug_logger = logger
+end
+
+function SuwayomiAPI.testConnection(credentials, options)
+    local result = performGraphQLRequest(
+        credentials,
+        SuwayomiAPI._buildConnectionTestQuery(),
+        "testConnection",
+        options
+    )
+    if not result.ok then
+        return result
+    end
+    return {
+        ok = true,
+    }
 end
 
 function SuwayomiAPI.fetchSources(credentials)

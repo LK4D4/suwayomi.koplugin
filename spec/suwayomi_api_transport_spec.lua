@@ -114,6 +114,32 @@ describe("suwayomi/api/transport", function()
         assert.are.equal("response", events[1].event)
     end)
 
+    it("allows GraphQL callers to use a shorter request timeout", function()
+        install_ltn12()
+        local request = {}
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    request.timeout = options.timeout
+                    options.sink([[{"data":{"ok":true}}]])
+                    return 1, 200
+                end,
+            }
+        end
+
+        local result = transport.performGraphQLRequest(
+            valid_credentials(),
+            [[{"query":"query { __typename }"}]],
+            "testConnection",
+            nil,
+            { timeout_seconds = 5 }
+        )
+
+        assert.is_true(result.ok)
+        assert.are.equal(5, request.timeout)
+    end)
+
     it("returns transport errors for missing URLs and non-200 GraphQL responses", function()
         forbid_ltn12()
         local missing = transport.performGraphQLRequest({}, "{}", "missing")
@@ -250,7 +276,7 @@ describe("suwayomi/api/transport", function()
         local result = transport.performGraphQLRequest(valid_credentials(), "{}", "slowOperation")
 
         assert.are.equal(false, result.ok)
-        assert.are.equal("Could not reach the Suwayomi server: response timeout", result.error)
+        assert.are.equal("Connection timed out while waiting for Suwayomi.", result.error)
     end)
 
     it("uses socket.http for absolute http page URLs without rewriting them", function()

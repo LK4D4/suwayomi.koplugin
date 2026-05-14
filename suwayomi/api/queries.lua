@@ -26,6 +26,12 @@ function Queries._buildSourcesQuery()
     })
 end
 
+function Queries._buildConnectionTestQuery()
+    return json.encode({
+        query = "query { __typename }",
+    })
+end
+
 function Queries._buildLegacySourcesQuery()
     return json.encode({
         query = "query getSources { sources { nodes { id name displayName lang } } }",

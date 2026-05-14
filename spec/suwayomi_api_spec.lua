@@ -158,6 +158,15 @@ describe("suwayomi/api facade", function()
         assert.are.equal("legacy_source_query_retry", events[2].event)
     end)
 
+    it("tests connection with a lightweight GraphQL request", function()
+        local request = install_graphql_stub([[{"data":{"__typename":"Query"}}]])
+
+        local result = api.testConnection(valid_credentials())
+
+        assert.is_true(result.ok)
+        assert.are.equal([[{"query":"query { __typename }"}]], request.bodies[1])
+    end)
+
     it("fetches extensions and updates extension install state", function()
         local request = install_graphql_stub([[{"data":{"fetchExtensions":{"extensions":[{"pkgName":"pkg.mangadex","name":"MangaDex","lang":"all","versionName":"1.4.0","versionCode":140,"isNsfw":true,"isInstalled":false,"hasUpdate":false,"isObsolete":false,"iconUrl":"/icons/md.png","apkName":"mangadex.apk","repo":"https://repo.example"}]}}}]])
 

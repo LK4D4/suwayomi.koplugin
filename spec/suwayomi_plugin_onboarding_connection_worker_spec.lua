@@ -14,18 +14,15 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
 
     after_each(clearModules)
 
-    it("tests connection by fetching sources with supplied credentials", function()
+    it("tests connection with a lightweight API probe", function()
         clearModules()
         package.preload["suwayomi/api"] = function()
             return {
-                fetchSources = function(credentials)
+                testConnection = function(credentials, options)
                     assert.are.equal("https://suwayomi.example", credentials.server_url)
+                    assert.are.equal(5, options.timeout_seconds)
                     return {
                         ok = true,
-                        sources = {
-                            { id = "mangadex" },
-                            { id = "local" },
-                        },
                     }
                 end,
             }
@@ -48,8 +45,40 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
         local result = worker:run({ server_url = "https://suwayomi.example" }, "/tmp/result.json")
 
         assert.is_true(result.ok)
-        assert.are.equal(2, result.source_count)
-        assert.are.equal("Connection test passed. Found 2 sources.", result.message)
+        assert.are.equal("Connection test passed.", result.message)
+    end)
+
+    it("retries transient connection test timeouts", function()
+        clearModules()
+        local attempts = 0
+        package.preload["suwayomi/api"] = function()
+            return {
+                testConnection = function()
+                    attempts = attempts + 1
+                    if attempts < 3 then
+                        return {
+                            ok = false,
+                            error = "Connection timed out while waiting for Suwayomi.",
+                        }
+                    end
+                    return { ok = true }
+                end,
+            }
+        end
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                writeResult = function(_, result)
+                    return result
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/plugin/onboarding_connection_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, "/tmp/result.json")
+
+        assert.is_true(result.ok)
+        assert.are.equal(3, attempts)
+        assert.are.equal("Connection test passed after retry.", result.message)
     end)
 
     it("returns readable failure for missing server url", function()

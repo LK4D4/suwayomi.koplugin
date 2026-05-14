@@ -165,8 +165,9 @@ function Transport.buildChapterArchiveDownloadURL(server_url, chapter_id)
     )
 end
 
-function Transport.performGraphQLRequest(credentials, request_body, operation_name, log_debug_event)
+function Transport.performGraphQLRequest(credentials, request_body, operation_name, log_debug_event, options)
     local server_url = credentials and credentials.server_url
+    options = options or {}
 
     if not server_url or server_url == "" then
         return {
@@ -196,7 +197,7 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
         sink = buildGuardedTableSink(response_chunks, {
             max_bytes = MAX_GRAPHQL_RESPONSE_BYTES,
         }),
-        timeout = REQUEST_TIMEOUT_SECONDS,
+        timeout = options.timeout_seconds or REQUEST_TIMEOUT_SECONDS,
     }
 
     local response_body = table.concat(response_chunks)

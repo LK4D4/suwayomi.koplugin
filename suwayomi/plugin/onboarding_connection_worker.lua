@@ -9,20 +9,43 @@ local SuwayomiAPI = require("suwayomi/api")
 local SubprocessJob = require("suwayomi/subprocess/job")
 
 local OnboardingConnectionWorker = {}
+local CONNECTION_TEST_ATTEMPTS = 3
+local CONNECTION_TEST_TIMEOUT_SECONDS = 5
 
-local function countSources(sources)
-    local count = 0
-    for _, _ in ipairs(sources or {}) do
-        count = count + 1
-    end
-    return count
+local function isTransientConnectionError(error_message)
+    error_message = tostring(error_message or ""):lower()
+    return error_message:match("timed out") ~= nil
+        or error_message:match("could not reach") ~= nil
 end
 
-local function successMessage(source_count)
-    if source_count == 1 then
-        return "Connection test passed. Found 1 source."
+local function runConnectionTest(credentials)
+    local last_response
+    for attempt = 1, CONNECTION_TEST_ATTEMPTS do
+        local response
+        if SuwayomiAPI.testConnection then
+            response = SuwayomiAPI.testConnection(credentials, {
+                timeout_seconds = CONNECTION_TEST_TIMEOUT_SECONDS,
+            })
+        else
+            response = SuwayomiAPI.fetchSources(credentials)
+        end
+        response = response or {}
+        if response.ok == true then
+            return response, attempt
+        end
+        last_response = response
+        if not isTransientConnectionError(response.error) then
+            break
+        end
     end
-    return "Connection test passed. Found " .. tostring(source_count) .. " sources."
+    return last_response or { ok = false, error = "Could not connect to Suwayomi." }, CONNECTION_TEST_ATTEMPTS
+end
+
+local function successMessage(attempt)
+    if attempt and attempt > 1 then
+        return "Connection test passed after retry."
+    end
+    return "Connection test passed."
 end
 
 local function normalizeResult(result)
@@ -50,13 +73,12 @@ function OnboardingConnectionWorker:run(credentials, result_path)
             error = "Enter a Suwayomi server URL first.",
         }
     else
-        local response = SuwayomiAPI.fetchSources(credentials) or {}
+        local response, attempt = runConnectionTest(credentials)
         if response.ok == true then
-            local source_count = countSources(response.sources)
             result = {
                 ok = true,
-                source_count = source_count,
-                message = successMessage(source_count),
+                source_count = 0,
+                message = successMessage(attempt),
             }
         else
             result = {
