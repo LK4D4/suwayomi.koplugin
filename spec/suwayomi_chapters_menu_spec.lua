@@ -12,6 +12,25 @@ describe("suwayomi/chapters/menu", function()
         })
     end)
 
+    it("labels one-shot downloads separately from download-ahead buffers", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local plugin = {}
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+
+        local actions = plugin:getBulkDownloadActions()
+
+        assert.are.equal("Download next 5", actions[1].text)
+        assert.are.equal("Download next 10", actions[2].text)
+        assert.are.equal("Download next 50", actions[3].text)
+        assert.are.equal("Keep next 5 downloaded", actions[4].text)
+        assert.are.equal("Keep next 10 downloaded", actions[5].text)
+        assert.are.equal("Keep next 50 downloaded", actions[6].text)
+    end)
+
     it("builds chapter title actions through the shared title menu", function()
         helper.stubControllerDependencies()
         package.loaded["suwayomi/chapters/menu"] = nil
@@ -102,7 +121,7 @@ describe("suwayomi/chapters/menu", function()
                 return { { id = "scanlator_filter_all", text = "All" } }
             end,
             getBulkDownloadActions = function()
-                return { { id = "download_next_5_unread", text = "Download 5 unread" } }
+                return { { id = "download_next_5_unread", text = "Download next 5" } }
             end,
         }
         for name, method in pairs(ChapterMenu.methods) do

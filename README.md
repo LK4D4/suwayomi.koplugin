@@ -25,7 +25,7 @@ This plugin is experimental and still under active development.
 - Source-scoped download layout: `<download directory>/<source>/<manga>/<chapter>.cbz`
 - Download individual chapters as `.cbz`
 - Chapter actions menu with `Open`, `Download`, `Delete from device`, and `Mark as read` / `Mark as unread`
-- Bulk chapter menu actions for selected chapters, `Download next 5/10/50 unread`, per-manga `Keep next 5/10/50 unread` auto-refill buffers, and deleting read chapters
+- Bulk chapter menu actions for selected chapters, one-shot `Download next 5/10/50` commands, per-manga `Keep next 5/10/50 downloaded` auto-refill buffers, and deleting read chapters
 - Downloads settings can delete local chapter files after manual mark-read actions or after finishing chapters while reading
 - Chapter action to mark the selected chapter and all previous chapters as read, useful for setting up a clean device from an existing reading position
 - Batch downloads queue chapters in the visible chapter-list order
@@ -78,7 +78,7 @@ Manual installation:
 11. Tap a manga result to open manga actions, or tap a chapter to open the chapter actions dialog.
 12. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
 13. Tap **Downloads** from the hub to inspect active, queued, and failed KOReader-local jobs.
-14. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to download or keep the next unread chapters.
+14. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to queue a one-shot **Download next** batch or enable a **Download ahead** buffer.
 
 ## Remote Source Notes
 

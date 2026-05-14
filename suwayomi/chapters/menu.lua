@@ -304,12 +304,12 @@ end
 function Methods:getBulkDownloadActions()
     local actions = {}
 
-    table.insert(actions, { id = "download_next_5_unread", text = _("Download 5 unread") })
-    table.insert(actions, { id = "download_next_10_unread", text = _("Download 10 unread") })
-    table.insert(actions, { id = "download_next_50_unread", text = _("Download 50 unread") })
-    table.insert(actions, { id = "keep_next_5_unread", text = _("Keep 5 unread") })
-    table.insert(actions, { id = "keep_next_10_unread", text = _("Keep 10 unread") })
-    table.insert(actions, { id = "keep_next_50_unread", text = _("Keep 50 unread") })
+    table.insert(actions, { id = "download_next_5_unread", text = _("Download next 5") })
+    table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10") })
+    table.insert(actions, { id = "download_next_50_unread", text = _("Download next 50") })
+    table.insert(actions, { id = "keep_next_5_unread", text = _("Keep next 5 downloaded") })
+    table.insert(actions, { id = "keep_next_10_unread", text = _("Keep next 10 downloaded") })
+    table.insert(actions, { id = "keep_next_50_unread", text = _("Keep next 50 downloaded") })
 
     return actions
 end
