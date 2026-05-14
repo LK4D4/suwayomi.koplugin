@@ -17,33 +17,34 @@ local function resetModules()
     end
 end
 
-local function stubDependencies()
+local function stubDependencies(options)
+    options = options or {}
     helper.stubControllerDependencies()
     ui_calls = {}
 
     package.preload["suwayomi/ui"] = function()
         return {
-            showExtensionsMenu = function(extensions, onSelect, options)
+            showExtensionsMenu = function(extensions, onSelect, menu_options)
                 ui_calls.extensions_menu = {
                     extensions = extensions,
                     onSelect = onSelect,
-                    options = options,
+                    options = menu_options,
                 }
                 return { kind = "extensions-menu" }
             end,
-            updateExtensionsMenu = function(menu, extensions, onSelect, options)
+            updateExtensionsMenu = function(menu, extensions, onSelect, menu_options)
                 ui_calls.updated_extensions_menu = {
                     menu = menu,
                     extensions = extensions,
                     onSelect = onSelect,
-                    options = options,
+                    options = menu_options,
                 }
             end,
-            showExtensionActionMenu = function(extension, onSelect, options)
+            showExtensionActionMenu = function(extension, onSelect, menu_options)
                 ui_calls.extension_actions = {
                     extension = extension,
                     onSelect = onSelect,
-                    options = options,
+                    options = menu_options,
                 }
                 return { kind = "extension-actions-menu" }
             end,
@@ -60,7 +61,7 @@ local function stubDependencies()
     package.preload["suwayomi/settings"] = function()
         return {
             load = function()
-                return { server_url = "https://suwayomi.example" }
+                return options.credentials or { server_url = "https://suwayomi.example" }
             end,
         }
     end
@@ -73,9 +74,9 @@ local function stubDependencies()
     end
 end
 
-local function loadExtensions()
+local function loadExtensions(options)
     resetModules()
-    stubDependencies()
+    stubDependencies(options)
     return require("suwayomi/browse/extensions")
 end
 
@@ -145,6 +146,23 @@ describe("suwayomi/browse/extensions", function()
         assert(type(extensions.methods.showExtensionActions) == "function")
         assert(type(extensions.methods.startExtensionWorker) == "function")
         assert(type(extensions.methods.pollExtensionWorker) == "function")
+    end)
+
+    it("opens onboarding setup when extension credentials are missing", function()
+        local extensions = loadExtensions({ credentials = { server_url = "" } })
+        local controller = buildController(extensions, {
+            showOnboardingSetup = function(self, options)
+                self.setup_options = options
+            end,
+            startExtensionWorker = function()
+                error("unexpected worker")
+            end,
+        })
+
+        controller:showExtensions()
+
+        assert.are.equal("Set up your Suwayomi server login first.", controller.messages[#controller.messages])
+        assert.is_true(controller.setup_options.first_run)
     end)
 
     it("renders fetched extension rows with refresh action", function()

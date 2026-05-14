@@ -63,6 +63,7 @@ local function newClient(options)
     local opened_manga
     local shown_manga_actions
     local scheduled_sync_credentials
+    local shown_onboarding_setup
     local log_events = {}
     local tracked_screens = {}
     local network_requests
@@ -120,6 +121,9 @@ local function newClient(options)
             showMessage = function(_, message)
                 table.insert(shown_messages, message)
             end,
+            showOnboardingSetup = function(_, setup_options)
+                shown_onboarding_setup = setup_options or {}
+            end,
             showChaptersForManga = function(_, manga)
                 opened_manga = manga
             end,
@@ -167,6 +171,9 @@ local function newClient(options)
         end,
         scheduled_sync_credentials = function()
             return scheduled_sync_credentials
+        end,
+        shown_onboarding_setup = function()
+            return shown_onboarding_setup
         end,
         tracked_screens = tracked_screens,
     }

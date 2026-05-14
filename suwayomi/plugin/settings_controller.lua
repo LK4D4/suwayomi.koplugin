@@ -8,6 +8,8 @@
 local UIManager = require("ui/uimanager")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
+local OnboardingConnectionWorker = require("suwayomi/plugin/onboarding_connection_worker")
+local SubprocessJob = require("suwayomi/subprocess/job")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
 local T = FFIUtil.template
@@ -56,6 +58,165 @@ function Methods:showLoginDialog(touchmenu_instance)
             end)
         end,
     })
+end
+
+
+function Methods:getOnboardingCredentialsKey(credentials)
+    credentials = credentials or {}
+    return table.concat({
+        tostring(credentials.server_url or ""),
+        tostring(credentials.username or ""),
+        tostring(credentials.password or ""),
+        tostring(credentials.auth_method or "basic_auth"),
+    }, "\n")
+end
+
+
+function Methods:needsOnboardingSetup()
+    local credentials = SuwayomiSettings:load()
+    if not credentials.server_url or credentials.server_url == "" then
+        return true
+    end
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    return not download_directory or download_directory == ""
+end
+
+
+function Methods:getOnboardingConnectionResultPath()
+    return SubprocessJob.buildResultPath("onboarding_connection")
+end
+
+
+function Methods:startOnboardingConnectionTest(credentials)
+    if self.onboarding_connection_test_active then
+        self:showMessage(_("Connection test already running."))
+        return false
+    end
+
+    local active = {
+        credentials = credentials,
+        result_path = self:getOnboardingConnectionResultPath(),
+        loading_message = self:showLoadingMessage(_("Testing Suwayomi connection...")),
+    }
+    active = SubprocessJob.start({
+        active = active,
+        ffi_util = FFIUtil,
+        ui_manager = UIManager,
+        poll_interval_seconds = self.onboarding_connection_poll_interval_seconds or 0.5,
+        timeout_seconds = self.onboarding_connection_timeout_seconds or 60,
+        run = function(path)
+            OnboardingConnectionWorker:run(credentials, path)
+        end,
+        read_result = function(path)
+            return OnboardingConnectionWorker:readResult(path)
+        end,
+        on_finish = function(finished_active, result)
+            self:finishOnboardingConnectionTest(finished_active, result)
+        end,
+        on_timeout = function()
+            self:showMessage(_("Suwayomi connection test timed out."))
+        end,
+        on_error = function(err)
+            self.onboarding_connection_test_active = nil
+            self:closeLoadingMessage(active.loading_message)
+            self:showMessage(T(_("Could not start connection test: %1"), err or _("unknown error")))
+        end,
+    })
+    self.onboarding_connection_test_active = active and not active.cleaned and active or nil
+    return active ~= nil
+end
+
+
+function Methods:finishOnboardingConnectionTest(active, result)
+    self.onboarding_connection_test_active = nil
+    self:closeLoadingMessage(active and active.loading_message)
+    if result and result.ok == true then
+        self.onboarding_connection_test_key = self:getOnboardingCredentialsKey(active and active.credentials)
+        self:showMessage(result.message or _("Connection test passed."))
+        return
+    end
+    self:showMessage((result and result.error) or _("Could not connect to Suwayomi."))
+end
+
+
+function Methods:pollOnboardingConnectionTest()
+    SubprocessJob.poll(self.onboarding_connection_test_active)
+end
+
+
+function Methods:getOnboardingDialogCredentials()
+    local credentials = SuwayomiSettings:load()
+    if not credentials.server_url or credentials.server_url == "" then
+        credentials.server_url = "https://"
+    end
+    return credentials
+end
+
+
+function Methods:finishOnboardingSetup()
+    self:showMessage(_("Suwayomi setup complete."))
+    if self.showHome then
+        UIManager:nextTick(function()
+            self:showHome()
+        end)
+    end
+end
+
+
+function Methods:showOnboardingDirectoryStep()
+    self:chooseDownloadDirectory(function()
+        self:finishOnboardingSetup()
+    end, { next_tick = true })
+end
+
+
+function Methods:showOnboardingConnectionStep(options)
+    options = options or {}
+    return SuwayomiUI.showOnboardingConnectionDialog({
+        credentials = self:getOnboardingDialogCredentials(),
+        onTestConnection = function(credentials)
+            self:startOnboardingConnectionTest(credentials)
+        end,
+        onContinue = function(credentials)
+            if options.first_run ~= false
+                and self.onboarding_connection_test_key ~= self:getOnboardingCredentialsKey(credentials)
+            then
+                self:showMessage(_("Test connection before continuing."))
+                return false
+            end
+
+            local saved_credentials = SuwayomiSettings:save(credentials)
+            self:showMessage(T(_("Suwayomi login settings saved for %1."), saved_credentials.server_url))
+            local download_directory = SuwayomiSettings:loadDownloadDirectory()
+            if not download_directory or download_directory == "" then
+                UIManager:nextTick(function()
+                    self:showOnboardingDirectoryStep(options)
+                end)
+            else
+                UIManager:nextTick(function()
+                    self:finishOnboardingSetup()
+                end)
+            end
+            return true
+        end,
+    })
+end
+
+
+function Methods:showOnboardingSetup(options)
+    options = options or {}
+    local credentials = SuwayomiSettings:load()
+    if options.first_run == false then
+        return self:showOnboardingConnectionStep(options)
+    end
+    if not credentials.server_url or credentials.server_url == "" then
+        return self:showOnboardingConnectionStep(options)
+    end
+    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    if not download_directory or download_directory == "" then
+        return self:showOnboardingDirectoryStep(options)
+    end
+    self:finishOnboardingSetup()
 end
 
 
@@ -252,6 +413,13 @@ function Methods:buildSettingsMenu()
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:showLoginDialog(touchmenu_instance)
+                    end,
+                },
+                {
+                    text = _("Setup wizard"),
+                    keep_menu_open = true,
+                    callback = function()
+                        self:showOnboardingSetup({ first_run = false })
                     end,
                 },
             },

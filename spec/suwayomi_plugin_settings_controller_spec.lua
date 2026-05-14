@@ -6,6 +6,8 @@ local modules_to_clear = {
     "ffi/util",
     "gettext",
     "ui/uimanager",
+    "suwayomi/subprocess/job",
+    "suwayomi/plugin/onboarding_connection_worker",
     "suwayomi/settings",
     "suwayomi/ui",
     "suwayomi/plugin/settings_controller",
@@ -35,6 +37,8 @@ local function installController(options)
             delete_finished_while_reading = 0,
         },
         saved_category_behavior = options.category_behavior or "automatic",
+        credentials = options.credentials or { server_url = "https://suwayomi.example" },
+        download_directory = options.download_directory or "",
     }
 
     package.preload.gettext = function()
@@ -63,10 +67,11 @@ local function installController(options)
     package.preload["suwayomi/settings"] = function()
         local settings = {
             load = function()
-                return { server_url = "https://suwayomi.example" }
+                return state.credentials
             end,
             save = function(_, credentials)
                 state.saved_credentials = credentials
+                state.credentials = credentials
                 return credentials
             end,
             loadSourceLanguages = function()
@@ -84,7 +89,7 @@ local function installController(options)
                 return browse_settings
             end,
             loadDownloadDirectory = function()
-                return ""
+                return state.download_directory
             end,
             loadMaxParallelChapterDownloads = function()
                 return state.saved_parallel
@@ -122,6 +127,9 @@ local function installController(options)
             end,
             showLoginDialog = function(dialog_options)
                 state.login_dialog_options = dialog_options
+            end,
+            showOnboardingConnectionDialog = function(dialog_options)
+                state.onboarding_connection_options = dialog_options
             end,
             showLanguageMenu = function(menu_options)
                 state.language_menu_options = menu_options
@@ -161,6 +169,26 @@ local function installController(options)
             end,
         }
     end
+    package.preload["suwayomi/subprocess/job"] = function()
+        return {
+            buildResultPath = function()
+                return "/mock/settings/suwayomi_dl_onboarding_connection.json"
+            end,
+            start = function(job_options)
+                state.started_connection_job = job_options
+                return job_options.active
+            end,
+            poll = function() end,
+        }
+    end
+    package.preload["suwayomi/plugin/onboarding_connection_worker"] = function()
+        return {
+            run = function() end,
+            readResult = function()
+                return { ok = true, message = "Connection test passed." }
+            end,
+        }
+    end
 
     local controller = require("suwayomi/plugin/settings_controller")
     local plugin = {
@@ -172,6 +200,13 @@ local function installController(options)
     end
     function plugin:showMessage(message)
         table.insert(self.messages, message)
+    end
+    function plugin:showLoadingMessage(message)
+        state.loading_message = { message = message }
+        return state.loading_message
+    end
+    function plugin:closeLoadingMessage(message)
+        state.closed_loading_message = message
     end
     function plugin:getDownloadDirectorySummary()
         return "not set"
@@ -197,6 +232,8 @@ describe("suwayomi/plugin/settings_controller", function()
         helper.assertControllerModule("suwayomi/plugin/settings_controller", {
             "showSettings",
             "showLoginDialog",
+            "showOnboardingSetup",
+            "startOnboardingConnectionTest",
             "showDownloadDirectoryDialog",
             "buildSettingsMenu",
         })
@@ -211,6 +248,7 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("Browse", menu[3].text)
         assert.are.equal("Downloads", menu[4].text)
         assert.are.equal("Login information", menu[1].sub_item_table[1].text)
+        assert.are.equal("Setup wizard", menu[1].sub_item_table[2].text)
         assert.is_true(menu[1].sub_item_table[1].keep_menu_open)
 
         menu[1].sub_item_table[1].callback(state.touchmenu)
@@ -219,6 +257,75 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("https://new.example", state.saved_credentials.server_url)
         assert.are.equal(1, state.refresh_count)
         assert.are.equal("Suwayomi login settings saved for https://new.example.", state.messages[#state.messages])
+    end)
+
+    it("runs first-run setup as connection test then download folder", function()
+        local plugin, state = installController({
+            credentials = { server_url = "" },
+            download_directory = "",
+        })
+        plugin.startOnboardingConnectionTest = function(self, credentials)
+            state.tested_credentials = credentials
+            self.onboarding_connection_test_key = self:getOnboardingCredentialsKey(credentials)
+        end
+
+        assert.is_true(plugin:needsOnboardingSetup())
+        plugin:showOnboardingSetup({ first_run = true })
+
+        assert.are.equal("https://", state.onboarding_connection_options.credentials.server_url)
+        assert.is_false(state.onboarding_connection_options.onContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
+        assert.are.equal("Test connection before continuing.", state.messages[#state.messages])
+        assert.is_nil(state.saved_credentials)
+
+        state.onboarding_connection_options.onTestConnection({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        })
+        assert.is_true(state.onboarding_connection_options.onContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
+
+        assert.are.equal("https://suwayomi.example", state.saved_credentials.server_url)
+        assert.truthy(state.choose_download_callback)
+
+        state.choose_download_callback("/storage/emulated/0/Books/Manga")
+
+        assert.are.equal("Suwayomi setup complete.", state.messages[#state.messages])
+    end)
+
+    it("lets settings setup wizard retest an already configured connection", function()
+        local plugin, state = installController({
+            credentials = { server_url = "https://suwayomi.example" },
+            download_directory = "/storage/emulated/0/Books/Manga",
+        })
+
+        plugin:showOnboardingSetup({ first_run = false })
+
+        assert.truthy(state.onboarding_connection_options)
+        assert.are.equal("https://suwayomi.example", state.onboarding_connection_options.credentials.server_url)
+    end)
+
+    it("uses a device-friendly timeout for onboarding connection tests", function()
+        local plugin, state = installController()
+
+        plugin:startOnboardingConnectionTest({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        })
+
+        assert.are.equal(60, state.started_connection_job.timeout_seconds)
     end)
 
     it("keeps source language filtering out of plugin settings", function()

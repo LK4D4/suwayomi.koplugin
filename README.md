@@ -69,17 +69,18 @@ Manual installation:
 
 1. Open the **Search** tab in KOReader's top menu.
 2. Tap **Suwayomi** to open the hub.
-3. First time use: Tap **Settings** > **Connection** > **Login information** to enter your Suwayomi server URL, username, and password.
-4. Optionally tap **Sync** to flush any pending local read/unread changes.
-5. Optionally tap **Settings** > **Browse** to filter source languages, show/hide NSFW sources, or hide in-library source results.
-6. Tap **Settings** > **Downloads** > **Download directory** to choose where manga will be downloaded. The same Downloads settings section also controls optional local-file deletion after mark-read or finished-reading events.
-7. Tap **Library** to open manga already in your Suwayomi library, or **Browse** to explore sources.
-8. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, or **Search**.
-9. Use **Next page** and **Previous page** on source result pages when available.
-10. Use the title-bar burger menu on Suwayomi Library/Browse/Search screens to return to the hub.
-11. Tap a manga result to open manga actions, or tap a chapter to open the chapter actions dialog.
-12. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
-13. Tap **Downloads** from the hub to inspect active, queued, and failed KOReader-local jobs.
+3. First time use opens **Suwayomi setup**. Enter your server URL, username, and password, tap **Test connection**, then choose the download folder used for KOReader-local CBZ files.
+4. To re-run setup later, tap **Settings** > **Connection** > **Setup wizard**. To edit only the saved login, tap **Settings** > **Connection** > **Login information**.
+5. Optionally tap **Sync** to flush any pending local read/unread changes.
+6. Optionally tap **Settings** > **Browse** to filter source languages, show/hide NSFW sources, or hide in-library source results.
+7. Tap **Settings** > **Downloads** > **Download directory** to change where manga will be downloaded. The same Downloads settings section also controls optional local-file deletion after mark-read or finished-reading events.
+8. Tap **Library** to open manga already in your Suwayomi library, or **Browse** to explore sources.
+9. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, or **Search**.
+10. Use **Next page** and **Previous page** on source result pages when available.
+11. Use the title-bar burger menu on Suwayomi Library/Browse/Search screens to return to the hub.
+12. Tap a manga result to open manga actions, or tap a chapter to open the chapter actions dialog.
+13. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
+14. Tap **Downloads** from the hub to inspect active, queued, and failed KOReader-local jobs.
 14. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to queue a one-shot **Download next** batch or enable a **Download ahead** buffer.
 
 ## Remote Source Notes

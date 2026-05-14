@@ -230,6 +230,10 @@ function Methods:addToMainMenu(menu_items)
         sorting_hint = "search",
         callback = function(menu)
             self:closeMenu(menu)
+            if self.needsOnboardingSetup and self:needsOnboardingSetup() then
+                self:showOnboardingSetup({ first_run = true })
+                return
+            end
             self:showHome()
         end,
     }

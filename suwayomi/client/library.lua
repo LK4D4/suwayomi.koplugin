@@ -209,6 +209,9 @@ function SuwayomiClient:showLibrary()
         local credentials = self.settings:load()
         if not credentials.server_url or credentials.server_url == "" then
             self.plugin:showMessage(self:translate("Set up your Suwayomi server login first."))
+            if self.plugin.showOnboardingSetup then
+                self.plugin:showOnboardingSetup({ first_run = true })
+            end
             return
         end
         if self.plugin.schedulePendingReadSync then

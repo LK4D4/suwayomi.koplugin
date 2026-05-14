@@ -1,5 +1,6 @@
 .worktrees/
 .codex-tmp/
+.superpowers/
 tmp-uiqa/
 docs/superpowers/plans/
 .tmp-*/

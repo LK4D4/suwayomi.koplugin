@@ -37,7 +37,8 @@ Core plugin shell:
 - `suwayomi/reader_return.lua`: reader-menu shortcut state and async chapter reload for returning from an opened CBZ to the originating Suwayomi chapter list.
 - `suwayomi/plugin/home.lua`: Suwayomi hub and main-menu entry behavior.
 - `suwayomi/plugin/title_menu.lua`: shared title-bar burger menus for full-screen plugin screens, including the universal Suwayomi home action.
-- `suwayomi/plugin/settings_controller.lua`: grouped Settings menus and settings action routing.
+- `suwayomi/plugin/settings_controller.lua`: grouped Settings menus, setup wizard orchestration, connection-test state, and settings action routing.
+- `suwayomi/plugin/onboarding_connection_worker.lua`: subprocess-safe Suwayomi connection probe used by the setup wizard.
 
 API:
 
@@ -110,7 +111,7 @@ common changes and the specs that usually cover them.
 
 | Change area | Start here | Usually covered by |
 | --- | --- | --- |
-| KOReader plugin lifecycle, dispatcher actions, menu entry, or dependency construction | `main.lua`, `suwayomi/plugin/home.lua`, `suwayomi/plugin/settings_controller.lua`, `suwayomi/plugin/title_menu.lua` | `spec/main_spec.lua`, plugin controller specs |
+| KOReader plugin lifecycle, dispatcher actions, menu entry, setup wizard, or dependency construction | `main.lua`, `suwayomi/plugin/home.lua`, `suwayomi/plugin/settings_controller.lua`, `suwayomi/plugin/onboarding_connection_worker.lua`, `suwayomi/plugin/title_menu.lua` | `spec/main_spec.lua`, plugin controller specs, `spec/suwayomi_plugin_onboarding_connection_worker_spec.lua` |
 | GraphQL fields, mutations, response normalization, response timeout/byte limits, or legacy-schema fallback | `suwayomi/api/queries.lua`, `suwayomi/api/parsers.lua`, `suwayomi/api.lua`, `suwayomi/api/transport.lua` | API specs |
 | Browse source list, source cache, source language/NSFW filtering, or source refresh | `suwayomi/browse/source_catalog.lua`, `suwayomi/browse/controller.lua`, `suwayomi/settings.lua` | `spec/suwayomi_browse_*`, settings specs |
 | Source extension list, install/update/uninstall actions, or post-action source-cache refresh | `suwayomi/browse/extensions.lua`, `suwayomi/browse/extension_worker.lua`, `suwayomi/api/queries.lua`, `suwayomi/api/parsers.lua` | `spec/suwayomi_browse_extensions_spec.lua`, `spec/suwayomi_extension_worker_spec.lua`, API specs |

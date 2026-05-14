@@ -320,6 +320,61 @@ describe("suwayomi/ui", function()
         assert.are.equal(shown_dialog, closed_dialog)
     end)
 
+    it("shows onboarding connection dialog with test and continue actions", function()
+        local ui = require("suwayomi/ui")
+        local tested_credentials
+        local continued_credentials
+
+        ui.showOnboardingConnectionDialog({
+            credentials = {
+                server_url = "https://saved.example",
+                username = "saved-user",
+                password = "saved-pass",
+            },
+            onTestConnection = function(credentials)
+                tested_credentials = credentials
+            end,
+            onContinue = function(credentials)
+                continued_credentials = credentials
+            end,
+        })
+
+        assert.are.equal("Suwayomi setup: connection", shown_dialog.title)
+        assert.are.equal("Server URL", shown_dialog.fields[1].hint)
+        assert.are.equal("https://saved.example", shown_dialog.fields[1].text)
+        assert.are.equal("Username", shown_dialog.fields[2].hint)
+        assert.are.equal("Password", shown_dialog.fields[3].hint)
+        assert.are.equal("Test connection", shown_dialog.buttons[1][2].text)
+        assert.are.equal("Continue", shown_dialog.buttons[2][1].text)
+
+        shown_dialog.buttons[1][2].callback()
+        shown_dialog.buttons[2][1].callback()
+
+        assert.are.equal("https://suwayomi.example", tested_credentials.server_url)
+        assert.are.equal("alice", tested_credentials.username)
+        assert.are.equal("secret", tested_credentials.password)
+        assert.are.equal("basic_auth", tested_credentials.auth_method)
+        assert.are.equal("https://suwayomi.example", continued_credentials.server_url)
+        assert.are.equal(shown_dialog, closed_dialog)
+    end)
+
+    it("keeps onboarding dialog open when continue validation fails", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showOnboardingConnectionDialog({
+            credentials = {
+                server_url = "https://saved.example",
+            },
+            onContinue = function()
+                return false
+            end,
+        })
+
+        shown_dialog.buttons[2][1].callback()
+
+        assert.is_nil(closed_dialog)
+    end)
+
     it("shows a chapter menu", function()
         local ui = require("suwayomi/ui")
         local selected = {}

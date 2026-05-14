@@ -54,6 +54,7 @@ describe("suwayomi/client library flows", function()
         client:showLibrary()
 
         assert.are.equal("Set up your Suwayomi server login first.", state.shown_messages[#state.shown_messages])
+        assert.is_true(state.shown_onboarding_setup().first_run)
         assert.is_nil(state.scheduled_sync_credentials())
     end)
 

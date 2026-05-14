@@ -196,6 +196,9 @@ function Methods:showExtensions()
     local credentials = SuwayomiSettings:load()
     if credentials.server_url == "" then
         self:showMessage(_("Set up your Suwayomi server login first."))
+        if self.showOnboardingSetup then
+            self:showOnboardingSetup({ first_run = true })
+        end
         return
     end
     return self:startExtensionWorker(credentials, {

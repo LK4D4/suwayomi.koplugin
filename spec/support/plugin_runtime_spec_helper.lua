@@ -246,6 +246,9 @@ function Helper.install(options)
             loadMaxParallelChapterDownloads = function()
                 return options.max_parallel_chapter_downloads or 2
             end,
+            loadDownloadDirectory = function()
+                return options.download_directory or "/books"
+            end,
             loadDownloadQueue = function()
                 return {}
             end,

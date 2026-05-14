@@ -659,4 +659,79 @@ function SuwayomiUI.showLoginDialog(options)
     dialog:onShowKeyboard()
 end
 
+local function getCredentialsFromDialog(dialog)
+    local fields = dialog:getFields()
+    return {
+        server_url = fields[1],
+        username = fields[2],
+        password = fields[3],
+        auth_method = "basic_auth",
+    }
+end
+
+function SuwayomiUI.showOnboardingConnectionDialog(options)
+    options = options or {}
+    local credentials = options.credentials or {}
+    local UIManager = require("ui/uimanager")
+    local dialog
+
+    dialog = MultiInputDialog:new{
+        title = _("Suwayomi setup: connection"),
+        fields = {
+            {
+                hint = _("Server URL"),
+                text = credentials.server_url or "",
+            },
+            {
+                hint = _("Username"),
+                text = credentials.username or "",
+            },
+            {
+                hint = _("Password"),
+                text = credentials.password or "",
+                text_type = "password",
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    id = "close",
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+                {
+                    text = _("Test connection"),
+                    callback = function()
+                        if options.onTestConnection then
+                            options.onTestConnection(getCredentialsFromDialog(dialog))
+                        end
+                    end,
+                },
+            },
+            {
+                {
+                    text = _("Continue"),
+                    is_enter_default = true,
+                    callback = function()
+                        local dialog_credentials = getCredentialsFromDialog(dialog)
+                        local should_close = true
+                        if options.onContinue then
+                            should_close = options.onContinue(dialog_credentials) ~= false
+                        end
+                        if should_close then
+                            UIManager:close(dialog)
+                        end
+                    end,
+                },
+            },
+        },
+    }
+
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+    return dialog
+end
+
 return SuwayomiUI
