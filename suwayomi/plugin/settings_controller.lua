@@ -201,7 +201,10 @@ function Methods:showOnboardingConnectionStep(options)
             local saved_credentials = SuwayomiSettings:save(credentials)
             self:showMessage(T(_("Suwayomi login settings saved for %1."), saved_credentials.server_url))
             local download_directory = SuwayomiSettings:loadDownloadDirectory()
-            if not download_directory or download_directory == "" then
+            local should_choose_directory = options.first_run == false
+                or not download_directory
+                or download_directory == ""
+            if should_choose_directory then
                 UIManager:nextTick(function()
                     self:showOnboardingDirectoryStep(options)
                 end)

@@ -308,7 +308,7 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("Suwayomi setup complete.", state.messages[#state.messages])
     end)
 
-    it("lets settings setup wizard retest an already configured connection", function()
+    it("lets settings setup wizard retest and change an already configured directory", function()
         local plugin, state = installController({
             credentials = { server_url = "https://suwayomi.example" },
             download_directory = "/storage/emulated/0/Books/Manga",
@@ -318,6 +318,13 @@ describe("suwayomi/plugin/settings_controller", function()
 
         assert.truthy(state.onboarding_connection_options)
         assert.are.equal("https://suwayomi.example", state.onboarding_connection_options.credentials.server_url)
+        assert.is_true(state.onboarding_connection_options.onContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
+        assert.truthy(state.choose_download_callback)
     end)
 
     it("uses a device-friendly timeout for onboarding connection tests", function()
