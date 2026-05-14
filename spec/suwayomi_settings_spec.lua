@@ -237,6 +237,36 @@ describe("suwayomi/settings", function()
         assert.are.equal(4, stored_data.max_parallel_chapter_downloads)
     end)
 
+    it("loads and saves automatic delete-after-read settings", function()
+        local settings = require("suwayomi/settings")
+
+        assert.are.same({
+            delete_after_mark_read = false,
+            delete_finished_while_reading = 0,
+        }, settings:loadDeleteChaptersSettings())
+
+        local saved = settings:saveDeleteChaptersSettings({
+            delete_after_mark_read = true,
+            delete_finished_while_reading = 3,
+        })
+
+        assert.is_true(flushed)
+        assert.are.same({
+            delete_after_mark_read = true,
+            delete_finished_while_reading = 3,
+        }, saved)
+        assert.are.same(saved, stored_data.delete_chapters_settings)
+
+        stored_data.delete_chapters_settings = {
+            delete_after_mark_read = "yes",
+            delete_finished_while_reading = "8",
+        }
+        assert.are.same({
+            delete_after_mark_read = false,
+            delete_finished_while_reading = 0,
+        }, settings:loadDeleteChaptersSettings())
+    end)
+
     it("loads and saves per-manga keep-next unread download limits", function()
         local settings = require("suwayomi/settings")
         local manga = { id = "m1", title = "Frieren" }

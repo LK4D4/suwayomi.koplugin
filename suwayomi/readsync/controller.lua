@@ -27,6 +27,28 @@ end
 
 local Methods = {}
 
+local function mangaFromLedgerEntry(entry)
+    if type(entry) ~= "table" or not entry.manga_id then
+        return nil
+    end
+    return {
+        id = tostring(entry.manga_id),
+        title = entry.manga_title or tostring(entry.manga_id),
+    }
+end
+
+local function chapterFromLedgerEntry(entry)
+    if type(entry) ~= "table" or not entry.chapter_id then
+        return nil
+    end
+    return {
+        id = tostring(entry.chapter_id),
+        name = entry.chapter_name or tostring(entry.chapter_id),
+        path = entry.path,
+        is_read = true,
+    }
+end
+
 function Methods:getReadSyncResultPath()
     return SubprocessJob.buildResultPath("read_sync")
 end
@@ -252,7 +274,15 @@ function Methods:onCloseDocument()
     local ledger = self:loadChapterLedger()
     for _, entry in pairs(ledger) do
         if entry.path == document_path then
-            self:markLedgerEntryRead(entry)
+            local already_read = entry.read == true
+            local marked = self:markLedgerEntryRead(entry)
+            if (marked or already_read) and self.deleteFinishedChaptersWhileReading then
+                local manga = mangaFromLedgerEntry(entry)
+                local chapter = chapterFromLedgerEntry(entry)
+                if manga and chapter then
+                    self:deleteFinishedChaptersWhileReading(manga, chapter)
+                end
+            end
             return
         end
     end

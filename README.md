@@ -26,6 +26,7 @@ This plugin is experimental and still under active development.
 - Download individual chapters as `.cbz`
 - Chapter actions menu with `Open`, `Download`, `Delete from device`, and `Mark as read` / `Mark as unread`
 - Bulk chapter menu actions for selected chapters, `Download next 5/10/50 unread`, per-manga `Keep next 5/10/50 unread` auto-refill buffers, and deleting read chapters
+- Downloads settings can delete local chapter files after manual mark-read actions or after finishing chapters while reading
 - Chapter action to mark the selected chapter and all previous chapters as read, useful for setting up a clean device from an existing reading position
 - Batch downloads queue chapters in the visible chapter-list order
 - Queued chapter downloads run in parallel with a conservative default of 2 active chapters
@@ -69,7 +70,7 @@ Manual installation:
 3. First time use: Tap **Settings** > **Connection** > **Login information** to enter your Suwayomi server URL, username, and password.
 4. Optionally tap **Sync** to flush any pending local read/unread changes.
 5. Optionally tap **Settings** > **Browse** to filter source languages, show/hide NSFW sources, or hide in-library source results.
-6. Tap **Settings** > **Downloads** > **Download directory** to choose where manga will be downloaded.
+6. Tap **Settings** > **Downloads** > **Download directory** to choose where manga will be downloaded. The same Downloads settings section also controls optional local-file deletion after mark-read or finished-reading events.
 7. Tap **Library** to open manga already in your Suwayomi library, or **Browse** to explore sources.
 8. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, or **Search**.
 9. Use **Next page** and **Previous page** on source result pages when available.

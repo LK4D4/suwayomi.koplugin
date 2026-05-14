@@ -119,6 +119,84 @@ function Methods:showParallelDownloadsDialog(touchmenu_instance)
     })
 end
 
+function Methods:loadDeleteChaptersSettings()
+    if SuwayomiSettings.loadDeleteChaptersSettings then
+        return SuwayomiSettings:loadDeleteChaptersSettings()
+    end
+    return {
+        delete_after_mark_read = false,
+        delete_finished_while_reading = 0,
+    }
+end
+
+function Methods:getDeleteChaptersSettingSummary(key)
+    local settings = self:loadDeleteChaptersSettings()
+    if key == "delete_after_mark_read" then
+        return settings.delete_after_mark_read and _("yes") or _("no")
+    end
+    if key == "delete_finished_while_reading" then
+        return self:getDeleteFinishedWhileReadingLabel(settings.delete_finished_while_reading)
+    end
+    return ""
+end
+
+function Methods:getDeleteFinishedWhileReadingLabel(value)
+    local labels = {
+        [0] = _("Disabled"),
+        [1] = _("Last read chapter"),
+        [2] = _("Second to last read chapter"),
+        [3] = _("Third to last read chapter"),
+        [4] = _("Fourth to last read chapter"),
+        [5] = _("Fifth to last read chapter"),
+    }
+    return labels[tonumber(value) or 0] or labels[0]
+end
+
+function Methods:toggleDeleteAfterMarkRead(touchmenu_instance)
+    if not SuwayomiSettings.saveDeleteChaptersSettings then
+        self:showMessage(_("Delete chapter settings are unavailable."))
+        return
+    end
+    local settings = self:loadDeleteChaptersSettings()
+    settings.delete_after_mark_read = not settings.delete_after_mark_read
+    SuwayomiSettings:saveDeleteChaptersSettings(settings)
+    self:refreshSettingsMenu(touchmenu_instance)
+    self:showMessage(_("Suwayomi delete chapter setting saved."))
+end
+
+function Methods:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
+    if not SuwayomiSettings.saveDeleteChaptersSettings then
+        self:showMessage(_("Delete chapter settings are unavailable."))
+        return
+    end
+
+    local delete_menu
+    local choices = { 0, 1, 2, 3, 4, 5 }
+    local function onSelect(value)
+        local settings = self:loadDeleteChaptersSettings()
+        settings.delete_finished_while_reading = value
+        local saved_settings = SuwayomiSettings:saveDeleteChaptersSettings(settings)
+        self:refreshSettingsMenu(touchmenu_instance)
+        self:showMessage(T(
+            _("Suwayomi delete-while-reading setting saved: %1"),
+            self:getDeleteFinishedWhileReadingLabel(saved_settings.delete_finished_while_reading)
+        ))
+        if SuwayomiUI.updateDeleteFinishedWhileReadingMenu then
+            SuwayomiUI.updateDeleteFinishedWhileReadingMenu(delete_menu, {
+                current = saved_settings.delete_finished_while_reading,
+                choices = choices,
+                onSelect = onSelect,
+            })
+        end
+    end
+
+    delete_menu = SuwayomiUI.showDeleteFinishedWhileReadingMenu({
+        current = self:loadDeleteChaptersSettings().delete_finished_while_reading,
+        choices = choices,
+        onSelect = onSelect,
+    })
+end
+
 
 function Methods:getLibraryCategoryPickerBehaviorSummary()
     if SuwayomiSettings.loadLibraryCategoryPickerBehavior then
@@ -235,6 +313,30 @@ function Methods:buildSettingsMenu()
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:showParallelDownloadsDialog(touchmenu_instance)
+                    end,
+                },
+                {
+                    text_func = function()
+                        return T(
+                            _("Delete after manual mark-read: %1"),
+                            self:getDeleteChaptersSettingSummary("delete_after_mark_read")
+                        )
+                    end,
+                    keep_menu_open = true,
+                    callback = function(touchmenu_instance)
+                        self:toggleDeleteAfterMarkRead(touchmenu_instance)
+                    end,
+                },
+                {
+                    text_func = function()
+                        return T(
+                            _("Delete while reading: %1"),
+                            self:getDeleteChaptersSettingSummary("delete_finished_while_reading")
+                        )
+                    end,
+                    keep_menu_open = true,
+                    callback = function(touchmenu_instance)
+                        self:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
                     end,
                 },
             },

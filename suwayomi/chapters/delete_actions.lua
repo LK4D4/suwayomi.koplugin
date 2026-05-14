@@ -6,6 +6,7 @@
 -- External data: Queue state, ledger entries, and filesystem paths are checked before destructive cleanup.
 
 local _ = require("gettext")
+local SuwayomiSettings = require("suwayomi/settings")
 
 local ChapterDeleteActions = {}
 ChapterDeleteActions.__index = ChapterDeleteActions
@@ -18,6 +19,31 @@ function ChapterDeleteActions:new(deps)
 end
 
 local Methods = {}
+
+local function loadDeleteChaptersSettings()
+    if SuwayomiSettings.loadDeleteChaptersSettings then
+        return SuwayomiSettings:loadDeleteChaptersSettings()
+    end
+    return {
+        delete_after_mark_read = false,
+        delete_finished_while_reading = 0,
+    }
+end
+
+local function sameId(left, right)
+    return tostring(left or "") == tostring(right or "")
+end
+
+local function contextMatchesManga(self, manga)
+    if not self.current_chapter_context then
+        return false
+    end
+    if self.isCurrentChapterContextForManga then
+        return self:isCurrentChapterContextForManga(manga)
+    end
+    local context_manga = self.current_chapter_context.manga
+    return context_manga and manga and sameId(context_manga.id, manga.id)
+end
 
 -- Return states are part of the actions facade contract:
 -- deleted, queued, missing, and downloading.
@@ -43,7 +69,13 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
         return false, "downloading"
     end
 
-    local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
+    local downloaded, chapter_path
+    if options.chapter_path then
+        chapter_path = options.chapter_path
+        downloaded = self:chapterArchiveExists(chapter_path)
+    else
+        downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
+    end
     if not downloaded or not chapter_path then
         if not options.quiet_missing then
             self:showMessage(_("This chapter is not downloaded."))
@@ -93,6 +125,98 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
         self:refreshChapterMenu()
     end
     return true, cancelled and "queued" or "deleted"
+end
+
+function Methods:deleteChaptersAfterManualMarkRead(manga, chapters, options)
+    options = options or {}
+    local settings = loadDeleteChaptersSettings()
+    if settings.delete_after_mark_read ~= true then
+        return 0
+    end
+
+    local deleted = 0
+    for _, chapter in ipairs(chapters or {}) do
+        local ok = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
+            ledger = options.ledger,
+            quiet_active = true,
+            quiet_delete_failed = true,
+            quiet_missing = true,
+            skip_refresh = true,
+        })
+        if ok then
+            deleted = deleted + 1
+        end
+    end
+    return deleted
+end
+
+function Methods:getChapterLedgerEntryForDelete(ledger, manga, chapter)
+    local key = self:getChapterLedgerKey(manga, chapter)
+    local entry = ledger[key]
+    if entry then
+        return entry
+    end
+
+    for _, existing in pairs(ledger or {}) do
+        if sameId(existing.manga_id, manga and manga.id)
+            and sameId(existing.chapter_id, chapter and chapter.id)
+        then
+            return existing
+        end
+    end
+    return nil
+end
+
+function Methods:getFinishedChapterDeleteCandidate(manga, chapter, offset)
+    offset = tonumber(offset) or 0
+    if offset <= 0 then
+        return nil
+    end
+    if not self.current_chapter_context or not self.current_chapter_context.chapters then
+        return offset == 1 and chapter or nil
+    end
+    if not contextMatchesManga(self, manga) then
+        return offset == 1 and chapter or nil
+    end
+
+    local finished_index
+    for index, current in ipairs(self.current_chapter_context.chapters) do
+        if sameId(current.id, chapter and chapter.id)
+            or (chapter and chapter.name and tostring(current.name or "") == tostring(chapter.name))
+        then
+            finished_index = index
+            break
+        end
+    end
+    if not finished_index then
+        return offset == 1 and chapter or nil
+    end
+    return self.current_chapter_context.chapters[finished_index - offset + 1]
+end
+
+function Methods:deleteFinishedChaptersWhileReading(manga, chapter)
+    local settings = loadDeleteChaptersSettings()
+    local offset = settings.delete_finished_while_reading
+    local candidate = self:getFinishedChapterDeleteCandidate(manga, chapter, offset)
+    if not candidate then
+        return 0
+    end
+
+    local ledger = self:loadChapterLedger()
+    local entry = self:getChapterLedgerEntryForDelete(ledger, manga, candidate)
+    local ok = self:deleteChapterFromDeviceWithOptions(manga, candidate, {
+        ledger = ledger,
+        chapter_path = (entry and entry.path) or candidate.path,
+        quiet_active = true,
+        quiet_delete_failed = true,
+        quiet_missing = true,
+        skip_refresh = true,
+    })
+    if ok then
+        self:saveChapterLedger(ledger)
+        return 1
+    end
+    return 0
 end
 
 ChapterDeleteActions.methods = Methods

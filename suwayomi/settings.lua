@@ -37,6 +37,18 @@ local DEFAULT_DOWNLOAD_DIRECTORY = ""
 local DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS = 2
 local MIN_PARALLEL_CHAPTER_DOWNLOADS = 1
 local MAX_PARALLEL_CHAPTER_DOWNLOADS = 4
+local DEFAULT_DELETE_CHAPTERS_SETTINGS = {
+    delete_after_mark_read = false,
+    delete_finished_while_reading = 0,
+}
+local DELETE_FINISHED_WHILE_READING_LIMITS = {
+    [0] = true,
+    [1] = true,
+    [2] = true,
+    [3] = true,
+    [4] = true,
+    [5] = true,
+}
 local DEFAULT_MANGA_KEEP_NEXT_UNREAD_DOWNLOADS = 0
 local MANGA_KEEP_NEXT_UNREAD_DOWNLOAD_LIMITS = {
     [0] = true,
@@ -63,6 +75,24 @@ function SuwayomiSettings:normalizeMaxParallelChapterDownloads(value)
         return MAX_PARALLEL_CHAPTER_DOWNLOADS
     end
     return normalized
+end
+
+function SuwayomiSettings:normalizeDeleteChaptersSettings(value)
+    if type(value) ~= "table" then
+        return copyTable(DEFAULT_DELETE_CHAPTERS_SETTINGS)
+    end
+
+    local delete_finished_while_reading = tonumber(value.delete_finished_while_reading)
+        or DEFAULT_DELETE_CHAPTERS_SETTINGS.delete_finished_while_reading
+    delete_finished_while_reading = math.floor(delete_finished_while_reading)
+    if not DELETE_FINISHED_WHILE_READING_LIMITS[delete_finished_while_reading] then
+        delete_finished_while_reading = DEFAULT_DELETE_CHAPTERS_SETTINGS.delete_finished_while_reading
+    end
+
+    return {
+        delete_after_mark_read = value.delete_after_mark_read == true,
+        delete_finished_while_reading = delete_finished_while_reading,
+    }
 end
 
 function SuwayomiSettings:normalizeMangaKeepNextUnreadDownloads(value)
@@ -238,6 +268,18 @@ end
 function SuwayomiSettings:saveMaxParallelChapterDownloads(value)
     local normalized = self:normalizeMaxParallelChapterDownloads(value)
     self:open():saveSetting("max_parallel_chapter_downloads", normalized):flush()
+    return normalized
+end
+
+function SuwayomiSettings:loadDeleteChaptersSettings()
+    return self:normalizeDeleteChaptersSettings(
+        self:open():readSetting("delete_chapters_settings", DEFAULT_DELETE_CHAPTERS_SETTINGS)
+    )
+end
+
+function SuwayomiSettings:saveDeleteChaptersSettings(value)
+    local normalized = self:normalizeDeleteChaptersSettings(value)
+    self:open():saveSetting("delete_chapters_settings", normalized):flush()
     return normalized
 end
 

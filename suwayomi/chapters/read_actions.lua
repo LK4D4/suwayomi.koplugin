@@ -47,6 +47,12 @@ function Methods:markChapterRead(manga, chapter, options)
             end
         end
     end
+    local deleted_after_mark_read = 0
+    if not options.skip_delete_after_mark_read and self.deleteChaptersAfterManualMarkRead then
+        deleted_after_mark_read = self:deleteChaptersAfterManualMarkRead(manga, { chapter }, {
+            ledger = options.ledger,
+        })
+    end
     if not options.skip_refresh then
         self:refreshChapterMenu()
     end
@@ -64,6 +70,7 @@ function Methods:markChapterRead(manga, chapter, options)
             chapter_id = chapter and chapter.id,
             downloaded = downloaded == true,
             metadata_updated = metadata_updated == true,
+            deleted_after_mark_read = deleted_after_mark_read,
             skip_refresh = options.skip_refresh == true,
             skip_schedule = options.skip_schedule == true,
             elapsed_ms = SuwayomiDebug.elapsedMs(started_at),

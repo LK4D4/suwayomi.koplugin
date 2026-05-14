@@ -30,6 +30,10 @@ local function installController(options)
             hide_in_library_results = false,
         },
         saved_parallel = options.parallel or 2,
+        saved_delete_chapters_settings = options.delete_chapters_settings or {
+            delete_after_mark_read = false,
+            delete_finished_while_reading = 0,
+        },
         saved_category_behavior = options.category_behavior or "automatic",
     }
 
@@ -89,6 +93,13 @@ local function installController(options)
                 state.saved_parallel = value
                 return value
             end,
+            loadDeleteChaptersSettings = function()
+                return state.saved_delete_chapters_settings
+            end,
+            saveDeleteChaptersSettings = function(_, value)
+                state.saved_delete_chapters_settings = value
+                return value
+            end,
             loadLibraryCategoryPickerBehavior = function()
                 return state.saved_category_behavior
             end,
@@ -127,6 +138,14 @@ local function installController(options)
             updateParallelDownloadsMenu = function(menu, menu_options)
                 state.parallel_menu_options = menu_options
                 state.parallel_menu_options.menu = menu
+            end,
+            showDeleteFinishedWhileReadingMenu = function(menu_options)
+                state.delete_finished_menu_options = menu_options
+                return { name = "delete-finished-menu" }
+            end,
+            updateDeleteFinishedWhileReadingMenu = function(menu, menu_options)
+                state.delete_finished_menu_options = menu_options
+                state.delete_finished_menu_options.menu = menu
             end,
             updateKeepNextUnreadDownloadsMenu = function(menu, menu_options)
                 state.keep_next_menu_options = menu_options
@@ -242,7 +261,7 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.is_nil(plugin.download_queue)
         assert.are.equal("parallel-downloads-menu", state.parallel_menu_options.menu.name)
         assert.are.equal("Suwayomi parallel chapter downloads saved: 3", state.messages[#state.messages])
-        assert.is_nil(download_items[3])
+        assert.are.equal("Delete after manual mark-read: no", download_items[3].text_func())
     end)
 
     it("saves category picker behavior and reports unavailable persistence", function()
@@ -263,5 +282,29 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("Category picker: automatic", unavailable_item.text_func())
         unavailable_item.callback(unavailable_state.touchmenu)
         assert.are.equal("Library category picker settings are unavailable.", unavailable_state.messages[#unavailable_state.messages])
+    end)
+
+    it("builds delete chapter settings and saves their changes", function()
+        local plugin, state = installController()
+        local download_items = plugin:buildSettingsMenu()[4].sub_item_table
+
+        assert.are.equal("Delete after manual mark-read: no", download_items[3].text_func())
+        assert.are.equal("Delete while reading: Disabled", download_items[4].text_func())
+
+        download_items[3].callback(state.touchmenu)
+
+        assert.is_true(state.saved_delete_chapters_settings.delete_after_mark_read)
+        assert.are.equal(1, state.refresh_count)
+        assert.are.equal("Suwayomi delete chapter setting saved.", state.messages[#state.messages])
+
+        download_items[4].callback(state.touchmenu)
+        assert.are.equal(0, state.delete_finished_menu_options.current)
+
+        state.delete_finished_menu_options.onSelect(2)
+
+        assert.are.equal(2, state.saved_delete_chapters_settings.delete_finished_while_reading)
+        assert.are.equal("Suwayomi delete-while-reading setting saved: Second to last read chapter", state.messages[#state.messages])
+        assert.are.equal(2, state.delete_finished_menu_options.current)
+        assert.are.equal("delete-finished-menu", state.delete_finished_menu_options.menu.name)
     end)
 end)

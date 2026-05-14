@@ -429,6 +429,18 @@ function SuwayomiUI.showLibraryCategoryPickerBehaviorMenu(options)
     return menu
 end
 
+function SuwayomiUI.showDeleteFinishedWhileReadingMenu(options)
+    options = options or {}
+    local UIManager = require("ui/uimanager")
+    local menu = Menu:new{
+        title = _("Delete finished chapters"),
+        item_table = SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options),
+        state_w = getStateMarkWidth(),
+    }
+    UIManager:show(menu)
+    return menu
+end
+
 function SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options)
     options = options or {}
     local labels = {
@@ -458,6 +470,38 @@ function SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options)
     return menu_table
 end
 
+function SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options)
+    options = options or {}
+    local labels = {
+        [0] = _("Disabled"),
+        [1] = _("Last read chapter"),
+        [2] = _("Second to last read chapter"),
+        [3] = _("Third to last read chapter"),
+        [4] = _("Fourth to last read chapter"),
+        [5] = _("Fifth to last read chapter"),
+    }
+    local menu_table = {}
+    local current = tonumber(options.current) or 0
+    for _, value in ipairs(options.choices or { 0, 1, 2, 3, 4, 5 }) do
+        table.insert(menu_table, {
+            text = labels[value] or tostring(value),
+            radio = true,
+            state = newStateMark("radio", value == current),
+            checked_func = function()
+                return value == current
+            end,
+            callback = function()
+                if options.onSelect then
+                    options.onSelect(value)
+                end
+            end,
+            keep_menu_open = true,
+        })
+    end
+
+    return menu_table
+end
+
 function SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu(menu, options)
     if not menu then
         return
@@ -466,6 +510,17 @@ function SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu(menu, options)
     menu.item_table = SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options)
     if menu.updateItems then
         menu:updateItems()
+    end
+end
+
+function SuwayomiUI.updateDeleteFinishedWhileReadingMenu(menu, options)
+    if not menu then
+        return
+    end
+
+    menu.item_table = SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options)
+    if menu.updateItems then
+        menu:updateItems(nil, true)
     end
 end
 

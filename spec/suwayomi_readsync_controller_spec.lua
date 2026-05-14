@@ -31,6 +31,7 @@ local function buildPlugin(controller, options)
         read_sync_batch_size = options.read_sync_batch_size or 2,
         read_sync_poll_interval_seconds = options.read_sync_poll_interval_seconds or 0.1,
         read_sync_watchdog_timeout_seconds = options.read_sync_watchdog_timeout_seconds or 30,
+        deleted_finished = {},
     }
     for name, method in pairs(controller.methods) do
         plugin[name] = method
@@ -80,11 +81,15 @@ local function buildPlugin(controller, options)
         return batch
     end
     function plugin:markLedgerEntryRead(entry)
+        if entry.read == true then
+            return false
+        end
         entry.read = true
         entry.pending_read_sync = true
         entry.pending_read_state = true
         self:saveChapterLedger(ledger)
         self:schedulePendingReadSync()
+        return true
     end
     function plugin:reconcileDownloadedChapterLedger()
         self.reconcile_count = (self.reconcile_count or 0) + 1
@@ -94,6 +99,10 @@ local function buildPlugin(controller, options)
     end
     function plugin:isCurrentDocumentFinished()
         return options.current_document_finished == true
+    end
+    function plugin:deleteFinishedChaptersWhileReading(manga, chapter)
+        table.insert(self.deleted_finished, { manga = manga, chapter = chapter })
+        return 1
     end
     return plugin
 end
@@ -350,5 +359,53 @@ describe("suwayomi/readsync/controller", function()
         assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
         assert.are.equal(1, #plugin.saved_ledgers)
         assert.are.equal(1, #state.scheduled)
+    end)
+
+    it("runs delete-while-reading cleanup after a finished document marks read", function()
+        local controller = installController()
+        local plugin = buildPlugin(controller, {
+            current_document_path = "/books/Frieren/Ch. 2.cbz",
+            current_document_finished = true,
+            ledger = {
+                ["m1:c2"] = {
+                    manga_id = "m1",
+                    manga_title = "Frieren",
+                    chapter_id = "c2",
+                    chapter_name = "Ch. 2",
+                    path = "/books/Frieren/Ch. 2.cbz",
+                    read = false,
+                },
+            },
+        })
+
+        plugin:onCloseDocument()
+
+        assert.are.equal("m1", plugin.deleted_finished[1].manga.id)
+        assert.are.equal("Frieren", plugin.deleted_finished[1].manga.title)
+        assert.are.equal("c2", plugin.deleted_finished[1].chapter.id)
+        assert.are.equal("Ch. 2", plugin.deleted_finished[1].chapter.name)
+    end)
+
+    it("runs delete-while-reading cleanup for already-read finished documents", function()
+        local controller = installController()
+        local plugin = buildPlugin(controller, {
+            current_document_path = "/books/Frieren/Ch. 3.cbz",
+            current_document_finished = true,
+            ledger = {
+                ["m1:c3"] = {
+                    manga_id = "m1",
+                    manga_title = "Frieren",
+                    chapter_id = "c3",
+                    chapter_name = "Ch. 3",
+                    path = "/books/Frieren/Ch. 3.cbz",
+                    read = true,
+                },
+            },
+        })
+
+        plugin:onCloseDocument()
+
+        assert.are.equal("c3", plugin.deleted_finished[1].chapter.id)
+        assert.are.equal(0, #plugin.saved_ledgers)
     end)
 end)

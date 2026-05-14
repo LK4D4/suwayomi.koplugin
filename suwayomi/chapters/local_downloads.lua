@@ -40,6 +40,15 @@ function Methods:isChapterDownloaded(manga, chapter)
     return SuwayomiDownloader:chapterExists(chapter_path), chapter_path
 end
 
+function Methods:chapterArchiveExists(chapter_path)
+    if not chapter_path or chapter_path == "" then
+        return false
+    end
+
+    local SuwayomiDownloader = require("suwayomi/downloads/downloader")
+    return SuwayomiDownloader:chapterExists(chapter_path)
+end
+
 function Methods:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
     os.remove(chapter_path)
     local SuwayomiDownloader = require("suwayomi/downloads/downloader")
