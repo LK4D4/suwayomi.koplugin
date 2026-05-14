@@ -1,5 +1,7 @@
 # Suwayomi Downloader for KOReader
 
+[![Test](https://github.com/LK4D4/suwayomi_dl.koplugin/actions/workflows/test.yml/badge.svg)](https://github.com/LK4D4/suwayomi_dl.koplugin/actions/workflows/test.yml)
+
 A KOReader plugin that allows you to browse your self-hosted [Suwayomi (Tachidesk)](https://github.com/Suwayomi/Suwayomi-Server) server and download chapters directly to your e-ink device.
 
 ## Development Status
