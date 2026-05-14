@@ -204,7 +204,7 @@ function Methods:getMangaActions(manga)
         table.insert(actions, { id = "add_to_library", text = _("Add to library") })
     end
     table.insert(actions, { id = "download_first_unread", text = _("Download first unread") })
-    table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10 unread") })
+    table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10") })
     table.insert(actions, { id = "more", text = _("More..."), submenu = true })
     if destructive_action then
         table.insert(actions, destructive_action)
@@ -349,11 +349,11 @@ function Methods:showMoreMangaActions(manga, options)
     local menu = SuwayomiUI.showMangaActionsMenu({
         title = _("More..."),
         actions = {
-            { id = "download_next_5_unread", text = _("Download next 5 unread") },
-            { id = "download_next_50_unread", text = _("Download next 50 unread") },
+            { id = "download_next_5_unread", text = _("Download next 5") },
+            { id = "download_next_50_unread", text = _("Download next 50") },
             { id = "download_all_unread", text = _("Download all unread") },
             { id = "download_all_chapters", text = _("Download all chapters") },
-            { id = "keep_downloaded", text = _("Keep downloaded"), submenu = true },
+            { id = "keep_downloaded", text = _("Download ahead"), submenu = true },
             { id = "delete_read_downloaded", text = _("Delete read downloads"), destructive = true },
         },
         on_back = function()
@@ -377,12 +377,12 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
         return false
     end
     local menu = SuwayomiUI.showMangaActionsMenu({
-        title = _("Keep downloaded"),
+        title = _("Download ahead"),
         actions = {
-            { id = "keep_next_5_unread", text = _("Keep next 5 unread") },
-            { id = "keep_next_10_unread", text = _("Keep next 10 unread") },
-            { id = "keep_next_50_unread", text = _("Keep next 50 unread") },
-            { id = "keep_next_0_unread", text = _("Stop keeping unread") },
+            { id = "keep_next_5_unread", text = _("Keep next 5 downloaded") },
+            { id = "keep_next_10_unread", text = _("Keep next 10 downloaded") },
+            { id = "keep_next_50_unread", text = _("Keep next 50 downloaded") },
+            { id = "keep_next_0_unread", text = _("Stop download ahead") },
         },
         on_back = function()
             self:showMoreMangaActions(manga, options)
@@ -449,7 +449,7 @@ function Methods:performMangaAction(manga, action_id, options)
         local limit = tonumber(keep_unread_count)
         if limit == 0 then
             SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, 0)
-            self:showMessage(_("Keep-next buffer disabled."))
+            self:showMessage(_("Download ahead disabled."))
             return true
         end
         return self:keepNextUnreadChaptersForManga(manga, limit)
@@ -588,7 +588,7 @@ function Methods:confirmKeepNextUnreadChaptersDownloaded(limit)
     local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
     if #chapters == 0 then
         SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
-        self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
+        self:showMessage(_("Download-ahead buffer is already downloaded or queued."))
         return 0
     end
 
@@ -644,7 +644,7 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
 
         SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
         if #chapters == 0 then
-            self:showMessage(_("Next unread chapter buffer is already downloaded or queued."))
+            self:showMessage(_("Download-ahead buffer is already downloaded or queued."))
             return 0
         end
 

@@ -507,7 +507,7 @@ describe("suwayomi/ui", function()
         ui.showActionMenu({
             title = "Bulk downloads",
             actions = {
-                { id = "download_next_5_unread", text = "Download 5 unread" },
+                { id = "download_next_5_unread", text = "Download next 5" },
             },
             on_back = function()
                 table.insert(events, "back")
@@ -518,7 +518,7 @@ describe("suwayomi/ui", function()
 
         assert.are.equal("< Back", shown_dialog.buttons[1][1].text)
         assert.are.same({}, shown_dialog.buttons[2])
-        assert.are.equal("Download 5 unread", shown_dialog.buttons[3][1].text)
+        assert.are.equal("Download next 5", shown_dialog.buttons[3][1].text)
 
         shown_dialog.buttons[1][1].callback()
 

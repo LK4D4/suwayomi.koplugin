@@ -7,7 +7,7 @@ This roadmap tracks the next implementation path from the current downloader-ori
 The MVP should expose four first-class client surfaces:
 
 ```text
-Suwayomi -> Library -> Manga -> First unread / Download next unread / Keep next unread
+Suwayomi -> Library -> Manga -> First unread / Download next / Download ahead
 Suwayomi -> Browse -> Search all / Source -> Popular / Latest / Search -> Manga -> Add to library / Open chapter list
 Suwayomi -> Downloads -> Active / Queued / Failed -> Retry / Clear / Open manga
 Suwayomi -> Settings -> Connection / Library / Browse / Downloads
@@ -22,8 +22,8 @@ For the first remote-source release, prioritize this scenario:
 3. The reader opens a manga chapter list.
 4. The reader filters the chapter list by scanlator/translation group when duplicate translations exist.
 5. The reader marks already-read chapters as read, either selected chapters or everything before/through a chapter.
-6. The reader downloads the whole manga, all unread chapters, or the next unread chapters.
-7. The reader queues missing downloads for the next unread chapters.
+6. The reader downloads the whole manga, all unread chapters, or a one-shot next-chapter batch.
+7. The reader can enable a download-ahead buffer that queues only missing downloads for the next unread window.
 8. After reading, the plugin best-effort syncs read state.
 
 ## Reading Boundary
@@ -53,7 +53,7 @@ Already implemented:
 - [x] Chapter actions: open local CBZ in KOReader, download, delete from device, mark read/unread
 - [x] Chapter selection mode
 - [x] Bulk chapter actions
-- [x] Bulk policies: download next unread, queue missing downloads for the next unread chapters, delete read downloaded chapters
+- [x] Bulk policies: one-shot download next batches, download-ahead missing-buffer refills, delete read downloaded chapters
 - [x] Read-state reconciliation from Suwayomi, KOReader metadata, and the plugin ledger
 - [x] Background retry for pending read/unread sync
 - [x] Manual read-state sync action
@@ -287,10 +287,10 @@ Goal: add WebUI-inspired manga and chapter actions that fit the Library, Browse,
 - [x] Add `Remove from library` with confirmation
 - [x] Add `Open first unread in KOReader` when the first unread chapter is locally available
 - [x] Add `Download first unread`
-- [x] Add `Download next 5/10/50 unread`, preserving the existing queue cap behavior
+- [x] Add one-shot `Download next 5/10/50`, preserving the existing queue cap behavior
 - [x] Add `Download all unread` with confirmation and queue cap/chunking feedback
 - [x] Add `Download all chapters` / whole manga with confirmation and queue cap/chunking feedback
-- [x] Add `Keep next 5/10/50 unread` queue actions
+- [x] Add `Keep next 5/10/50 downloaded` download-ahead queue actions
 - [x] Add `Delete read downloaded chapters from device`
 - [x] Add explicit removal of read local downloads without deleting active downloads
 - [x] Preserve scanlator on parsed chapter nodes
@@ -308,7 +308,7 @@ Tests:
 - [x] First-unread actions select the expected chapter
 - [x] Existing bulk policies can be triggered from manga-level actions
 - [x] `Download all unread` and whole-manga downloads respect confirmation and queue cap/chunking behavior
-- [x] `Keep next` actions persist per manga and refill missing unread-buffer downloads after chapters are marked read
+- [x] `Download ahead` actions persist per manga and refill missing unread-buffer downloads after chapters are marked read
 - [x] Explicit read-download removal deletes only read KOReader-local files and skips active downloads
 - [x] Chapter parser preserves scanlator
 - [x] Chapter-list scanlator filter hides only matching translation groups
@@ -389,7 +389,7 @@ Goal: prove the client MVP works with real remote source flows and the first rel
   - [x] mark individual chapters read/unread
   - [ ] mark selected/previous chapters read
   - [ ] download whole manga or all unread chapters
-  - [ ] queue missing downloads for next unread chapters
+  - [ ] queue missing downloads for a download-ahead unread window
   - [x] read/open local CBZ in KOReader
   - [ ] best-effort read sync
 - [ ] Verify MangaDex search, library add/remove, refresh, chapter listing, and download
