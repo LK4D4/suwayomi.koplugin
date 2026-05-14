@@ -144,6 +144,10 @@ local function textBoxLineHeight(face)
     return math.max(1, height)
 end
 
+local function isSectionHeader(item)
+    return type(item) == "table" and item.is_section_header == true
+end
+
 local function placeholderText(text)
     text = tostring(text or ""):gsub("^%s+", "")
     if text == "" then
@@ -243,6 +247,28 @@ function ListMenuItem:buildThumbnail(slot_size)
 end
 
 function ListMenuItem:buildRowWidget(width, height)
+    if isSectionHeader(self.entry) then
+        local horizontal_padding = scaled(12)
+        local title_width = math.max(1, width - 2 * horizontal_padding)
+        local title = TextBoxWidget:new{
+            text = BD.auto(tostring(self.text or "")),
+            face = fontFace("cfont", fontSizeForRow(16, 20, self.menu and self.menu._suwayomi_base_item_height or height)),
+            width = title_width,
+            height = height,
+            height_adjust = true,
+            height_overflow_show_ellipsis = true,
+            alignment = "left",
+            bold = true,
+            fgcolor = Blitbuffer.COLOR_DARK_GRAY,
+        }
+        return HorizontalGroup:new{
+            align = "center",
+            HorizontalSpan:new{ width = horizontal_padding },
+            title,
+            HorizontalSpan:new{ width = horizontal_padding },
+        }
+    end
+
     local has_thumbnail = self.entry.thumbnail_placeholder or self.entry.thumbnail_url or self.entry.thumbnail_path
     local font_height = self.menu and self.menu._suwayomi_base_item_height or height
     local left_padding = has_thumbnail and 0 or scaled(10)
@@ -421,6 +447,10 @@ function ListMenu.consumePendingItemNumber(menu)
 end
 
 function ListMenu.estimateItemTitleWidth(menu, item, base_height)
+    if isSectionHeader(item) then
+        return math.max(1, menu.item_width - 2 * scaled(12))
+    end
+
     local has_thumbnail = item.thumbnail_placeholder or item.thumbnail_url or item.thumbnail_path
     local left_padding = has_thumbnail and 0 or scaled(10)
     local right_padding = scaled(10)
@@ -460,13 +490,17 @@ function ListMenu.setupItemHeights(menu)
     local page_items = {}
     local page_height = 0
     for index, item in ipairs(menu.item_table) do
-        local title_width = ListMenu.estimateItemTitleWidth(menu, item, base_height)
-        local title_width_px = textWidth(getItemText(item), title_face, item.title_bold == true) * 1.08
-        local subtitle_lines = item.subtitle and 1 or 0
-        local max_title_lines = math.max(1, (menu.items_max_lines or 1) - subtitle_lines)
-        local title_lines = math.min(math.max(1, math.ceil(title_width_px / title_width)), max_title_lines)
-        local lines = title_lines + subtitle_lines
-        item.height = math.max(base_height, lines * line_height + row_padding)
+        if isSectionHeader(item) then
+            item.height = math.max(line_height + row_padding, math.floor(base_height * 0.55))
+        else
+            local title_width = ListMenu.estimateItemTitleWidth(menu, item, base_height)
+            local title_width_px = textWidth(getItemText(item), title_face, item.title_bold == true) * 1.08
+            local subtitle_lines = item.subtitle and 1 or 0
+            local max_title_lines = math.max(1, (menu.items_max_lines or 1) - subtitle_lines)
+            local title_lines = math.min(math.max(1, math.ceil(title_width_px / title_width)), max_title_lines)
+            local lines = title_lines + subtitle_lines
+            item.height = math.max(base_height, lines * line_height + row_padding)
+        end
 
         page_height = page_height + item.height
         if page_height <= menu.available_height or #page_items == 0 then
@@ -727,18 +761,46 @@ end
 
 function ListMenu.install(menu, options)
     menu._suwayomi_thumbnail_credentials = options and options.thumbnail_credentials
+    menu._suwayomi_on_close = options and options.on_close
     menu._suwayomi_thumbnail_active = menu._suwayomi_thumbnail_active or {}
     menu._suwayomi_thumbnail_active_count = menu._suwayomi_thumbnail_active_count or 0
     menu._suwayomi_thumbnail_generation = menu._suwayomi_thumbnail_generation or 0
 
     if not menu._suwayomi_list_menu_installed then
         local original_on_close_widget = menu.onCloseWidget
+        local original_on_close = menu.onClose
+        local original_on_menu_select = menu.onMenuSelect
         menu._suwayomi_original_recalculate_dimen = menu._recalculateDimen
         menu._recalculateDimen = function(self, no_recalculate_dimen)
             return ListMenu.recalculateDimen(self, no_recalculate_dimen)
         end
         menu.updateItems = function(self, select_number, no_recalculate_dimen)
             return ListMenu.updateItems(self, select_number, no_recalculate_dimen)
+        end
+        menu.onClose = function(self, ...)
+            if type(self._suwayomi_on_close) == "function" and self._suwayomi_on_close(self, ...) == true then
+                return true
+            end
+            if original_on_close then
+                return original_on_close(self, ...)
+            end
+            return false
+        end
+        menu.onMenuSelect = function(self, item)
+            if item and item.keep_menu_open == true and item.sub_item_table == nil then
+                if item.select_enabled == false then
+                    return true
+                end
+                if item.select_enabled_func and not item.select_enabled_func() then
+                    return true
+                end
+                self:onMenuChoice(item)
+                return true
+            end
+            if original_on_menu_select then
+                return original_on_menu_select(self, item)
+            end
+            return false
         end
         menu.onCloseWidget = function(self, ...)
             cancelThumbnailJobs(self)
@@ -754,6 +816,7 @@ local function applyOptions(menu, options)
     menu_utils.applyTitleBarOptions(menu, options)
     menu_utils.applyCloseCallback(menu, options)
     menu._suwayomi_thumbnail_credentials = options and options.thumbnail_credentials
+    menu._suwayomi_on_close = options and options.on_close
 end
 
 function ListMenu.show(options)

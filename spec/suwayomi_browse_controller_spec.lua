@@ -12,6 +12,9 @@ describe("suwayomi/browse/controller", function()
             "startSourceFetchWorker",
             "pollSourceFetch",
             "browseSuwayomi",
+            "showExtensions",
+            "startExtensionWorker",
+            "pollExtensionWorker",
         })
     end)
 end)

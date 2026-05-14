@@ -7,7 +7,7 @@ A KOReader plugin that allows you to browse your self-hosted [Suwayomi (Tachides
 This plugin is experimental and still under active development.
 
 - Expect rough edges and incomplete features.
-- The login flow, Suwayomi hub, Library entry point, source browsing/search, global search, manga browsing, manga actions, chapter browsing, chapter actions menu, single-chapter downloads, source-scoped download paths, cached source refresh, local queue inspection, and read-state syncing are currently implemented and being tested.
+- The login flow, Suwayomi hub, Library entry point, source browsing/search, extension install/update/uninstall, global search, manga browsing, manga actions, chapter browsing, chapter actions menu, single-chapter downloads, source-scoped download paths, cached source refresh, local queue inspection, and read-state syncing are currently implemented and being tested.
 - The practical flow has been verified on device with the Suwayomi **Local Source** and a live Comick remote-source browse/latest workflow. Remote source search still depends heavily on source/server behavior; global search is partial and cancellable, while individual source requests can still time out.
 - The top-level Downloads screen can inspect active, queued, and failed local downloads, although completed history is not implemented yet.
 
@@ -16,6 +16,7 @@ This plugin is experimental and still under active development.
 - Native Suwayomi hub with Library, Browse, Downloads, Sync, Settings, and Close actions
 - Library entry point with category picker behavior settings
 - Browse sources, search across visible sources, search within a source, page source results, and open manga/chapter actions directly from the server
+- Browse available Suwayomi extensions from KOReader and install, update, or uninstall extensions on the server
 - Cached source list with silent background refresh
 - Basic auth login against a self-hosted Suwayomi server
 - Filter sources by language
@@ -102,7 +103,7 @@ The current client MVP intentionally does not implement:
 
 - Full dynamic source filter editing
 - Source preference editing
-- Extension install, update, or source enable/disable management
+- Extension repository editing or source enable/disable management
 - Server-side Suwayomi download queue, download settings, or completed history management
 - Per-source download directory overrides
 - A custom in-plugin manga reader; downloaded chapters open in KOReader's normal reader

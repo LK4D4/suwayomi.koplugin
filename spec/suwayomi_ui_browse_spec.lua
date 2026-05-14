@@ -17,6 +17,7 @@ describe("suwayomi/ui/browse", function()
         package.loaded["suwayomi/ui/menu_utils"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
+        package.loaded["ui/widget/buttondialog"] = nil
         package.loaded["ui/widget/multiinputdialog"] = nil
         package.loaded["ui/uimanager"] = nil
         package.loaded["suwayomi/ui/manga_menu"] = nil
@@ -30,6 +31,15 @@ describe("suwayomi/ui/browse", function()
         package.preload["ui/widget/menu"] = function()
             return {
                 new = function(_, options)
+                    return options
+                end,
+            }
+        end
+
+        package.preload["ui/widget/buttondialog"] = function()
+            return {
+                new = function(_, options)
+                    options.is_button_dialog = true
                     return options
                 end,
             }
@@ -89,6 +99,7 @@ describe("suwayomi/ui/browse", function()
     after_each(function()
         package.preload.gettext = nil
         package.preload["ui/widget/menu"] = nil
+        package.preload["ui/widget/buttondialog"] = nil
         package.preload["ui/widget/multiinputdialog"] = nil
         package.preload["ui/uimanager"] = nil
         package.preload["suwayomi/ui/list_menu"] = nil
@@ -148,6 +159,91 @@ describe("suwayomi/ui/browse", function()
         assert.is_true(closed)
     end)
 
+    it("shows extension rows and extension install/update actions", function()
+        local browse = require("suwayomi/ui/browse")
+        local selected = {}
+
+        browse.showExtensionsMenu({
+            {
+                pkg_name = "pkg.mangadex",
+                name = "MangaDex",
+                lang = "all",
+                version_name = "1.4.0",
+                icon_url = "/icons/md.png",
+                is_nsfw = true,
+                is_installed = false,
+            },
+            {
+                pkg_name = "pkg.comick",
+                name = "Comick",
+                lang = "en",
+                version_name = "1.2.0",
+                is_installed = true,
+                has_update = true,
+            },
+        }, function(extension)
+            table.insert(selected, extension)
+        end, {
+            title_bar_left_icon = "appbar.menu",
+        })
+
+        assert.are.equal("Suwayomi Extensions", shown_dialog.title)
+        assert.are.equal("list_menu", shown_dialog.renderer)
+        assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
+        assert.are.equal("Updates (1)", shown_dialog.item_table[1].text)
+        assert.is_false(shown_dialog.item_table[1].select_enabled)
+        assert.are.equal("Update available\nv1.2.0", shown_dialog.item_table[2].mandatory)
+        assert.are.equal("Available (1)", shown_dialog.item_table[3].text)
+        assert.are.equal("MangaDex", shown_dialog.item_table[4].text)
+        assert.are.equal("All", shown_dialog.item_table[4].subtitle)
+        assert.are.equal("Not installed\n18+ · v1.4.0", shown_dialog.item_table[4].mandatory)
+        assert.are.equal("/icons/md.png", shown_dialog.item_table[4].thumbnail_url)
+
+        shown_dialog.item_table[4].callback()
+
+        assert.are.equal("pkg.mangadex", selected[1].pkg_name)
+
+        local actions = {}
+        browse.showExtensionActionMenu({
+            pkg_name = "pkg.mangadex",
+            name = "MangaDex",
+            is_installed = false,
+        }, function(action)
+            table.insert(actions, action)
+        end)
+        assert.is_true(shown_dialog.is_button_dialog)
+        assert.are.equal("Install", shown_dialog.buttons[1][1].text)
+        shown_dialog.buttons[1][1].callback()
+
+        browse.showExtensionActionMenu({
+            pkg_name = "pkg.comick",
+            name = "Comick",
+            is_installed = true,
+            has_update = true,
+        }, function(action)
+            table.insert(actions, action)
+        end)
+        assert.is_true(shown_dialog.is_button_dialog)
+        assert.are.equal("Update", shown_dialog.buttons[1][1].text)
+        shown_dialog.buttons[1][1].callback()
+        assert.are.equal("Uninstall", shown_dialog.buttons[2][1].text)
+        shown_dialog.buttons[2][1].callback()
+
+        browse.showExtensionActionMenu({
+            pkg_name = "pkg.installed",
+            name = "Installed Source",
+            is_installed = true,
+            has_update = false,
+        }, function(action)
+            table.insert(actions, action)
+        end)
+        assert.is_true(shown_dialog.is_button_dialog)
+        assert.are.equal("Uninstall", shown_dialog.buttons[1][1].text)
+        shown_dialog.buttons[1][1].callback()
+
+        assert.are.same({ "install", "update", "uninstall", "uninstall" }, actions)
+    end)
+
     it("shows a source mode menu and hides latest when unsupported", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}
@@ -176,6 +272,7 @@ describe("suwayomi/ui/browse", function()
         local selected_mode
         local searched_query
         local global_query
+        local extension_query
 
         browse.showSourceModeMenu({
             id = "s1",
@@ -212,6 +309,29 @@ describe("suwayomi/ui/browse", function()
         end
         shown_dialog.buttons[1][2].callback()
         assert.are.equal("dandadan", global_query)
+
+        browse.showExtensionSearchPrompt("akuma", function(query)
+            extension_query = query
+        end)
+        assert.are.equal("Search extensions", shown_dialog.title)
+        assert.are.equal("akuma", shown_dialog.fields[1].text)
+        shown_dialog.getFields = function()
+            return { "buon dua" }
+        end
+        shown_dialog.buttons[1][2].callback()
+        assert.are.equal("buon dua", extension_query)
+
+        browse.showExtensionSearchPrompt("buon", function(query)
+            extension_query = query
+        end)
+        shown_dialog.buttons[1][1].callback()
+        assert.are.equal("", extension_query)
+
+        browse.showExtensionSearchPrompt("akuma", function(query)
+            extension_query = query
+        end)
+        shown_dialog.close_callback()
+        assert.are.equal("", extension_query)
     end)
 
     it("shows global search summaries and opens only successful or pageable source rows", function()

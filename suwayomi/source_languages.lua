@@ -207,6 +207,7 @@ zu	isiZulu
 local LABELS = {}
 local CASE_FOLDED_LABELS = {}
 local UI_FONT_FALLBACK_LABELS = {
+    all = "All",
     my = "Burmese",
     te = "Telugu",
     ti = "Tigrinya",

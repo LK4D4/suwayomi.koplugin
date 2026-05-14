@@ -34,10 +34,14 @@ local query_exports = {
     "_buildUpdateChaptersReadMutation",
     "_buildMarkChapterReadMutation",
     "_buildMarkChapterUnreadMutation",
+    "_buildFetchExtensionsMutation",
+    "_buildUpdateExtensionMutation",
 }
 
 local parser_exports = {
     "parseSourcesResponse",
+    "parseExtensionsResponse",
+    "parseUpdateExtensionResponse",
     "parseMangaResponse",
     "parseLibraryMangaResponse",
     "parseCategoryResponse",
@@ -109,6 +113,48 @@ function SuwayomiAPI.fetchSources(credentials)
     return {
         ok = true,
         sources = sources,
+    }
+end
+
+function SuwayomiAPI.fetchExtensions(credentials)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildFetchExtensionsMutation(), "fetchExtensions")
+    if not result.ok then
+        return result
+    end
+
+    local extensions, parse_error = SuwayomiAPI.parseExtensionsResponse(result.response_body)
+    if not extensions then
+        logDebugEvent({ operation = "fetchExtensions", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        extensions = extensions,
+    }
+end
+
+function SuwayomiAPI.updateExtension(credentials, pkg_name, action)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildUpdateExtensionMutation(pkg_name, action), "updateExtension")
+    if not result.ok then
+        return result
+    end
+
+    local extension, parse_error = SuwayomiAPI.parseUpdateExtensionResponse(result.response_body)
+    if not extension then
+        logDebugEvent({ operation = "updateExtension", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        extension = extension,
     }
 end
 

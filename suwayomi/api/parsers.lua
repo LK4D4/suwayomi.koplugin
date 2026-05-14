@@ -22,6 +22,30 @@ local function parseSource(source)
     }
 end
 
+local function parseExtensionNode(extension)
+    if type(extension) ~= "table" then
+        return nil
+    end
+    local pkg_name = extension.pkgName or extension.pkg_name
+    if pkg_name == nil then
+        return nil
+    end
+    return {
+        pkg_name = tostring(pkg_name),
+        name = extension.name or tostring(pkg_name),
+        lang = extension.lang,
+        version_name = extension.versionName,
+        version_code = tonumber(extension.versionCode) or extension.versionCode,
+        is_nsfw = extension.isNsfw == true,
+        is_installed = extension.isInstalled == true,
+        has_update = extension.hasUpdate == true,
+        is_obsolete = extension.isObsolete == true,
+        icon_url = extension.iconUrl,
+        apk_name = extension.apkName,
+        repo = extension.repo,
+    }
+end
+
 local function parseChapterNode(chapter)
     if type(chapter) ~= "table" then
         return nil
@@ -138,6 +162,53 @@ function Parsers.isOptionalSourceMetadataFieldError(response_body)
         end
     end
     return false
+end
+
+function Parsers.parseExtensionsResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local extension_nodes = payload
+        and payload.data
+        and payload.data.fetchExtensions
+        and payload.data.fetchExtensions.extensions
+    if type(extension_nodes) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not return an extension list."
+    end
+
+    local extensions = {}
+    for _, extension in ipairs(extension_nodes) do
+        local parsed = parseExtensionNode(extension)
+        if parsed then
+            table.insert(extensions, parsed)
+        end
+    end
+    return extensions
+end
+
+function Parsers.parseUpdateExtensionResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local extension = payload
+        and payload.data
+        and payload.data.updateExtension
+        and payload.data.updateExtension.extension
+    if type(extension) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not update extension."
+    end
+
+    local parsed = parseExtensionNode(extension)
+    if not parsed then
+        return nil, "Suwayomi server returned an invalid extension."
+    end
+    return parsed
 end
 
 function Parsers.parseMangaResponse(response_body)

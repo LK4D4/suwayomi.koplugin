@@ -103,7 +103,11 @@ describe("suwayomi/api facade", function()
             "_buildUpdateChaptersReadMutation",
             "_buildMarkChapterReadMutation",
             "_buildMarkChapterUnreadMutation",
+            "_buildFetchExtensionsMutation",
+            "_buildUpdateExtensionMutation",
             "parseSourcesResponse",
+            "parseExtensionsResponse",
+            "parseUpdateExtensionResponse",
             "parseMangaResponse",
             "parseLibraryMangaResponse",
             "parseCategoryResponse",
@@ -152,6 +156,34 @@ describe("suwayomi/api facade", function()
         assert.is_nil(request.bodies[2]:match("iconUrl"))
         assert.is_nil(request.bodies[2]:match("isNsfw"))
         assert.are.equal("legacy_source_query_retry", events[2].event)
+    end)
+
+    it("fetches extensions and updates extension install state", function()
+        local request = install_graphql_stub([[{"data":{"fetchExtensions":{"extensions":[{"pkgName":"pkg.mangadex","name":"MangaDex","lang":"all","versionName":"1.4.0","versionCode":140,"isNsfw":true,"isInstalled":false,"hasUpdate":false,"isObsolete":false,"iconUrl":"/icons/md.png","apkName":"mangadex.apk","repo":"https://repo.example"}]}}}]])
+
+        local extensions = api.fetchExtensions(valid_credentials())
+
+        assert.are.equal(true, extensions.ok)
+        assert.are.equal("pkg.mangadex", extensions.extensions[1].pkg_name)
+        assert.are.equal("MangaDex", extensions.extensions[1].name)
+        assert.are.equal("all", extensions.extensions[1].lang)
+        assert.are.equal("1.4.0", extensions.extensions[1].version_name)
+        assert.are.equal(140, extensions.extensions[1].version_code)
+        assert.is_true(extensions.extensions[1].is_nsfw)
+        assert.is_false(extensions.extensions[1].is_installed)
+        assert.is_false(extensions.extensions[1].has_update)
+        assert.is_false(extensions.extensions[1].is_obsolete)
+        assert.truthy(request.bodies[1]:match("fetchExtensions"))
+
+        local update_request = install_graphql_stub([[{"data":{"updateExtension":{"extension":{"pkgName":"pkg.mangadex","name":"MangaDex","lang":"all","versionName":"1.4.0","versionCode":140,"isNsfw":true,"isInstalled":true,"hasUpdate":false,"isObsolete":false,"iconUrl":"/icons/md.png","apkName":"mangadex.apk","repo":"https://repo.example"}}}}]])
+        local installed = api.updateExtension(valid_credentials(), "pkg.mangadex", "install")
+
+        assert.are.equal(true, installed.ok)
+        assert.are.equal("pkg.mangadex", installed.extension.pkg_name)
+        assert.is_true(installed.extension.is_installed)
+        assert.truthy(update_request.bodies[1]:match("updateExtension"))
+        assert.truthy(update_request.bodies[1]:match("\"id\":\"pkg.mangadex\""))
+        assert.truthy(update_request.bodies[1]:match("\"install\":true"))
     end)
 
     it("fetches manga, library manga, categories, updates library state, and refreshes manga", function()

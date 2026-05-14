@@ -60,6 +60,26 @@ describe("suwayomi/api/queries", function()
         assert.truthy(categories:match("mangas { totalCount }"))
     end)
 
+    it("builds extension fetch and update mutations", function()
+        local fetch = decode_request(queries._buildFetchExtensionsMutation())
+        assert.truthy(fetch.query:match("fetchExtensions"))
+        assert.truthy(fetch.query:match("pkgName"))
+        assert.is_nil(fetch.variables)
+
+        local install = decode_request(queries._buildUpdateExtensionMutation("pkg.mangadex", "install"))
+        assert.truthy(install.query:match("updateExtension"))
+        assert.are.equal("pkg.mangadex", install.variables.input.id)
+        assert.are.equal(true, install.variables.input.patch.install)
+        assert.is_nil(install.variables.input.patch.update)
+        assert.is_nil(install.variables.input.patch.uninstall)
+
+        local update = decode_request(queries._buildUpdateExtensionMutation("pkg.mangadex", "update"))
+        assert.are.equal(true, update.variables.input.patch.update)
+
+        local uninstall = decode_request(queries._buildUpdateExtensionMutation("pkg.mangadex", "uninstall"))
+        assert.are.equal(true, uninstall.variables.input.patch.uninstall)
+    end)
+
     it("builds manga update and refresh mutations", function()
         local update = decode_request(queries._buildUpdateMangaLibraryMutation("17", true))
         assert.truthy(update.query:match("UPDATE_MANGA_LIBRARY"))

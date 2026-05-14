@@ -13,6 +13,7 @@ describe("suwayomi/source_languages", function()
         assert.are.equal("日本語", source_languages.formatLabel("ja"))
         assert.are.equal("Português (Brasil)", source_languages.formatLabel("pt_BR"))
         assert.are.equal("српски језик", source_languages.formatLabel("sr"))
+        assert.are.equal("All", source_languages.formatLabel("all"))
     end)
 
     it("uses readable fallbacks for scripts missing from KOReader UI fonts", function()

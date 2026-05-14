@@ -79,7 +79,7 @@ Reviewed upstream [Suwayomi-WebUI](https://github.com/Suwayomi/Suwayomi-WebUI) a
 Use WebUI actions and naming as the default reference when the action makes sense on an e-ink KOReader device, but keep KOReader-specific ownership explicit:
 
 - Library and manga cards: WebUI exposes category tabs, search/global search, filter/sort/display controls, selection mode, and manga actions for download, delete downloaded chapters, mark read/unread, migrate, track, change categories, and remove from library. For the KOReader release, mirror the useful reading/offline actions first: download variants, mark read/unread, add/remove library, refresh, and device-local cleanup. Defer migrate, tracker, category editing, and full library filter/sort/display parity.
-- Browse and sources: WebUI exposes enabled/language-filtered source lists, global search, source pinning, source Popular/Latest/Filter modes, source filters, saved searches, and in-library result markers. For the KOReader release, implement global search, one-source search, Popular/Latest, pagination, language/NSFW visibility, and in-library markers. Defer source pinning, saved searches, source configuration, extension management, and the full dynamic filter editor.
+- Browse and sources: WebUI exposes enabled/language-filtered source lists, global search, source pinning, source Popular/Latest/Filter modes, source filters, saved searches, extension management, and in-library result markers. For the KOReader release, implement global search, one-source search, Popular/Latest, pagination, language/NSFW visibility, in-library markers, and basic extension install/update/uninstall. Defer source pinning, saved searches, source configuration, extension repository management, and the full dynamic filter editor.
 - Manga details and chapters: WebUI refreshes uninitialized manga, has a refresh action, shows the first unread/continue affordance, filters chapters by unread/downloaded/bookmarked/scanlator, sorts by source/chapter/upload/fetched, and exposes chapter actions for download, delete, bookmark, mark read/unread, mark previous as read, and browser/webview opens. For KOReader, prioritize refresh, first unread/open local CBZ, scanlator filtering, read/unread actions, selected/bulk actions, and local download/delete. Defer server-side bookmarks and browser/webview actions.
 - Downloads: WebUI manages Suwayomi's server-side queue with start/stop, clear all, reorder, remove, retry, server download settings, download-ahead, and delete-while-reading settings. This plugin's Downloads surface remains KOReader-device-local. Mirror the intent of download-ahead and delete-while-reading through local policies, but do not mutate or present Suwayomi server downloads as KOReader-local availability.
 
@@ -432,7 +432,7 @@ Goal: keep public documentation aligned with the client MVP.
   - full source filters
   - source preferences
   - custom in-plugin manga reader
-  - extension management
+  - extension repository management
   - server-side download queue management
   - server-side download settings
   - per-source download directory overrides
@@ -460,7 +460,6 @@ These are intentionally outside the client MVP:
 - Server-side download queue inspection/management
 - Server-side download queue reorder/start-stop/clear-all controls
 - Server-side download settings, including Suwayomi server download path
-- Extension install/update/uninstall
 - Extension repository management
 - Server local-source path management
 - Source preference editor

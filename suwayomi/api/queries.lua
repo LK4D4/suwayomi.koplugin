@@ -18,6 +18,8 @@ local function normalizeNumber(value, fallback)
     return fallback
 end
 
+local EXTENSION_FIELDS = "pkgName name lang versionName versionCode isNsfw isInstalled hasUpdate isObsolete iconUrl apkName repo"
+
 function Queries._buildSourcesQuery()
     return json.encode({
         query = "query getSources { sources { nodes { id name displayName lang iconUrl isNsfw supportsLatest } } }",
@@ -27,6 +29,33 @@ end
 function Queries._buildLegacySourcesQuery()
     return json.encode({
         query = "query getSources { sources { nodes { id name displayName lang } } }",
+    })
+end
+
+function Queries._buildFetchExtensionsMutation()
+    return json.encode({
+        query = "mutation FETCH_EXTENSIONS { fetchExtensions(input: {}) { extensions { " .. EXTENSION_FIELDS .. " } } }",
+    })
+end
+
+function Queries._buildUpdateExtensionMutation(pkg_name, action)
+    local patch = {}
+    if action == "install" then
+        patch.install = true
+    elseif action == "update" then
+        patch.update = true
+    elseif action == "uninstall" then
+        patch.uninstall = true
+    end
+
+    return json.encode({
+        query = "mutation UPDATE_EXTENSION($input: UpdateExtensionInput!) { updateExtension(input: $input) { extension { " .. EXTENSION_FIELDS .. " } } }",
+        variables = {
+            input = {
+                id = tostring(pkg_name or ""),
+                patch = patch,
+            },
+        },
     })
 end
 

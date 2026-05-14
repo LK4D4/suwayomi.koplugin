@@ -8,6 +8,7 @@
 -- formatted for display here.
 
 local Menu = require("ui/widget/menu")
+local ButtonDialog = require("ui/widget/buttondialog")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local _ = require("gettext")
 local ListRows = require("suwayomi/ui/list_rows")
@@ -42,6 +43,99 @@ function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
         on_title_bar_left_hold = options.on_title_bar_left_hold,
         thumbnail_credentials = options.thumbnail_credentials,
     }
+end
+
+function BrowseUI.showExtensionsMenu(extensions, onSelectCallback, options)
+    options = options or {}
+    return getListMenu().show{
+        title = options.title or _("Suwayomi Extensions"),
+        title_bar_left_icon = options and options.title_bar_left_icon,
+        item_table = ListRows.buildExtensionMenuTable(extensions, {
+            on_select = onSelectCallback,
+            empty_text = options.empty_text,
+        }),
+        close_callback = options.close_callback,
+        on_close = options.on_close,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+        thumbnail_credentials = options.thumbnail_credentials,
+    }
+end
+
+function BrowseUI.updateExtensionsMenu(menu, extensions, onSelectCallback, options)
+    options = options or {}
+    return getListMenu().update(menu, {
+        title = options.title or _("Suwayomi Extensions"),
+        title_bar_left_icon = options.title_bar_left_icon,
+        item_table = ListRows.buildExtensionMenuTable(extensions, {
+            on_select = onSelectCallback,
+            empty_text = options.empty_text,
+        }),
+        close_callback = options.close_callback,
+        on_close = options.on_close,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+        thumbnail_credentials = options.thumbnail_credentials,
+    })
+end
+
+function BrowseUI.showExtensionActionMenu(extension, onSelectCallback, options)
+    options = options or {}
+    local buttons = {}
+    local UIManager = require("ui/uimanager")
+    local dialog
+
+    local function addActionButton(action, text, destructive)
+        table.insert(buttons, {
+            {
+                text = text,
+                id = action,
+                destructive = destructive == true or nil,
+                callback = function()
+                    local function selectAction()
+                        if onSelectCallback then
+                            onSelectCallback(action)
+                        end
+                    end
+                    UIManager:close(dialog)
+                    if UIManager.nextTick then
+                        UIManager:nextTick(selectAction)
+                    else
+                        selectAction()
+                    end
+                end,
+            },
+        })
+    end
+
+    if type(extension) == "table" and extension.is_installed ~= true then
+        addActionButton("install", _("Install"))
+    elseif type(extension) == "table" and extension.has_update == true then
+        addActionButton("update", _("Update"))
+    end
+    if type(extension) == "table" and extension.is_installed == true then
+        addActionButton("uninstall", _("Uninstall"), true)
+    end
+
+    if #buttons == 0 then
+        table.insert(buttons, {
+            {
+                text = _("No actions available"),
+                callback = function()
+                    UIManager:close(dialog)
+                end,
+            },
+        })
+    end
+
+    dialog = ButtonDialog:new{
+        title = ListRows.getExtensionTitle(extension),
+        buttons = buttons,
+        anchor = options.anchor,
+        close_callback = options.close_callback,
+    }
+    UIManager:show(dialog)
+    return dialog
 end
 
 function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
@@ -116,6 +210,59 @@ function BrowseUI.showSourceSearchPrompt(source, onSearchCallback)
                 },
             },
         },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+    return dialog
+end
+
+function BrowseUI.showExtensionSearchPrompt(currentQuery, onSearchCallback)
+    local UIManager = require("ui/uimanager")
+    local dialog
+    local handled = false
+    local function finish(query)
+        if handled then
+            return
+        end
+        handled = true
+        UIManager:close(dialog)
+        if onSearchCallback then
+            onSearchCallback(query or "")
+        end
+    end
+    dialog = MultiInputDialog:new{
+        title = _("Search extensions"),
+        fields = {
+            {
+                hint = _("Extension name, language, or package"),
+                text = currentQuery or "",
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    id = "close",
+                    callback = function()
+                        finish("")
+                    end,
+                },
+                {
+                    text = _("Search"),
+                    is_enter_default = true,
+                    callback = function()
+                        local fields = dialog:getFields()
+                        finish(fields[1] or "")
+                    end,
+                },
+            },
+        },
+        close_callback = function()
+            if not handled and onSearchCallback then
+                handled = true
+                onSearchCallback("")
+            end
+        end,
     }
     UIManager:show(dialog)
     dialog:onShowKeyboard()

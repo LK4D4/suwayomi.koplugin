@@ -248,6 +248,14 @@ describe("suwayomi/ui", function()
         assert.are.same({ id = "m1", title = "One Piece" }, selected)
     end)
 
+    it("preserves facade access to extension menus", function()
+        local ui = require("suwayomi/ui")
+
+        assert.is_function(ui.showExtensionsMenu)
+        assert.is_function(ui.updateExtensionsMenu)
+        assert.is_function(ui.showExtensionActionMenu)
+    end)
+
     it("preserves facade access to downloads menus", function()
         local ui = require("suwayomi/ui")
         local retried_key

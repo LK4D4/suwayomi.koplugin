@@ -156,6 +156,126 @@ function ListRows.buildSourceMenuTable(sources, options)
     return menu_table
 end
 
+function ListRows.getExtensionTitle(extension)
+    if type(extension) ~= "table" then
+        return ""
+    end
+    return extension.name
+        or extension.pkg_name
+        or extension.apk_name
+        or ""
+end
+
+function ListRows.getExtensionSubtitle(extension)
+    if type(extension) ~= "table" then
+        return nil
+    end
+    local lang = extension.lang
+    if lang == nil or lang == "" then
+        return nil
+    end
+    return SourceLanguages.formatLabel(lang)
+end
+
+function ListRows.getExtensionMandatory(extension)
+    if type(extension) ~= "table" then
+        return nil
+    end
+    local status
+    if extension.has_update == true then
+        status = _("Update available")
+    elseif extension.is_installed ~= true then
+        status = _("Not installed")
+    elseif extension.is_obsolete == true then
+        status = _("Obsolete")
+    else
+        status = _("Installed")
+    end
+    local markers = {}
+    if extension.is_nsfw == true then
+        table.insert(markers, "18+")
+    end
+    if extension.version_name and extension.version_name ~= "" then
+        table.insert(markers, "v" .. tostring(extension.version_name))
+    end
+    if #markers == 0 then
+        return status
+    end
+    return status .. "\n" .. table.concat(markers, _(" · "))
+end
+
+function ListRows.buildExtensionRow(extension, options)
+    options = options or {}
+    return {
+        text = ListRows.getExtensionTitle(extension),
+        subtitle = ListRows.getExtensionSubtitle(extension),
+        mandatory = ListRows.getExtensionMandatory(extension),
+        thumbnail_url = type(extension) == "table" and extension.icon_url or nil,
+        thumbnail_placeholder = true,
+        extension = extension,
+        keep_menu_open = true,
+        callback = function()
+            if options.on_select then
+                options.on_select(extension)
+            end
+        end,
+    }
+end
+
+function ListRows.buildSectionHeaderRow(text)
+    return {
+        text = text,
+        title_bold = true,
+        select_enabled = false,
+        is_section_header = true,
+    }
+end
+
+local function sectionTitle(label, count)
+    return string.format("%s (%d)", label, count)
+end
+
+function ListRows.buildExtensionMenuTable(extensions, options)
+    options = options or {}
+    local menu_table = {}
+    local updates = {}
+    local installed = {}
+    local available = {}
+
+    for _, extension in ipairs(extensions or {}) do
+        if type(extension) == "table" and extension.has_update == true then
+            table.insert(updates, extension)
+        elseif type(extension) == "table" and extension.is_installed == true then
+            table.insert(installed, extension)
+        else
+            table.insert(available, extension)
+        end
+    end
+
+    local function appendSection(label, group)
+        if #group == 0 then
+            return
+        end
+        table.insert(menu_table, ListRows.buildSectionHeaderRow(sectionTitle(label, #group)))
+        for _, extension in ipairs(group) do
+            table.insert(menu_table, ListRows.buildExtensionRow(extension, options))
+        end
+    end
+
+    appendSection(_("Updates"), updates)
+    appendSection(_("Installed"), installed)
+    appendSection(_("Available"), available)
+
+    if #menu_table == 0 and options.empty_text then
+        table.insert(menu_table, {
+            text = options.empty_text,
+            select_enabled = false,
+        })
+    end
+
+    return menu_table
+end
+
 local function formatResultCount(summary)
     local count = 0
     if type(summary) == "table" then

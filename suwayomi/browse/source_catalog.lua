@@ -271,6 +271,11 @@ function Methods:showSourceList(sources, options)
                 submenu = true,
             })
         end
+        table.insert(actions, {
+            id = "extensions",
+            text = _("Extensions"),
+            submenu = true,
+        })
         if self.getTitleBarMenuOptions then
             menu_options = self:getTitleBarMenuOptions({
                 title = _("Suwayomi Sources"),
@@ -278,6 +283,9 @@ function Methods:showSourceList(sources, options)
                 onSelect = function(action, _, menu_context)
                     if action and action.id == "global_search" then
                         return showGlobalSearch()
+                    end
+                    if action and action.id == "extensions" then
+                        return self:showExtensions()
                     end
                     if action and action.id == "source_language_filter" then
                         return self:showSourceLanguageFilterActions(source_language_choices, menu_context)

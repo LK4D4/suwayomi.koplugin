@@ -12,6 +12,24 @@ describe("suwayomi/ui/list_menu", function()
         }
     end
 
+    local function textWidgetModule()
+        return {
+            new = function(_, options)
+                options = options or {}
+                function options:getSize()
+                    local face = self.face or {}
+                    local size = face.size or 12
+                    return {
+                        w = #tostring(self.text or "") * math.max(1, math.floor(size / 2)),
+                        h = size,
+                    }
+                end
+                function options:free() end
+                return options
+            end,
+        }
+    end
+
     before_each(function()
         created_options = nil
         stubbed_modules = {
@@ -96,7 +114,7 @@ describe("suwayomi/ui/list_menu", function()
             return {
                 border = { thin = 1 },
                 line = { thin = 1 },
-                span = { horizontal_default = 3 },
+                span = { horizontal_default = 3, vertical_default = 2 },
             }
         end
         package.preload["ui/uimanager"] = function()
@@ -131,14 +149,14 @@ describe("suwayomi/ui/list_menu", function()
             "ui/widget/container/leftcontainer",
             "ui/widget/overlapgroup",
             "ui/widget/container/rightcontainer",
-            "ui/widget/textboxwidget",
-            "ui/widget/textwidget",
             "ui/widget/container/underlinecontainer",
             "ui/widget/verticalgroup",
             "ui/widget/verticalspan",
         }) do
             package.preload[name] = widgetModule
         end
+        package.preload["ui/widget/textboxwidget"] = textWidgetModule
+        package.preload["ui/widget/textwidget"] = textWidgetModule
 
         package.preload["ui/widget/menu"] = function()
             return {
@@ -197,5 +215,97 @@ describe("suwayomi/ui/list_menu", function()
         assert.are.equal(2, menu.items_max_lines)
         assert.is_false(menu.multilines_show_more_text)
         assert.are.equal(12, menu.items_mandatory_font_size)
+    end)
+
+    it("does not fire close callbacks for rows that keep the menu open", function()
+        local ListMenu = require("suwayomi/ui/list_menu")
+        local selected = false
+        local closed = false
+        local base_selected = false
+        local menu = {
+            item_table = {},
+            onMenuChoice = function(_, item)
+                if item.callback then
+                    item.callback()
+                end
+            end,
+            onMenuSelect = function(self, item)
+                base_selected = true
+                self:onMenuChoice(item)
+                if self.close_callback then
+                    self.close_callback()
+                end
+                return true
+            end,
+            close_callback = function()
+                closed = true
+            end,
+        }
+
+        ListMenu.install(menu, {})
+        menu:onMenuSelect({
+            text = "Extension",
+            keep_menu_open = true,
+            callback = function()
+                selected = true
+            end,
+        })
+
+        assert.is_true(selected)
+        assert.is_false(closed)
+        assert.is_false(base_selected)
+    end)
+
+    it("lets callers intercept title-bar close before the menu closes", function()
+        local ListMenu = require("suwayomi/ui/list_menu")
+        local intercepted = false
+        local base_closed = false
+        local menu = {
+            item_table_stack = {},
+            onClose = function()
+                base_closed = true
+                return true
+            end,
+        }
+
+        ListMenu.install(menu, {
+            on_close = function()
+                intercepted = true
+                return true
+            end,
+        })
+
+        assert.is_true(menu:onClose())
+        assert.is_true(intercepted)
+        assert.is_false(base_closed)
+    end)
+
+    it("uses compact rows for section headers", function()
+        local ListMenu = require("suwayomi/ui/list_menu")
+        local menu = {
+            item_width = 320,
+            item_dimen = { h = 64 },
+            _suwayomi_base_item_height = 64,
+            available_height = 180,
+            items_max_lines = 3,
+            item_table = {
+                {
+                    text = "Installed (1)",
+                    is_section_header = true,
+                    select_enabled = false,
+                    title_bold = true,
+                },
+                {
+                    text = "A very very very very very long available extension title",
+                    thumbnail_placeholder = true,
+                },
+            },
+        }
+
+        ListMenu.setupItemHeights(menu)
+
+        assert.is_true(menu.item_table[1].height < menu._suwayomi_base_item_height)
+        assert.is_true(menu.item_table[2].height >= menu._suwayomi_base_item_height)
+        assert.are.same({ { 1, 2 } }, menu.page_items)
     end)
 end)

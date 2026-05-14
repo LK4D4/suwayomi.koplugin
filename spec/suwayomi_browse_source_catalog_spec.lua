@@ -84,6 +84,30 @@ local function stubDependencies()
                 }
                 return { kind = "language-menu" }
             end,
+            showExtensionsMenu = function(extensions, onSelect, options)
+                ui_calls.extensions_menu = {
+                    extensions = extensions,
+                    onSelect = onSelect,
+                    options = options,
+                }
+                return { kind = "extensions-menu" }
+            end,
+            updateExtensionsMenu = function(menu, extensions, onSelect, options)
+                ui_calls.updated_extensions_menu = {
+                    menu = menu,
+                    extensions = extensions,
+                    onSelect = onSelect,
+                    options = options,
+                }
+            end,
+            showExtensionActionMenu = function(extension, onSelect, options)
+                ui_calls.extension_actions = {
+                    extension = extension,
+                    onSelect = onSelect,
+                    options = options,
+                }
+                return { kind = "extension-actions-menu" }
+            end,
             updateLanguageMenu = function(menu, options, onToggle)
                 ui_calls.updated_language_menu = {
                     menu = menu,
@@ -174,13 +198,14 @@ describe("suwayomi/browse/source_catalog", function()
         assert(type(catalog.methods.showMangaForSource) == "function")
     end)
 
-    it("filters sources to english by default while always allowing local source language", function()
+    it("filters sources to english by default while allowing local source language", function()
         local catalog = loadCatalog()
         local controller = buildController(catalog)
 
         local filtered = controller:filterSourcesByLanguage({
             { id = "english", lang = "en" },
             { id = "local", lang = "localsourcelang" },
+            { id = "all", lang = "all" },
             { id = "spanish", lang = "es" },
             { id = "nsfw", lang = "en", is_nsfw = true },
         })
@@ -195,12 +220,14 @@ describe("suwayomi/browse/source_catalog", function()
         local choices = controller:getSourceLanguageFilterChoices({
             { id = "english", lang = "en" },
             { id = "local", lang = "localsourcelang" },
+            { id = "all", lang = "all" },
             { id = "spanish", lang = "es" },
             { id = "japanese", lang = "ja" },
             { id = "duplicate", lang = "en" },
         })
 
         assert.are.same({
+            { code = "all", label = "All", enabled = false },
             { code = "en", label = "English", enabled = true },
             { code = "es", label = "Español", enabled = false },
             { code = "ja", label = "日本語", enabled = false },
@@ -248,6 +275,27 @@ describe("suwayomi/browse/source_catalog", function()
 
         assert.are.same({ "spanish" }, { ui_calls.updated.sources[1].id })
         assert.are.same({ server_url = "https://suwayomi.example" }, ui_calls.updated.options.thumbnail_credentials)
+    end)
+
+    it("adds Extensions to the source title menu", function()
+        local catalog = loadCatalog()
+        local started
+        local controller = buildController(catalog, {
+            showExtensions = function()
+                started = true
+            end,
+        })
+
+        controller:showFetchedSources({
+            ok = true,
+            sources = {
+                { id = "english", lang = "en" },
+            },
+        }, { credentials = { server_url = "https://suwayomi.example" } })
+
+        assert.are.equal("extensions", controller.title_menu_options.actions[3].id)
+        controller.title_menu_options.onSelect({ id = "extensions" })
+        assert.is_true(started)
     end)
 
     it("filters multiple selected source languages plus local source", function()
@@ -355,7 +403,8 @@ describe("suwayomi/browse/source_catalog", function()
         })
 
         assert.are.equal("global_search", controller.title_menu_options.actions[1].id)
-        assert.is_nil(controller.title_menu_options.actions[2])
+        assert.are.equal("extensions", controller.title_menu_options.actions[2].id)
+        assert.is_nil(controller.title_menu_options.actions[3])
     end)
 
     it("reports fetched source failures unless silent", function()

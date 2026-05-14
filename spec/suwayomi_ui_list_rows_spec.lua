@@ -163,6 +163,11 @@ describe("suwayomi/ui/list_rows", function()
         }, {
             show_language = true,
         }))
+        assert.are.equal("All", rows.getSourceSubtitle({
+            lang = "all",
+        }, {
+            show_language = true,
+        }))
     end)
 
     it("hides local source language and absent adult markers", function()
@@ -225,6 +230,77 @@ describe("suwayomi/ui/list_rows", function()
         menu_table[2].callback()
         menu_table[3].callback()
         assert.are.same({ "s1", "s3" }, selected)
+    end)
+
+    it("groups extension rows with installed entries above available entries", function()
+        local rows = require("suwayomi/ui/list_rows")
+        local selected = {}
+        local extensions = {
+            {
+                pkg_name = "pkg.available",
+                name = "Available Source",
+                is_installed = false,
+            },
+            {
+                pkg_name = "pkg.installed",
+                name = "Installed Source",
+                is_installed = true,
+            },
+            {
+                pkg_name = "pkg.update",
+                name = "Update Source",
+                is_installed = true,
+                has_update = true,
+            },
+        }
+
+        local menu_table = rows.buildExtensionMenuTable(extensions, {
+            on_select = function(extension)
+                table.insert(selected, extension.pkg_name)
+            end,
+        })
+
+        assert.are.equal("Updates (1)", menu_table[1].text)
+        assert.is_true(menu_table[1].is_section_header)
+        assert.is_false(menu_table[1].select_enabled)
+        assert.is_nil(menu_table[1].thumbnail_placeholder)
+
+        assert.are.equal("Update Source", menu_table[2].text)
+        assert.are.same(extensions[3], menu_table[2].extension)
+        assert.is_true(menu_table[2].keep_menu_open)
+        assert.are.equal("Installed (1)", menu_table[3].text)
+        assert.is_true(menu_table[3].is_section_header)
+        assert.are.equal("Installed Source", menu_table[4].text)
+        assert.are.same(extensions[2], menu_table[4].extension)
+        assert.is_true(menu_table[4].keep_menu_open)
+        assert.are.equal("Available (1)", menu_table[5].text)
+        assert.is_true(menu_table[5].is_section_header)
+        assert.are.equal("Available Source", menu_table[6].text)
+        assert.are.same(extensions[1], menu_table[6].extension)
+        assert.is_true(menu_table[6].keep_menu_open)
+
+        menu_table[2].callback()
+        menu_table[4].callback()
+        menu_table[6].callback()
+        assert.are.same({ "pkg.update", "pkg.installed", "pkg.available" }, selected)
+    end)
+
+    it("keeps extension status on the first right-column line and markers on the second", function()
+        local rows = require("suwayomi/ui/list_rows")
+
+        assert.are.equal("Not installed\n18+ · v1.4.0", rows.getExtensionMandatory({
+            is_installed = false,
+            is_nsfw = true,
+            version_name = "1.4.0",
+        }))
+        assert.are.equal("Update available\nv1.2.0", rows.getExtensionMandatory({
+            is_installed = true,
+            has_update = true,
+            version_name = "1.2.0",
+        }))
+        assert.are.equal("Installed", rows.getExtensionMandatory({
+            is_installed = true,
+        }))
     end)
 
     it("builds library category rows with manga counts in the status column", function()
