@@ -65,6 +65,37 @@ describe("suwayomi/settings", function()
         assert.are.same(stored_data.credentials, credentials)
     end)
 
+    it("normalizes corrupt scalar credentials before callers use them", function()
+        stored_data.credentials = "not-a-table"
+
+        local settings = require("suwayomi/settings")
+        local credentials = settings:load()
+
+        assert.are.same({
+            server_url = "",
+            username = "",
+            password = "",
+            auth_method = "basic_auth",
+        }, credentials)
+    end)
+
+    it("coerces persisted credential fields to strings", function()
+        stored_data.credentials = {
+            server_url = 123,
+            username = false,
+            password = 456,
+            auth_method = "",
+        }
+
+        local settings = require("suwayomi/settings")
+        local credentials = settings:load()
+
+        assert.are.equal("123", credentials.server_url)
+        assert.are.equal("false", credentials.username)
+        assert.are.equal("456", credentials.password)
+        assert.are.equal("basic_auth", credentials.auth_method)
+    end)
+
     it("saves credentials and flushes the settings file", function()
         local settings = require("suwayomi/settings")
         settings:save({

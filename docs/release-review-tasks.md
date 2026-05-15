@@ -42,7 +42,7 @@ Fresh local verification from the review worktree:
     false/nil plus error or throws.
   - Tests: add disk-full or close-failure specs.
 
-- [ ] Normalize persisted credentials before use.
+- [x] Normalize persisted credentials before use.
   - Area: `suwayomi/settings.lua:142`
   - Risk: corrupt or old scalar settings can crash login/read-sync before the UI
     can recover.

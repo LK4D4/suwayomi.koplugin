@@ -65,6 +65,29 @@ local function copyTable(source)
     return target
 end
 
+local function toStringOrDefault(value, default)
+    if value == nil then
+        return default or ""
+    end
+    return tostring(value)
+end
+
+function SuwayomiSettings:normalizeCredentials(credentials)
+    if type(credentials) ~= "table" then
+        credentials = {}
+    end
+    local auth_method = toStringOrDefault(credentials.auth_method, DEFAULT_CREDENTIALS.auth_method)
+    if auth_method == "" then
+        auth_method = DEFAULT_CREDENTIALS.auth_method
+    end
+    return {
+        server_url = toStringOrDefault(credentials.server_url, DEFAULT_CREDENTIALS.server_url),
+        username = toStringOrDefault(credentials.username, DEFAULT_CREDENTIALS.username),
+        password = toStringOrDefault(credentials.password, DEFAULT_CREDENTIALS.password),
+        auth_method = auth_method,
+    }
+end
+
 function SuwayomiSettings:normalizeMaxParallelChapterDownloads(value)
     local normalized = tonumber(value) or DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS
     normalized = math.floor(normalized)
@@ -139,19 +162,16 @@ function SuwayomiSettings:normalizeServerURL(server_url)
 end
 
 function SuwayomiSettings:load()
-    local credentials = self:open():readSetting("credentials", copyTable(DEFAULT_CREDENTIALS))
-    if credentials.auth_method == nil or credentials.auth_method == "" then
-        credentials.auth_method = DEFAULT_CREDENTIALS.auth_method
-    end
-    return credentials
+    return self:normalizeCredentials(self:open():readSetting("credentials", copyTable(DEFAULT_CREDENTIALS)))
 end
 
 function SuwayomiSettings:save(credentials)
+    credentials = self:normalizeCredentials(credentials)
     local normalized = {
         server_url = self:normalizeServerURL(credentials.server_url),
-        username = credentials.username or "",
-        password = credentials.password or "",
-        auth_method = credentials.auth_method or DEFAULT_CREDENTIALS.auth_method,
+        username = credentials.username,
+        password = credentials.password,
+        auth_method = credentials.auth_method,
     }
 
     self:open():saveSetting("credentials", normalized):flush()
