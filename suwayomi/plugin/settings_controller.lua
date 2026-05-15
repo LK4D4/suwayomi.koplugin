@@ -423,6 +423,13 @@ end
 function Methods:buildSettingsMenu()
     return {
         {
+            text = _("Setup wizard"),
+            keep_menu_open = true,
+            callback = function()
+                self:showOnboardingSetup({ first_run = false })
+            end,
+        },
+        {
             text = _("Connection"),
             sub_item_table = {
                 {
@@ -430,13 +437,6 @@ function Methods:buildSettingsMenu()
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:showLoginDialog(touchmenu_instance)
-                    end,
-                },
-                {
-                    text = _("Setup wizard"),
-                    keep_menu_open = true,
-                    callback = function()
-                        self:showOnboardingSetup({ first_run = false })
                     end,
                 },
             },

@@ -70,7 +70,7 @@ Manual installation:
 1. Open the **Search** tab in KOReader's top menu.
 2. Tap **Suwayomi** to open the hub.
 3. First time use opens **Suwayomi setup**. Enter your server URL, username, and password, tap **Test connection**, then choose the download folder used for KOReader-local CBZ files.
-4. To re-run setup later, tap **Settings** > **Connection** > **Setup wizard**. To edit only the saved login, tap **Settings** > **Connection** > **Login information**.
+4. To re-run setup later, tap **Settings** > **Setup wizard**. To edit only the saved login, tap **Settings** > **Connection** > **Login information**.
 5. Optionally tap **Sync** to flush any pending local read/unread changes.
 6. Optionally tap **Settings** > **Browse** to filter source languages, show/hide NSFW sources, or hide in-library source results.
 7. Tap **Settings** > **Downloads** > **Download directory** to change where manga will be downloaded. The same Downloads settings section also controls optional local-file deletion after mark-read or finished-reading events.

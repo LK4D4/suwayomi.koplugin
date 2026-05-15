@@ -233,6 +233,14 @@ end
 describe("suwayomi/plugin/settings_controller", function()
     after_each(clearModules)
 
+    local function findMenuItem(items, text)
+        for _, item in ipairs(items or {}) do
+            if item.text == text then
+                return item
+            end
+        end
+    end
+
     it("exports settings dialog and settings menu methods", function()
         helper.assertControllerModule("suwayomi/plugin/settings_controller", {
             "showSettings",
@@ -247,16 +255,21 @@ describe("suwayomi/plugin/settings_controller", function()
     it("builds settings menu callbacks and saves login changes", function()
         local plugin, state = installController()
         local menu = plugin:showSettings()
+        local connection_menu = findMenuItem(menu, "Connection")
 
-        assert.are.equal("Connection", menu[1].text)
-        assert.are.equal("Library", menu[2].text)
-        assert.are.equal("Browse", menu[3].text)
-        assert.are.equal("Downloads", menu[4].text)
-        assert.are.equal("Login information", menu[1].sub_item_table[1].text)
-        assert.are.equal("Setup wizard", menu[1].sub_item_table[2].text)
-        assert.is_true(menu[1].sub_item_table[1].keep_menu_open)
+        assert.are.equal("Setup wizard", menu[1].text)
+        assert.are.equal("Connection", menu[2].text)
+        assert.are.equal("Library", menu[3].text)
+        assert.are.equal("Browse", menu[4].text)
+        assert.are.equal("Downloads", menu[5].text)
+        assert.are.equal("Login information", connection_menu.sub_item_table[1].text)
+        assert.is_nil(connection_menu.sub_item_table[2])
+        assert.is_true(connection_menu.sub_item_table[1].keep_menu_open)
 
-        menu[1].sub_item_table[1].callback(state.touchmenu)
+        menu[1].callback()
+        assert.truthy(state.onboarding_connection_options)
+
+        connection_menu.sub_item_table[1].callback(state.touchmenu)
         state.login_dialog_options.onSave({ server_url = "https://new.example" })
 
         assert.are.equal("https://new.example", state.saved_credentials.server_url)
@@ -374,7 +387,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
     it("keeps source language filtering out of plugin settings", function()
         local plugin, state = installController()
-        local browse_items = plugin:buildSettingsMenu()[3].sub_item_table
+        local browse_items = findMenuItem(plugin:buildSettingsMenu(), "Browse").sub_item_table
 
         assert.are.equal("Show NSFW sources: no", browse_items[1].text_func())
         assert.are.equal("Hide in-library results: no", browse_items[2].text_func())
@@ -383,7 +396,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
     it("toggles browse settings through menu callbacks", function()
         local plugin, state = installController()
-        local browse_items = plugin:buildSettingsMenu()[3].sub_item_table
+        local browse_items = findMenuItem(plugin:buildSettingsMenu(), "Browse").sub_item_table
 
         assert.are.equal("Show NSFW sources: no", browse_items[1].text_func())
         assert.are.equal("Hide in-library results: no", browse_items[2].text_func())
@@ -401,7 +414,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
     it("saves parallel download settings from downloads settings", function()
         local plugin, state = installController()
-        local download_items = plugin:buildSettingsMenu()[4].sub_item_table
+        local download_items = findMenuItem(plugin:buildSettingsMenu(), "Downloads").sub_item_table
 
         assert.are.equal("Parallel downloads: 2", download_items[2].text_func())
         download_items[2].callback(state.touchmenu)
@@ -424,7 +437,7 @@ describe("suwayomi/plugin/settings_controller", function()
                 process_count = process_count + 1
             end,
         }
-        local download_items = plugin:buildSettingsMenu()[4].sub_item_table
+        local download_items = findMenuItem(plugin:buildSettingsMenu(), "Downloads").sub_item_table
 
         download_items[2].callback(state.touchmenu)
         state.parallel_menu_options.onSelect(4)
@@ -437,7 +450,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
     it("saves category picker behavior and reports unavailable persistence", function()
         local plugin, state = installController()
-        local library_item = plugin:buildSettingsMenu()[2].sub_item_table[1]
+        local library_item = findMenuItem(plugin:buildSettingsMenu(), "Library").sub_item_table[1]
 
         assert.are.equal("Category picker: automatic", library_item.text_func())
         library_item.callback(state.touchmenu)
@@ -449,7 +462,7 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("Suwayomi library category picker saved: always", state.messages[#state.messages])
 
         local unavailable_plugin, unavailable_state = installController({ no_category_persistence = true })
-        local unavailable_item = unavailable_plugin:buildSettingsMenu()[2].sub_item_table[1]
+        local unavailable_item = findMenuItem(unavailable_plugin:buildSettingsMenu(), "Library").sub_item_table[1]
         assert.are.equal("Category picker: automatic", unavailable_item.text_func())
         unavailable_item.callback(unavailable_state.touchmenu)
         assert.are.equal("Library category picker settings are unavailable.", unavailable_state.messages[#unavailable_state.messages])
@@ -457,7 +470,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
     it("builds delete chapter settings and saves their changes", function()
         local plugin, state = installController()
-        local download_items = plugin:buildSettingsMenu()[4].sub_item_table
+        local download_items = findMenuItem(plugin:buildSettingsMenu(), "Downloads").sub_item_table
 
         assert.are.equal("Delete after manual mark-read: no", download_items[3].text_func())
         assert.are.equal("Delete while reading: Disabled", download_items[4].text_func())
