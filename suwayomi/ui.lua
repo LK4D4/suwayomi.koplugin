@@ -695,6 +695,12 @@ function SuwayomiUI.updateOnboardingConnectionDialogStatus(dialog, status)
     if dialog.title_bar and dialog.title_bar.setTitle then
         dialog.title_bar:setTitle(title, true)
     end
+    local continue_button = dialog.button_table
+        and dialog.button_table.getButtonById
+        and dialog.button_table:getButtonById("continue")
+    if continue_button and continue_button.refresh then
+        continue_button:refresh()
+    end
 end
 
 function SuwayomiUI.showOnboardingConnectionDialog(options)
@@ -702,6 +708,15 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
     local credentials = options.credentials or {}
     local UIManager = require("ui/uimanager")
     local dialog
+    local function canContinue()
+        if not options.canContinue then
+            return true
+        end
+        if not dialog or not dialog.getFields then
+            return false
+        end
+        return options.canContinue(getCredentialsFromDialog(dialog)) == true
+    end
 
     dialog = MultiInputDialog:new{
         title = formatOnboardingConnectionTitle(options.connection_status),
@@ -741,6 +756,9 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
             {
                 {
                     text = _("Continue"),
+                    id = "continue",
+                    enabled = options.canContinue == nil,
+                    enabled_func = canContinue,
                     is_enter_default = true,
                     callback = function()
                         local dialog_credentials = getCredentialsFromDialog(dialog)

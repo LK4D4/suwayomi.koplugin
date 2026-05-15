@@ -321,16 +321,75 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("Suwayomi setup complete.", state.messages[#state.messages])
     end)
 
-    it("lets settings setup wizard retest and change an already configured directory", function()
+    it("requires settings setup wizard to test current connection before continuing", function()
         local plugin, state = installController({
             credentials = { server_url = "https://suwayomi.example" },
             download_directory = "/storage/emulated/0/Books/Manga",
         })
+        plugin.startOnboardingConnectionTest = function(self, credentials)
+            state.tested_credentials = credentials
+            self.onboarding_connection_test_key = self:getOnboardingCredentialsKey(credentials)
+        end
 
         plugin:showOnboardingSetup({ first_run = false })
 
         assert.truthy(state.onboarding_connection_options)
         assert.are.equal("https://suwayomi.example", state.onboarding_connection_options.credentials.server_url)
+        assert.is_function(state.onboarding_connection_options.canContinue)
+        assert.is_false(state.onboarding_connection_options.canContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
+        assert.is_false(state.onboarding_connection_options.onContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
+        assert.are.equal("Test connection before continuing.", state.messages[#state.messages])
+        assert.is_nil(state.saved_credentials)
+        assert.is_nil(state.choose_download_callback)
+
+        state.onboarding_connection_options.onTestConnection({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        })
+        assert.is_false(state.onboarding_connection_options.canContinue({
+            server_url = "https://changed.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
+        assert.is_false(state.onboarding_connection_options.canContinue({
+            server_url = "https://suwayomi.example",
+            username = "bob",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
+        assert.is_false(state.onboarding_connection_options.canContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "changed",
+            auth_method = "basic_auth",
+        }))
+        assert.is_false(state.onboarding_connection_options.onContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "changed",
+            auth_method = "basic_auth",
+        }))
+        assert.is_nil(state.saved_credentials)
+
+        assert.is_true(state.onboarding_connection_options.canContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
         assert.is_true(state.onboarding_connection_options.onContinue({
             server_url = "https://suwayomi.example",
             username = "alice",

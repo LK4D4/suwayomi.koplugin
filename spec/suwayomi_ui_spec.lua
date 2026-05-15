@@ -5,12 +5,18 @@ describe("suwayomi/ui", function()
     local closed_dialog
     local events
     local record_next_tick
+    local dialog_fields
 
     before_each(function()
         shown_dialog = nil
         closed_dialog = nil
         events = {}
         record_next_tick = false
+        dialog_fields = {
+            "https://suwayomi.example",
+            "alice",
+            "secret",
+        }
 
         package.loaded["suwayomi/ui"] = nil
         package.loaded["suwayomi/ui/browse"] = nil
@@ -64,11 +70,7 @@ describe("suwayomi/ui", function()
             return {
                 new = function(_, options)
                     options.getFields = function()
-                        return {
-                            "https://suwayomi.example",
-                            "alice",
-                            "secret",
-                        }
+                        return dialog_fields
                     end
                     options.onShowKeyboard = function() end
                     return options
@@ -373,6 +375,34 @@ describe("suwayomi/ui", function()
         shown_dialog.buttons[2][1].callback()
 
         assert.is_nil(closed_dialog)
+    end)
+
+    it("disables onboarding continue until current fields match a passed test", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showOnboardingConnectionDialog({
+            credentials = {
+                server_url = "https://saved.example",
+            },
+            canContinue = function(credentials)
+                return credentials.server_url == "https://suwayomi.example"
+                    and credentials.username == "alice"
+                    and credentials.password == "secret"
+            end,
+        })
+
+        local continue_button = shown_dialog.buttons[2][1]
+        assert.are.equal("continue", continue_button.id)
+        assert.is_function(continue_button.enabled_func)
+        assert.is_true(continue_button.enabled_func())
+
+        dialog_fields = {
+            "https://suwayomi.example",
+            "alice",
+            "changed",
+        }
+
+        assert.is_false(continue_button.enabled_func())
     end)
 
     it("keeps onboarding connection test status visible", function()

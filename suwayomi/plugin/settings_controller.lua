@@ -72,6 +72,12 @@ function Methods:getOnboardingCredentialsKey(credentials)
 end
 
 
+function Methods:hasOnboardingConnectionTestPassed(credentials)
+    return self.onboarding_connection_test_key ~= nil
+        and self.onboarding_connection_test_key == self:getOnboardingCredentialsKey(credentials)
+end
+
+
 function Methods:needsOnboardingSetup()
     local credentials = SuwayomiSettings:load()
     if not credentials.server_url or credentials.server_url == "" then
@@ -93,6 +99,7 @@ function Methods:startOnboardingConnectionTest(credentials)
         return false
     end
 
+    self.onboarding_connection_test_key = nil
     SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "testing")
     local active = {
         credentials = credentials,
@@ -190,10 +197,12 @@ function Methods:showOnboardingConnectionStep(options)
         onTestConnection = function(credentials)
             self:startOnboardingConnectionTest(credentials)
         end,
+        canContinue = function(credentials)
+            return self:hasOnboardingConnectionTestPassed(credentials)
+        end,
         onContinue = function(credentials)
-            if options.first_run ~= false
-                and self.onboarding_connection_test_key ~= self:getOnboardingCredentialsKey(credentials)
-            then
+            if not self:hasOnboardingConnectionTestPassed(credentials) then
+                SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "untested")
                 self:showMessage(_("Test connection before continuing."))
                 return false
             end
