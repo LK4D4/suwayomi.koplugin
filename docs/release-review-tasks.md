@@ -255,7 +255,7 @@ Fresh local verification from the review worktree:
   - Area: `docs/ARCHITECTURE.md:115`
   - Risk: future changes may miss `suwayomi/source_languages.lua`.
 
-- [ ] Update stale Android performance weak-spot notes.
+- [x] Update stale Android performance weak-spot notes.
   - Area: `docs/android-performance-testing.md:148`
   - Risk: QA guidance still mentions synchronous GraphQL paths that have moved to
     async workers/request jobs.
