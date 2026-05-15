@@ -20,8 +20,8 @@ local function clearModules()
     end
 end
 
-local function installControllerWithSourceFetchStub(options)
-    options = options or {}
+local function installControllerWithSourceFetchStub(config)
+    config = config or {}
     clearModules()
     helper.stubControllerDependencies()
     local started_options
@@ -53,7 +53,7 @@ local function installControllerWithSourceFetchStub(options)
     package.preload["suwayomi/settings"] = function()
         return {
             load = function()
-                return options.credentials or { server_url = "https://suwayomi.example" }
+                return config.credentials or { server_url = "https://suwayomi.example" }
             end,
         }
     end

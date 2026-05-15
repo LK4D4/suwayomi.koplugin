@@ -406,7 +406,7 @@ describe("suwayomi/api/transport", function()
 
         package.preload["ssl.https"] = function()
             return {
-                request = function(options)
+                request = function()
                     return 1, 200, { ["content-length"] = "9" }
                 end,
             }

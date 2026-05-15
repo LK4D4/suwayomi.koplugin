@@ -172,7 +172,7 @@ function Methods:applyPendingReadSyncResult(active, result)
 end
 
 
-function Methods:finishPendingReadSync(active, synced, attempted)
+function Methods:finishPendingReadSync(_active, synced, attempted)
     self.pending_read_sync_active = nil
 
     if self:hasPendingReadSync(self:loadChapterLedger()) then
@@ -219,8 +219,7 @@ function Methods:schedulePendingReadSync(credentials, delay_seconds)
         if not started then
             if self:hasPendingReadSync(self:loadChapterLedger()) then
                 if attempted and attempted > 0 then
-                    local next_delay = self.read_sync_delay_seconds
-                    next_delay = self.pending_read_sync_failure_delay or self.read_sync_failure_delay_seconds
+                    local next_delay = self.pending_read_sync_failure_delay or self.read_sync_failure_delay_seconds
                     self.pending_read_sync_failure_delay = math.min(
                         next_delay * 2,
                         self.read_sync_max_failure_delay_seconds
