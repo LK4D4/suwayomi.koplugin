@@ -215,11 +215,19 @@ describe("suwayomi plugin", function()
     it("wires completed download archives into reader return context", function()
         local plugin = build_plugin()
         local saved_context
+        local ledger_context
         plugin.saveReaderReturnContext = function(_, manga, chapter, path)
             saved_context = {
                 manga = manga,
                 chapter = chapter,
                 path = path,
+            }
+        end
+        plugin.upsertChapterLedgerEntry = function(_, manga, chapter, updates)
+            ledger_context = {
+                manga = manga,
+                chapter = chapter,
+                updates = updates,
             }
         end
 
@@ -232,6 +240,11 @@ describe("suwayomi plugin", function()
         assert.are.equal(manga, saved_context.manga)
         assert.are.equal(chapter, saved_context.chapter)
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", saved_context.path)
+        assert.are.equal(manga, ledger_context.manga)
+        assert.are.equal(chapter, ledger_context.chapter)
+        assert.are.same({
+            path = "/downloads/Manga/Chapter 1.cbz",
+        }, ledger_context.updates)
     end)
 
     it("constructs navigation lazily and closes tracked Suwayomi screens", function()

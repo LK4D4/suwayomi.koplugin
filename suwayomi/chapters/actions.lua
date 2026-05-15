@@ -57,6 +57,11 @@ function Methods:openChapter(manga, chapter)
     if self.saveReaderReturnContext then
         self:saveReaderReturnContext(manga, chapter, chapter_path)
     end
+    if self.upsertChapterLedgerEntry then
+        self:upsertChapterLedgerEntry(manga, chapter, {
+            path = chapter_path,
+        })
+    end
 
     if ReaderUI.instance and ReaderUI.instance.switchDocument then
         ReaderUI.instance:switchDocument(chapter_path)

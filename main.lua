@@ -80,6 +80,11 @@ function SuwayomiPlugin:createDownloadQueue()
             if self.saveReaderReturnContext then
                 self:saveReaderReturnContext(manga, chapter, chapter_path)
             end
+            if self.upsertChapterLedgerEntry then
+                self:upsertChapterLedgerEntry(manga, chapter, {
+                    path = chapter_path,
+                })
+            end
         end,
     }
 end

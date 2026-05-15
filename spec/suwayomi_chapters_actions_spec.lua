@@ -352,6 +352,7 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(manga, plugin.reader_return_contexts[1].manga)
         assert.are.equal(chapter, plugin.reader_return_contexts[1].chapter)
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.reader_return_contexts[1].path)
+        assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.ledger["m1:c1"].path)
         package.preload["apps/reader/readerui"] = nil
         package.loaded["apps/reader/readerui"] = nil
     end)

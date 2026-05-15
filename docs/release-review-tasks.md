@@ -66,7 +66,7 @@ Fresh local verification from the review worktree:
     call `process()`, or migrate/recover active state before replacement.
   - Tests: cover setting change with active and queued jobs.
 
-- [ ] Ensure download-open path participates in read-sync ledger.
+- [x] Ensure download-open path participates in read-sync ledger.
   - Areas: `main.lua:79`, `suwayomi/readsync/controller.lua:274`
   - Risk: download -> open -> finish before a full chapter rebuild can skip server
     read-sync and delete-while-reading cleanup because `onCloseDocument()` scans
