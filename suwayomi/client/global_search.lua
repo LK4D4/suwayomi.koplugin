@@ -287,7 +287,7 @@ function SuwayomiClient:showGlobalSearch(sources)
             operation = "globalSearch",
             event = "global_search_started",
             source_count = #ordered_sources,
-            query = search_query,
+            query_length = #search_query,
         })
 
         if self.ui.showGlobalSearchResultsMenu then

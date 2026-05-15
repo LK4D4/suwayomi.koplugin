@@ -90,13 +90,30 @@ end
 
 local function sanitizeValue(key, value)
     key = tostring(key or ""):lower()
-    if key:match("password") or key:match("authorization") or key:match("credential") then
+    if key:match("password")
+        or key:match("authorization")
+        or key:match("credential")
+        or key:match("username")
+        or key:match("query")
+        or key:match("title")
+        or key:match("source")
+        or key:match("path")
+        or key:match("url")
+    then
         return "<redacted>"
     end
     if type(value) == "table" then
         return "<table>"
     end
-    return tostring(value)
+    local scalar = tostring(value)
+    if scalar:match("^https?://")
+        or scalar:match("^/")
+        or scalar:match("^%a:[/\\]")
+        or scalar:match("[/\\][^/\\]+[/\\]")
+    then
+        return "<redacted>"
+    end
+    return scalar
 end
 
 local function formatEvent(event)

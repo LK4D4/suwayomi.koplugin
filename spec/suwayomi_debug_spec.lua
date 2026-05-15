@@ -121,6 +121,36 @@ describe("suwayomi/debug", function()
         assert.truthy(file_lines[1]:match("password=<redacted>"))
     end)
 
+    it("redacts user data, paths, and URLs from QA debug events", function()
+        loaded_configs["/mock/settings/suwayomi_dl_debug.lua"] = {
+            enabled = true,
+            log_to_file = true,
+            log_to_koreader_log = true,
+        }
+        local debug = loadDebug()
+
+        debug.log({
+            operation = "globalSearch",
+            event = "start",
+            username = "alice",
+            query = "frieren",
+            title = "Sousou no Frieren",
+            source_name = "MangaDex",
+            server_url = "https://suwayomi.example/api/graphql",
+            path = "/storage/emulated/0/Books/Frieren/Ch. 1.cbz",
+        })
+
+        assert.truthy(logs[1]:match("username=<redacted>"))
+        assert.truthy(logs[1]:match("query=<redacted>"))
+        assert.truthy(logs[1]:match("title=<redacted>"))
+        assert.truthy(logs[1]:match("source_name=<redacted>"))
+        assert.truthy(logs[1]:match("server_url=<redacted>"))
+        assert.truthy(logs[1]:match("path=<redacted>"))
+        assert.is_nil(logs[1]:match("frieren"))
+        assert.is_nil(logs[1]:match("suwayomi.example"))
+        assert.is_nil(logs[1]:match("/storage"))
+    end)
+
     it("skips fast timing events when a slow threshold is configured", function()
         local now = 100
         package.preload.socket = function()

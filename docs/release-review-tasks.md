@@ -148,7 +148,7 @@ Fresh local verification from the review worktree:
   - Direction: reload credentials per retry or cancel scheduled retry on settings
     save.
 
-- [ ] Expand debug redaction for release QA logs.
+- [x] Expand debug redaction for release QA logs.
   - Areas: `suwayomi/debug.lua:93`, `suwayomi/client/global_search.lua:286`
   - Risk: debug logs can persist server URLs, usernames, filesystem paths, titles,
     source names, and search queries.
