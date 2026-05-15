@@ -242,7 +242,7 @@ Fresh local verification from the review worktree:
   - Area: `suwayomi/ui/menu_utils.lua:37`
   - Risk: callers can wire hold behavior that silently never fires.
 
-- [ ] Refresh manga action menu after add/remove library.
+- [x] Refresh manga action menu after add/remove library.
   - Area: `suwayomi/manga/controller.lua:388`
   - Risk: open action menu can still show the old Add/Remove Library action.
 
