@@ -205,7 +205,7 @@ Fresh local verification from the review worktree:
   - Risk: hardened repo/org defaults can make release asset upload fail.
   - Direction: add explicit `permissions: contents: write`.
 
-- [ ] Run lint/tests before release artifact publish.
+- [x] Run lint/tests before release artifact publish.
   - Area: `.github/workflows/release.yml:16`
   - Risk: a bad tag can publish an unverified zip because `test.yml` does not run
     on tag push.

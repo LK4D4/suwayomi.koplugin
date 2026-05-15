@@ -16,6 +16,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - uses: leafo/gh-actions-lua@v13
+        with:
+          luaVersion: "luajit-2.1"
+
+      - uses: leafo/gh-actions-luarocks@v6
+
+      - name: Install dependencies
+        run: |
+          luarocks install busted
+          luarocks install dkjson
+          luarocks install luasocket
+          luarocks install luasec
+          luarocks install luacheck
+
+      - name: Run lint
+        run: luacheck --codes spec suwayomi main.lua _meta.lua
+
+      - name: Run tests
+        run: busted spec
+
       - name: Build project
         run: |
           mkdir suwayomi_dl.koplugin
