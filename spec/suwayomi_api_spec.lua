@@ -104,7 +104,9 @@ describe("suwayomi/api facade", function()
             "_buildMarkChapterReadMutation",
             "_buildMarkChapterUnreadMutation",
             "_buildFetchExtensionsMutation",
+            "_buildLegacyFetchExtensionsMutation",
             "_buildUpdateExtensionMutation",
+            "_buildLegacyUpdateExtensionMutation",
             "parseSourcesResponse",
             "parseExtensionsResponse",
             "parseUpdateExtensionResponse",
@@ -193,6 +195,44 @@ describe("suwayomi/api facade", function()
         assert.truthy(update_request.bodies[1]:match("updateExtension"))
         assert.truthy(update_request.bodies[1]:match("\"id\":\"pkg.mangadex\""))
         assert.truthy(update_request.bodies[1]:match("\"install\":true"))
+    end)
+
+    it("retries extension operations with legacy fields for old schemas", function()
+        local request = install_graphql_sequence_stub({
+            {
+                body = [[{"errors":[{"message":"Cannot query field \"apkName\" on type \"Extension\""}]}]],
+            },
+            {
+                body = [[{"data":{"fetchExtensions":{"extensions":[{"pkgName":"pkg.mangadex","name":"MangaDex","lang":"all","versionName":"1.4.0","versionCode":140,"isNsfw":false,"isInstalled":true,"hasUpdate":false,"isObsolete":false}]}}}]],
+            },
+        })
+
+        local extensions = api.fetchExtensions(valid_credentials())
+
+        assert.are.equal(true, extensions.ok)
+        assert.are.equal("pkg.mangadex", extensions.extensions[1].pkg_name)
+        assert.are.equal(2, request.count)
+        assert.truthy(request.bodies[1]:match("apkName"))
+        assert.is_nil(request.bodies[2]:match("apkName"))
+        assert.is_nil(request.bodies[2]:match("iconUrl"))
+        assert.is_nil(request.bodies[2]:match("repo"))
+
+        local update_request = install_graphql_sequence_stub({
+            {
+                body = [[{"errors":[{"message":"Cannot query field \"repo\" on type \"Extension\""}]}]],
+            },
+            {
+                body = [[{"data":{"updateExtension":{"extension":{"pkgName":"pkg.mangadex","name":"MangaDex","lang":"all","versionName":"1.4.0","versionCode":140,"isNsfw":false,"isInstalled":true,"hasUpdate":false,"isObsolete":false}}}}]],
+            },
+        })
+
+        local installed = api.updateExtension(valid_credentials(), "pkg.mangadex", "install")
+
+        assert.are.equal(true, installed.ok)
+        assert.are.equal(2, update_request.count)
+        assert.truthy(update_request.bodies[1]:match("repo"))
+        assert.is_nil(update_request.bodies[2]:match("repo"))
+        assert.truthy(update_request.bodies[2]:match("\"install\":true"))
     end)
 
     it("fetches manga, library manga, categories, updates library state, and refreshes manga", function()

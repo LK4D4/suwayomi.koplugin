@@ -36,7 +36,9 @@ local query_exports = {
     "_buildMarkChapterReadMutation",
     "_buildMarkChapterUnreadMutation",
     "_buildFetchExtensionsMutation",
+    "_buildLegacyFetchExtensionsMutation",
     "_buildUpdateExtensionMutation",
+    "_buildLegacyUpdateExtensionMutation",
 }
 
 local parser_exports = {
@@ -137,6 +139,13 @@ function SuwayomiAPI.fetchExtensions(credentials)
     if not result.ok then
         return result
     end
+    if parsers.isOptionalExtensionMetadataFieldError(result.response_body) then
+        logDebugEvent({ operation = "fetchExtensions", event = "legacy_extension_query_retry" })
+        result = performGraphQLRequest(credentials, SuwayomiAPI._buildLegacyFetchExtensionsMutation(), "fetchExtensions")
+        if not result.ok then
+            return result
+        end
+    end
 
     local extensions, parse_error = SuwayomiAPI.parseExtensionsResponse(result.response_body)
     if not extensions then
@@ -157,6 +166,13 @@ function SuwayomiAPI.updateExtension(credentials, pkg_name, action)
     local result = performGraphQLRequest(credentials, SuwayomiAPI._buildUpdateExtensionMutation(pkg_name, action), "updateExtension")
     if not result.ok then
         return result
+    end
+    if parsers.isOptionalExtensionMetadataFieldError(result.response_body) then
+        logDebugEvent({ operation = "updateExtension", event = "legacy_extension_query_retry" })
+        result = performGraphQLRequest(credentials, SuwayomiAPI._buildLegacyUpdateExtensionMutation(pkg_name, action), "updateExtension")
+        if not result.ok then
+            return result
+        end
     end
 
     local extension, parse_error = SuwayomiAPI.parseUpdateExtensionResponse(result.response_body)

@@ -77,7 +77,7 @@ Fresh local verification from the review worktree:
 
 ## P2 Important
 
-- [ ] Add legacy fallback for extension GraphQL fields.
+- [x] Add legacy fallback for extension GraphQL fields.
   - Area: `suwayomi/api/queries.lua:21`
   - Risk: older Suwayomi schemas can reject `iconUrl`, `apkName`, or `repo` and
     break extension list/install/update.

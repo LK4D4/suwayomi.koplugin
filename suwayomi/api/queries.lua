@@ -19,6 +19,7 @@ local function normalizeNumber(value, fallback)
 end
 
 local EXTENSION_FIELDS = "pkgName name lang versionName versionCode isNsfw isInstalled hasUpdate isObsolete iconUrl apkName repo"
+local LEGACY_EXTENSION_FIELDS = "pkgName name lang versionName versionCode isNsfw isInstalled hasUpdate isObsolete"
 
 function Queries._buildSourcesQuery()
     return json.encode({
@@ -44,7 +45,13 @@ function Queries._buildFetchExtensionsMutation()
     })
 end
 
-function Queries._buildUpdateExtensionMutation(pkg_name, action)
+function Queries._buildLegacyFetchExtensionsMutation()
+    return json.encode({
+        query = "mutation FETCH_EXTENSIONS { fetchExtensions(input: {}) { extensions { " .. LEGACY_EXTENSION_FIELDS .. " } } }",
+    })
+end
+
+local function buildUpdateExtensionMutation(pkg_name, action, fields)
     local patch = {}
     if action == "install" then
         patch.install = true
@@ -55,7 +62,7 @@ function Queries._buildUpdateExtensionMutation(pkg_name, action)
     end
 
     return json.encode({
-        query = "mutation UPDATE_EXTENSION($input: UpdateExtensionInput!) { updateExtension(input: $input) { extension { " .. EXTENSION_FIELDS .. " } } }",
+        query = "mutation UPDATE_EXTENSION($input: UpdateExtensionInput!) { updateExtension(input: $input) { extension { " .. fields .. " } } }",
         variables = {
             input = {
                 id = tostring(pkg_name or ""),
@@ -63,6 +70,14 @@ function Queries._buildUpdateExtensionMutation(pkg_name, action)
             },
         },
     })
+end
+
+function Queries._buildUpdateExtensionMutation(pkg_name, action)
+    return buildUpdateExtensionMutation(pkg_name, action, EXTENSION_FIELDS)
+end
+
+function Queries._buildLegacyUpdateExtensionMutation(pkg_name, action)
+    return buildUpdateExtensionMutation(pkg_name, action, LEGACY_EXTENSION_FIELDS)
 end
 
 function Queries._buildMangaQuery(options)

@@ -35,6 +35,16 @@ describe("suwayomi/api/parsers", function()
         assert.is_false(parsers.isOptionalSourceMetadataFieldError([[
             { "errors": [ { "message": "Authentication failed" } ] }
         ]]))
+
+        assert.is_true(parsers.isOptionalExtensionMetadataFieldError([[
+            { "errors": [ { "message": "Cannot query field \"apkName\" on type \"Extension\"" } ] }
+        ]]))
+        assert.is_true(parsers.isOptionalExtensionMetadataFieldError([[
+            { "errors": [ { "message": "Cannot query field \"repo\" on type \"Extension\"" } ] }
+        ]]))
+        assert.is_false(parsers.isOptionalExtensionMetadataFieldError([[
+            { "errors": [ { "message": "Authentication failed" } ] }
+        ]]))
     end)
 
     it("parses manga, library manga, categories, and refresh responses", function()

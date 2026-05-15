@@ -66,6 +66,13 @@ describe("suwayomi/api/queries", function()
         assert.truthy(fetch.query:match("pkgName"))
         assert.is_nil(fetch.variables)
 
+        local legacy_fetch = decode_request(queries._buildLegacyFetchExtensionsMutation())
+        assert.truthy(legacy_fetch.query:match("fetchExtensions"))
+        assert.truthy(legacy_fetch.query:match("pkgName"))
+        assert.is_nil(legacy_fetch.query:match("iconUrl"))
+        assert.is_nil(legacy_fetch.query:match("apkName"))
+        assert.is_nil(legacy_fetch.query:match("repo"))
+
         local install = decode_request(queries._buildUpdateExtensionMutation("pkg.mangadex", "install"))
         assert.truthy(install.query:match("updateExtension"))
         assert.are.equal("pkg.mangadex", install.variables.input.id)
@@ -75,6 +82,14 @@ describe("suwayomi/api/queries", function()
 
         local update = decode_request(queries._buildUpdateExtensionMutation("pkg.mangadex", "update"))
         assert.are.equal(true, update.variables.input.patch.update)
+
+        local legacy_update = decode_request(queries._buildLegacyUpdateExtensionMutation("pkg.mangadex", "update"))
+        assert.truthy(legacy_update.query:match("updateExtension"))
+        assert.are.equal("pkg.mangadex", legacy_update.variables.input.id)
+        assert.are.equal(true, legacy_update.variables.input.patch.update)
+        assert.is_nil(legacy_update.query:match("iconUrl"))
+        assert.is_nil(legacy_update.query:match("apkName"))
+        assert.is_nil(legacy_update.query:match("repo"))
 
         local uninstall = decode_request(queries._buildUpdateExtensionMutation("pkg.mangadex", "uninstall"))
         assert.are.equal(true, uninstall.variables.input.patch.uninstall)

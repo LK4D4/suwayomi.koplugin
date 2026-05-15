@@ -164,6 +164,27 @@ function Parsers.isOptionalSourceMetadataFieldError(response_body)
     return false
 end
 
+function Parsers.isOptionalExtensionMetadataFieldError(response_body)
+    local payload = json.decode(response_body, 1, nil)
+    if type(payload) ~= "table" or type(payload.errors) ~= "table" then
+        return false
+    end
+
+    for _, graph_error in ipairs(payload.errors) do
+        local message = tostring(graph_error and graph_error.message or "")
+        local mentions_optional_field = message:match("iconUrl")
+            or message:match("apkName")
+            or message:match("repo")
+        local looks_like_schema_error = message:match("Cannot query field")
+            or message:match("Unknown field")
+            or message:match("FieldUndefined")
+        if mentions_optional_field and looks_like_schema_error then
+            return true
+        end
+    end
+    return false
+end
+
 function Parsers.parseExtensionsResponse(response_body)
     local payload, _, err = json.decode(response_body, 1, nil)
     if err then
