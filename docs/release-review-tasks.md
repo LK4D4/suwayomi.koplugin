@@ -179,7 +179,7 @@ Fresh local verification from the review worktree:
     after server/settings switch.
   - Direction: compare worker credentials/server generation before UI update.
 
-- [ ] Thread `onMangaUpdated` through chapter refresh action.
+- [x] Thread `onMangaUpdated` through chapter refresh action.
   - Area: `suwayomi/manga/controller.lua:523`
   - Risk: refreshed title/chapter metadata can leave browse/library/search parent
     rows stale.

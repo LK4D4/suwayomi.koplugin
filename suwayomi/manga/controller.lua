@@ -150,6 +150,9 @@ function Methods:handleRefreshMangaResult(manga, result, options)
     end
 
     self:applyMangaRefreshResult(manga, result.manga)
+    if options.onMangaUpdated then
+        options.onMangaUpdated(manga)
+    end
     return self:showChapterResultForManga(manga, {
         ok = true,
         manga = manga,
@@ -431,13 +434,13 @@ function Methods:confirmRemoveMangaFromLibrary(manga, options)
 end
 
 
-function Methods:refreshMangaChapters(manga)
+function Methods:refreshMangaChapters(manga, options)
     if not manga or not manga.id then
         self:showMessage(_("This manga cannot be refreshed right now."))
         return false
     end
 
-    return self:startRefreshMangaForChapters(manga)
+    return self:startRefreshMangaForChapters(manga, options)
 end
 
 
@@ -521,7 +524,7 @@ function Methods:performMangaAction(manga, action_id, options)
         end)
     end
     if action_id == "refresh_chapters" then
-        return self:refreshMangaChapters(manga)
+        return self:refreshMangaChapters(manga, options)
     end
     if action_id == "add_to_library" then
         return self:addMangaToLibrary(manga, options)

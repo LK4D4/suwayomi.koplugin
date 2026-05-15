@@ -434,11 +434,17 @@ describe("suwayomi/manga/controller", function()
     it("refreshes manga and shows returned chapters", function()
         local plugin, state = installController()
         local manga = { id = "m1", title = "Frieren" }
+        local updated_manga
 
-        assert.is_true(plugin:performMangaAction(manga, "refresh_chapters"))
+        assert.is_true(plugin:performMangaAction(manga, "refresh_chapters", {
+            onMangaUpdated = function(value)
+                updated_manga = value
+            end,
+        }))
 
         assert.are.same({ "m1" }, state.refresh_calls)
         assert.are.equal("Refreshed title", manga.title)
+        assert.are.equal(manga, updated_manga)
         assert.are.equal("Refreshed title", state.chapter_menu_options.title)
         assert.are.equal("c2", plugin.current_chapter_context.chapters[1].id)
         assert.are.equal("chapters", state.tracked_screens[1].route_id)
