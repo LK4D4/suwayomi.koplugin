@@ -339,6 +339,45 @@ describe("suwayomi/settings", function()
         assert.are.same(ledger, stored_data.chapter_ledger)
     end)
 
+    it("drops corrupt chapter ledger values before read-sync uses them", function()
+        stored_data.chapter_ledger = {
+            ["m1:c1"] = {
+                manga_id = 1,
+                manga_title = 2,
+                chapter_id = 3,
+                chapter_name = 4,
+                path = 5,
+                read = 1,
+                pending_read_sync = true,
+                pending_read_state = 1,
+            },
+            bad = "scalar",
+        }
+
+        local settings = require("suwayomi/settings")
+        local ledger = settings:loadChapterLedger()
+
+        assert.is_nil(ledger.bad)
+        assert.are.same({
+            manga_id = "1",
+            manga_title = "2",
+            chapter_id = "3",
+            chapter_name = "4",
+            path = "5",
+            read = false,
+            pending_read_sync = true,
+            pending_read_state = true,
+        }, ledger["m1:c1"])
+    end)
+
+    it("normalizes non-table chapter ledgers to an empty table", function()
+        stored_data.chapter_ledger = "not-a-table"
+
+        local settings = require("suwayomi/settings")
+
+        assert.are.same({}, settings:loadChapterLedger())
+    end)
+
     it("loads and saves reader return contexts by chapter path", function()
         local settings = require("suwayomi/settings")
         local contexts = {

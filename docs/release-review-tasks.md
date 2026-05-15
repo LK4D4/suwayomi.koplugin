@@ -50,7 +50,7 @@ Fresh local verification from the review worktree:
     fields.
   - Tests: add invalid persisted credential specs.
 
-- [ ] Normalize persisted chapter ledger before use.
+- [x] Normalize persisted chapter ledger before use.
   - Area: `suwayomi/settings.lua:319`
   - Risk: non-table or corrupt ledger data can crash chapter menu, close-document
     sync, or pending replay.
