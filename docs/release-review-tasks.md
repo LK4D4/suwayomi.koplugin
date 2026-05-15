@@ -186,7 +186,7 @@ Fresh local verification from the review worktree:
   - Direction: pass options through refresh helpers and notify parent after result
     application.
 
-- [ ] Make scanlator-filtered "mark previous" respect visible chapters.
+- [x] Make scanlator-filtered "mark previous" respect visible chapters.
   - Area: `suwayomi/chapters/context.lua:292`
   - Risk: filtered view can mark hidden scanlator chapters read and sync wrong
     server state.

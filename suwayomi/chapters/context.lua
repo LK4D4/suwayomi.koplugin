@@ -289,7 +289,7 @@ function Methods:getChaptersThrough(chapter)
     end
 
     local found = false
-    for _, current in ipairs(self.current_chapter_context.chapters) do
+    for _, current in ipairs(self:getVisibleChapters(self.current_chapter_context.chapters)) do
         table.insert(chapters, current)
         if tostring(current.id or "") == tostring(chapter.id or "") then
             found = true
