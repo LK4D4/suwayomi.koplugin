@@ -9,6 +9,7 @@ local SuwayomiSettings = require("suwayomi/settings")
 
 local KoreaderMetadata = {}
 KoreaderMetadata.__index = KoreaderMetadata
+local MAX_KOREADER_LUA_BYTES = 64 * 1024
 
 -- Controllers expose new(deps) for a consistent boundary; methods remain plugin-bound mixins so this refactor can move code without changing callback behavior.
 function KoreaderMetadata:new(deps)
@@ -19,6 +20,20 @@ function KoreaderMetadata:new(deps)
 end
 
 local Methods = {}
+
+local function readBoundedLuaFile(path)
+    local handle = path and io.open(path, "r")
+    if not handle then
+        return nil
+    end
+
+    local content = handle:read(MAX_KOREADER_LUA_BYTES + 1) or ""
+    handle:close()
+    if #content > MAX_KOREADER_LUA_BYTES then
+        return nil
+    end
+    return content
+end
 
 function Methods:getKoreaderMetadataPathForDocument(document_path)
     if not document_path or document_path == "" then
@@ -62,14 +77,11 @@ function Methods:loadKoreaderMetadataTable(chapter_path)
     local metadata = {
         doc_path = chapter_path,
     }
-    local handle = metadata_path and io.open(metadata_path, "r")
-    if not handle then
+
+    local content = readBoundedLuaFile(metadata_path)
+    if not content then
         return metadata, metadata_path
     end
-
-    local content = handle:read("*a") or ""
-    handle:close()
-
     local loader = loadstring(content)
     if not loader then
         return metadata, metadata_path
@@ -177,14 +189,10 @@ end
 
 
 function Methods:isKoreaderMetadataFinished(metadata_path)
-    local handle = metadata_path and io.open(metadata_path, "r")
-    if not handle then
+    local content = readBoundedLuaFile(metadata_path)
+    if not content then
         return false
     end
-
-    local content = handle:read("*a") or ""
-    handle:close()
-
     local status = content:match('%["status"%]%s*=%s*"([^"]+)"')
     if status == "complete" or status == "completed" or status == "finished" then
         return true
@@ -216,14 +224,10 @@ end
 
 function Methods:loadKoreaderHistoryPaths()
     local history_path = self:getKoreaderHistoryPath()
-    local handle = history_path and io.open(history_path, "r")
-    if not handle then
+    local content = readBoundedLuaFile(history_path)
+    if not content then
         return {}
     end
-
-    local content = handle:read("*a") or ""
-    handle:close()
-
     local loader = loadstring(content)
     if not loader then
         return {}

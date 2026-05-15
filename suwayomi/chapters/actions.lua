@@ -343,7 +343,11 @@ function Methods:deleteReadChaptersFromDevice()
     end)
 
     self:refreshChapterMenu()
-    self:showMessage(self:formatReadDownloadDeleteMessage(deleted))
+    self:showMessage(self:formatReadDownloadDeleteMessage(deleted, {
+        missing = missing,
+        active = active,
+        failed = failed,
+    }))
     SuwayomiDebug.log({
         operation = "deleteReadChaptersFromDevice",
         event = "end",
@@ -397,11 +401,31 @@ function Methods:getReadDownloadedChaptersFromCurrentContext()
     return chapters
 end
 
-function Methods:formatReadDownloadDeleteMessage(deleted)
-    return T(
+function Methods:formatReadDownloadDeleteMessage(deleted, details)
+    local message = T(
         self:pluralize(deleted, _("Deleted %1 chapter from device."), _("Deleted %1 chapters from device.")),
         deleted
     )
+    details = details or {}
+    if (details.active or 0) > 0 then
+        message = message .. " " .. T(
+            self:pluralize(details.active, _("Skipped %1 active download."), _("Skipped %1 active downloads.")),
+            details.active
+        )
+    end
+    if (details.missing or 0) > 0 then
+        message = message .. " " .. T(
+            self:pluralize(details.missing, _("Missing %1 download."), _("Missing %1 downloads.")),
+            details.missing
+        )
+    end
+    if (details.failed or 0) > 0 then
+        message = message .. " " .. T(
+            self:pluralize(details.failed, _("Failed to delete %1 download."), _("Failed to delete %1 downloads.")),
+            details.failed
+        )
+    end
+    return message
 end
 
 

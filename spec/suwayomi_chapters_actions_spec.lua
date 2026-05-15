@@ -565,9 +565,46 @@ describe("suwayomi/chapters/actions", function()
         local deleted = plugin:deleteReadChaptersFromDevice()
 
         assert.are.equal(0, deleted)
-        assert.are.same({ "Deleted 0 chapters from device." }, plugin.messages)
+        assert.are.same({ "Deleted 0 chapters from device. Failed to delete 1 download." }, plugin.messages)
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.ledger["m1:c1"].path)
         assert.are.equal(0, #queue.cleared)
+    end)
+
+    it("reports partial delete-read outcomes in the result text", function()
+        local chapters = {
+            { id = "c1", name = "Chapter 1", is_read = true },
+            { id = "c2", name = "Chapter 2", is_read = true },
+            { id = "c3", name = "Chapter 3", is_read = true },
+            { id = "c4", name = "Chapter 4", is_read = true },
+        }
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+                ["/downloads/Manga/Chapter 4.cbz"] = true,
+            },
+            remove_results = {
+                ["/downloads/Manga/Chapter 4.cbz"] = false,
+            },
+            queue = {
+                status = {
+                    ["m1:c2"] = { state = "downloading" },
+                },
+            },
+            current_chapter_context = {
+                manga = manga,
+                chapters = chapters,
+            },
+        })
+        function plugin:getReadDownloadedChaptersFromCurrentContext()
+            return chapters
+        end
+
+        local deleted = plugin:deleteReadChaptersFromDevice()
+
+        assert.are.equal(1, deleted)
+        assert.are.same({
+            "Deleted 1 chapter from device. Skipped 1 active download. Missing 1 download. Failed to delete 1 download.",
+        }, plugin.messages)
     end)
 
     it("deletes the configured finished chapter offset while reading", function()

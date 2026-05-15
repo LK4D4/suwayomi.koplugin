@@ -334,12 +334,18 @@ function Methods:showMangaActions(manga, options)
         return self:showChaptersForManga(manga)
     end
 
+    local action_options = {}
+    for key, value in pairs(options) do
+        action_options[key] = value
+    end
+    action_options.refresh_action_menu_after_library_update = true
+
     local menu = SuwayomiUI.showMangaActionsMenu({
         title = manga and (manga.title or tostring(manga.id)) or _("Manga actions"),
         actions = self:getMangaActions(manga),
     }, function(action)
         if action then
-            self:performMangaAction(manga, action.id, options)
+            self:performMangaAction(manga, action.id, action_options)
         end
     end)
     if self.trackSuwayomiScreen then
@@ -396,6 +402,9 @@ function Methods:setMangaLibraryState(manga, in_library, options)
             self:showMessage(_("Added to library."))
         else
             self:showMessage(_("Removed from library."))
+        end
+        if options.refresh_action_menu_after_library_update then
+            self:showMangaActions(manga, options)
         end
     end, _("Could not update library."), "library_state:" .. tostring(manga.id))
     if not result then

@@ -279,6 +279,15 @@ local function installController(options)
     return plugin, state
 end
 
+local function hasAction(actions, action_id)
+    for _, action in ipairs(actions or {}) do
+        if action.id == action_id then
+            return true
+        end
+    end
+    return false
+end
+
 describe("suwayomi/manga/controller", function()
     after_each(clearModules)
 
@@ -368,6 +377,25 @@ describe("suwayomi/manga/controller", function()
         assert.is_false(manga.in_library)
         assert.is_nil(manga.menu_text)
         assert.are.equal("Removed from library.", state.messages[#state.messages])
+    end)
+
+    it("refreshes the open manga action menu after library state changes", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Frieren", in_library = false }
+
+        plugin:showMangaActions(manga)
+        assert.is_true(hasAction(state.manga_actions_options.actions, "add_to_library"))
+
+        state.manga_actions_callback({ id = "add_to_library" })
+
+        assert.is_true(hasAction(state.manga_actions_options.actions, "remove_from_library"))
+        assert.is_false(hasAction(state.manga_actions_options.actions, "add_to_library"))
+
+        state.manga_actions_callback({ id = "remove_from_library" })
+        state.confirm_options.ok_callback()
+
+        assert.is_true(hasAction(state.manga_actions_options.actions, "add_to_library"))
+        assert.is_false(hasAction(state.manga_actions_options.actions, "remove_from_library"))
     end)
 
     it("opens first unread and downloads the next unread chapter from manga actions", function()

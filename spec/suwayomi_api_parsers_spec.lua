@@ -162,4 +162,68 @@ describe("suwayomi/api/parsers", function()
         assert.is_nil(chapters)
         assert.are.equal("Suwayomi server did not return a chapter list.", chapters_error)
     end)
+
+    it("rejects malformed manga nodes with an explicit parser error", function()
+        local source_manga, source_error = parsers.parseMangaResponse([[
+            { "data": { "fetchSourceManga": { "hasNextPage": false, "mangas": [
+                { "title": "Missing id" }
+            ] } } }
+        ]])
+        assert.is_nil(source_manga)
+        assert.are.equal("Suwayomi server returned invalid manga data.", source_error)
+
+        local library_manga, library_error = parsers.parseLibraryMangaResponse([[
+            { "data": { "mangas": { "totalCount": 1, "nodes": [
+                { "title": "Missing id" }
+            ] } } }
+        ]])
+        assert.is_nil(library_manga)
+        assert.are.equal("Suwayomi server returned invalid manga data.", library_error)
+
+        local refreshed, refresh_error = parsers.parseRefreshMangaResponse([[
+            { "data": {
+                "fetchManga": { "manga": { "title": "Missing id" } },
+                "fetchChapters": { "chapters": [ { "id": 398, "name": "Ch. 1" } ] }
+            } }
+        ]])
+        assert.is_nil(refreshed)
+        assert.are.equal("Suwayomi server returned invalid manga data.", refresh_error)
+    end)
+
+    it("rejects malformed nested manga metadata explicitly", function()
+        local library_manga, library_error = parsers.parseLibraryMangaResponse([[
+            { "data": { "mangas": { "totalCount": 1, "nodes": [
+                { "id": 17, "title": "Frieren",
+                  "categories": { "nodes": [ { "name": "Missing id" } ] } }
+            ] } } }
+        ]])
+        assert.is_nil(library_manga)
+        assert.are.equal("Suwayomi server returned invalid manga data.", library_error)
+
+        local source_manga, source_error = parsers.parseMangaResponse([[
+            { "data": { "fetchSourceManga": { "hasNextPage": false, "mangas": [
+                { "id": 17, "title": "Frieren",
+                  "firstUnreadChapter": { "name": "Missing id" } }
+            ] } } }
+        ]])
+        assert.is_nil(source_manga)
+        assert.are.equal("Suwayomi server returned invalid manga data.", source_error)
+
+        local refreshed, refresh_error = parsers.parseRefreshMangaResponse([[
+            { "data": {
+                "fetchManga": { "manga": { "id": 17, "title": "Frieren" } },
+                "fetchChapters": { "chapters": [ { "name": "Missing id" } ] }
+            } }
+        ]])
+        assert.is_nil(refreshed)
+        assert.are.equal("Suwayomi server returned invalid chapter data.", refresh_error)
+
+        local categories, category_error = parsers.parseCategoryResponse([[
+            { "data": { "categories": { "nodes": [
+                { "name": "Missing id" }
+            ] } } }
+        ]])
+        assert.is_nil(categories)
+        assert.are.equal("Suwayomi server returned invalid category data.", category_error)
+    end)
 end)
