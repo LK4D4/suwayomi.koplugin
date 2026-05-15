@@ -233,7 +233,7 @@ Fresh local verification from the review worktree:
   - Risk: malformed partial GraphQL data can create bad rows or crash instead of
     producing a parser error.
 
-- [ ] Cap or replace `loadstring` metadata/history parsing.
+- [x] Cap or replace `loadstring` metadata/history parsing.
   - Areas: `suwayomi/readsync/koreader_metadata.lua:73`,
     `suwayomi/readsync/koreader_metadata.lua:227`
   - Risk: corrupt or huge KOReader metadata/history files can freeze plugin work.
