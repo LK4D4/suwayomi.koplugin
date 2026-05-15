@@ -212,7 +212,7 @@ Fresh local verification from the review worktree:
   - Direction: run the same LuaJIT `luacheck` and `busted` checks in the release
     job, or gate release on a proven Test workflow for the tag SHA.
 
-- [ ] Fix Android performance doc push command.
+- [x] Fix Android performance doc push command.
   - Area: `docs/android-performance-testing.md:15`
   - Risk: `adb push .` can copy `.git`, specs, docs, CI, scratch files, or user
     data to the device plugin directory.

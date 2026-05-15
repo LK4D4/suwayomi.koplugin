@@ -11,11 +11,18 @@ This document records the repeatable Android checks for Suwayomi Downloader UI s
 3. Install the plugin:
 
 ```powershell
+$stage = Join-Path $env:TEMP "suwayomi_dl.koplugin"
+Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force $stage | Out-Null
+Copy-Item _meta.lua, main.lua, README.md $stage
+Copy-Item suwayomi $stage -Recurse
+
 adb shell mkdir -p /sdcard/koreader/plugins/suwayomi_dl.koplugin
-adb push . /sdcard/koreader/plugins/suwayomi_dl.koplugin/
+adb push "$stage/." /sdcard/koreader/plugins/suwayomi_dl.koplugin/
 ```
 
-When pushing from a git checkout, stage a clean temporary directory containing only the plugin runtime files, not `.git`, `spec`, or CI files.
+The staged directory contains only plugin runtime files: `_meta.lua`, `main.lua`,
+`README.md`, and `suwayomi/`.
 
 4. Optional test settings can be pushed to `/sdcard/koreader/settings/suwayomi_dl.lua`:
 
