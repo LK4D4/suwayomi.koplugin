@@ -91,6 +91,19 @@ local function filterExtensionsBySearch(extensions, query)
     return filtered
 end
 
+local function extensionTimeoutMessage(action)
+    if action == "install" then
+        return _("Extension install timed out.")
+    end
+    if action == "update" then
+        return _("Extension update timed out.")
+    end
+    if action == "uninstall" then
+        return _("Extension uninstall timed out.")
+    end
+    return _("Extension list loading timed out.")
+end
+
 function Methods:getExtensionWorkerResultPath()
     return SubprocessJob.buildResultPath("extensions")
 end
@@ -134,6 +147,20 @@ function Methods:startExtensionWorker(credentials, request, options)
         end,
         on_finish = function(finished_active, result)
             self:finishExtensionWorker(finished_active, result)
+        end,
+        on_timeout = function(timed_out_active)
+            if self.extension_worker_active == timed_out_active then
+                self.extension_worker_active = nil
+            end
+            self:closeLoadingMessage(timed_out_active and timed_out_active.loading_message)
+            if not options.silent then
+                self:showMessage(extensionTimeoutMessage(timed_out_active and timed_out_active.request and timed_out_active.request.action))
+            end
+        end,
+        on_cleanup = function(cleaned_active)
+            if self.extension_worker_active == cleaned_active then
+                self.extension_worker_active = nil
+            end
         end,
         on_error = function(err)
             self.extension_worker_active = nil

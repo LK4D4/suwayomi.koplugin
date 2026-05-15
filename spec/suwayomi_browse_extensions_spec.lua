@@ -9,6 +9,8 @@ local function resetModules()
         "suwayomi/browse/extensions",
         "suwayomi/ui",
         "suwayomi/settings",
+        "suwayomi/subprocess/job",
+        "suwayomi/browse/extension_worker",
     }) do
         package.loaded[name] = nil
         package.preload[name] = nil
@@ -62,11 +64,39 @@ local function stubDependencies()
             end,
         }
     end
+
+    package.preload["suwayomi/browse/extension_worker"] = function()
+        return {
+            run = function() end,
+            readResult = function() end,
+        }
+    end
 end
 
 local function loadExtensions()
     resetModules()
     stubDependencies()
+    return require("suwayomi/browse/extensions")
+end
+
+local function loadExtensionsWithSubprocessStub(onStart)
+    resetModules()
+    stubDependencies()
+    package.preload["suwayomi/subprocess/job"] = function()
+        return {
+            buildResultPath = function()
+                return "/settings/extensions.json"
+            end,
+            start = function(options)
+                if onStart then
+                    onStart(options)
+                end
+                return options.active
+            end,
+            schedulePoll = function() end,
+            poll = function() end,
+        }
+    end
     return require("suwayomi/browse/extensions")
 end
 
@@ -259,6 +289,50 @@ describe("suwayomi/browse/extensions", function()
 
         assert.is_false(started)
         assert.are.same({ "Extension task already running." }, controller.messages)
+    end)
+
+    it("clears active extension fetch state and closes loading UI on timeout", function()
+        local started_options
+        local extensions = loadExtensionsWithSubprocessStub(function(options)
+            started_options = options
+        end)
+        local controller = buildController(extensions)
+
+        assert.is_true(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
+            action = "fetch",
+        }))
+        started_options.active.loading_message = { message = "Loading extensions..." }
+        started_options.on_timeout(started_options.active)
+
+        assert.is_nil(controller.extension_worker_active)
+        assert.are.equal("Loading extensions...", controller.closed_loading.message)
+        assert.are.same({ "Extension list loading timed out." }, controller.messages)
+        assert.is_true(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
+            action = "fetch",
+        }))
+    end)
+
+    it("uses action-aware timeout feedback for extension mutations", function()
+        local started_options
+        local extensions = loadExtensionsWithSubprocessStub(function(options)
+            started_options = options
+        end)
+        local controller = buildController(extensions)
+
+        assert.is_true(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
+            action = "install",
+            pkg_name = "pkg.mangadex",
+        }))
+        started_options.active.loading_message = { message = "Installing extension..." }
+        started_options.on_timeout(started_options.active)
+
+        assert.is_nil(controller.extension_worker_active)
+        assert.are.equal("Installing extension...", controller.closed_loading.message)
+        assert.are.same({ "Extension install timed out." }, controller.messages)
+        assert.is_true(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
+            action = "update",
+            pkg_name = "pkg.mangadex",
+        }))
     end)
 
     it("starts install/update actions from extension action menus", function()

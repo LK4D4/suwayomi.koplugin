@@ -18,7 +18,7 @@ Fresh local verification from the review worktree:
     UI, and surface a user-visible error.
   - Tests: add a timeout spec covering active-state cleanup and later Browse retry.
 
-- [ ] Fix extension worker timeout cleanup.
+- [x] Fix extension worker timeout cleanup.
   - Area: `suwayomi/browse/extensions.lua:123`
   - Risk: timed-out extension fetch/install/update/uninstall can block all later
     extension actions.
