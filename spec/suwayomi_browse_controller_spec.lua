@@ -2,7 +2,96 @@ package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/controller_module_spec_helper")
 
+local function clearModules()
+    for _, name in ipairs({
+        "suwayomi/browse/controller",
+        "suwayomi/browse/source_catalog",
+        "suwayomi/browse/extensions",
+        "suwayomi/browse/source_fetch_worker",
+        "suwayomi/subprocess/job",
+        "suwayomi/settings",
+        "suwayomi/debug",
+        "ui/uimanager",
+        "ffi/util",
+        "gettext",
+    }) do
+        package.loaded[name] = nil
+        package.preload[name] = nil
+    end
+end
+
+local function installControllerWithSourceFetchStub()
+    clearModules()
+    helper.stubControllerDependencies()
+    local started_options
+    package.preload["suwayomi/browse/source_catalog"] = function()
+        return { methods = {} }
+    end
+    package.preload["suwayomi/browse/extensions"] = function()
+        return { methods = {} }
+    end
+    package.preload["suwayomi/browse/source_fetch_worker"] = function()
+        return {
+            run = function() end,
+            readResult = function() end,
+        }
+    end
+    package.preload["suwayomi/subprocess/job"] = function()
+        return {
+            buildResultPath = function()
+                return "/settings/source_fetch.json"
+            end,
+            start = function(options)
+                started_options = options
+                return options.active
+            end,
+            schedulePoll = function() end,
+            poll = function() end,
+        }
+    end
+    package.preload["suwayomi/settings"] = function()
+        return {
+            load = function()
+                return { server_url = "https://suwayomi.example" }
+            end,
+        }
+    end
+    package.preload["suwayomi/debug"] = function()
+        return {
+            time = function(_, callback)
+                return callback()
+            end,
+        }
+    end
+
+    return require("suwayomi/browse/controller"), function()
+        return started_options
+    end
+end
+
+local function buildController(controller_module)
+    local controller
+    controller = {
+        messages = {},
+        showMessage = function(self, message)
+            table.insert(self.messages, message)
+        end,
+        showLoadingMessage = function(_, message)
+            return { message = message }
+        end,
+        closeLoadingMessage = function(_, loading_message)
+            controller.closed_loading = loading_message
+        end,
+    }
+    for name, method in pairs(controller_module.methods) do
+        controller[name] = method
+    end
+    return controller
+end
+
 describe("suwayomi/browse/controller", function()
+    after_each(clearModules)
+
     it("exports source cache, worker, and browse flow methods", function()
         helper.assertControllerModule("suwayomi/browse/controller", {
             "filterSourcesByLanguage",
@@ -16,5 +105,34 @@ describe("suwayomi/browse/controller", function()
             "startExtensionWorker",
             "pollExtensionWorker",
         })
+    end)
+
+    it("clears active source fetch state and closes loading UI on timeout", function()
+        local controller_module, get_started_options = installControllerWithSourceFetchStub()
+        local controller = buildController(controller_module)
+
+        assert.is_true(controller:startSourceFetchWorker({ server_url = "https://suwayomi.example" }))
+        local started_options = get_started_options()
+        started_options.active.loading_message = { message = "Loading sources..." }
+        started_options.on_timeout(started_options.active)
+
+        assert.is_nil(controller.source_fetch_active)
+        assert.are.equal("Loading sources...", controller.closed_loading.message)
+        assert.are.same({ "Source loading timed out." }, controller.messages)
+        assert.is_true(controller:startSourceFetchWorker({ server_url = "https://suwayomi.example" }))
+    end)
+
+    it("keeps silent source fetch timeout cleanup quiet", function()
+        local controller_module, get_started_options = installControllerWithSourceFetchStub()
+        local controller = buildController(controller_module)
+
+        assert.is_true(controller:startSourceFetchWorker({ server_url = "https://suwayomi.example" }, {
+            silent = true,
+        }))
+        local started_options = get_started_options()
+        started_options.on_timeout(started_options.active)
+
+        assert.is_nil(controller.source_fetch_active)
+        assert.are.same({}, controller.messages)
     end)
 end)

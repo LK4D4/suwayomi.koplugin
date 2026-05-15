@@ -10,7 +10,7 @@ Fresh local verification from the review worktree:
 
 ## P1 Release Blockers
 
-- [ ] Fix source fetch timeout cleanup.
+- [x] Fix source fetch timeout cleanup.
   - Area: `suwayomi/browse/controller.lua:83`
   - Risk: a hung source fetch can leave `source_fetch_active` set and keep Browse
     stuck until restart.

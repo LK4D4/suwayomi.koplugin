@@ -95,6 +95,20 @@ function Methods:startSourceFetchWorker(credentials, options)
         on_finish = function(finished_active, result)
             self:finishSourceFetch(finished_active, result)
         end,
+        on_timeout = function(timed_out_active)
+            if self.source_fetch_active == timed_out_active then
+                self.source_fetch_active = nil
+            end
+            self:closeLoadingMessage(timed_out_active and timed_out_active.loading_message)
+            if not options.silent then
+                self:showMessage(_("Source loading timed out."))
+            end
+        end,
+        on_cleanup = function(cleaned_active)
+            if self.source_fetch_active == cleaned_active then
+                self.source_fetch_active = nil
+            end
+        end,
         on_error = function(err)
             self.source_fetch_active = nil
             self:closeLoadingMessage(active.loading_message)
