@@ -1,6 +1,7 @@
 local M = {}
 
 local buildImmediateSourceMangaRuntime
+local buildImmediateNetworkRequestJob
 
 local function newClient(options)
     local Client = require("suwayomi/client")
@@ -56,12 +57,22 @@ local function newClient(options)
         end
     end
     local loading_messages = {}
+    local shown_loading_messages = {}
+    local closed_loading_messages = {}
     local shown_messages = {}
     local opened_manga
     local shown_manga_actions
     local scheduled_sync_credentials
     local log_events = {}
     local tracked_screens = {}
+    local network_requests
+    if not options.network_request_job
+        and options.api
+        and options.api.fetchCategories
+        and options.api.fetchLibraryManga
+    then
+        options.network_request_job, network_requests = buildImmediateNetworkRequestJob(options.api)
+    end
     local client = Client:new{
         settings = {
             load = function()
@@ -98,6 +109,14 @@ local function newClient(options)
                 table.insert(loading_messages, key .. ":" .. message)
                 return callback()
             end,
+            showLoadingMessage = function(_, message)
+                local loading_message = { message = message }
+                table.insert(shown_loading_messages, message)
+                return loading_message
+            end,
+            closeLoadingMessage = function(_, loading_message)
+                table.insert(closed_loading_messages, loading_message)
+            end,
             showMessage = function(_, message)
                 table.insert(shown_messages, message)
             end,
@@ -127,6 +146,7 @@ local function newClient(options)
             global_search_source_timeout_seconds = options.global_search_source_timeout_seconds,
             chapter_count_max_active = options.chapter_count_max_active,
         },
+        network_request_job = options.network_request_job,
         gettext = function(text)
             return text
         end,
@@ -134,6 +154,9 @@ local function newClient(options)
 
     return client, {
         loading_messages = loading_messages,
+        shown_loading_messages = shown_loading_messages,
+        closed_loading_messages = closed_loading_messages,
+        network_requests = network_requests or {},
         shown_messages = shown_messages,
         log_events = log_events,
         opened_manga = function()
@@ -147,6 +170,64 @@ local function newClient(options)
         end,
         tracked_screens = tracked_screens,
     }
+end
+
+buildImmediateNetworkRequestJob = function(api)
+    local started = {}
+    local fake = {}
+
+    local function fetchLibraryMangaPages(credentials)
+        local page_size = 100
+        local offset = 0
+        local all_manga = {}
+        local total_count
+
+        while true do
+            local result = api.fetchLibraryManga(credentials, {
+                first = page_size,
+                offset = offset,
+            })
+            if not result.ok then
+                return result
+end
+
+            local page_manga = result.manga or {}
+            for _, manga in ipairs(page_manga) do
+                table.insert(all_manga, manga)
+            end
+            total_count = tonumber(result.total_count) or #all_manga
+
+            if #page_manga == 0 or #page_manga < page_size or #all_manga >= total_count then
+                break
+            end
+            offset = offset + page_size
+        end
+
+        return {
+            ok = true,
+            manga = all_manga,
+            total_count = total_count,
+        }
+    end
+
+    function fake.start(options)
+        table.insert(started, options)
+        local request = options.request or {}
+        local result
+        if request.action == "fetch_library_categories" then
+            result = api.fetchCategories(options.credentials)
+        elseif request.action == "fetch_library_manga_pages" then
+            result = fetchLibraryMangaPages(options.credentials)
+        else
+            result = { ok = false, error = "Unexpected network request." }
+        end
+        if options.on_finish then
+            options.on_finish(result)
+        end
+        return { pid = 2468 }
+    end
+
+    return fake, started
 end
 local function buildGlobalSearchSubprocessFake()
     local started = {}
@@ -311,5 +392,6 @@ M.newClient = newClient
 M.buildGlobalSearchSubprocessFake = buildGlobalSearchSubprocessFake
 M.buildSourceMangaSubprocessFake = buildSourceMangaSubprocessFake
 M.buildChapterCountSubprocessFake = buildChapterCountSubprocessFake
+M.buildImmediateNetworkRequestJob = buildImmediateNetworkRequestJob
 
 return M

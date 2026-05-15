@@ -5,8 +5,8 @@
 -- Dependencies: KOReader reader/filemanager UI modules, Suwayomi settings/API, and plugin chapter menu methods.
 -- External data: Document paths, persisted contexts, and API responses are treated as optional and checked before use.
 
-local SuwayomiAPI = require("suwayomi/api")
 local SuwayomiSettings = require("suwayomi/settings")
+local NetworkRequestJob = require("suwayomi/network/request_job")
 local UIManager = require("ui/uimanager")
 local _ = require("gettext")
 
@@ -240,22 +240,85 @@ function Methods:fetchReaderReturnChapters(context)
         return nil
     end
 
+    self:showMessage(_("Chapters are loading."))
+    return nil
+end
+
+function Methods:startReaderReturnChapterRequest(context)
+    if not context or not context.manga_id then
+        self:showMessage(_("This book is not linked to Suwayomi chapters."))
+        return false
+    end
+
+    local previous = self.active_reader_return_request
+    if previous and previous.active and NetworkRequestJob.cancel then
+        NetworkRequestJob.cancel(previous.active)
+    end
+
+    local request_token = {
+        path = context.path,
+    }
+    self.active_reader_return_request = request_token
+
     local credentials = SuwayomiSettings:load()
-    local result = self:withLoadingMessage("reader-return-chapters", _("Loading chapters..."), function()
-        return SuwayomiAPI.fetchChaptersForManga(credentials, context.manga_id)
-    end)
-    if not result then
-        return nil
+    local active = NetworkRequestJob.start({
+        owner = self,
+        credentials = credentials,
+        request = {
+            action = "fetch_chapters_for_manga",
+            manga_id = context.manga_id,
+        },
+        loading_message = _("Loading chapters..."),
+        result_prefix = "reader_return_chapters",
+        timeout_seconds = self.reader_return_timeout_seconds or 30,
+        timeout_message = _("Could not load chapters."),
+        on_cancel = function()
+            if self.active_reader_return_request == request_token then
+                self.active_reader_return_request = nil
+            end
+        end,
+        on_finish = function(result)
+            if self.active_reader_return_request ~= request_token then
+                return
+            end
+            self.active_reader_return_request = nil
+            if not contextMatches(self:getCurrentReaderReturnContext(), context) then
+                return
+            end
+            if not result then
+                return
+            end
+            if not result.ok then
+                self:showMessage(_(result.error))
+                return
+            end
+            if not result.chapters or #result.chapters == 0 then
+                self:showMessage(_("This manga has no chapters."))
+                return
+            end
+
+            local manga = {
+                id = context.manga_id,
+                title = context.manga_title or context.manga_id,
+                source = copyTable(context.source),
+            }
+            self:closeReaderToFileManager(function()
+                self:showChapterResultForManga(manga, result, {
+                    return_context = context,
+                })
+            end)
+        end,
+    })
+    if not active then
+        if self.active_reader_return_request == request_token then
+            self.active_reader_return_request = nil
+        end
+        return false
     end
-    if not result.ok then
-        self:showMessage(_(result.error))
-        return nil
+    if self.active_reader_return_request == request_token then
+        request_token.active = active
     end
-    if not result.chapters or #result.chapters == 0 then
-        self:showMessage(_("This manga has no chapters."))
-        return nil
-    end
-    return result
+    return true
 end
 
 function Methods:closeReaderToFileManager(callback)
@@ -287,22 +350,7 @@ function Methods:returnToSuwayomiChapters(context)
         return false
     end
 
-    local result = self:fetchReaderReturnChapters(context)
-    if not result then
-        return false
-    end
-
-    local manga = {
-        id = context.manga_id,
-        title = context.manga_title or context.manga_id,
-        source = copyTable(context.source),
-    }
-    self:closeReaderToFileManager(function()
-        self:showChapterResultForManga(manga, result, {
-            return_context = context,
-        })
-    end)
-    return true
+    return self:startReaderReturnChapterRequest(context)
 end
 
 ReaderReturn.methods = Methods

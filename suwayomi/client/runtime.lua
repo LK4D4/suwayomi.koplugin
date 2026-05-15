@@ -40,6 +40,13 @@ function SuwayomiClient:getChapterCountWorker()
     return self.chapter_count_worker
 end
 
+function SuwayomiClient:getNetworkRequestJob()
+    if not self.network_request_job then
+        self.network_request_job = require("suwayomi/network/request_job")
+    end
+    return self.network_request_job
+end
+
 function SuwayomiClient:getFFIUtil()
     if not self.ffi_util then
         self.ffi_util = require("ffi/util")
@@ -94,6 +101,10 @@ end
 
 function SuwayomiClient:getChapterCountTimeoutSeconds()
     return (self.plugin and self.plugin.chapter_count_timeout_seconds) or 15
+end
+
+function SuwayomiClient:getNetworkRequestTimeoutSeconds()
+    return (self.plugin and self.plugin.network_request_timeout_seconds) or 30
 end
 end
 

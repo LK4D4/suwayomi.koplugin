@@ -31,7 +31,11 @@ describe("suwayomi/client library flows", function()
 
         client:showLibrary()
 
-        assert.are.same({ "library-categories:Loading library...", "library-manga:Loading library manga..." }, state.loading_messages)
+        assert.are.same({}, state.loading_messages)
+        assert.are.same({ "fetch_library_categories", "fetch_library_manga_pages" }, {
+            state.network_requests[1].request.action,
+            state.network_requests[2].request.action,
+        })
         assert.are.equal("Your Suwayomi library is empty.", state.shown_messages[#state.shown_messages])
         assert.are.equal("https://suwayomi.example", state.scheduled_sync_credentials().server_url)
     end)
@@ -433,5 +437,56 @@ describe("suwayomi/client library flows", function()
         client:showLibrary()
 
         assert.are.equal("This category has no manga.", state.shown_messages[#state.shown_messages])
+    end)
+
+    it("ignores stale library manga loads when a newer category wins", function()
+        local requests = {}
+        local canceled = {}
+        local shown_manga
+        local client = newClient({
+            api = {},
+            network_request_job = {
+                start = function(options)
+                    table.insert(requests, options)
+                    return {
+                        pid = #requests,
+                        on_cancel = options.on_cancel,
+                    }
+                end,
+                cancel = function(active)
+                    table.insert(canceled, active)
+                    if active.on_cancel then
+                        active.on_cancel()
+                    end
+                end,
+            },
+            ui = {
+                showLibraryMangaMenu = function(manga)
+                    shown_manga = manga
+                    return { name = "library-menu" }
+                end,
+            },
+        })
+
+        assert.is_true(client:showLibraryManga({ id = "1", name = "First" }))
+        assert.is_true(client:showLibraryManga({ id = "2", name = "Second" }))
+        assert.are.equal(1, #canceled)
+
+        requests[1].on_finish({
+            ok = true,
+            manga = {
+                { id = "old", title = "Old Manga", categories = { { id = "1" } } },
+            },
+        })
+        assert.is_nil(shown_manga)
+
+        requests[2].on_finish({
+            ok = true,
+            manga = {
+                { id = "new", title = "New Manga", categories = { { id = "2" } } },
+            },
+        })
+
+        assert.are.equal("New Manga", shown_manga[1].title)
     end)
 end)

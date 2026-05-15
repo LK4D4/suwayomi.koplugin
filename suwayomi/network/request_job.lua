@@ -72,8 +72,18 @@ function RequestJob.start(options)
                 })
             end
         end,
+        on_cancel = function()
+            closeLoading(owner, loading_message)
+            if options.on_cancel then
+                options.on_cancel()
+            end
+        end,
     })
-    return active ~= nil
+    return active
+end
+
+function RequestJob.cancel(active)
+    return SubprocessJob.cancel(active)
 end
 
 return RequestJob

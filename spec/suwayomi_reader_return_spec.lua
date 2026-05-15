@@ -10,6 +10,7 @@ describe("suwayomi/reader_return", function()
             "suwayomi/reader_return",
             "suwayomi/settings",
             "suwayomi/api",
+            "suwayomi/network/request_job",
             "ui/uimanager",
             "apps/reader/readerui",
             "apps/filemanager/filemanager",
@@ -29,6 +30,8 @@ describe("suwayomi/reader_return", function()
             ledger = options.ledger or {},
             events = {},
             fetched_manga_ids = {},
+            network_requests = {},
+            canceled_requests = {},
             messages = {},
         }
 
@@ -66,6 +69,37 @@ describe("suwayomi/reader_return", function()
                             { id = "c1", name = "Chapter 1" },
                         },
                     }
+                end,
+            }
+        end
+        package.preload["suwayomi/network/request_job"] = function()
+            return {
+                cancel = function(active)
+                    table.insert(state.canceled_requests, active)
+                    active.canceled = true
+                    if active.on_cancel then
+                        active.on_cancel()
+                    end
+                end,
+                start = function(request_options)
+                    table.insert(state.network_requests, request_options)
+                    table.insert(state.events, "network-request")
+                    local active = {
+                        pid = 2468,
+                        on_cancel = request_options.on_cancel,
+                    }
+                    if options.defer_network_finish then
+                        return active
+                    end
+                    if request_options.on_finish then
+                        request_options.on_finish(options.fetch_result or {
+                            ok = true,
+                            chapters = {
+                                { id = "c1", name = "Chapter 1" },
+                            },
+                        })
+                    end
+                    return active
                 end,
             }
         end
@@ -112,9 +146,15 @@ describe("suwayomi/reader_return", function()
                 },
             },
             messages = state.messages,
-            withLoadingMessage = function(_, _, _, callback)
-                table.insert(state.events, "loading")
-                return callback()
+            withLoadingMessage = function()
+                error("reader return should not block the UI thread")
+            end,
+            showLoadingMessage = function(_, message)
+                table.insert(state.events, "loading:" .. message)
+                return { message = message }
+            end,
+            closeLoadingMessage = function(_, loading_message)
+                table.insert(state.events, "close-loading:" .. tostring(loading_message and loading_message.message))
             end,
             showMessage = function(self, message)
                 table.insert(self.messages, message)
@@ -291,7 +331,7 @@ describe("suwayomi/reader_return", function()
         assert.is_nil(plugin:getCurrentReaderReturnContext())
     end)
 
-    it("fetches chapters before closing reader and restores the chapter list", function()
+    it("fetches chapters asynchronously before closing reader and restores the chapter list", function()
         local plugin = build_plugin({
             contexts = {
                 ["/downloads/Local/Manga/Chapter 1.cbz"] = {
@@ -308,13 +348,14 @@ describe("suwayomi/reader_return", function()
         assert.is_true(plugin:returnToSuwayomiChapters())
 
         assert.are.same({
-            "loading",
-            "fetch",
+            "network-request",
             "close-reader",
             "reinit-filemanager",
             "show-chapters",
         }, state.events)
-        assert.are.same({ "m1" }, state.fetched_manga_ids)
+        assert.are.equal("fetch_chapters_for_manga", state.network_requests[1].request.action)
+        assert.are.equal("m1", state.network_requests[1].request.manga_id)
+        assert.are.same({}, state.fetched_manga_ids)
         assert.are.equal("m1", state.shown_manga.id)
         assert.are.equal("Manga", state.shown_manga.title)
         assert.are.same({ id = "local", name = "Local source" }, state.shown_manga.source)
@@ -337,9 +378,45 @@ describe("suwayomi/reader_return", function()
             },
         })
 
-        assert.is_false(plugin:returnToSuwayomiChapters())
+        assert.is_true(plugin:returnToSuwayomiChapters())
 
-        assert.are.same({ "loading", "fetch" }, state.events)
+        assert.are.same({ "network-request" }, state.events)
+        assert.are.equal("fetch_chapters_for_manga", state.network_requests[1].request.action)
+        assert.are.same({}, state.fetched_manga_ids)
         assert.are.same({ "Network unavailable." }, plugin.messages)
+    end)
+
+    it("ignores stale reader-return results after the reader document changes", function()
+        local plugin = build_plugin({
+            defer_network_finish = true,
+            contexts = {
+                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Manga",
+                    chapter_id = "c1",
+                    chapter_name = "Chapter 1",
+                },
+                ["/downloads/Local/Manga/Chapter 2.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 2.cbz",
+                    manga_id = "m2",
+                    manga_title = "Other Manga",
+                    chapter_id = "c2",
+                    chapter_name = "Chapter 2",
+                },
+            },
+        })
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+        plugin.ui.document.file = "/downloads/Local/Manga/Chapter 2.cbz"
+        state.network_requests[1].on_finish({
+            ok = true,
+            chapters = {
+                { id = "c1", name = "Chapter 1" },
+            },
+        })
+
+        assert.are.same({ "network-request" }, state.events)
+        assert.is_nil(state.shown_manga)
     end)
 end)

@@ -5,8 +5,6 @@
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
-local SuwayomiAPI = require("suwayomi/api")
-local SuwayomiSettings = require("suwayomi/settings")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
 local T = FFIUtil.template
@@ -59,29 +57,7 @@ function Methods:ensureMangaChapterContext(manga)
         return nil
     end
 
-    local result, refresh_attempted = self:refreshUninitializedMangaForChapters(manga)
-    if not result and refresh_attempted then
-        return nil
-    end
-    if not result and not refresh_attempted then
-        local credentials = SuwayomiSettings:load()
-        result = self:withLoadingMessage("chapters", _("Loading chapters..."), function()
-            return SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
-        end)
-    end
-    if not result then
-        return nil
-    end
-    if not result.ok then
-        self:showMessage(_(result.error))
-        return nil
-    end
-    if not result.chapters or #result.chapters == 0 then
-        self:showMessage(_("This manga has no chapters."))
-        return nil
-    end
-
-    return self:setCurrentMangaChapterContext(manga, self:mergeChaptersWithReadLedger(manga, result.chapters))
+    return nil
 end
 
 

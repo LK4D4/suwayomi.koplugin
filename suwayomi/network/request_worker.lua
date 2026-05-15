@@ -11,6 +11,40 @@ local SubprocessJob = require("suwayomi/subprocess/job")
 
 local RequestWorker = {}
 
+local function fetchLibraryMangaPages(credentials)
+    local page_size = 100
+    local offset = 0
+    local all_manga = {}
+    local total_count
+
+    while true do
+        local result = SuwayomiAPI.fetchLibraryManga(credentials, {
+            first = page_size,
+            offset = offset,
+        })
+        if not result.ok then
+            return result
+        end
+
+        local page_manga = result.manga or {}
+        for _, manga in ipairs(page_manga) do
+            table.insert(all_manga, manga)
+        end
+        total_count = tonumber(result.total_count) or #all_manga
+
+        if #page_manga == 0 or #page_manga < page_size or #all_manga >= total_count then
+            break
+        end
+        offset = offset + page_size
+    end
+
+    return {
+        ok = true,
+        manga = all_manga,
+        total_count = total_count,
+    }
+end
+
 local function normalizeResult(result)
     if type(result) ~= "table" then
         return {
@@ -41,6 +75,15 @@ function RequestWorker:run(credentials, request, result_path)
         end
         if request.action == "refresh_manga" then
             return SuwayomiAPI.refreshManga(credentials, request.manga_id)
+        end
+        if request.action == "update_manga_library_state" then
+            return SuwayomiAPI.updateMangaLibraryState(credentials, request.manga_id, request.in_library == true)
+        end
+        if request.action == "fetch_library_categories" then
+            return SuwayomiAPI.fetchCategories(credentials)
+        end
+        if request.action == "fetch_library_manga_pages" then
+            return fetchLibraryMangaPages(credentials)
         end
         return {
             ok = false,

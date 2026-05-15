@@ -5,7 +5,6 @@
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
-local SuwayomiAPI = require("suwayomi/api")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
@@ -77,52 +76,63 @@ end
 
 
 function Methods:refreshUninitializedMangaForChapters(manga)
-    if not self:isMangaUninitialized(manga) or not manga.id or not SuwayomiAPI.refreshManga then
-        return nil, false
-    end
-
-    local credentials = SuwayomiSettings:load()
-    local result = self:withLoadingMessage("refresh-manga", _("Refreshing chapters..."), function()
-        return SuwayomiAPI.refreshManga(credentials, manga.id)
-    end)
-    if not result then
-        return nil, true
-    end
-    if not result.ok then
-        self:showMessage(_(result.error))
-        return nil, true
-    end
-    if type(result.chapters) ~= "table" then
-        self:showMessage(_("Suwayomi server did not refresh manga."))
-        return nil, true
-    end
-
-    self:applyMangaRefreshResult(manga, result.manga)
-    return {
-        ok = true,
-        manga = manga,
-        chapters = result.chapters,
-    }, true
+    return nil, self:isMangaUninitialized(manga) == true
 end
 
-function Methods:startMangaNetworkRequest(manga, request, loading_message, on_finish)
+function Methods:startMangaNetworkRequest(manga, request, loading_message, on_finish, timeout_message, slot_key)
     if not manga or not manga.id then
         self:showMessage(_("This manga cannot be loaded right now."))
         return false
     end
 
     local credentials = SuwayomiSettings:load()
-    local started = NetworkRequestJob.start({
+    local active_requests = self.active_manga_network_requests or {}
+    self.active_manga_network_requests = active_requests
+    slot_key = slot_key or tostring(request and request.action or "manga_request")
+
+    local previous = active_requests[slot_key]
+    if previous and previous.active then
+        NetworkRequestJob.cancel(previous.active)
+    end
+
+    local request_token = {
+        manga_id = tostring(manga.id),
+    }
+    active_requests[slot_key] = request_token
+
+    local active = NetworkRequestJob.start({
         owner = self,
         credentials = credentials,
         request = request,
         loading_message = loading_message,
         result_prefix = "manga_request",
         timeout_seconds = self.manga_network_timeout_seconds or 30,
-        timeout_message = _("Could not load chapters."),
-        on_finish = on_finish,
+        timeout_message = timeout_message or _("Could not load chapters."),
+        on_cancel = function()
+            if active_requests[slot_key] == request_token then
+                active_requests[slot_key] = nil
+            end
+        end,
+        on_finish = function(result)
+            if active_requests[slot_key] ~= request_token then
+                return
+            end
+            active_requests[slot_key] = nil
+            if on_finish then
+                on_finish(result)
+            end
+        end,
     })
-    return started ~= nil and started ~= false
+    if not active then
+        if active_requests[slot_key] == request_token then
+            active_requests[slot_key] = nil
+        end
+        return false
+    end
+    if active_requests[slot_key] == request_token then
+        request_token.active = active
+    end
+    return true
 end
 
 function Methods:handleRefreshMangaResult(manga, result, options)
@@ -147,13 +157,63 @@ function Methods:handleRefreshMangaResult(manga, result, options)
     }, options)
 end
 
+function Methods:handleChapterContextResult(manga, result, on_ready)
+    if not result then
+        return false
+    end
+    if not result.ok then
+        self:showMessage(_(result.error))
+        return false
+    end
+    if type(result.chapters) ~= "table" or #result.chapters == 0 then
+        self:showMessage(_("This manga has no chapters."))
+        return false
+    end
+
+    if result.manga then
+        self:applyMangaRefreshResult(manga, result.manga)
+    end
+    local chapters = self:mergeChaptersWithReadLedger(manga, result.chapters)
+    local context = self:setCurrentMangaChapterContext(manga, chapters)
+    if on_ready then
+        on_ready(context)
+    end
+    return true
+end
+
+function Methods:startLoadMangaChapterContext(manga, on_ready)
+    local action = self:isMangaUninitialized(manga) and "refresh_manga" or "fetch_chapters_for_manga"
+    local message = action == "refresh_manga" and _("Refreshing chapters...") or _("Loading chapters...")
+    return self:startMangaNetworkRequest(manga, {
+        action = action,
+        manga_id = manga and manga.id,
+    }, message, function(result)
+        self:handleChapterContextResult(manga, result, on_ready)
+    end, _("Could not load chapters."), "chapter_context")
+end
+
+function Methods:withMangaChapterContext(manga, on_ready)
+    local context = self:ensureMangaChapterContext(manga)
+    if context then
+        if on_ready then
+            on_ready(context)
+        end
+        return true
+    end
+    if not manga or not manga.id then
+        self:showMessage(_("This manga has no chapters loaded."))
+        return false
+    end
+    return self:startLoadMangaChapterContext(manga, on_ready)
+end
+
 function Methods:startRefreshMangaForChapters(manga, options)
     return self:startMangaNetworkRequest(manga, {
         action = "refresh_manga",
         manga_id = manga and manga.id,
     }, _("Refreshing chapters..."), function(result)
         self:handleRefreshMangaResult(manga, result, options)
-    end)
+    end, _("Could not load chapters."), "chapter_menu")
 end
 
 function Methods:startFetchChaptersForManga(manga, options)
@@ -162,7 +222,7 @@ function Methods:startFetchChaptersForManga(manga, options)
         manga_id = manga and manga.id,
     }, _("Loading chapters..."), function(result)
         self:showChapterResultForManga(manga, result, options)
-    end)
+    end, _("Could not load chapters."), "chapter_menu")
 end
 
 
@@ -310,28 +370,33 @@ function Methods:setMangaLibraryState(manga, in_library, options)
         return false
     end
 
-    local credentials = SuwayomiSettings:load()
-    local loading_key = in_library and "add-manga-library" or "remove-manga-library"
     local loading_message = in_library and _("Adding to library...") or _("Removing from library...")
-    local result = self:withLoadingMessage(loading_key, loading_message, function()
-        return SuwayomiAPI.updateMangaLibraryState(credentials, manga.id, in_library)
-    end)
+    local result
+    result = self:startMangaNetworkRequest(manga, {
+        action = "update_manga_library_state",
+        manga_id = manga and manga.id,
+        in_library = in_library == true,
+    }, loading_message, function(response)
+        if not response then
+            return
+        end
+        if not response.ok then
+            self:showMessage(_(response.error))
+            return
+        end
+
+        self:updateMangaFromLibraryStateResponse(manga, response.manga, in_library)
+        if options.onMangaUpdated then
+            options.onMangaUpdated(manga)
+        end
+        if in_library then
+            self:showMessage(_("Added to library."))
+        else
+            self:showMessage(_("Removed from library."))
+        end
+    end, _("Could not update library."), "library_state:" .. tostring(manga.id))
     if not result then
         return false
-    end
-    if not result.ok then
-        self:showMessage(_(result.error))
-        return false
-    end
-
-    self:updateMangaFromLibraryStateResponse(manga, result.manga, in_library)
-    if options.onMangaUpdated then
-        options.onMangaUpdated(manga)
-    end
-    if in_library then
-        self:showMessage(_("Added to library."))
-    else
-        self:showMessage(_("Removed from library."))
     end
     return true
 end
@@ -441,12 +506,19 @@ function Methods:performMangaAction(manga, action_id, options)
         return true
     end
     if action_id == "open_first_unread" then
-        local chapter = self:getFirstUnreadChapterForManga(manga)
-            or (manga and manga.first_unread_chapter)
-        if chapter then
-            return self:openChapter(manga, chapter)
+        if self:ensureMangaChapterContext(manga) then
+            local chapter = self:getFirstUnreadChapterForManga(manga)
+            if chapter then
+                return self:openChapter(manga, chapter)
+            end
+            return false
         end
-        return false
+        return self:withMangaChapterContext(manga, function()
+            local resolved_chapter = self:getFirstUnreadChapterForManga(manga)
+            if resolved_chapter then
+                self:openChapter(manga, resolved_chapter)
+            end
+        end)
     end
     if action_id == "refresh_chapters" then
         return self:refreshMangaChapters(manga)
@@ -490,9 +562,9 @@ function Methods:performMangaAction(manga, action_id, options)
         return self:keepNextUnreadChaptersForManga(manga, limit)
     end
     if action_id == "delete_read_downloaded" then
-        if self:ensureMangaChapterContext(manga) then
+        self:withMangaChapterContext(manga, function()
             self:confirmDeleteReadChaptersFromDevice()
-        end
+        end)
         return true
     end
     return false
@@ -500,10 +572,6 @@ end
 
 
 function Methods:downloadNextUnreadChaptersForManga(manga, limit, confirm)
-    if not self:ensureMangaChapterContext(manga) then
-        return false
-    end
-
     local function queue(download_directory)
         local chapters = self:getNextUnreadChaptersForDownload(manga, limit)
         if #chapters == 0 then
@@ -527,20 +595,21 @@ function Methods:downloadNextUnreadChaptersForManga(manga, limit, confirm)
         return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
     end
 
-    local download_directory = self:getDownloadDirectoryOrChoose(queue)
+    local function queueAfterContext(download_directory)
+        return self:withMangaChapterContext(manga, function()
+            queue(download_directory)
+        end)
+    end
+
+    local download_directory = self:getDownloadDirectoryOrChoose(queueAfterContext)
     if not download_directory then
         return true
     end
-    queue(download_directory)
-    return true
+    return queueAfterContext(download_directory)
 end
 
 
 function Methods:confirmDownloadAllUnreadChaptersForManga(manga)
-    if not self:ensureMangaChapterContext(manga) then
-        return false
-    end
-
     local function queue(download_directory)
         local chapters = self:getUnreadChaptersForManga(manga)
         if #chapters == 0 then
@@ -560,20 +629,21 @@ function Methods:confirmDownloadAllUnreadChaptersForManga(manga)
         )
     end
 
-    local download_directory = self:getDownloadDirectoryOrChoose(queue)
+    local function queueAfterContext(download_directory)
+        return self:withMangaChapterContext(manga, function()
+            queue(download_directory)
+        end)
+    end
+
+    local download_directory = self:getDownloadDirectoryOrChoose(queueAfterContext)
     if not download_directory then
         return true
     end
-    queue(download_directory)
-    return true
+    return queueAfterContext(download_directory)
 end
 
 
 function Methods:confirmDownloadAllChaptersForManga(manga)
-    if not self:ensureMangaChapterContext(manga) then
-        return false
-    end
-
     local function queue(download_directory)
         local chapters = self:getAllChaptersForManga(manga)
         if #chapters == 0 then
@@ -593,12 +663,17 @@ function Methods:confirmDownloadAllChaptersForManga(manga)
         )
     end
 
-    local download_directory = self:getDownloadDirectoryOrChoose(queue)
+    local function queueAfterContext(download_directory)
+        return self:withMangaChapterContext(manga, function()
+            queue(download_directory)
+        end)
+    end
+
+    local download_directory = self:getDownloadDirectoryOrChoose(queueAfterContext)
     if not download_directory then
         return true
     end
-    queue(download_directory)
-    return true
+    return queueAfterContext(download_directory)
 end
 
 
@@ -647,10 +722,6 @@ end
 
 
 function Methods:keepNextUnreadChaptersForManga(manga, limit)
-    if not self:ensureMangaChapterContext(manga) then
-        return false
-    end
-
     local requested_limit = SuwayomiSettings:normalizeMangaKeepNextUnreadDownloads(limit)
     if requested_limit <= 0 then
         return true
@@ -686,12 +757,17 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
         return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
     end
 
-    local download_directory = self:getDownloadDirectoryOrChoose(queue)
+    local function queueAfterContext(download_directory)
+        return self:withMangaChapterContext(manga, function()
+            queue(download_directory)
+        end)
+    end
+
+    local download_directory = self:getDownloadDirectoryOrChoose(queueAfterContext)
     if not download_directory then
         return true
     end
-    queue(download_directory)
-    return true
+    return queueAfterContext(download_directory)
 end
 
 

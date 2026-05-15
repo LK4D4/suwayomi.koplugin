@@ -47,45 +47,54 @@ function SuwayomiClient:buildLibraryCategoryChoices(categories)
     return choices
 end
 
-function SuwayomiClient:fetchLibraryMangaPages(credentials)
-    local page_size = 100
-    local offset = 0
-    local all_manga = {}
-    local total_count
-
-    while true do
-        local result = self.api.fetchLibraryManga(credentials, {
-            first = page_size,
-            offset = offset,
-        })
-        if not result.ok then
-            return result
-        end
-
-        local page_manga = result.manga or {}
-        for _, manga in ipairs(page_manga) do
-            table.insert(all_manga, manga)
-        end
-        total_count = tonumber(result.total_count) or #all_manga
-
-        if #page_manga == 0 or #page_manga < page_size or #all_manga >= total_count then
-            break
-        end
-        offset = offset + page_size
+function SuwayomiClient:startLibraryNetworkRequest(credentials, request, loading_message, on_finish)
+    local active_requests = self.active_library_network_requests or {}
+    self.active_library_network_requests = active_requests
+    local slot_key = tostring(request and request.action or "library_request")
+    local previous = active_requests[slot_key]
+    local request_job = self:getNetworkRequestJob()
+    if previous and previous.active and request_job.cancel then
+        request_job.cancel(previous.active)
     end
 
-    return {
-        ok = true,
-        manga = all_manga,
-        total_count = total_count,
-    }
+    local request_token = {}
+    active_requests[slot_key] = request_token
+    local active = request_job.start({
+        owner = self.plugin,
+        credentials = credentials,
+        request = request,
+        loading_message = loading_message,
+        result_prefix = "library_request",
+        timeout_seconds = self:getNetworkRequestTimeoutSeconds(),
+        timeout_message = self:translate("Could not load library."),
+        on_cancel = function()
+            if active_requests[slot_key] == request_token then
+                active_requests[slot_key] = nil
+            end
+        end,
+        on_finish = function(result)
+            if active_requests[slot_key] ~= request_token then
+                return
+            end
+            active_requests[slot_key] = nil
+            if on_finish then
+                on_finish(result)
+            end
+        end,
+    })
+    if not active then
+        if active_requests[slot_key] == request_token then
+            active_requests[slot_key] = nil
+        end
+        return false
+    end
+    if active_requests[slot_key] == request_token then
+        request_token.active = active
+    end
+    return true
 end
 
-function SuwayomiClient:showLibraryManga(category, credentials)
-    credentials = credentials or self.settings:load()
-    local result = self.plugin:withLoadingMessage("library-manga", self:translate("Loading library manga..."), function()
-        return self:fetchLibraryMangaPages(credentials)
-    end)
+function SuwayomiClient:showLibraryMangaResult(category, credentials, result)
     if not result then
         return
     end
@@ -157,6 +166,44 @@ function SuwayomiClient:showLibraryManga(category, credentials)
     end
 end
 
+function SuwayomiClient:showLibraryManga(category, credentials)
+    credentials = credentials or self.settings:load()
+    return self:startLibraryNetworkRequest(credentials, {
+        action = "fetch_library_manga_pages",
+    }, self:translate("Loading library manga..."), function(result)
+        self:showLibraryMangaResult(category, credentials, result)
+    end)
+end
+
+function SuwayomiClient:showLibraryCategoriesResult(credentials, result)
+    if not result then
+        return
+    end
+    if not result.ok then
+        self.plugin:showMessage(self:translate(result.error))
+        return
+    end
+
+    local categories = result.categories or {}
+    local picker_behavior = self.settings.loadLibraryCategoryPickerBehavior
+        and self.settings:loadLibraryCategoryPickerBehavior()
+        or "automatic"
+    local should_show_category_picker = picker_behavior == "always"
+        or (picker_behavior == "automatic" and #categories > 1)
+
+    if should_show_category_picker and #categories > 0 then
+        local category_menu = self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
+            self:showLibraryManga(category, credentials)
+        end, self:getTitleBarMenuOptions({
+            title = self:translate("Suwayomi Library"),
+        }))
+        self:trackScreen("library-categories", category_menu)
+        return
+    end
+
+    self:showLibraryManga(nil, credentials)
+end
+
 function SuwayomiClient:showLibrary()
     return self:time("showLibrary", {}, function()
         local credentials = self.settings:load()
@@ -168,35 +215,11 @@ function SuwayomiClient:showLibrary()
             self.plugin:schedulePendingReadSync(credentials)
         end
 
-        local result = self.plugin:withLoadingMessage("library-categories", self:translate("Loading library..."), function()
-            return self.api.fetchCategories(credentials)
+        return self:startLibraryNetworkRequest(credentials, {
+            action = "fetch_library_categories",
+        }, self:translate("Loading library..."), function(result)
+            self:showLibraryCategoriesResult(credentials, result)
         end)
-        if not result then
-            return
-        end
-        if not result.ok then
-            self.plugin:showMessage(self:translate(result.error))
-            return
-        end
-
-        local categories = result.categories or {}
-        local picker_behavior = self.settings.loadLibraryCategoryPickerBehavior
-            and self.settings:loadLibraryCategoryPickerBehavior()
-            or "automatic"
-        local should_show_category_picker = picker_behavior == "always"
-            or (picker_behavior == "automatic" and #categories > 1)
-
-        if should_show_category_picker and #categories > 0 then
-            local category_menu = self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
-                self:showLibraryManga(category, credentials)
-            end, self:getTitleBarMenuOptions({
-                title = self:translate("Suwayomi Library"),
-            }))
-            self:trackScreen("library-categories", category_menu)
-            return
-        end
-
-        self:showLibraryManga(nil, credentials)
     end)
 end
 end

@@ -18,6 +18,7 @@ function SuwayomiClient:new(options)
         global_search_worker = options.global_search_worker,
         source_manga_worker = options.source_manga_worker,
         chapter_count_worker = options.chapter_count_worker,
+        network_request_job = options.network_request_job,
         ffi_util = options.ffi_util,
         ui_manager = options.ui_manager,
         settings = options.settings,

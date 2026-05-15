@@ -34,7 +34,7 @@ Core plugin shell:
 
 - `main.lua`: KOReader lifecycle, dependency construction, action/menu registration, queue recovery, and controller method installation.
 - `suwayomi/navigation.lua`: route-aware stack for Suwayomi-owned KOReader widgets.
-- `suwayomi/reader_return.lua`: reader-menu shortcut state for returning from an opened CBZ to the originating Suwayomi chapter list.
+- `suwayomi/reader_return.lua`: reader-menu shortcut state and async chapter reload for returning from an opened CBZ to the originating Suwayomi chapter list.
 - `suwayomi/plugin/home.lua`: Suwayomi hub and main-menu entry behavior.
 - `suwayomi/plugin/title_menu.lua`: shared title-bar burger menus for full-screen plugin screens, including the universal Suwayomi home action.
 - `suwayomi/plugin/settings_controller.lua`: grouped Settings menus and settings action routing.
@@ -52,7 +52,7 @@ Browse and Library:
 - `suwayomi/client/runtime.lua`: lazy runtime dependency lookup and worker timeout/concurrency settings.
 - `suwayomi/client/source_manga.lua`: source mode selection, source-specific search prompts, source manga worker loading, browse result rendering, and manga action refresh callbacks.
 - `suwayomi/client/global_search.lua`: partial global search state, worker scheduling, cancellation, timeout handling, and live summary menu updates.
-- `suwayomi/client/library.lua`: library category selection, paged library loading, category filtering, and library manga menu refresh callbacks.
+- `suwayomi/client/library.lua`: async library category/paged manga loading, category filtering, and library manga menu refresh callbacks.
 - `suwayomi/client/browse_chapter_counts.lua`: bounded background chapter-count enrichment for browse result rows.
 - `suwayomi/client/util.lua`: tiny shared helpers used by client flow modules.
 - `suwayomi/ui/list_rows.lua`: pure shared row formatting for manga and source records, including subtitles, status markers, and thumbnail metadata.
@@ -67,7 +67,7 @@ Browse and Library:
 - `suwayomi/browse/global_search_worker.lua`: subprocess worker for fetching one source's first search page into a result file for partial global search.
 - `suwayomi/browse/source_manga_worker.lua`: subprocess worker for source Popular/Latest/Search manga result pages.
 - `suwayomi/browse/chapter_count_worker.lua`: subprocess worker for browse-result chapter-count enrichment.
-- `suwayomi/manga/controller.lua`: manga actions, refresh, library membership, first-unread helpers, and manga-level download/read actions.
+- `suwayomi/manga/controller.lua`: async manga actions, refresh, library membership, chapter-context preload, first-unread helpers, and manga-level download/read actions.
 
 Downloads:
 
@@ -82,7 +82,7 @@ Downloads:
 
 Chapters and read state:
 
-- `suwayomi/chapters/context.lua`: current manga/chapter context and visible chapter filtering state.
+- `suwayomi/chapters/context.lua`: current manga/chapter context and visible chapter filtering state; remote chapter loading is owned by async manga request helpers.
 - `suwayomi/chapters/menu.lua`: chapter menu construction, updates, selection mode, and menu refresh behavior.
 - `suwayomi/chapters/actions.lua`: chapter and selected-chapter action facade.
 - `suwayomi/chapters/local_downloads.lua`: local archive existence/open/delete helpers.
@@ -92,7 +92,7 @@ Chapters and read state:
 - `suwayomi/readsync/koreader_metadata.lua`: KOReader sidecar/history inspection.
 - `suwayomi/readsync/worker.lua`: background read-sync worker behavior.
 - `suwayomi/readsync/controller.lua`: pending read-sync scheduling, polling, retry, and reconciliation.
-- `suwayomi/network/request_worker.lua`, `suwayomi/network/request_job.lua`: generic one-shot network request worker/launcher for menu flows that need remote data without blocking KOReader UI callbacks.
+- `suwayomi/network/request_worker.lua`, `suwayomi/network/request_job.lua`: generic one-shot network request worker/launcher for Library, reader-return, manga actions, and chapter-context flows that need remote data without blocking KOReader UI callbacks. Callers keep active job tokens so newer requests cancel or ignore stale older results.
 
 Shared support:
 
@@ -118,8 +118,9 @@ common changes and the specs that usually cover them.
 | Thumbnail list rendering, cached thumbnail slots, visible-row thumbnail jobs, or Menu-compatible row widgets | `suwayomi/ui/list_menu.lua`, `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua` | `spec/suwayomi_ui_list_menu_spec.lua`, `spec/suwayomi_ui_manga_menu_spec.lua` |
 | Source manga loading, source-specific search, browse result pagination, and browse chapter-count enrichment | `suwayomi/client/source_manga.lua`, `suwayomi/client/browse_chapter_counts.lua`, `suwayomi/browse/source_manga_worker.lua`, `suwayomi/browse/chapter_count_worker.lua` | `spec/suwayomi_client_source_manga_spec.lua`, worker specs |
 | Global search prompt/results, partial worker scheduling, cancellation, or timeouts | `suwayomi/client/global_search.lua`, `suwayomi/browse/global_search_worker.lua` | `spec/suwayomi_client_global_search_spec.lua`, worker specs |
-| Library loading, category picker behavior, library paging, and library row refresh after manga actions | `suwayomi/client/library.lua`, `suwayomi/client.lua` | `spec/suwayomi_client_library_spec.lua`, `spec/suwayomi_client_spec.lua` |
-| Manga-level actions, async chapter loading/refresh, library membership, and first-unread behavior | `suwayomi/manga/controller.lua`, `suwayomi/network/request_job.lua`, `suwayomi/network/request_worker.lua`, `suwayomi/client.lua` | manga/client/controller specs |
+| Library loading, category picker behavior, library paging, and library row refresh after manga actions | `suwayomi/client/library.lua`, `suwayomi/network/request_job.lua`, `suwayomi/network/request_worker.lua`, `suwayomi/client.lua` | `spec/suwayomi_client_library_spec.lua`, `spec/suwayomi_client_spec.lua` |
+| Manga-level actions, async chapter loading/refresh/preload, library membership, and first-unread behavior | `suwayomi/manga/controller.lua`, `suwayomi/network/request_job.lua`, `suwayomi/network/request_worker.lua`, `suwayomi/client.lua` | manga/client/controller specs |
+| Reader return from a CBZ back to Suwayomi chapters | `suwayomi/reader_return.lua`, `suwayomi/network/request_job.lua`, `suwayomi/network/request_worker.lua` | `spec/suwayomi_reader_return_spec.lua` |
 | Chapter menu behavior, selected/bulk actions, local archive delete/open, or read/unread actions | `suwayomi/chapters/menu.lua`, `suwayomi/chapters/actions.lua`, `suwayomi/chapters/local_downloads.lua`, `suwayomi/chapters/delete_actions.lua`, `suwayomi/chapters/read_actions.lua` | chapter specs |
 | Download queue, active jobs, progress files, status text, or one-chapter CBZ writing | `suwayomi/downloads/queue.lua`, `suwayomi/downloads/active_jobs.lua`, `suwayomi/downloads/progress_file.lua`, `suwayomi/downloads/status_formatter.lua`, `suwayomi/downloads/downloader.lua` | queue/download specs |
 | Download directory selection or source-scoped path layout | `suwayomi/downloads/directory.lua`, `suwayomi/paths.lua` | directory/path specs |

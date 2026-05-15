@@ -26,8 +26,10 @@ local function installController(options)
     local state = {
         messages = {},
         update_calls = {},
+        update_requests = {},
         refresh_calls = {},
         network_requests = {},
+        canceled_requests = {},
         tracked_screens = {},
         keep_next_saves = {},
     }
@@ -123,9 +125,23 @@ local function installController(options)
     end
     package.preload["suwayomi/network/request_job"] = function()
         return {
+            cancel = function(active)
+                table.insert(state.canceled_requests, active)
+                active.canceled = true
+                if active.on_cancel then
+                    active.on_cancel()
+                end
+            end,
             start = function(request_options)
                 table.insert(state.network_requests, request_options)
                 local request = request_options.request or {}
+                local active = {
+                    pid = 4321,
+                    on_cancel = request_options.on_cancel,
+                }
+                if options.defer_network_finish then
+                    return active
+                end
                 local result
                 if request.action == "refresh_manga" then
                     table.insert(state.refresh_calls, request.manga_id)
@@ -134,16 +150,33 @@ local function installController(options)
                         manga = { id = request.manga_id, title = "Refreshed title" },
                         chapters = { { id = "c2", name = "Ch. 2", is_read = false } },
                     }
+                elseif request.action == "update_manga_library_state" then
+                    table.insert(state.update_requests, {
+                        manga_id = request.manga_id,
+                        in_library = request.in_library,
+                    })
+                    result = {
+                        ok = options.library_update_ok ~= false,
+                        error = "Library update failed.",
+                        manga = {
+                            id = request.manga_id,
+                            in_library = request.in_library,
+                            title = "Updated " .. request.manga_id,
+                        },
+                    }
                 else
                     result = {
                         ok = true,
-                        chapters = { { id = "c1", name = "Ch. 1", is_read = false } },
+                        chapters = options.context_chapters or {
+                            { id = "c1", name = "Ch. 1", is_read = true },
+                            { id = "c2", name = "Ch. 2", is_read = false },
+                        },
                     }
                 end
                 if request_options.on_finish then
                     request_options.on_finish(result)
                 end
-                return { pid = 4321 }
+                return active
             end,
         }
     end
@@ -175,6 +208,13 @@ local function installController(options)
         return options.first_unread_downloaded == true
     end
     function plugin:getFirstUnreadChapterForManga()
+        if self.current_chapter_context then
+            for _, chapter in ipairs(self.current_chapter_context.chapters or {}) do
+                if chapter.is_read ~= true then
+                    return chapter
+                end
+            end
+        end
         return options.first_unread_chapter
     end
     function plugin:openChapter(manga, chapter)
@@ -193,14 +233,10 @@ local function installController(options)
     function plugin:handleChapterTap() end
     function plugin:toggleChapterSelection() end
     function plugin:ensureMangaChapterContext(manga)
-        self.current_chapter_context = {
-            manga = manga,
-            chapters = options.context_chapters or {
-                { id = "c1", name = "Ch. 1", is_read = true },
-                { id = "c2", name = "Ch. 2", is_read = false },
-            },
-        }
-        return true
+        if self.current_chapter_context and self.current_chapter_context.manga == manga then
+            return self.current_chapter_context
+        end
+        return nil
     end
     function plugin:getDownloadDirectoryOrChoose(callback)
         if callback then
@@ -314,7 +350,8 @@ describe("suwayomi/manga/controller", function()
                 updated_manga = value
             end,
         }))
-        assert.are.same({ { manga_id = "m1", in_library = true } }, state.update_calls)
+        assert.are.same({}, state.update_calls)
+        assert.are.same({ { manga_id = "m1", in_library = true } }, state.update_requests)
         assert.is_true(manga.in_library)
         assert.is_nil(manga.menu_text)
         assert.are.equal(manga, updated_manga)
@@ -327,14 +364,14 @@ describe("suwayomi/manga/controller", function()
         assert.are.same({
             { manga_id = "m1", in_library = true },
             { manga_id = "m1", in_library = false },
-        }, state.update_calls)
+        }, state.update_requests)
         assert.is_false(manga.in_library)
         assert.is_nil(manga.menu_text)
         assert.are.equal("Removed from library.", state.messages[#state.messages])
     end)
 
     it("opens first unread and downloads the next unread chapter from manga actions", function()
-        local plugin = installController({
+        local plugin, state = installController({
             first_unread_chapter = { id = "c2", name = "Ch. 2" },
         })
         local manga = { id = "m1", title = "Frieren" }
@@ -343,8 +380,55 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("c2", plugin.opened_chapters[1].chapter.id)
 
         assert.is_true(plugin:performMangaAction(manga, "download_first_unread"))
+        assert.are.equal("fetch_chapters_for_manga", state.network_requests[#state.network_requests].request.action)
         assert.are.equal("c2", plugin.enqueued[1].chapters[1].id)
         assert.are.equal("/books", plugin.enqueued[1].download_directory)
+    end)
+
+    it("opens first unread from loaded context before using stale row cache", function()
+        local plugin = installController({
+            first_unread_chapter = { id = "stale", name = "Stale row chapter" },
+        })
+        local manga = { id = "m1", title = "Frieren", first_unread_chapter = { id = "stale" } }
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = {
+                { id = "c1", name = "Ch. 1", is_read = true },
+                { id = "c2", name = "Ch. 2", is_read = false },
+            },
+        }
+
+        assert.is_true(plugin:performMangaAction(manga, "open_first_unread"))
+
+        assert.are.equal("c2", plugin.opened_chapters[1].chapter.id)
+    end)
+
+    it("ignores stale chapter loads when a newer manga request wins", function()
+        local plugin, state = installController({
+            defer_network_finish = true,
+        })
+        local first = { id = "m1", title = "First" }
+        local second = { id = "m2", title = "Second" }
+
+        assert.is_true(plugin:showChaptersForManga(first))
+        assert.is_true(plugin:showChaptersForManga(second))
+        assert.are.equal(2, #state.network_requests)
+        assert.are.equal(1, #state.canceled_requests)
+
+        state.network_requests[1].on_finish({
+            ok = true,
+            chapters = { { id = "old", name = "Old", is_read = false } },
+        })
+
+        assert.is_nil(plugin.current_chapter_context)
+
+        state.network_requests[2].on_finish({
+            ok = true,
+            chapters = { { id = "new", name = "New", is_read = false } },
+        })
+
+        assert.are.equal("m2", plugin.current_chapter_context.manga.id)
+        assert.are.equal("new", plugin.current_chapter_context.chapters[1].id)
     end)
 
     it("refreshes manga and shows returned chapters", function()
