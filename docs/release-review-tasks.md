@@ -84,7 +84,7 @@ Fresh local verification from the review worktree:
   - Direction: retry with a lean extension field set on optional-field validation
     errors.
 
-- [ ] Add byte limits to direct archive download.
+- [x] Add byte limits to direct archive download.
   - Area: `suwayomi/api/transport.lua:374`
   - Risk: a bad server can fill device storage before cleanup.
   - Direction: reject oversized `Content-Length` and stop file sink after a

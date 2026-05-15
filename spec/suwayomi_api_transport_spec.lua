@@ -392,6 +392,49 @@ describe("suwayomi/api/transport", function()
         assert.is_nil(io.open(target_path, "rb"))
     end)
 
+    it("rejects oversized chapter archives reported by Content-Length", function()
+        local target_path = os.tmpname()
+        os.remove(target_path)
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    return 1, 200, { ["content-length"] = "9" }
+                end,
+            }
+        end
+
+        local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path, nil, {
+            max_bytes = 5,
+        })
+
+        assert.are.equal(false, result.ok)
+        assert.are.equal("Downloaded response was too large.", result.error)
+        assert.is_nil(io.open(target_path, "rb"))
+    end)
+
+    it("stops oversized chapter archive streams and removes partial files", function()
+        local target_path = os.tmpname()
+        os.remove(target_path)
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    local ok, err = options.sink("123456")
+                    return ok, err
+                end,
+            }
+        end
+
+        local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path, nil, {
+            max_bytes = 5,
+        })
+
+        assert.are.equal(false, result.ok)
+        assert.are.equal("Downloaded response was too large.", result.error)
+        assert.is_nil(io.open(target_path, "rb"))
+    end)
+
     it("does not inherit transport preload stubs from earlier examples", function()
         assert.is_nil(package.preload["ssl.https"])
         assert.is_nil(package.preload["socket.http"])

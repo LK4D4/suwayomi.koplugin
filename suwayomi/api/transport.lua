@@ -333,7 +333,8 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event, reques
     }
 end
 
-function Transport.downloadChapterArchive(credentials, chapter_id, target_path, log_debug_event)
+function Transport.downloadChapterArchive(credentials, chapter_id, target_path, log_debug_event, request_options)
+    request_options = request_options or {}
     local server_url = credentials and credentials.server_url
     if not server_url or server_url == "" then
         return {
@@ -363,6 +364,7 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
     local response_bytes = 0
     local write_error
     local started_at = now()
+    local max_bytes = request_options.max_bytes or MAX_BINARY_RESPONSE_BYTES
 
     local ok, code, response_headers = client.request{
         url = request_url,
@@ -372,6 +374,10 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
             if chunk then
                 if now() - started_at > RESPONSE_TOTAL_TIMEOUT_SECONDS then
                     write_error = RESPONSE_TIMEOUT_ERROR
+                    return nil, write_error
+                end
+                if response_bytes + #chunk > max_bytes then
+                    write_error = RESPONSE_TOO_LARGE_ERROR
                     return nil, write_error
                 end
                 local written, err = handle:write(chunk)
@@ -388,6 +394,7 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
     handle:close()
 
     response_headers = response_headers or {}
+    local content_length = tonumber(response_headers["content-length"] or response_headers["Content-Length"])
     local finished_at = now()
     logDebugEvent(log_debug_event, {
         operation = "downloadChapterArchive",
@@ -399,17 +406,31 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
         response_bytes = response_bytes,
     })
 
+    if code == 200 and not write_error and content_length and content_length > max_bytes then
+        os.remove(target_path)
+        return {
+            ok = false,
+            error = "Downloaded response was too large.",
+        }
+    end
+
     if code == 200 and not write_error then
         return {
             ok = true,
             path = target_path,
             bytes = response_bytes,
             content_type = response_headers["content-type"] or response_headers["Content-Type"],
-            content_length = tonumber(response_headers["content-length"] or response_headers["Content-Length"]),
+            content_length = content_length,
         }
     end
 
     os.remove(target_path)
+    if write_error == RESPONSE_TOO_LARGE_ERROR then
+        return {
+            ok = false,
+            error = "Downloaded response was too large.",
+        }
+    end
     if write_error then
         return {
             ok = false,
