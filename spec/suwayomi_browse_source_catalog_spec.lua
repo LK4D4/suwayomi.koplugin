@@ -370,6 +370,28 @@ describe("suwayomi/browse/source_catalog", function()
         assert.are.equal(1, debug_logs[1].filtered_source_count)
     end)
 
+    it("saves silent refreshed sources without reopening a closed source menu", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        local rendered = controller:showFetchedSources({
+            ok = true,
+            sources = {
+                { id = "english", lang = "en" },
+            },
+        }, {
+            credentials = { server_url = "https://suwayomi.example" },
+            silent = true,
+            refresh = true,
+        })
+
+        assert.is_true(rendered)
+        assert.are.equal("english", settings_calls.saved_cache.sources[1].id)
+        assert.is_nil(ui_calls.shown)
+        assert.is_nil(ui_calls.updated)
+        assert.are.equal("sources_refreshed", debug_logs[1].event)
+    end)
+
     it("keeps the Browse source menu reachable when the default language has no matches", function()
         local catalog = loadCatalog()
         local controller = buildController(catalog)

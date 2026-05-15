@@ -353,6 +353,9 @@ function Methods:showFetchedSources(result, options)
         end
         return
     end
+    if options.silent and not self.current_sources_menu then
+        return true
+    end
 
     self:showSourceList(filtered_sources, {
         credentials = options.credentials,

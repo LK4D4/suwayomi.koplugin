@@ -167,7 +167,7 @@ Fresh local verification from the review worktree:
     is still settling.
   - Direction: use the same `UIManager:nextTick` pattern as normal actions.
 
-- [ ] Stop silent source refresh from reopening closed Sources UI.
+- [x] Stop silent source refresh from reopening closed Sources UI.
   - Area: `suwayomi/browse/source_catalog.lua:357`
   - Risk: cached source refresh can pop Sources back onto screen after user has
     navigated away.
