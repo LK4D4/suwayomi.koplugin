@@ -961,6 +961,154 @@ describe("suwayomi/downloads/downloader", function()
         assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
     end)
 
+    it("does not finalize when archive writer close reports a disk error", function()
+        local removed_path
+        local renamed = false
+
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchChapterPages = function()
+                    return {
+                        ok = true,
+                        pages = { "/page/0" },
+                    }
+                end,
+                downloadBinary = function()
+                    return { ok = true, body = "page-one", content_type = "image/jpeg" }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function()
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function() return true end,
+                            addFileFromMemory = function() return true end,
+                            close = function() return false, "disk full" end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_rename = os.rename
+        os.rename = function()
+            renamed = true
+            return true
+        end
+        local original_remove = os.remove
+        os.remove = function(path)
+            removed_path = path
+            return true
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.rename = original_rename
+        os.remove = original_remove
+
+        assert.is_false(result.ok)
+        assert.is_false(renamed)
+        assert.are.equal("Could not close chapter archive. disk full", result.error)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+    end)
+
+    it("does not finalize when archive writer close throws", function()
+        local removed_path
+        local renamed = false
+
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchChapterPages = function()
+                    return {
+                        ok = true,
+                        pages = { "/page/0" },
+                    }
+                end,
+                downloadBinary = function()
+                    return { ok = true, body = "page-one", content_type = "image/jpeg" }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function()
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function() return true end,
+                            addFileFromMemory = function() return true end,
+                            close = function() error("zip footer failed") end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_rename = os.rename
+        os.rename = function()
+            renamed = true
+            return true
+        end
+        local original_remove = os.remove
+        os.remove = function(path)
+            removed_path = path
+            return true
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.rename = original_rename
+        os.remove = original_remove
+
+        assert.is_false(result.ok)
+        assert.is_false(renamed)
+        assert.truthy(result.error:match("zip footer failed"))
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+    end)
+
     it("treats finalize rename failure as skipped when the target cbz already exists", function()
         local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
         local chapter_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"

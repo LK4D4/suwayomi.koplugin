@@ -34,7 +34,7 @@ Fresh local verification from the review worktree:
     the key is already active.
   - Tests: add recovery specs with duplicate queued/downloading jobs for one key.
 
-- [ ] Check archive writer close before final rename.
+- [x] Check archive writer close before final rename.
   - Area: `suwayomi/downloads/downloader.lua:333`
   - Risk: disk-full or zip footer write failure can be reported only by `close()`;
     ignoring it can publish a corrupt final `.cbz`.

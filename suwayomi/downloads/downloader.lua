@@ -73,7 +73,9 @@ end
 
 function Downloader:failAndCleanup(message, chapter_path, writer)
     if writer then
-        writer:close()
+        pcall(function()
+            writer:close()
+        end)
     end
     local cleanup_ok, cleanup_error = self:cleanupPartialFile(chapter_path)
     local result = {
@@ -84,6 +86,23 @@ function Downloader:failAndCleanup(message, chapter_path, writer)
         result.cleanup_error = cleanup_error
     end
     return result
+end
+
+function Downloader:closeArchiveWriter(writer)
+    if not writer then
+        return true
+    end
+
+    local ok, closed, close_error = pcall(function()
+        return writer:close()
+    end)
+    if not ok then
+        return false, "Could not close chapter archive. " .. tostring(closed)
+    end
+    if closed == false or close_error ~= nil then
+        return false, "Could not close chapter archive. " .. tostring(close_error or writer.err or "unknown error")
+    end
+    return true
 end
 
 function Downloader:isArchiveContentType(content_type)
@@ -301,8 +320,11 @@ function Downloader:downloadNextPage(job)
 
     if job.current >= #job.pages then
         if job.writer then
-            job.writer:close()
+            local closed, close_error = self:closeArchiveWriter(job.writer)
             job.writer = nil
+            if not closed then
+                return self:failAndCleanup(close_error, job.partial_path)
+            end
         end
         return self:finalizeChapterArchive(job)
     end
@@ -330,8 +352,11 @@ function Downloader:downloadNextPage(job)
     job.written = (job.written or 0) + 1
     local done = job.current == #job.pages
     if done then
-        job.writer:close()
+        local closed, close_error = self:closeArchiveWriter(job.writer)
         job.writer = nil
+        if not closed then
+            return self:failAndCleanup(close_error, job.partial_path)
+        end
         return self:finalizeChapterArchive(job)
     end
 
