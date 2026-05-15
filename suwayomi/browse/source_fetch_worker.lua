@@ -33,11 +33,22 @@ function SourceFetchWorker:run(credentials, result_path)
             sources = {},
         }
     else
-        result = SuwayomiAPI.fetchSources(credentials) or {
-            ok = false,
-            error = "Could not fetch Suwayomi sources.",
-            sources = {},
-        }
+        local ok, fetched = pcall(function()
+            return SuwayomiAPI.fetchSources(credentials)
+        end)
+        if ok then
+            result = fetched or {
+                ok = false,
+                error = "Could not fetch Suwayomi sources.",
+                sources = {},
+            }
+        else
+            result = {
+                ok = false,
+                error = tostring(fetched),
+                sources = {},
+            }
+        end
         result.sources = type(result.sources) == "table" and result.sources or {}
     end
 

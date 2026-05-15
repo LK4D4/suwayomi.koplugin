@@ -122,7 +122,7 @@ Fresh local verification from the review worktree:
   - Direction: keep timed-out jobs counted until cleanup/reap, or start the next
     job from cleanup callback.
 
-- [ ] Normalize source fetch worker errors.
+- [x] Normalize source fetch worker errors.
   - Area: `suwayomi/browse/source_fetch_worker.lua:36`
   - Risk: thrown API/client errors can produce no result file and lose root cause.
   - Direction: wrap the worker body in `pcall` and always write a normalized

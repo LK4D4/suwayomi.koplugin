@@ -100,4 +100,22 @@ describe("suwayomi/browse/source_fetch_worker", function()
         assert.are.equal(2, #result.sources)
         assert.are.same(result, worker:readResult("/settings/source_fetch.json"))
     end)
+
+    it("writes normalized error results when source fetch throws", function()
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchSources = function()
+                    error("boom from api")
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/browse/source_fetch_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, "/settings/source_fetch_error.json")
+
+        assert.is_false(result.ok)
+        assert.truthy(result.error:match("boom from api"))
+        assert.are.same({}, result.sources)
+        assert.are.same(result, worker:readResult("/settings/source_fetch_error.json"))
+    end)
 end)
