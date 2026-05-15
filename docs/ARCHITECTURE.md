@@ -62,6 +62,7 @@ Browse and Library:
 - `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua`: private thumbnail cache pathing and bounded background thumbnail fetch support.
 - `suwayomi/browse/controller.lua`: Browse entry flow, source fetch worker lifecycle, polling, and source-cache refresh.
 - `suwayomi/browse/source_catalog.lua`: source filtering, source cache IO, and source-list rendering.
+- `suwayomi/source_languages.lua`: source language code-to-label formatting for Browse filters and source rows; owns the static Suwayomi WebUI language label table.
 - `suwayomi/browse/extensions.lua`: extension list rendering, extension install/update/uninstall action routing, and extension worker result handling.
 - `suwayomi/browse/source_fetch_worker.lua`: subprocess worker for fetching sources into a result file.
 - `suwayomi/browse/extension_worker.lua`: subprocess worker for fetching available extensions and installing/updating/uninstalling a selected extension.
@@ -113,7 +114,7 @@ common changes and the specs that usually cover them.
 | --- | --- | --- |
 | KOReader plugin lifecycle, dispatcher actions, menu entry, setup wizard, or dependency construction | `main.lua`, `suwayomi/plugin/home.lua`, `suwayomi/plugin/settings_controller.lua`, `suwayomi/plugin/onboarding_connection_worker.lua`, `suwayomi/plugin/title_menu.lua` | `spec/main_spec.lua`, plugin controller specs, `spec/suwayomi_plugin_onboarding_connection_worker_spec.lua` |
 | GraphQL fields, mutations, response normalization, response timeout/byte limits, or legacy-schema fallback | `suwayomi/api/queries.lua`, `suwayomi/api/parsers.lua`, `suwayomi/api.lua`, `suwayomi/api/transport.lua` | API specs |
-| Browse source list, source cache, source language/NSFW filtering, or source refresh | `suwayomi/browse/source_catalog.lua`, `suwayomi/browse/controller.lua`, `suwayomi/settings.lua` | `spec/suwayomi_browse_*`, settings specs |
+| Browse source list, source cache, source language/NSFW filtering, or source refresh | `suwayomi/browse/source_catalog.lua`, `suwayomi/source_languages.lua`, `suwayomi/browse/controller.lua`, `suwayomi/settings.lua` | `spec/suwayomi_browse_*`, `spec/suwayomi_source_languages_spec.lua`, settings specs |
 | Source extension list, install/update/uninstall actions, or post-action source-cache refresh | `suwayomi/browse/extensions.lua`, `suwayomi/browse/extension_worker.lua`, `suwayomi/api/queries.lua`, `suwayomi/api/parsers.lua` | `spec/suwayomi_browse_extensions_spec.lua`, `spec/suwayomi_extension_worker_spec.lua`, API specs |
 | Source row metadata such as icons, language labels, adult markers, or global-search summary rows | `suwayomi/ui/list_rows.lua`, `suwayomi/ui/browse.lua`, `suwayomi/browse/source_catalog.lua`, `suwayomi/api/queries.lua`, `suwayomi/api/parsers.lua` | `spec/suwayomi_ui_list_rows_spec.lua`, `spec/suwayomi_ui_browse_spec.lua`, API parser/query specs |
 | Thumbnail list rendering, cached thumbnail slots, visible-row thumbnail jobs, or Menu-compatible row widgets | `suwayomi/ui/list_menu.lua`, `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua` | `spec/suwayomi_ui_list_menu_spec.lua`, `spec/suwayomi_ui_manga_menu_spec.lua` |

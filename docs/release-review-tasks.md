@@ -251,7 +251,7 @@ Fresh local verification from the review worktree:
   - Risk: partial failures, active jobs, or missing files are hidden behind
     `Deleted N`.
 
-- [ ] Update architecture map for source language ownership.
+- [x] Update architecture map for source language ownership.
   - Area: `docs/ARCHITECTURE.md:115`
   - Risk: future changes may miss `suwayomi/source_languages.lua`.
 
