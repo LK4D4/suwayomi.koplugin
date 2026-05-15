@@ -246,7 +246,7 @@ Fresh local verification from the review worktree:
   - Area: `suwayomi/manga/controller.lua:388`
   - Risk: open action menu can still show the old Add/Remove Library action.
 
-- [ ] Improve delete-read-downloads result text.
+- [x] Improve delete-read-downloads result text.
   - Area: `suwayomi/chapters/actions.lua:340`
   - Risk: partial failures, active jobs, or missing files are hidden behind
     `Deleted N`.
