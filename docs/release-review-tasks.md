@@ -228,7 +228,7 @@ Fresh local verification from the review worktree:
 
 ## P3 Minor / Polish
 
-- [ ] Validate malformed manga nodes more explicitly.
+- [x] Validate malformed manga nodes more explicitly.
   - Area: `suwayomi/api/parsers.lua:70`
   - Risk: malformed partial GraphQL data can create bad rows or crash instead of
     producing a parser error.

@@ -47,7 +47,7 @@ local function parseExtensionNode(extension)
 end
 
 local function parseChapterNode(chapter)
-    if type(chapter) ~= "table" then
+    if type(chapter) ~= "table" or chapter.id == nil then
         return nil
     end
 
@@ -67,6 +67,10 @@ local function parseChapterNode(chapter)
 end
 
 local function parseMangaNode(entry)
+    if type(entry) ~= "table" or entry.id == nil then
+        return nil
+    end
+
     local manga = {
         id = tostring(entry.id),
         title = entry.title or tostring(entry.id),
@@ -98,6 +102,9 @@ local function parseMangaNode(entry)
     if entry.categories and type(entry.categories.nodes) == "table" then
         manga.categories = {}
         for _, category in ipairs(entry.categories.nodes) do
+            if type(category) ~= "table" or category.id == nil then
+                return nil
+            end
             table.insert(manga.categories, {
                 id = tostring(category.id),
                 name = category.name or tostring(category.id),
@@ -107,7 +114,13 @@ local function parseMangaNode(entry)
     end
 
     manga.first_unread_chapter = parseChapterNode(entry.firstUnreadChapter)
+    if entry.firstUnreadChapter ~= nil and not manga.first_unread_chapter then
+        return nil
+    end
     manga.latest_fetched_chapter = parseChapterNode(entry.latestFetchedChapter)
+    if entry.latestFetchedChapter ~= nil and not manga.latest_fetched_chapter then
+        return nil
+    end
     return manga
 end
 
@@ -251,7 +264,11 @@ function Parsers.parseMangaResponse(response_body)
 
     local manga = {}
     for _, entry in ipairs(manga_nodes) do
-        table.insert(manga, parseMangaNode(entry))
+        local parsed = parseMangaNode(entry)
+        if not parsed then
+            return nil, "Suwayomi server returned invalid manga data."
+        end
+        table.insert(manga, parsed)
     end
 
     return manga, source_manga.hasNextPage == true
@@ -272,7 +289,11 @@ function Parsers.parseLibraryMangaResponse(response_body)
 
     local parsed = {}
     for _, entry in ipairs(manga_nodes) do
-        table.insert(parsed, parseMangaNode(entry))
+        local manga = parseMangaNode(entry)
+        if not manga then
+            return nil, "Suwayomi server returned invalid manga data."
+        end
+        table.insert(parsed, manga)
     end
     return {
         total_count = tonumber(mangas.totalCount) or #parsed,
@@ -297,6 +318,9 @@ function Parsers.parseCategoryResponse(response_body)
 
     local categories = {}
     for _, category in ipairs(category_nodes) do
+        if type(category) ~= "table" or category.id == nil then
+            return nil, "Suwayomi server returned invalid category data."
+        end
         table.insert(categories, {
             id = tostring(category.id),
             name = category.name or tostring(category.id),
@@ -351,6 +375,9 @@ function Parsers.parseRefreshMangaResponse(response_body)
     local chapters = {}
     for _, chapter in ipairs(chapter_nodes) do
         local parsed_chapter = parseChapterNode(chapter)
+        if not parsed_chapter then
+            return nil, "Suwayomi server returned invalid chapter data."
+        end
         table.insert(chapters, {
             id = parsed_chapter.id,
             name = parsed_chapter.name,
@@ -360,8 +387,13 @@ function Parsers.parseRefreshMangaResponse(response_body)
             is_read = parsed_chapter.is_read,
         })
     end
+    local parsed_manga = parseMangaNode(manga)
+    if not parsed_manga then
+        return nil, "Suwayomi server returned invalid manga data."
+    end
+
     return {
-        manga = parseMangaNode(manga),
+        manga = parsed_manga,
         chapters = chapters,
     }
 end
@@ -384,7 +416,11 @@ function Parsers.parseChapterResponse(response_body)
 
     local chapters = {}
     for _, entry in ipairs(chapter_nodes) do
-        table.insert(chapters, parseChapterNode(entry))
+        local chapter = parseChapterNode(entry)
+        if not chapter then
+            return nil, "Suwayomi server returned invalid chapter data."
+        end
+        table.insert(chapters, chapter)
     end
 
     return chapters
@@ -445,7 +481,11 @@ function Parsers.parseStoredChapterResponse(response_body)
 
     local chapters = {}
     for _, entry in ipairs(chapter_nodes) do
-        table.insert(chapters, parseChapterNode(entry))
+        local chapter = parseChapterNode(entry)
+        if not chapter then
+            return nil, "Suwayomi server returned invalid chapter data."
+        end
+        table.insert(chapters, chapter)
     end
 
     return chapters
