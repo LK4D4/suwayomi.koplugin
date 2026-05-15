@@ -39,6 +39,11 @@ function MenuUtils.applyTitleBarOptions(menu, options)
             return options.on_title_bar_left_tap(menu, ...)
         end
     end
+    if options.on_title_bar_left_hold then
+        menu.onLeftButtonHold = function(...)
+            return options.on_title_bar_left_hold(menu, ...)
+        end
+    end
     return menu
 end
 

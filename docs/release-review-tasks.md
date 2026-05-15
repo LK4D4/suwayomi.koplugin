@@ -238,7 +238,7 @@ Fresh local verification from the review worktree:
     `suwayomi/readsync/koreader_metadata.lua:227`
   - Risk: corrupt or huge KOReader metadata/history files can freeze plugin work.
 
-- [ ] Bind title-bar left hold if kept as an option.
+- [x] Bind title-bar left hold if kept as an option.
   - Area: `suwayomi/ui/menu_utils.lua:37`
   - Risk: callers can wire hold behavior that silently never fires.
 
