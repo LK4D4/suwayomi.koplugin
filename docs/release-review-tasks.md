@@ -219,7 +219,7 @@ Fresh local verification from the review worktree:
   - Direction: stage `_meta.lua`, `main.lua`, `README.md`, and `suwayomi/` into a
     clean temp directory before pushing.
 
-- [ ] Fix README path for source-language filtering.
+- [x] Fix README path for source-language filtering.
   - Area: `README.md:74`
   - Risk: users cannot find the control described under Settings > Browse because
     implementation keeps it in the Browse source-list title menu.

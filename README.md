@@ -22,7 +22,7 @@ This plugin is experimental and still under active development.
 - Cached source list with silent background refresh
 - Basic auth login against a self-hosted Suwayomi server
 - Filter sources by language
-- Browse settings for source languages, NSFW source visibility, and optionally hiding in-library source results
+- Browse title-menu settings for source languages, NSFW source visibility, and optionally hiding in-library source results
 - Select a custom download directory
 - Source-scoped download layout: `<download directory>/<source>/<manga>/<chapter>.cbz`
 - Download individual chapters as `.cbz`
@@ -72,7 +72,7 @@ Manual installation:
 3. First time use opens **Suwayomi setup**. Enter your server URL, username, and password, tap **Test connection**, then choose the download folder used for KOReader-local CBZ files.
 4. To re-run setup later, tap **Settings** > **Setup wizard**. To edit only the saved login, tap **Settings** > **Connection** > **Login information**.
 5. Optionally tap **Sync** to flush any pending local read/unread changes.
-6. Optionally tap **Settings** > **Browse** to filter source languages, show/hide NSFW sources, or hide in-library source results.
+6. Optionally tap **Browse**, then open the title-bar menu to filter source languages, show/hide NSFW sources, or hide in-library source results.
 7. Tap **Settings** > **Downloads** > **Download directory** to change where manga will be downloaded. The same Downloads settings section also controls optional local-file deletion after mark-read or finished-reading events.
 8. Tap **Library** to open manga already in your Suwayomi library, or **Browse** to explore sources.
 9. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, or **Search**.
