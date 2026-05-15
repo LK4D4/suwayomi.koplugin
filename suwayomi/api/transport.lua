@@ -257,6 +257,12 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event, reques
             error = "Missing Suwayomi server URL.",
         }
     end
+    if type(page_url) ~= "string" or page_url == "" then
+        return {
+            ok = false,
+            error = "Invalid chapter page URL.",
+        }
+    end
 
     local request_url = Transport.buildRequestURL(server_url, page_url)
     local client = request_url:match("^https://") and require("ssl.https") or require("socket.http")

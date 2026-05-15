@@ -90,7 +90,7 @@ Fresh local verification from the review worktree:
   - Direction: reject oversized `Content-Length` and stop file sink after a
     configured maximum byte count.
 
-- [ ] Validate page URLs before URL joining.
+- [x] Validate page URLs before URL joining.
   - Area: `suwayomi/api/transport.lua:147`
   - Risk: malformed or non-string page entries can crash a worker instead of
     producing a clean download error.

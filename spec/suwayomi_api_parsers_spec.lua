@@ -117,6 +117,15 @@ describe("suwayomi/api/parsers", function()
         assert.are.equal("Sousou no Frieren", pages.chapter.manga_title)
         assert.are.equal("/api/v1/manga/85/chapter/1/page/0", pages.pages[1])
 
+        local invalid_pages, invalid_pages_error = parsers.parseChapterPagesResponse([[
+            { "data": { "fetchChapterPages": {
+                "pages": [ "/api/v1/page/0", "" ],
+                "chapter": { "id": 398, "name": "Chapter 1" }
+            } } }
+        ]])
+        assert.is_nil(invalid_pages)
+        assert.are.equal("Suwayomi server returned invalid chapter page URLs.", invalid_pages_error)
+
         local stored = assert(parsers.parseStoredChapterResponse([[
             { "data": { "chapters": { "nodes": [
                 { "id": 399, "name": "Ch. 2", "isRead": true }

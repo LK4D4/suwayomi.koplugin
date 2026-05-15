@@ -404,6 +404,11 @@ function Parsers.parseChapterPagesResponse(response_body)
         local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
         return nil, graph_error or "Suwayomi server did not return chapter pages."
     end
+    for _, page_url in ipairs(pages) do
+        if type(page_url) ~= "string" or page_url == "" then
+            return nil, "Suwayomi server returned invalid chapter page URLs."
+        end
+    end
 
     local chapter_name = chapter.name
     if not chapter_name or chapter_name == "" then

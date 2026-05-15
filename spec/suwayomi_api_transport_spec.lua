@@ -184,6 +184,14 @@ describe("suwayomi/api/transport", function()
         assert.are.equal("Missing Suwayomi server URL.", missing.error)
     end)
 
+    it("rejects invalid binary page URLs before loading HTTP helpers", function()
+        forbid_ltn12()
+        local invalid = transport.downloadBinary(valid_credentials(), nil)
+
+        assert.are.equal(false, invalid.ok)
+        assert.are.equal("Invalid chapter page URL.", invalid.error)
+    end)
+
     it("maps GraphQL HTTP statuses and non-numeric status strings", function()
         install_ltn12()
         local statuses = {
