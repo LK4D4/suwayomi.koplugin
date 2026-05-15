@@ -200,7 +200,7 @@ Fresh local verification from the review worktree:
   - Direction: include stable auth identity hash in cache keys or clear caches
     when connection credentials change.
 
-- [ ] Harden release workflow permissions.
+- [x] Harden release workflow permissions.
   - Area: `.github/workflows/release.yml:23`
   - Risk: hardened repo/org defaults can make release asset upload fail.
   - Direction: add explicit `permissions: contents: write`.
