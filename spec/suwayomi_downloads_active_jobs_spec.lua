@@ -315,6 +315,37 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.equal(1, #context.scheduled)
     end)
 
+    it("skips queued jobs whose key is already active", function()
+        local context = build_queue({
+            max_active_chapters = 2,
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:setActiveJob({
+            key = context.queue:getKey(manga, chapter),
+            manga = manga,
+            chapter = chapter,
+            pid = 999,
+        })
+        table.insert(context.queue.items, {
+            key = context.queue:getKey(manga, chapter),
+            download_directory = "/books",
+            manga = manga,
+            chapter = chapter,
+            downloader = context.queue.downloader,
+        })
+
+        context.queue:process()
+
+        assert.are.equal(1, context.active_count())
+        assert.are.equal(999, context.active_job(manga, chapter).pid)
+        assert.are.equal(0, context.download_calls())
+        assert.are.equal(0, #context.queue.items)
+    end)
+
     it("uses atomic progress writes so polling sees complete updates", function()
         local context = build_queue()
         local progress_path = context.queue:buildProgressPath(

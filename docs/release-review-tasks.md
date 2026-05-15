@@ -26,7 +26,7 @@ Fresh local verification from the review worktree:
     text.
   - Tests: add timeout specs for fetch and one mutation action.
 
-- [ ] Prevent duplicate active download jobs for the same chapter.
+- [x] Prevent duplicate active download jobs for the same chapter.
   - Area: `suwayomi/downloads/active_jobs.lua:173`
   - Risk: duplicate recovered or persisted jobs can launch two subprocesses for
     the same chapter, corrupting `.cbz` or leaving an orphan worker.

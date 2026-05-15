@@ -108,6 +108,12 @@ end
 
 function ActiveJobs:startQueuedJob(queued)
     local queue = self.queue
+    local key = queued.key or queue:getKey(queued.manga, queued.chapter)
+    if self:getJob(key) then
+        queue:setStatus(queued.manga, queued.chapter, { state = "downloading" })
+        return false
+    end
+    queued.key = key
     queued.started_at = queue.now()
     queued.last_progress_at = queued.started_at
     queued.last_progress_current = nil

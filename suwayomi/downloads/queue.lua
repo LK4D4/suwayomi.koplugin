@@ -457,6 +457,7 @@ function DownloadQueue:recover()
 
     local recovered_jobs = {}
     local should_process = false
+    local seen_recovered_keys = {}
     for _, job in ipairs(jobs) do
         if job.manga and job.chapter and job.download_directory and (job.state == "queued" or job.state == "downloading") then
             local recovered
@@ -465,6 +466,17 @@ function DownloadQueue:recover()
             else
                 recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued")
             end
+            local key = recovered.key or self:getKey(recovered.manga, recovered.chapter)
+            if seen_recovered_keys[key] then
+                self:logDebug({
+                    operation = "downloadQueue.recover",
+                    event = "duplicate",
+                    key = key,
+                    chapter_id = recovered.chapter and recovered.chapter.id,
+                })
+            else
+                seen_recovered_keys[key] = true
+                recovered.key = key
             table.insert(recovered_jobs, recovered)
             table.insert(self.items, {
                 key = recovered.key,
@@ -475,6 +487,7 @@ function DownloadQueue:recover()
             })
             self:setStatus(recovered.manga, recovered.chapter, { state = "queued" })
             should_process = true
+            end
         elseif job.manga and job.chapter and job.state == "failed" then
             if self:jobArchiveExists(job, job.progress) then
                 self.statuses[job.key or self:getKey(job.manga, job.chapter)] = nil

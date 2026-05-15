@@ -896,6 +896,35 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal("m1:399", context.saved_queue()[2].key)
     end)
 
+    it("deduplicates recovered queued and downloading jobs by chapter key", function()
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m1:398",
+                    state = "downloading",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+                {
+                    key = "m1:398",
+                    state = "queued",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        assert.are.equal(1, #context.saved_queue())
+        assert.are.equal(1, #context.queue.items)
+        assert.are.equal("m1:398", context.saved_queue()[1].key)
+        assert.are.equal("m1:398", context.queue.items[1].key)
+        assert.are.equal(1, #context.scheduled)
+    end)
+
     it("keeps failed jobs with progress failed during recovery", function()
         local context = build_queue({
             saved_queue = {
