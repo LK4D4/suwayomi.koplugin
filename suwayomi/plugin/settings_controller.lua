@@ -176,6 +176,9 @@ function Methods:finishOnboardingSetup()
     self:showMessage(_("Suwayomi setup complete."))
     if self.showHome then
         UIManager:nextTick(function()
+            if self.closeSuwayomiPlugin then
+                self:closeSuwayomiPlugin()
+            end
             self:showHome()
         end)
     end
@@ -185,7 +188,10 @@ end
 function Methods:showOnboardingDirectoryStep()
     self:chooseDownloadDirectory(function()
         self:finishOnboardingSetup()
-    end, { next_tick = true })
+    end, {
+        next_tick = true,
+        suppress_saved_message = true,
+    })
 end
 
 

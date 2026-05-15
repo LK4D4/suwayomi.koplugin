@@ -123,7 +123,9 @@ end
 function Methods:chooseDownloadDirectory(callback, options)
     SuwayomiUI.showDirectoryChooser(function(path)
         local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
-        self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+        if not (options and options.suppress_saved_message) then
+            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+        end
         runCallback(callback, saved_path, options)
     end, self:getDownloadDirectoryChooserStartDir())
 end

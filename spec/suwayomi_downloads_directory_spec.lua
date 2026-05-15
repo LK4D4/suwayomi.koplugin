@@ -194,6 +194,29 @@ describe("suwayomi/downloads/directory", function()
         assert.are.same({ "Suwayomi download directory saved: /chosen" }, plugin.messages)
     end)
 
+    it("can choose a directory without showing the save toast", function()
+        local Directory = load_directory()
+        local callback_path
+        local plugin = {
+            messages = {},
+            showMessage = function(self, message)
+                table.insert(self.messages, message)
+            end,
+        }
+        for name, method in pairs(Directory.methods) do
+            plugin[name] = method
+        end
+
+        plugin:chooseDownloadDirectory(function(path)
+            callback_path = path
+        end, { suppress_saved_message = true })
+        ui.calls[1].callback("/chosen")
+
+        assert.are.equal("/chosen", settings.download_directory)
+        assert.are.equal("/chosen", callback_path)
+        assert.are.same({}, plugin.messages)
+    end)
+
     it("returns a saved directory without opening the chooser", function()
         local Directory = load_directory({
             download_directory = "/books",

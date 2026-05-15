@@ -216,8 +216,15 @@ local function installController(options)
     function plugin:getDownloadDirectorySummary()
         return "not set"
     end
-    function plugin:chooseDownloadDirectory(callback)
+    function plugin:chooseDownloadDirectory(callback, choose_options)
         state.choose_download_callback = callback
+        state.choose_download_options = choose_options
+    end
+    function plugin:closeSuwayomiPlugin()
+        state.closed_plugin = true
+    end
+    function plugin:showHome()
+        state.home_count = (state.home_count or 0) + 1
     end
     function plugin:pluralize(value, singular, plural)
         return value == 1 and singular or plural
@@ -315,10 +322,16 @@ describe("suwayomi/plugin/settings_controller", function()
 
         assert.are.equal("https://suwayomi.example", state.saved_credentials.server_url)
         assert.truthy(state.choose_download_callback)
+        assert.are.same({
+            next_tick = true,
+            suppress_saved_message = true,
+        }, state.choose_download_options)
 
         state.choose_download_callback("/storage/emulated/0/Books/Manga")
 
         assert.are.equal("Suwayomi setup complete.", state.messages[#state.messages])
+        assert.is_true(state.closed_plugin)
+        assert.are.equal(1, state.home_count)
     end)
 
     it("requires settings setup wizard to test current connection before continuing", function()
@@ -397,6 +410,39 @@ describe("suwayomi/plugin/settings_controller", function()
             auth_method = "basic_auth",
         }))
         assert.truthy(state.choose_download_callback)
+    end)
+
+    it("closes settings before landing home after settings-launched setup", function()
+        local plugin, state = installController({
+            credentials = { server_url = "https://suwayomi.example" },
+            download_directory = "/storage/emulated/0/Books/Manga",
+        })
+        plugin.startOnboardingConnectionTest = function(self, credentials)
+            self.onboarding_connection_test_key = self:getOnboardingCredentialsKey(credentials)
+        end
+
+        plugin:buildSettingsMenu()[1].callback()
+        state.onboarding_connection_options.onTestConnection({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        })
+        assert.is_true(state.onboarding_connection_options.onContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
+        state.choose_download_callback("/storage/emulated/0/Books/Manga")
+
+        assert.are.same({
+            next_tick = true,
+            suppress_saved_message = true,
+        }, state.choose_download_options)
+        assert.are.equal("Suwayomi setup complete.", state.messages[#state.messages])
+        assert.is_true(state.closed_plugin)
+        assert.are.equal(1, state.home_count)
     end)
 
     it("uses a device-friendly timeout for onboarding connection tests", function()
