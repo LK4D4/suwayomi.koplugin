@@ -58,7 +58,7 @@ Fresh local verification from the review worktree:
     fields at the settings/read-sync boundary.
   - Tests: add schema-drift specs for non-table and malformed entries.
 
-- [ ] Preserve active queue when changing parallel download setting.
+- [x] Preserve active queue when changing parallel download setting.
   - Area: `suwayomi/plugin/settings_controller.lua:103`
   - Risk: setting `self.download_queue = nil` can abandon active/queued in-memory
     jobs while subprocesses continue.

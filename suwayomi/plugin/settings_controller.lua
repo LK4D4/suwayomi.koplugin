@@ -100,7 +100,12 @@ function Methods:showParallelDownloadsDialog(touchmenu_instance)
     local choices = { 1, 2, 3, 4 }
     local function onSelect(value)
         local saved_value = SuwayomiSettings:saveMaxParallelChapterDownloads(value)
-        self.download_queue = nil
+        if self.download_queue then
+            self.download_queue.max_active_chapters = saved_value
+            if self.download_queue.process then
+                self.download_queue:process()
+            end
+        end
         self:showMessage(T(_("Suwayomi parallel chapter downloads saved: %1"), saved_value))
         self:refreshSettingsMenu(touchmenu_instance)
         if SuwayomiUI.updateParallelDownloadsMenu then

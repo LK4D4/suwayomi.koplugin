@@ -258,10 +258,30 @@ describe("suwayomi/plugin/settings_controller", function()
         state.parallel_menu_options.onSelect(3)
 
         assert.are.equal(3, state.saved_parallel)
-        assert.is_nil(plugin.download_queue)
+        assert.are.equal(3, plugin.download_queue.max_active_chapters)
         assert.are.equal("parallel-downloads-menu", state.parallel_menu_options.menu.name)
         assert.are.equal("Suwayomi parallel chapter downloads saved: 3", state.messages[#state.messages])
         assert.are.equal("Delete after manual mark-read: no", download_items[3].text_func())
+    end)
+
+    it("updates an existing download queue limit without abandoning active jobs", function()
+        local plugin, state = installController()
+        local process_count = 0
+        plugin.download_queue = {
+            max_active_chapters = 2,
+            process = function()
+                process_count = process_count + 1
+            end,
+        }
+        local download_items = plugin:buildSettingsMenu()[4].sub_item_table
+
+        download_items[2].callback(state.touchmenu)
+        state.parallel_menu_options.onSelect(4)
+
+        assert.are.equal(4, state.saved_parallel)
+        assert.are.equal(4, plugin.download_queue.max_active_chapters)
+        assert.are.equal(1, process_count)
+        assert.are.equal("Suwayomi parallel chapter downloads saved: 4", state.messages[#state.messages])
     end)
 
     it("saves category picker behavior and reports unavailable persistence", function()
