@@ -166,6 +166,9 @@ local function installController(options)
                 return "/settings"
             end,
             load = function()
+                if options.loadCredentials then
+                    return options.loadCredentials()
+                end
                 return options.credentials or { server_url = "https://suwayomi.example" }
             end,
         }
@@ -353,6 +356,25 @@ describe("suwayomi/readsync/controller", function()
         assert.are.equal(1, #state.scheduled)
         assert.are.equal(0, #state.worker_runs)
         assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
+    end)
+
+    it("reloads credentials for automatic read-sync retries", function()
+        local controller, state = installController({
+            worker_result = { attempted = 1, successes = {}, failures = {} },
+            loadCredentials = function()
+                return { server_url = "https://new.example" }
+            end,
+        })
+        local plugin = buildPlugin(controller, {
+            ledger = {
+                ["m1:c1"] = { chapter_id = "c1", read = true, pending_read_sync = true },
+            },
+        })
+
+        plugin:finishPendingReadSync({ credentials = { server_url = "https://old.example" } }, 0, 1)
+        state.scheduled[1].callback()
+
+        assert.are.equal("https://new.example", plugin.pending_read_sync_active.credentials.server_url)
     end)
 
     it("marks the matching ledger entry read when KOReader closes a finished document", function()

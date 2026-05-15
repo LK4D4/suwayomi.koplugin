@@ -141,7 +141,7 @@ Fresh local verification from the review worktree:
   - Direction: classify missing credentials as blocked until settings change or
     manual sync.
 
-- [ ] Reload credentials for read-sync retry.
+- [x] Reload credentials for read-sync retry.
   - Area: `suwayomi/readsync/controller.lua:189`
   - Risk: automatic retries can keep using stale credentials after the user fixes
     server/auth settings.

@@ -186,7 +186,7 @@ function Methods:finishPendingReadSync(active, synced, attempted)
         else
             self.pending_read_sync_failure_delay = nil
         end
-        self:schedulePendingReadSync(active and active.credentials or nil, next_delay)
+        self:schedulePendingReadSync(nil, next_delay)
     else
         self.pending_read_sync_failure_delay = nil
     end
@@ -225,7 +225,7 @@ function Methods:schedulePendingReadSync(credentials, delay_seconds)
                         next_delay * 2,
                         self.read_sync_max_failure_delay_seconds
                     )
-                    self:schedulePendingReadSync(sync_credentials, next_delay)
+                    self:schedulePendingReadSync(nil, next_delay)
                 else
                     self.pending_read_sync_failure_delay = nil
                 end
