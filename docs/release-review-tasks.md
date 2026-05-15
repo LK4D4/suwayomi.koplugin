@@ -103,7 +103,7 @@ Fresh local verification from the review worktree:
   - Direction: include a stable id/order suffix on collision, or use an id-aware
     naming rule with migration care.
 
-- [ ] Make progress filenames collision-safe.
+- [x] Make progress filenames collision-safe.
   - Area: `suwayomi/downloads/progress_file.lua:14`
   - Risk: sanitizer collisions for Unicode or no-id jobs can make active jobs read
     each other's progress.

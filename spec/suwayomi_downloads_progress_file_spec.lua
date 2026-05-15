@@ -81,10 +81,22 @@ describe("suwayomi/downloads/progress_file", function()
         package.loaded["suwayomi/downloads/progress_file"] = nil
     end)
 
-    it("builds the existing sanitized hidden progress filename", function()
+    it("builds hidden progress filenames from encoded full keys", function()
+        assert.are.equal(
+            "/books/.suwayomi_dl_progress_6d313a333938.txt",
+            progress_file.buildPath("m1:398", "/books/")
+        )
+        assert.are.equal(
+            "/books/.suwayomi_dl_progress_6d3153333938.txt",
+            progress_file.buildPath("m1S398", "/books/")
+        )
+        assert.are_not.equal(
+            progress_file.buildPath("m1:398", "/books/"),
+            progress_file.buildPath("m1/398", "/books/")
+        )
         assert.are.equal(
             "/books/.suwayomi_dl_progress_m1_398.txt",
-            progress_file.buildPath("m1:398", "/books/")
+            progress_file.buildLegacyPath("m1:398", "/books/")
         )
     end)
 

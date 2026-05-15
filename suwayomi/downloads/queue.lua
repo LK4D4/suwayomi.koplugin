@@ -405,7 +405,9 @@ function DownloadQueue:cleanupInterruptedProgress(job)
     if not job or not job.download_directory or not job.manga or not job.chapter then
         return false
     end
-    os.remove(self:buildProgressPath(job.manga, job.chapter, job.download_directory))
+    local key = self:getKey(job.manga, job.chapter)
+    os.remove(ProgressFile.buildPath(key, job.download_directory))
+    os.remove(ProgressFile.buildLegacyPath(key, job.download_directory))
     return true
 end
 

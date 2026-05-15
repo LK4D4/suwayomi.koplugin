@@ -10,8 +10,29 @@
 
 local ProgressFile = {}
 
-function ProgressFile.buildPath(key, download_directory)
+local function buildLegacyName(key)
     local sanitized_key = tostring(key or ""):gsub("[^%w%-_%.]", "_")
+    return sanitized_key
+end
+
+local function encodeKey(key)
+    local encoded = {}
+    for index = 1, #key do
+        encoded[#encoded + 1] = string.format("%02x", key:byte(index))
+    end
+    return table.concat(encoded)
+end
+
+function ProgressFile.buildPath(key, download_directory)
+    local encoded_key = encodeKey(tostring(key or ""))
+    if encoded_key == "" then
+        encoded_key = "empty"
+    end
+    return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_dl_progress_" .. encoded_key .. ".txt"
+end
+
+function ProgressFile.buildLegacyPath(key, download_directory)
+    local sanitized_key = buildLegacyName(key)
     return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_dl_progress_" .. sanitized_key .. ".txt"
 end
 
