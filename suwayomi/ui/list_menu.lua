@@ -669,6 +669,9 @@ function ListMenu.startThumbnailJob(menu, item)
             menu._suwayomi_thumbnail_active_count = math.max((menu._suwayomi_thumbnail_active_count or 1) - 1, 0)
             menu._suwayomi_thumbnail_active[timed_out_active.thumbnail_key] = nil
             markThumbnailResult(menu, timed_out_active.thumbnail_key, nil)
+            if menu.updateItems then
+                menu:updateItems(nil, true)
+            end
         end,
     })
     if active then

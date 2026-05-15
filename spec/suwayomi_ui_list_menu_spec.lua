@@ -308,4 +308,52 @@ describe("suwayomi/ui/list_menu", function()
         assert.is_true(menu.item_table[2].height >= menu._suwayomi_base_item_height)
         assert.are.same({ { 1, 2 } }, menu.page_items)
     end)
+
+    it("refreshes visible rows after thumbnail timeouts", function()
+        local started_options
+        package.loaded["suwayomi/subprocess/job"] = nil
+        package.loaded["suwayomi/ui/thumbnail_cache"] = nil
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                buildResultPath = function()
+                    return "/settings/thumbnail.json"
+                end,
+                start = function(options)
+                    started_options = options
+                    return options.active
+                end,
+            }
+        end
+        package.preload["suwayomi/ui/thumbnail_cache"] = function()
+            return {
+                getKey = function(_, url)
+                    return "key:" .. url
+                end,
+            }
+        end
+
+        local ListMenu = require("suwayomi/ui/list_menu")
+        local updates = 0
+        local item = {
+            text = "Frieren",
+            thumbnail_url = "/cover.jpg",
+        }
+        local menu = {
+            item_table = { item },
+            _suwayomi_thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            _suwayomi_thumbnail_generation = 0,
+            updateItems = function(_, _, no_recalculate_dimen)
+                updates = updates + 1
+                assert.is_true(no_recalculate_dimen)
+            end,
+        }
+
+        assert.is_true(ListMenu.startThumbnailJob(menu, item))
+        started_options.on_timeout(menu._suwayomi_thumbnail_active["key:/cover.jpg"])
+
+        assert.are.equal(1, updates)
+        assert.is_true(item.thumbnail_failed)
+        assert.is_nil(item.thumbnail_loading)
+        assert.are.equal(0, menu._suwayomi_thumbnail_active_count)
+    end)
 end)

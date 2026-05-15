@@ -155,7 +155,7 @@ Fresh local verification from the review worktree:
   - Direction: expand key denylist, redact URL/path-like scalar values, and avoid
     logging raw global-search queries.
 
-- [ ] Resume thumbnail queue after thumbnail timeout.
+- [x] Resume thumbnail queue after thumbnail timeout.
   - Area: `suwayomi/ui/list_menu.lua:663`
   - Risk: slow first visible thumbnail jobs can stall later visible thumbnail
     loading until user forces redraw.
