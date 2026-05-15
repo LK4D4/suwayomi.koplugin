@@ -115,7 +115,7 @@ Fresh local verification from the review worktree:
   - Direction: wrap `close()` in `pcall`, always cleanup partial on failure, and
     surface the close error.
 
-- [ ] Release subprocess slots only after child cleanup.
+- [x] Release subprocess slots only after child cleanup.
   - Areas: `suwayomi/client/global_search.lua:242`,
     `suwayomi/client/browse_chapter_counts.lua:114`
   - Risk: repeated slow sources can exceed configured subprocess caps on device.

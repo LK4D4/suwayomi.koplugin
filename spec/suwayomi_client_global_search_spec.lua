@@ -149,7 +149,7 @@ describe("suwayomi/client global search flows", function()
         assert.is_function(opened_options.on_next_page)
     end)
 
-    it("marks timed out global search sources and starts queued work", function()
+    it("keeps timed out global search slots active until cleanup", function()
         local subprocess_job, started = buildGlobalSearchSubprocessFake()
         local updated_summaries
         local client = newClient({
@@ -179,6 +179,10 @@ describe("suwayomi/client global search flows", function()
 
         assert.are.equal("timed_out", updated_summaries[1].status)
         assert.are.equal("searching", updated_summaries[2].status)
+        assert.are.equal(1, #started)
+
+        started[1].on_cleanup(started[1])
+
         assert.are.equal("s2", started[2].source.id)
     end)
 

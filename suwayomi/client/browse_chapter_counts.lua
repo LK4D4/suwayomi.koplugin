@@ -99,8 +99,7 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
                         if state.canceled then
                             return
                         end
-                        state.active_jobs[finished_active.manga_id] = nil
-                        state.active_count = math.max((state.active_count or 1) - 1, 0)
+                        self:releaseBrowseChapterCountJob(state, finished_active)
                         self:applyBrowseChapterCountResult(finished_active.manga, result)
                         if state.refresh then
                             state.refresh()
@@ -111,8 +110,6 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
                         if state.canceled then
                             return
                         end
-                        state.active_jobs[timed_out_active.manga_id] = nil
-                        state.active_count = math.max((state.active_count or 1) - 1, 0)
                         timed_out_active.canceled = true
                         self:applyBrowseChapterCountResult(timed_out_active.manga, {
                             ok = false,
@@ -121,7 +118,14 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
                         if state.refresh then
                             state.refresh()
                         end
-                        self:startNextBrowseChapterCountJobs(state)
+                    end,
+                    on_cleanup = function(cleaned_active)
+                        if state.canceled then
+                            return
+                        end
+                        if self:releaseBrowseChapterCountJob(state, cleaned_active) then
+                            self:startNextBrowseChapterCountJobs(state)
+                        end
                     end,
                 })
             end)
@@ -143,6 +147,18 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
             end
         end
     end
+end
+
+function SuwayomiClient:releaseBrowseChapterCountJob(state, active)
+    if not state or not active or active.released then
+        return false
+    end
+    if state.active_jobs and state.active_jobs[active.manga_id] == active then
+        state.active_jobs[active.manga_id] = nil
+    end
+    active.released = true
+    state.active_count = math.max((state.active_count or 1) - 1, 0)
+    return true
 end
 
 function SuwayomiClient:startBrowseChapterCountEnrichment(credentials, manga_list, refresh, runtime)

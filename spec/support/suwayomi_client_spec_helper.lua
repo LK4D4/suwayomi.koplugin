@@ -250,6 +250,7 @@ local function buildGlobalSearchSubprocessFake()
         active.on_finish = options.on_finish
         active.on_timeout = options.on_timeout
         active.on_cancel = options.on_cancel
+        active.on_cleanup = options.on_cleanup
         active.read_result = options.read_result
         active.run = options.run
         table.insert(started, active)
@@ -280,6 +281,7 @@ local function buildSourceMangaSubprocessFake()
         local active = options.active or {}
         active.on_finish = options.on_finish
         active.on_timeout = options.on_timeout
+        active.on_cleanup = options.on_cleanup
         active.read_result = options.read_result
         active.run = options.run
         table.insert(started, active)
@@ -307,6 +309,7 @@ buildImmediateSourceMangaRuntime = function(api)
         local active = options.active or {}
         active.on_finish = options.on_finish
         active.on_timeout = options.on_timeout
+        active.on_cleanup = options.on_cleanup
         active.read_result = options.read_result
         active.run = options.run
         if not tostring(active.result_path or ""):match("source_manga") then
@@ -369,6 +372,7 @@ local function buildChapterCountSubprocessFake()
         local active = options.active or {}
         active.on_finish = options.on_finish
         active.on_timeout = options.on_timeout
+        active.on_cleanup = options.on_cleanup
         table.insert(started, active)
         return active
     end

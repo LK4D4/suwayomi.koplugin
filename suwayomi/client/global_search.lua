@@ -194,6 +194,18 @@ function SuwayomiClient:startNextGlobalSearchJobs(search)
     self:finishGlobalSearchIfComplete(search)
 end
 
+function SuwayomiClient:releaseGlobalSearchJob(search, active)
+    if not search or not active or active.released then
+        return false
+    end
+    if search.active_jobs and search.active_jobs[active.summary_index] == active then
+        search.active_jobs[active.summary_index] = nil
+    end
+    active.released = true
+    search.active_count = math.max((search.active_count or 1) - 1, 0)
+    return true
+end
+
 function SuwayomiClient:startGlobalSearchJob(search, index)
     local source = search.sources[index]
     if not source then
@@ -223,8 +235,7 @@ function SuwayomiClient:startGlobalSearchJob(search, index)
             if search.canceled then
                 return
             end
-            search.active_jobs[finished_active.summary_index] = nil
-            search.active_count = math.max((search.active_count or 1) - 1, 0)
+            self:releaseGlobalSearchJob(search, finished_active)
             self:applyGlobalSearchResult(search, finished_active.summary_index, result)
             self:updateGlobalSearchMenu(search)
             self:startNextGlobalSearchJobs(search)
@@ -239,11 +250,16 @@ function SuwayomiClient:startGlobalSearchJob(search, index)
                 summary.result_count = 0
                 summary.manga = {}
             end
-            search.active_jobs[timed_out_active.summary_index] = nil
-            search.active_count = math.max((search.active_count or 1) - 1, 0)
             timed_out_active.canceled = true
             self:updateGlobalSearchMenu(search)
-            self:startNextGlobalSearchJobs(search)
+        end,
+        on_cleanup = function(cleaned_active)
+            if search.canceled then
+                return
+            end
+            if self:releaseGlobalSearchJob(search, cleaned_active) then
+                self:startNextGlobalSearchJobs(search)
+            end
         end,
     })
     if active then

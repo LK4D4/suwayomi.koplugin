@@ -695,6 +695,56 @@ describe("suwayomi/client source manga flows", function()
         assert.is_nil(updated_manga[5].m3.loading)
     end)
 
+    it("keeps timed out browse chapter count slots active until cleanup", function()
+        local subprocess_job, started = buildChapterCountSubprocessFake()
+        local updated_manga = {}
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            chapter_count_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            chapter_count_max_active = 1,
+            api = {
+                fetchMangaForSource = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Unknown Count", chapter_count = 0 },
+                            { id = "m2", title = "Missing Count" },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function()
+                    return { name = "browse-menu" }
+                end,
+                updateMangaMenu = function(_, manga)
+                    table.insert(updated_manga, {
+                        first_error = manga[1].chapter_count_error,
+                        second_loading = manga[2].chapter_count_loading,
+                    })
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            skip_mode_menu = true,
+        })
+
+        assert.are.equal("m1", started[1].manga_id)
+        started[1].on_timeout(started[1])
+
+        assert.is_true(updated_manga[#updated_manga].first_error)
+        assert.is_nil(updated_manga[#updated_manga].second_loading)
+        assert.are.equal(1, #started)
+
+        started[1].on_cleanup(started[1])
+
+        assert.are.equal("m2", started[2].manga_id)
+        assert.is_true(updated_manga[#updated_manga].second_loading)
+    end)
+
     it("opens browse result manga actions without changing the action surface", function()
         local shown_manga_action_options
         local client = newClient({
