@@ -135,7 +135,7 @@ Fresh local verification from the review worktree:
   - Direction: wrap fetch/install/update/uninstall paths and include action in the
     error result.
 
-- [ ] Avoid retrying read-sync when credentials are missing.
+- [x] Avoid retrying read-sync when credentials are missing.
   - Area: `suwayomi/readsync/controller.lua:73`
   - Risk: pending ledger can retry forever with no usable server URL.
   - Direction: classify missing credentials as blocked until settings change or

@@ -71,7 +71,7 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
         return false, 0
     end
     if not credentials or credentials.server_url == "" then
-        return false, #batch
+        return false, 0
     end
 
     local result_path = self:getReadSyncResultPath()
@@ -218,17 +218,17 @@ function Methods:schedulePendingReadSync(credentials, delay_seconds)
         local started, attempted = self:startPendingReadSyncWorker(sync_credentials, self.read_sync_batch_size)
         if not started then
             if self:hasPendingReadSync(self:loadChapterLedger()) then
-                local next_delay = self.read_sync_delay_seconds
                 if attempted and attempted > 0 then
+                    local next_delay = self.read_sync_delay_seconds
                     next_delay = self.pending_read_sync_failure_delay or self.read_sync_failure_delay_seconds
                     self.pending_read_sync_failure_delay = math.min(
                         next_delay * 2,
                         self.read_sync_max_failure_delay_seconds
                     )
+                    self:schedulePendingReadSync(sync_credentials, next_delay)
                 else
                     self.pending_read_sync_failure_delay = nil
                 end
-                self:schedulePendingReadSync(sync_credentials, next_delay)
             else
                 self.pending_read_sync_failure_delay = nil
             end

@@ -339,6 +339,22 @@ describe("suwayomi/readsync/controller", function()
         assert.are.equal(10, state.scheduled[3].delay)
     end)
 
+    it("blocks automatic read-sync retry when credentials are missing", function()
+        local controller, state = installController({ credentials = { server_url = "" } })
+        local plugin = buildPlugin(controller, {
+            ledger = {
+                ["m1:c1"] = { chapter_id = "c1", read = true, pending_read_sync = true },
+            },
+        })
+
+        plugin:schedulePendingReadSync()
+        state.scheduled[1].callback()
+
+        assert.are.equal(1, #state.scheduled)
+        assert.are.equal(0, #state.worker_runs)
+        assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
+    end)
+
     it("marks the matching ledger entry read when KOReader closes a finished document", function()
         local controller, state = installController()
         local plugin = buildPlugin(controller, {
