@@ -20,7 +20,8 @@ local function clearModules()
     end
 end
 
-local function installControllerWithSourceFetchStub()
+local function installControllerWithSourceFetchStub(options)
+    options = options or {}
     clearModules()
     helper.stubControllerDependencies()
     local started_options
@@ -52,7 +53,7 @@ local function installControllerWithSourceFetchStub()
     package.preload["suwayomi/settings"] = function()
         return {
             load = function()
-                return { server_url = "https://suwayomi.example" }
+                return options.credentials or { server_url = "https://suwayomi.example" }
             end,
         }
     end
@@ -134,6 +135,42 @@ describe("suwayomi/browse/controller", function()
 
         assert.is_nil(controller.source_fetch_active)
         assert.are.same({}, controller.messages)
+    end)
+
+    it("drops stale source fetch results after credentials change", function()
+        local controller_module = installControllerWithSourceFetchStub({
+            credentials = {
+                server_url = "https://new.example",
+                username = "bob",
+                password = "secret",
+                auth_method = "basic_auth",
+            },
+        })
+        local controller = buildController(controller_module)
+        local rendered
+        controller.showFetchedSources = function()
+            rendered = true
+        end
+
+        local result = controller:finishSourceFetch({
+            credentials = {
+                server_url = "https://old.example",
+                username = "alice",
+                password = "secret",
+                auth_method = "basic_auth",
+            },
+            loading_message = { message = "Loading sources..." },
+            options = {},
+        }, {
+            ok = true,
+            sources = {
+                { id = "source-mangadex" },
+            },
+        })
+
+        assert.is_false(result)
+        assert.is_nil(rendered)
+        assert.are.equal("Loading sources...", controller.closed_loading.message)
     end)
 
     it("opens onboarding setup when browse credentials are missing", function()

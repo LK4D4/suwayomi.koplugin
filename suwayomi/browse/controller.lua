@@ -37,6 +37,17 @@ for name, method in pairs(SuwayomiBrowseExtensions.methods) do
     Methods[name] = method
 end
 
+local function credentialField(credentials, field)
+    return tostring(type(credentials) == "table" and credentials[field] or "")
+end
+
+local function credentialsMatch(left, right)
+    return credentialField(left, "server_url") == credentialField(right, "server_url")
+        and credentialField(left, "auth_method") == credentialField(right, "auth_method")
+        and credentialField(left, "username") == credentialField(right, "username")
+        and credentialField(left, "password") == credentialField(right, "password")
+end
+
 function Methods:getSourceFetchResultPath()
     return SubprocessJob.buildResultPath("source_fetch")
 end
@@ -125,7 +136,11 @@ end
 function Methods:finishSourceFetch(active, result)
     self.source_fetch_active = nil
     self:closeLoadingMessage(active and active.loading_message)
+    if not credentialsMatch(active and active.credentials, SuwayomiSettings:load()) then
+        return false
+    end
     self:showFetchedSources(result, active and active.options or {})
+    return true
 end
 
 

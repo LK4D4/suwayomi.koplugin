@@ -173,7 +173,7 @@ Fresh local verification from the review worktree:
     navigated away.
   - Direction: for silent refresh, save cache/log but only update an existing menu.
 
-- [ ] Ignore stale source refresh results after credential/server changes.
+- [x] Ignore stale source refresh results after credential/server changes.
   - Area: `suwayomi/browse/source_catalog.lua:357`
   - Risk: old worker results can redraw wrong sources and thumbnail credentials
     after server/settings switch.
