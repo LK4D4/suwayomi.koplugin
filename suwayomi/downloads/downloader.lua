@@ -73,9 +73,10 @@ end
 
 function Downloader:failAndCleanup(message, chapter_path, writer)
     if writer then
-        pcall(function()
-            writer:close()
-        end)
+        local closed, close_error = self:closeArchiveWriter(writer)
+        if not closed and close_error and close_error ~= "" then
+            message = tostring(message or "") .. " " .. tostring(close_error)
+        end
     end
     local cleanup_ok, cleanup_error = self:cleanupPartialFile(chapter_path)
     local result = {

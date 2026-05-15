@@ -109,7 +109,7 @@ Fresh local verification from the review worktree:
     each other's progress.
   - Direction: encode or hash the full queue key and clean up old paths if needed.
 
-- [ ] Protect archive writer close on failure paths.
+- [x] Protect archive writer close on failure paths.
   - Area: `suwayomi/downloads/downloader.lua:303`
   - Risk: a throwing `close()` can skip partial cleanup and progress error writes.
   - Direction: wrap `close()` in `pcall`, always cleanup partial on failure, and

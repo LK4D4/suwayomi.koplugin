@@ -1314,6 +1314,70 @@ describe("suwayomi/downloads/downloader", function()
         assert.are.equal("Downloaded chapter page was not an image.", result.error)
     end)
 
+    it("surfaces archive close errors while cleaning up failed downloads", function()
+        local removed_path
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchChapterPages = function()
+                    return {
+                        ok = true,
+                        pages = { "/page/0" },
+                    }
+                end,
+                downloadBinary = function()
+                    return { ok = false, error = "network timeout" }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function()
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function() return true end,
+                            close = function() return false, "disk full" end,
+                        }
+                    end,
+                }
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_remove = os.remove
+        os.remove = function(path)
+            removed_path = path
+            return true
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.remove = original_remove
+
+        assert.is_false(result.ok)
+        assert.are.equal("network timeout Could not close chapter archive. disk full", result.error)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_path)
+    end)
+
     it("does not finalize when fewer pages were written than expected", function()
         local renamed = false
         local writer = {
