@@ -201,6 +201,31 @@ describe("suwayomi/settings", function()
         assert.is_nil(settings:loadSourceCache("https://other.example"))
     end)
 
+    it("partitions source cache by auth identity", function()
+        local settings = require("suwayomi/settings")
+        local alice = {
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }
+        local bob = {
+            server_url = "https://suwayomi.example",
+            username = "bob",
+            password = "secret",
+            auth_method = "basic_auth",
+        }
+        local cache = settings:saveSourceCache(alice, {
+            { id = "source-mangadex" },
+        }, 1777777777)
+
+        assert.are.same(cache, settings:loadSourceCache(alice))
+        assert.is_nil(settings:loadSourceCache(bob))
+        assert.matches("^%x+$", stored_data.source_cache.auth_identity)
+        assert.is_nil(stored_data.source_cache.auth_identity:match("alice"))
+        assert.is_nil(stored_data.source_cache.auth_identity:match("secret"))
+    end)
+
     it("loads an empty download directory by default", function()
         local settings = require("suwayomi/settings")
 

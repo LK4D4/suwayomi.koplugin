@@ -193,7 +193,7 @@ Fresh local verification from the review worktree:
   - Direction: compute before/through over visible chapters or pass visible list
     from menu action.
 
-- [ ] Partition source and thumbnail caches by auth identity.
+- [x] Partition source and thumbnail caches by auth identity.
   - Areas: `suwayomi/ui/thumbnail_cache.lua:80`, `suwayomi/settings.lua:214`
   - Risk: same server URL with different Basic Auth user can show stale protected
     covers/icons/sources.

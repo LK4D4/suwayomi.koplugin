@@ -72,6 +72,23 @@ local function toStringOrDefault(value, default)
     return tostring(value)
 end
 
+local function rollingHash(text, seed, multiplier)
+    local hash = seed
+    multiplier = multiplier or 131
+    for index = 1, #text do
+        hash = (hash * multiplier + text:byte(index)) % 4294967296
+    end
+    return hash
+end
+
+local function hashText(text)
+    return string.format(
+        "%08x%08x",
+        rollingHash(text, 2166136261, 131),
+        rollingHash(text, 16777619, 65599)
+    )
+end
+
 function SuwayomiSettings:normalizeCredentials(credentials)
     if type(credentials) ~= "table" then
         credentials = {}
@@ -86,6 +103,26 @@ function SuwayomiSettings:normalizeCredentials(credentials)
         password = toStringOrDefault(credentials.password, DEFAULT_CREDENTIALS.password),
         auth_method = auth_method,
     }
+end
+
+function SuwayomiSettings:getAuthIdentity(credentials)
+    if type(credentials) ~= "table" then
+        return ""
+    end
+    local normalized = self:normalizeCredentials(credentials)
+    return hashText(table.concat({
+        normalized.auth_method,
+        normalized.username,
+        normalized.password,
+    }, "\n"))
+end
+
+function SuwayomiSettings:getSourceCacheScope(credentials_or_url)
+    if type(credentials_or_url) == "table" then
+        local credentials = self:normalizeCredentials(credentials_or_url)
+        return credentials.server_url, self:getAuthIdentity(credentials)
+    end
+    return tostring(credentials_or_url or ""), ""
 end
 
 function SuwayomiSettings:normalizeChapterLedgerEntry(entry)
@@ -264,9 +301,13 @@ function SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
     return normalized
 end
 
-function SuwayomiSettings:loadSourceCache(server_url)
+function SuwayomiSettings:loadSourceCache(credentials_or_url)
+    local server_url, auth_identity = self:getSourceCacheScope(credentials_or_url)
     local cache = self:open():readSetting("source_cache", nil)
-    if type(cache) ~= "table" or cache.server_url ~= server_url then
+    if type(cache) ~= "table"
+        or cache.server_url ~= server_url
+        or tostring(cache.auth_identity or "") ~= auth_identity
+    then
         return nil
     end
     cache.sources = type(cache.sources) == "table" and cache.sources or {}
@@ -274,9 +315,11 @@ function SuwayomiSettings:loadSourceCache(server_url)
     return cache
 end
 
-function SuwayomiSettings:saveSourceCache(server_url, sources, updated_at)
+function SuwayomiSettings:saveSourceCache(credentials_or_url, sources, updated_at)
+    local server_url, auth_identity = self:getSourceCacheScope(credentials_or_url)
     local normalized = {
-        server_url = server_url or "",
+        server_url = server_url,
+        auth_identity = auth_identity,
         sources = {},
         updated_at = tonumber(updated_at) or os.time(),
     }

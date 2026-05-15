@@ -232,7 +232,7 @@ function Methods:loadSourceCache(credentials)
     if not SuwayomiSettings.loadSourceCache then
         return nil
     end
-    return SuwayomiSettings:loadSourceCache(credentials and credentials.server_url or "")
+    return SuwayomiSettings:loadSourceCache(credentials)
 end
 
 
@@ -241,7 +241,7 @@ function Methods:saveSourceCache(credentials, sources)
     if not SuwayomiSettings.saveSourceCache then
         return nil
     end
-    return SuwayomiSettings:saveSourceCache(credentials and credentials.server_url or "", sources or {}, os.time())
+    return SuwayomiSettings:saveSourceCache(credentials, sources or {}, os.time())
 end
 
 

@@ -43,12 +43,15 @@ local function stubDependencies()
             loadSourceLanguages = function()
                 return { "en" }
             end,
-            loadSourceCache = function(_, server_url)
-                settings_calls.loaded_cache_for = server_url
+            loadSourceCache = function(_, credentials)
+                settings_calls.loaded_cache_for = credentials
+                local server_url = type(credentials) == "table" and credentials.server_url or credentials
                 return { server_url = server_url, sources = { { id = "cached", lang = "en" } }, updated_at = 100 }
             end,
-            saveSourceCache = function(_, server_url, sources, updated_at)
+            saveSourceCache = function(_, credentials, sources, updated_at)
+                local server_url = type(credentials) == "table" and credentials.server_url or credentials
                 settings_calls.saved_cache = {
+                    credentials = credentials,
                     server_url = server_url,
                     sources = sources,
                     updated_at = updated_at,
@@ -342,8 +345,9 @@ describe("suwayomi/browse/source_catalog", function()
             { id = "saved", lang = "en" },
         })
 
-        assert.are.equal("https://suwayomi.example", settings_calls.loaded_cache_for)
+        assert.are.equal("https://suwayomi.example", settings_calls.loaded_cache_for.server_url)
         assert.are.equal("cached", cache.sources[1].id)
+        assert.are.equal("https://suwayomi.example", settings_calls.saved_cache.credentials.server_url)
         assert.are.equal("https://suwayomi.example", settings_calls.saved_cache.server_url)
         assert.are.equal("saved", settings_calls.saved_cache.sources[1].id)
         assert(type(settings_calls.saved_cache.updated_at) == "number")

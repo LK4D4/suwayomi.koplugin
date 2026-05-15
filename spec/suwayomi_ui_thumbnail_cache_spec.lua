@@ -137,6 +137,27 @@ describe("suwayomi/ui/thumbnail_cache", function()
         assert.is_nil(path:match("manga/123"))
     end)
 
+    it("partitions thumbnail cache keys by auth identity without leaking it", function()
+        local cache = require("suwayomi/ui/thumbnail_cache")
+        local alice_path = cache.getPath({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }, "/cover.png", "image/png")
+        local bob_path = cache.getPath({
+            server_url = "https://suwayomi.example",
+            username = "bob",
+            password = "secret",
+            auth_method = "basic_auth",
+        }, "/cover.png", "image/png")
+
+        assert.are_not.equal(alice_path, bob_path)
+        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.png$", alice_path)
+        assert.is_nil(alice_path:match("alice"))
+        assert.is_nil(alice_path:match("secret"))
+    end)
+
     it("writes thumbnails without leaking server or manga data", function()
         local cache = require("suwayomi/ui/thumbnail_cache")
         local credentials = { server_url = "https://suwayomi.example" }

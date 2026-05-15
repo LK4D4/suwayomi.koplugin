@@ -76,7 +76,15 @@ end
 
 function ThumbnailCache.getKey(credentials, thumbnail_url)
     local server_url = credentials and credentials.server_url or ""
-    return hashText(tostring(server_url) .. "\n" .. tostring(thumbnail_url or ""))
+    local auth_identity = ""
+    if type(credentials) == "table" then
+        auth_identity = hashText(table.concat({
+            tostring(credentials.auth_method or ""),
+            tostring(credentials.username or ""),
+            tostring(credentials.password or ""),
+        }, "\n"))
+    end
+    return hashText(tostring(server_url) .. "\n" .. auth_identity .. "\n" .. tostring(thumbnail_url or ""))
 end
 
 function ThumbnailCache.getPath(credentials, thumbnail_url, content_type)
