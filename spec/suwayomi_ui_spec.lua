@@ -577,6 +577,7 @@ describe("suwayomi/ui", function()
     it("adds a shared back action for nested action menus", function()
         local ui = require("suwayomi/ui")
         local selected
+        record_next_tick = true
 
         ui.showActionMenu({
             title = "Bulk downloads",
@@ -596,7 +597,7 @@ describe("suwayomi/ui", function()
 
         shown_dialog.buttons[1][1].callback()
 
-        assert.are.same({ "close", "back" }, events)
+        assert.are.same({ "close", "next-tick", "back" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
         assert.is_nil(selected)
     end)

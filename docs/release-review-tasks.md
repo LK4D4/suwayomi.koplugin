@@ -161,7 +161,7 @@ Fresh local verification from the review worktree:
     loading until user forces redraw.
   - Direction: mirror finish path by marking failure and calling `updateItems()`.
 
-- [ ] Schedule Back action through `nextTick`.
+- [x] Schedule Back action through `nextTick`.
   - Area: `suwayomi/ui.lua:189`
   - Risk: nested action menus can reopen parent while `ButtonDialog` focus/close
     is still settling.

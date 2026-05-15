@@ -185,8 +185,15 @@ local function buildBackActionButton(options, dialogProvider, UIManager)
         id = "back",
         text = "< " .. _("Back"),
         callback = function()
+            local function goBack()
+                options.on_back()
+            end
             UIManager:close(dialogProvider())
-            options.on_back()
+            if UIManager.nextTick then
+                UIManager:nextTick(goBack)
+            else
+                goBack()
+            end
         end,
     }
 end
