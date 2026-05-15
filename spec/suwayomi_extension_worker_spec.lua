@@ -105,6 +105,54 @@ describe("suwayomi/browse/extension_worker", function()
         assert.are.same(result, worker:readResult("/settings/extensions.json"))
     end)
 
+    it("writes normalized error results when fetch throws", function()
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchExtensions = function()
+                    error("extension fetch exploded")
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/browse/extension_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, {
+            action = "fetch",
+        }, "/settings/extensions_fetch_error.json")
+
+        assert.is_false(result.ok)
+        assert.are.equal("fetch", result.action)
+        assert.truthy(result.error:match("extension fetch exploded"))
+        assert.are.same({}, result.extensions)
+        assert.are.same({}, result.sources)
+        assert.are.same(result, worker:readResult("/settings/extensions_fetch_error.json"))
+    end)
+
+    it("writes normalized error results when update throws", function()
+        package.preload["suwayomi/api"] = function()
+            return {
+                updateExtension = function()
+                    error("install exploded")
+                end,
+                fetchSources = function()
+                    return { ok = true, sources = {} }
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/browse/extension_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, {
+            action = "install",
+            pkg_name = "pkg.mangadex",
+        }, "/settings/extensions_install_error.json")
+
+        assert.is_false(result.ok)
+        assert.are.equal("install", result.action)
+        assert.truthy(result.error:match("install exploded"))
+        assert.are.same({}, result.extensions)
+        assert.are.same({}, result.sources)
+        assert.are.same(result, worker:readResult("/settings/extensions_install_error.json"))
+    end)
+
     it("installs an extension, refreshes extensions, and returns refreshed sources for cache update", function()
         local calls = {}
         local fetch_source_count = 0

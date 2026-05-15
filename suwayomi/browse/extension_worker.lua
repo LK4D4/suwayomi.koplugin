@@ -85,6 +85,20 @@ local function fallbackExtensionList(extensions_result, updated_extension)
     return {}
 end
 
+local function runSafely(action, callback)
+    local ok, result = pcall(callback)
+    if ok then
+        return result
+    end
+    return {
+        ok = false,
+        action = action,
+        error = tostring(result),
+        extensions = {},
+        sources = {},
+    }
+end
+
 function ExtensionWorker:writeResult(result_path, result)
     return SubprocessJob.writeResult(result_path, normalizeResult(result))
 end
@@ -103,36 +117,42 @@ function ExtensionWorker:run(credentials, request, result_path)
             error = "Missing Suwayomi server URL.",
         }
     elseif request.action == "fetch" then
-        result = SuwayomiAPI.fetchExtensions(credentials) or {
-            ok = false,
-            error = "Could not fetch Suwayomi extensions.",
-        }
-    elseif request.action == "install" or request.action == "update" or request.action == "uninstall" then
-        local previous_sources
-        if request.action == "install" or request.action == "uninstall" then
-            previous_sources = SuwayomiAPI.fetchSources(credentials)
-        end
-        local updated = SuwayomiAPI.updateExtension(credentials, request.pkg_name, request.action) or {
-            ok = false,
-            error = "Could not update Suwayomi extension.",
-        }
-        if updated.ok then
-            local extensions = SuwayomiAPI.fetchExtensions(credentials) or {}
-            local sources = fetchSourcesAfterAction(credentials, request.action, sourceCount(previous_sources))
-            local extensions_ok = extensions.ok == true
-            result = {
-                ok = true,
-                action = request.action,
-                updated_extension = updated.extension,
-                extension_refresh_ok = extensions_ok,
-                extension_refresh_error = not extensions_ok and extensions.error or nil,
-                extensions = fallbackExtensionList(extensions, updated.extension),
-                sources = sources.ok and sources.sources or {},
+        result = runSafely(request.action, function()
+            local fetched = SuwayomiAPI.fetchExtensions(credentials) or {
+                ok = false,
+                error = "Could not fetch Suwayomi extensions.",
             }
-        else
-            result = updated
-            result.action = request.action
-        end
+            fetched.action = request.action
+            return fetched
+        end)
+    elseif request.action == "install" or request.action == "update" or request.action == "uninstall" then
+        result = runSafely(request.action, function()
+            local previous_sources
+            if request.action == "install" or request.action == "uninstall" then
+                previous_sources = SuwayomiAPI.fetchSources(credentials)
+            end
+            local updated = SuwayomiAPI.updateExtension(credentials, request.pkg_name, request.action) or {
+                ok = false,
+                error = "Could not update Suwayomi extension.",
+            }
+            if updated.ok then
+                local extensions = SuwayomiAPI.fetchExtensions(credentials) or {}
+                local sources = fetchSourcesAfterAction(credentials, request.action, sourceCount(previous_sources))
+                local extensions_ok = extensions.ok == true
+                return {
+                    ok = true,
+                    action = request.action,
+                    updated_extension = updated.extension,
+                    extension_refresh_ok = extensions_ok,
+                    extension_refresh_error = not extensions_ok and extensions.error or nil,
+                    extensions = fallbackExtensionList(extensions, updated.extension),
+                    sources = sources.ok and sources.sources or {},
+                }
+            else
+                updated.action = request.action
+                return updated
+            end
+        end)
     else
         result = {
             ok = false,

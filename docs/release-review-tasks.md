@@ -128,7 +128,7 @@ Fresh local verification from the review worktree:
   - Direction: wrap the worker body in `pcall` and always write a normalized
     `{ ok = false, error = ... }` result.
 
-- [ ] Normalize extension worker errors.
+- [x] Normalize extension worker errors.
   - Area: `suwayomi/browse/extension_worker.lua:106`
   - Risk: server/client exceptions after partial actions can produce no precise
     recovery state.
