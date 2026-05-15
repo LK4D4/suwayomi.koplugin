@@ -9,6 +9,7 @@ local modules_to_clear = {
     "suwayomi/settings",
     "suwayomi/ui",
     "suwayomi/debug",
+    "suwayomi/network/request_job",
     "suwayomi/manga/controller",
 }
 
@@ -26,6 +27,7 @@ local function installController(options)
         messages = {},
         update_calls = {},
         refresh_calls = {},
+        network_requests = {},
         tracked_screens = {},
         keep_next_saves = {},
     }
@@ -116,6 +118,32 @@ local function installController(options)
             log = function() end,
             time = function(_, _, callback)
                 return callback()
+            end,
+        }
+    end
+    package.preload["suwayomi/network/request_job"] = function()
+        return {
+            start = function(request_options)
+                table.insert(state.network_requests, request_options)
+                local request = request_options.request or {}
+                local result
+                if request.action == "refresh_manga" then
+                    table.insert(state.refresh_calls, request.manga_id)
+                    result = options.refresh_result or {
+                        ok = true,
+                        manga = { id = request.manga_id, title = "Refreshed title" },
+                        chapters = { { id = "c2", name = "Ch. 2", is_read = false } },
+                    }
+                else
+                    result = {
+                        ok = true,
+                        chapters = { { id = "c1", name = "Ch. 1", is_read = false } },
+                    }
+                end
+                if request_options.on_finish then
+                    request_options.on_finish(result)
+                end
+                return { pid = 4321 }
             end,
         }
     end
@@ -335,6 +363,20 @@ describe("suwayomi/manga/controller", function()
         state.chapter_menu_options.close_callback()
 
         assert.is_nil(plugin.current_chapter_menu)
+    end)
+
+    it("loads chapters through an async request instead of calling the API inline", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Frieren" }
+
+        assert.is_true(plugin:showChaptersForManga(manga))
+
+        assert.are.equal(1, #state.network_requests)
+        assert.are.equal("fetch_chapters_for_manga", state.network_requests[1].request.action)
+        assert.are.equal("m1", state.network_requests[1].request.manga_id)
+        assert.is_nil(state.fetch_chapters_manga_id)
+        assert.are.equal("Frieren", state.chapter_menu_options.title)
+        assert.are.equal("c1", plugin.current_chapter_context.chapters[1].id)
     end)
 
     it("focuses the returned chapter when showing chapters from reader return", function()

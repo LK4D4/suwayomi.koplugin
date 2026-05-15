@@ -196,9 +196,20 @@ function ActiveJobs:process()
     })
 end
 
+function ActiveJobs:terminateJob(active)
+    local queue = self.queue
+    if not active or not active.pid then
+        return
+    end
+    if queue and queue.ffi_util and queue.ffi_util.terminateSubProcess then
+        pcall(queue.ffi_util.terminateSubProcess, active.pid)
+    end
+end
+
 function ActiveJobs:finishWithFailure(active, message)
     local queue = self.queue
     local failure_message = queue:formatFailureMessage(active.manga, active.chapter, message or _("Chapter download failed."))
+    self:terminateJob(active)
     self:removeJob(active)
     os.remove(active.progress_path)
     queue:setStatus(active.manga, active.chapter, { state = "failed" })

@@ -293,8 +293,8 @@ function SuwayomiAPI.fetchChapterPages(credentials, chapter_id)
     }
 end
 
-function SuwayomiAPI.downloadBinary(credentials, page_url)
-    return transport.downloadBinary(credentials, page_url, logDebugEvent)
+function SuwayomiAPI.downloadBinary(credentials, page_url, options)
+    return transport.downloadBinary(credentials, page_url, logDebugEvent, options)
 end
 
 function SuwayomiAPI.downloadChapterArchive(credentials, chapter_id, target_path)

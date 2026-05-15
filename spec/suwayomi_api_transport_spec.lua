@@ -192,6 +192,51 @@ describe("suwayomi/api/transport", function()
         assert.is_nil(requests[2].headers.Authorization)
     end)
 
+    it("stops binary downloads when the byte cap is exceeded", function()
+        install_ltn12()
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    local ok, err = options.sink("123456")
+                    return ok, err
+                end,
+            }
+        end
+
+        local result = transport.downloadBinary(valid_credentials(), "/api/v1/page/1", {
+            max_bytes = 5,
+        })
+
+        assert.are.equal(false, result.ok)
+        assert.are.equal("Downloaded response was too large.", result.error)
+    end)
+
+    it("stops GraphQL responses when the total response deadline is exceeded", function()
+        install_ltn12()
+        local times = { 0, 0, 31, 31 }
+        package.loaded.socket = nil
+        package.preload.socket = function()
+            return {
+                gettime = function()
+                    return table.remove(times, 1) or 31
+                end,
+            }
+        end
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    local ok, err = options.sink([[{"data":{"ok":true}}]])
+                    return ok, err
+                end,
+            }
+        end
+
+        local result = transport.performGraphQLRequest(valid_credentials(), "{}", "slowOperation")
+
+        assert.are.equal(false, result.ok)
+        assert.are.equal("Could not reach the Suwayomi server: response timeout", result.error)
+    end)
+
     it("uses socket.http for absolute http page URLs without rewriting them", function()
         install_ltn12()
         local requested_url

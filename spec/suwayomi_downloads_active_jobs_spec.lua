@@ -85,6 +85,7 @@ describe("suwayomi/downloads/active_jobs", function()
         local status_changes = 0
         local download_calls = 0
         local archive_ready_calls = {}
+        local terminated_pids = {}
         local next_pid = 1233
         local subprocess_done = options.subprocess_done
 
@@ -155,6 +156,9 @@ describe("suwayomi/downloads/active_jobs", function()
                     end
                     return subprocess_done ~= false
                 end,
+                terminateSubProcess = function(pid)
+                    table.insert(terminated_pids, pid)
+                end,
             },
             max_active_chapters = options.max_active_chapters,
             now = function()
@@ -185,6 +189,7 @@ describe("suwayomi/downloads/active_jobs", function()
             archive_ready_calls = archive_ready_calls,
             status_changes = function() return status_changes end,
             download_calls = function() return download_calls end,
+            terminated_pids = terminated_pids,
             progress_files = progress_files,
             renamed_paths = renamed_paths,
             advance = function(seconds)
@@ -533,6 +538,7 @@ describe("suwayomi/downloads/active_jobs", function()
         context.advance((30 * 60) + 1)
         table.remove(context.scheduled, 1).callback()
 
+        assert.are.same({ 1234 }, context.terminated_pids)
         assert.are.equal("failed", context.saved_queue()[1].state)
         assert.are.same({
             state = "failed",

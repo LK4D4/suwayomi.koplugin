@@ -82,6 +82,7 @@ describe("suwayomi/downloads/queue", function()
         local status_changes = 0
         local download_calls = 0
         local debug_events = {}
+        local terminated_pids = {}
         local next_pid = 1233
         local subprocess_done = options.subprocess_done
 
@@ -152,6 +153,9 @@ describe("suwayomi/downloads/queue", function()
                     end
                     return subprocess_done ~= false
                 end,
+                terminateSubProcess = function(pid)
+                    table.insert(terminated_pids, pid)
+                end,
             },
             max_active_chapters = options.max_active_chapters,
             now = function()
@@ -176,6 +180,7 @@ describe("suwayomi/downloads/queue", function()
             save_count = function() return save_count end,
             messages = messages,
             debug_events = debug_events,
+            terminated_pids = terminated_pids,
             status_changes = function() return status_changes end,
             download_calls = function() return download_calls end,
             progress_files = progress_files,
@@ -427,7 +432,7 @@ describe("suwayomi/downloads/queue", function()
         assert.are.same({}, context.saved_queue())
     end)
 
-    it("does not cancel an active download", function()
+    it("cancels an active download by terminating its subprocess", function()
         local context = build_queue({ subprocess_done = false, skip_subprocess_callback = true })
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
@@ -437,11 +442,12 @@ describe("suwayomi/downloads/queue", function()
 
         local cancelled, state = context.queue:cancelPending(manga, chapter)
 
-        assert.is_false(cancelled)
+        assert.is_true(cancelled)
         assert.are.equal("downloading", state)
-        assert.are.equal("downloading", context.queue:getStatus(manga, chapter).state)
+        assert.are.equal("failed", context.queue:getStatus(manga, chapter).state)
         assert.are.equal(1, #context.saved_queue())
-        assert.are.equal("downloading", context.saved_queue()[1].state)
+        assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.are.same({ 1234 }, context.terminated_pids)
     end)
 
     it("clamps the active chapter limit to the supported range", function()

@@ -185,11 +185,13 @@ describe("suwayomi/subprocess/job", function()
         assert.is_true(removed["/settings/subprocess_poll.json.tmp"])
     end)
 
-    it("terminates and reports timeout once while continuing to poll", function()
+    it("terminates timed-out jobs and keeps polling until the child is reaped", function()
         local Job = require("suwayomi/subprocess/job")
         local scheduled
         local terminated_pid
         local timeout_count = 0
+        local cleaned = false
+        local done = false
 
         local active = Job.start({
             result_path = "/settings/subprocess_timeout.json",
@@ -203,7 +205,7 @@ describe("suwayomi/subprocess/job", function()
                     return 99
                 end,
                 isSubProcessDone = function()
-                    return false
+                    return done
                 end,
                 terminateSubProcess = function(pid)
                     terminated_pid = pid
@@ -214,25 +216,38 @@ describe("suwayomi/subprocess/job", function()
                     scheduled = callback
                 end,
             },
-            on_timeout = function()
+            on_timeout = function(timed_out_active)
                 timeout_count = timeout_count + 1
+                timed_out_active.canceled = true
+            end,
+            on_cleanup = function()
+                cleaned = true
             end,
         })
         active.started_at = 90
 
         scheduled()
-        scheduled()
-
         assert.are.equal(99, terminated_pid)
         assert.are.equal(1, timeout_count)
+        assert.is_false(cleaned)
+
+        done = true
+        scheduled()
+
+        assert.are.equal(1, timeout_count)
+        assert.is_true(cleaned)
+        assert.is_true(removed["/settings/subprocess_timeout.json"])
+        assert.is_true(removed["/settings/subprocess_timeout.json.tmp"])
     end)
 
-    it("cancels active jobs, cleans files, and ignores later polls", function()
+    it("cancels active jobs after the child is reaped", function()
         local Job = require("suwayomi/subprocess/job")
         local scheduled
         local terminated_pid
         local canceled
         local finished = false
+        local cleaned = false
+        local done = false
 
         local active = Job.start({
             result_path = "/settings/subprocess_cancel.json",
@@ -241,7 +256,7 @@ describe("suwayomi/subprocess/job", function()
                     return 321
                 end,
                 isSubProcessDone = function()
-                    return false
+                    return done
                 end,
                 terminateSubProcess = function(pid)
                     terminated_pid = pid
@@ -258,16 +273,24 @@ describe("suwayomi/subprocess/job", function()
             on_finish = function()
                 finished = true
             end,
+            on_cleanup = function()
+                cleaned = true
+            end,
         })
 
+        removed = {}
         Job.cancel(active)
-        if scheduled then
-            scheduled()
-        end
-
         assert.are.equal(321, terminated_pid)
         assert.is_true(canceled)
         assert.is_false(finished)
+        assert.is_false(cleaned)
+        assert.is_nil(removed["/settings/subprocess_cancel.json"])
+
+        assert.is_not_nil(scheduled)
+        done = true
+        scheduled()
+
+        assert.is_true(cleaned)
         assert.is_true(removed["/settings/subprocess_cancel.json"])
         assert.is_true(removed["/settings/subprocess_cancel.json.tmp"])
     end)

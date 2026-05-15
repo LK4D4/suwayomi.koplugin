@@ -81,20 +81,38 @@ function SubprocessJob.cleanup(active)
 end
 
 function SubprocessJob.schedulePoll(active)
-    if not active or active.canceled or active.poll_scheduled then
-        return
+    if not active or active.poll_scheduled then
+        return false
+    end
+    if active.canceled and not active.terminating then
+        return false
     end
     if not active.ui_manager or not active.ui_manager.scheduleIn then
-        return
+        return false
     end
 
     active.poll_scheduled = true
     active.ui_manager:scheduleIn(active.poll_interval_seconds or 1, function()
         SubprocessJob.poll(active)
     end)
+    return true
+end
+
+function SubprocessJob.terminate(active)
+    if not active or active.terminating then
+        return
+    end
+    active.terminating = true
+    if active.ffi_util and active.ffi_util.terminateSubProcess and active.pid then
+        pcall(active.ffi_util.terminateSubProcess, active.pid)
+    end
 end
 
 function SubprocessJob.finish(active)
+    if active.terminating or active.canceled then
+        SubprocessJob.cleanup(active)
+        return
+    end
     local result
     if active.read_result then
         result = active.read_result(active.result_path, active)
@@ -108,7 +126,10 @@ function SubprocessJob.finish(active)
 end
 
 function SubprocessJob.poll(active)
-    if not active or active.canceled then
+    if not active then
+        return
+    end
+    if active.canceled and not active.terminating then
         return
     end
     active.poll_scheduled = false
@@ -120,10 +141,7 @@ function SubprocessJob.poll(active)
             and not active.terminating
             and now() - (active.started_at or now()) > active.timeout_seconds
         then
-            if active.ffi_util and active.ffi_util.terminateSubProcess then
-                pcall(active.ffi_util.terminateSubProcess, active.pid)
-            end
-            active.terminating = true
+            SubprocessJob.terminate(active)
             if active.on_timeout then
                 active.on_timeout(active)
             end
@@ -178,13 +196,13 @@ function SubprocessJob.cancel(active)
         return
     end
     active.canceled = true
-    if active.ffi_util and active.ffi_util.terminateSubProcess and active.pid then
-        pcall(active.ffi_util.terminateSubProcess, active.pid)
-    end
+    SubprocessJob.terminate(active)
     if active.on_cancel then
         active.on_cancel(active)
     end
-    SubprocessJob.cleanup(active)
+    if not active.pid or (not active.poll_scheduled and not SubprocessJob.schedulePoll(active)) then
+        SubprocessJob.cleanup(active)
+    end
 end
 
 return SubprocessJob

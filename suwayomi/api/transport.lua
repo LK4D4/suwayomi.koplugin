@@ -11,6 +11,13 @@ local Transport = {}
 
 local BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local REQUEST_TIMEOUT_SECONDS = 15
+local RESPONSE_TOTAL_TIMEOUT_SECONDS = 30
+local MAX_GRAPHQL_RESPONSE_BYTES = 8 * 1024 * 1024
+local MAX_BINARY_RESPONSE_BYTES = 32 * 1024 * 1024
+local RESPONSE_TIMEOUT_ERROR = "response timeout"
+local RESPONSE_TOO_LARGE_ERROR = "response too large"
+
+Transport.MAX_BINARY_RESPONSE_BYTES = MAX_BINARY_RESPONSE_BYTES
 
 -- LuaJIT on KOReader does not guarantee a standalone base64 helper, so this
 -- tiny encoder keeps Basic Auth construction self-contained and testable.
@@ -83,6 +90,39 @@ local function logDebugEvent(log_debug_event, event)
     end
 end
 
+local function buildGuardedTableSink(target, options)
+    options = options or {}
+    target = target or {}
+    local started_at = now()
+    local total_bytes = 0
+    local total_timeout_seconds = options.total_timeout_seconds or RESPONSE_TOTAL_TIMEOUT_SECONDS
+    local max_bytes = options.max_bytes
+
+    return function(chunk)
+        if chunk then
+            if total_timeout_seconds
+                and total_timeout_seconds >= 0
+                and now() - started_at > total_timeout_seconds
+            then
+                return nil, RESPONSE_TIMEOUT_ERROR
+            end
+            total_bytes = total_bytes + #chunk
+            if max_bytes and total_bytes > max_bytes then
+                return nil, RESPONSE_TOO_LARGE_ERROR
+            end
+            table.insert(target, chunk)
+        end
+        return 1
+    end
+end
+
+local function normalizeBinaryCallOptions(log_debug_event, request_options)
+    if type(log_debug_event) == "table" and request_options == nil then
+        return nil, log_debug_event
+    end
+    return log_debug_event, request_options or {}
+end
+
 function Transport.buildBasicAuthHeader(username, password)
     return "Basic " .. base64Encode(string.format("%s:%s", username or "", password or ""))
 end
@@ -146,7 +186,9 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
         method = "POST",
         headers = headers,
         source = ltn12.source.string(request_body),
-        sink = ltn12.sink.table(response_chunks),
+        sink = buildGuardedTableSink(response_chunks, {
+            max_bytes = MAX_GRAPHQL_RESPONSE_BYTES,
+        }),
         timeout = REQUEST_TIMEOUT_SECONDS,
     }
 
@@ -198,7 +240,8 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
     }
 end
 
-function Transport.downloadBinary(credentials, page_url, log_debug_event)
+function Transport.downloadBinary(credentials, page_url, log_debug_event, request_options)
+    log_debug_event, request_options = normalizeBinaryCallOptions(log_debug_event, request_options)
     local server_url = credentials and credentials.server_url
     if not server_url or server_url == "" then
         return {
@@ -207,7 +250,6 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event)
         }
     end
 
-    local ltn12 = require("ltn12")
     local request_url = Transport.buildRequestURL(server_url, page_url)
     local client = request_url:match("^https://") and require("ssl.https") or require("socket.http")
     local response_chunks = {}
@@ -222,7 +264,10 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event)
         url = request_url,
         method = "GET",
         headers = headers,
-        sink = ltn12.sink.table(response_chunks),
+        sink = buildGuardedTableSink(response_chunks, {
+            max_bytes = request_options.max_bytes or MAX_BINARY_RESPONSE_BYTES,
+            total_timeout_seconds = request_options.total_timeout_seconds,
+        }),
         timeout = REQUEST_TIMEOUT_SECONDS,
     }
 
@@ -244,6 +289,13 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event)
             ok = true,
             body = body,
             content_type = response_headers["content-type"] or response_headers["Content-Type"],
+        }
+    end
+
+    if not ok and code == RESPONSE_TOO_LARGE_ERROR then
+        return {
+            ok = false,
+            error = "Downloaded response was too large.",
         }
     end
 
@@ -302,14 +354,18 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
     local headers = Transport.buildRequestHeaders(credentials)
     local response_bytes = 0
     local write_error
-
     local started_at = now()
+
     local ok, code, response_headers = client.request{
         url = request_url,
         method = "GET",
         headers = headers,
         sink = function(chunk)
             if chunk then
+                if now() - started_at > RESPONSE_TOTAL_TIMEOUT_SECONDS then
+                    write_error = RESPONSE_TIMEOUT_ERROR
+                    return nil, write_error
+                end
                 local written, err = handle:write(chunk)
                 if not written then
                     write_error = err or "write failed"

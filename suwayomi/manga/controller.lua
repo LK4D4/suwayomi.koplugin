@@ -9,6 +9,7 @@ local SuwayomiAPI = require("suwayomi/api")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
+local NetworkRequestJob = require("suwayomi/network/request_job")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
 local T = FFIUtil.template
@@ -104,6 +105,66 @@ function Methods:refreshUninitializedMangaForChapters(manga)
     }, true
 end
 
+function Methods:startMangaNetworkRequest(manga, request, loading_message, on_finish)
+    if not manga or not manga.id then
+        self:showMessage(_("This manga cannot be loaded right now."))
+        return false
+    end
+
+    local credentials = SuwayomiSettings:load()
+    local started = NetworkRequestJob.start({
+        owner = self,
+        credentials = credentials,
+        request = request,
+        loading_message = loading_message,
+        result_prefix = "manga_request",
+        timeout_seconds = self.manga_network_timeout_seconds or 30,
+        timeout_message = _("Could not load chapters."),
+        on_finish = on_finish,
+    })
+    return started ~= nil and started ~= false
+end
+
+function Methods:handleRefreshMangaResult(manga, result, options)
+    options = options or {}
+    if not result then
+        return false
+    end
+    if not result.ok then
+        self:showMessage(_(result.error))
+        return false
+    end
+    if type(result.chapters) ~= "table" then
+        self:showMessage(_("Suwayomi server did not refresh manga."))
+        return false
+    end
+
+    self:applyMangaRefreshResult(manga, result.manga)
+    return self:showChapterResultForManga(manga, {
+        ok = true,
+        manga = manga,
+        chapters = result.chapters,
+    }, options)
+end
+
+function Methods:startRefreshMangaForChapters(manga, options)
+    return self:startMangaNetworkRequest(manga, {
+        action = "refresh_manga",
+        manga_id = manga and manga.id,
+    }, _("Refreshing chapters..."), function(result)
+        self:handleRefreshMangaResult(manga, result, options)
+    end)
+end
+
+function Methods:startFetchChaptersForManga(manga, options)
+    return self:startMangaNetworkRequest(manga, {
+        action = "fetch_chapters_for_manga",
+        manga_id = manga and manga.id,
+    }, _("Loading chapters..."), function(result)
+        self:showChapterResultForManga(manga, result, options)
+    end)
+end
+
 
 function Methods:showChapterResultForManga(manga, result, options)
     options = options or {}
@@ -159,20 +220,10 @@ function Methods:showChaptersForManga(manga)
     return SuwayomiDebug.time("showChaptersForManga", {
         manga_id = manga and manga.id,
     }, function()
-        local result, refresh_attempted = self:refreshUninitializedMangaForChapters(manga)
-        if not result and refresh_attempted then
-            return
+        if self:isMangaUninitialized(manga) then
+            return self:startRefreshMangaForChapters(manga)
         end
-        if not result and not refresh_attempted then
-            local credentials = SuwayomiSettings:load()
-            result = self:withLoadingMessage("chapters", _("Loading chapters..."), function()
-                return SuwayomiAPI.fetchChaptersForManga(credentials, manga.id)
-            end)
-        end
-        if not result then
-            return
-        end
-        return self:showChapterResultForManga(manga, result)
+        return self:startFetchChaptersForManga(manga)
     end)
 end
 
@@ -321,23 +372,7 @@ function Methods:refreshMangaChapters(manga)
         return false
     end
 
-    local credentials = SuwayomiSettings:load()
-    local result = self:withLoadingMessage("refresh-manga", _("Refreshing chapters..."), function()
-        return SuwayomiAPI.refreshManga(credentials, manga.id)
-    end)
-    if result and not result.ok then
-        self:showMessage(_(result.error))
-        return false
-    end
-    if result and type(result.manga) == "table" then
-        for key, value in pairs(result.manga) do
-            manga[key] = value
-        end
-    end
-    if result and type(result.chapters) == "table" then
-        return self:showChapterResultForManga(manga, result)
-    end
-    return self:showChaptersForManga(manga)
+    return self:startRefreshMangaForChapters(manga)
 end
 
 

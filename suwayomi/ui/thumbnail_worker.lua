@@ -110,7 +110,9 @@ end
 function ThumbnailWorker:run(credentials, thumbnail_url, result_path)
     local result
     local ok, binary = pcall(function()
-        return SuwayomiAPI.downloadBinary(credentials, thumbnail_url)
+        return SuwayomiAPI.downloadBinary(credentials, thumbnail_url, {
+            max_bytes = self.MAX_THUMBNAIL_BYTES,
+        })
     end)
 
     if not ok then
