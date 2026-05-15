@@ -55,10 +55,24 @@ function SuwayomiPaths.getMangaDirectory(download_directory, manga)
     return FFIUtil.joinPath(source_dir, SuwayomiPaths.sanitizePathSegment(manga and manga.title))
 end
 
+function SuwayomiPaths.getChapterFilename(chapter)
+    local name = SuwayomiPaths.sanitizePathSegment(chapter and chapter.name)
+    if chapter and chapter.id ~= nil and tostring(chapter.id) ~= "" then
+        return name .. " [id-" .. SuwayomiPaths.sanitizePathSegment(chapter.id) .. "].cbz"
+    end
+    if chapter and chapter.source_order ~= nil and tostring(chapter.source_order) ~= "" then
+        return name .. " [order-" .. SuwayomiPaths.sanitizePathSegment(chapter.source_order) .. "].cbz"
+    end
+    if chapter and chapter.chapter_number ~= nil and tostring(chapter.chapter_number) ~= "" then
+        return name .. " [chapter-" .. SuwayomiPaths.sanitizePathSegment(chapter.chapter_number) .. "].cbz"
+    end
+    return name .. ".cbz"
+end
+
 function SuwayomiPaths.getChapterPath(download_directory, manga, chapter)
     return FFIUtil.joinPath(
         SuwayomiPaths.getMangaDirectory(download_directory, manga),
-        SuwayomiPaths.sanitizePathSegment(chapter and chapter.name) .. ".cbz"
+        SuwayomiPaths.getChapterFilename(chapter)
     )
 end
 
@@ -66,7 +80,7 @@ function SuwayomiPaths.getTargetPath(download_directory, manga, chapter)
     local manga_dir = SuwayomiPaths.getMangaDirectory(download_directory, manga)
     local chapter_path = FFIUtil.joinPath(
         manga_dir,
-        SuwayomiPaths.sanitizePathSegment(chapter and chapter.name) .. ".cbz"
+        SuwayomiPaths.getChapterFilename(chapter)
     )
     return manga_dir, chapter_path
 end

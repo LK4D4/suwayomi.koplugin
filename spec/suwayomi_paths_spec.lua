@@ -106,4 +106,29 @@ describe("suwayomi/paths", function()
         assert.are.equal("/books/MangaDex (EN)/Frieren_ Beyond Journey's End", manga_dir)
         assert.are.equal("/books/MangaDex (EN)/Frieren_ Beyond Journey's End/Vol. 1 _ Ch. 1.cbz", chapter_path)
     end)
+
+    it("keeps duplicate chapter names collision-safe with stable ids", function()
+        local paths = load_paths()
+        local manga = {
+            title = "Frieren",
+            source = { displayName = "MangaDex (EN)" },
+        }
+
+        local first = paths.getChapterPath("/books", manga, {
+            id = "398",
+            name = "Chapter 1",
+        })
+        local second = paths.getChapterPath("/books", manga, {
+            id = "399",
+            name = "Chapter 1",
+        })
+        local no_id = paths.getChapterPath("/books", manga, {
+            name = "Chapter 1",
+            source_order = 3,
+        })
+
+        assert.are.equal("/books/MangaDex (EN)/Frieren/Chapter 1 [id-398].cbz", first)
+        assert.are.equal("/books/MangaDex (EN)/Frieren/Chapter 1 [id-399].cbz", second)
+        assert.are.equal("/books/MangaDex (EN)/Frieren/Chapter 1 [order-3].cbz", no_id)
+    end)
 end)

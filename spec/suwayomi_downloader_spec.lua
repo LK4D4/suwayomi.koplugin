@@ -32,7 +32,7 @@ describe("suwayomi/downloads/downloader", function()
         package.preload.lfs = function()
             return {
                 attributes = function(path, attribute)
-                    if path == "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz" and attribute == "mode" then
+                    if path == "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz" and attribute == "mode" then
                         return "file"
                     end
                 end,
@@ -57,7 +57,7 @@ describe("suwayomi/downloads/downloader", function()
 
         assert.is_true(result.ok)
         assert.is_true(result.skipped)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", result.path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", result.path)
     end)
 
     it("builds a cbz from fetched page bytes", function()
@@ -112,7 +112,7 @@ describe("suwayomi/downloads/downloader", function()
                     new = function()
                         return {
                             open = function(_, path, format)
-                                assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", path)
+                                assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", path)
                                 assert.are.equal("zip", format)
                                 return true
                             end,
@@ -150,9 +150,9 @@ describe("suwayomi/downloads/downloader", function()
         os.rename = original_rename
 
         assert.is_true(result.ok)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", result.path)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", renamed_from)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", renamed_to)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", result.path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", renamed_from)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", renamed_to)
         assert.are.same({
             "/books/Unknown source",
             "/books/Unknown source/Sousou no Frieren",
@@ -171,7 +171,7 @@ describe("suwayomi/downloads/downloader", function()
             return {
                 downloadChapterArchive = function(_, chapter_id, target_path)
                     assert.are.equal("398", chapter_id)
-                    assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.direct.part", target_path)
+                    assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part", target_path)
                     return {
                         ok = true,
                         content_type = "application/vnd.comicbook+zip",
@@ -229,9 +229,9 @@ describe("suwayomi/downloads/downloader", function()
         os.rename = original_rename
 
         assert.is_true(result.ok)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", result.path)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.direct.part", renamed_from)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", renamed_to)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", result.path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part", renamed_from)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", renamed_to)
     end)
 
     it("falls back to page downloads when the direct archive endpoint is unavailable", function()
@@ -244,7 +244,7 @@ describe("suwayomi/downloads/downloader", function()
             return {
                 downloadChapterArchive = function(_, _, target_path)
                     direct_attempted = true
-                    assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.direct.part", target_path)
+                    assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part", target_path)
                     return { ok = false, error = "Chapter archive not found." }
                 end,
                 fetchChapterPages = function()
@@ -315,12 +315,12 @@ describe("suwayomi/downloads/downloader", function()
         assert.is_true(direct_attempted)
         assert.is_true(fetched_pages)
         assert.are.same({ { path = "0001.jpg", content = "page-one" } }, added_files)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", renamed_to)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", renamed_to)
     end)
 
     it("keeps direct archive scratch cleanup failures from blocking page fallback", function()
-        local direct_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.direct.part"
-        local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
+        local direct_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part"
+        local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"
         local opened_path
 
         package.preload["suwayomi/api"] = function()
@@ -606,7 +606,7 @@ describe("suwayomi/downloads/downloader", function()
         os.rename = original_rename
 
         assert.is_true(result.ok)
-        assert.are.equal("state=downloaded\ncurrent=2\ntotal=2\npath=/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz\n", progress_content)
+        assert.are.equal("state=downloaded\ncurrent=2\ntotal=2\npath=/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz\n", progress_content)
     end)
 
     it("removes a partial cbz when a page download fails", function()
@@ -675,11 +675,11 @@ describe("suwayomi/downloads/downloader", function()
         os.remove = original_remove
 
         assert.is_false(result.ok)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_path)
     end)
 
     it("tries to overwrite stale partial files when cleanup fails", function()
-        local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
+        local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"
         local removed_path
         local opened_path
 
@@ -754,7 +754,7 @@ describe("suwayomi/downloads/downloader", function()
     end)
 
     it("reports cleanup errors when a failed download leaves the partial archive behind", function()
-        local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
+        local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"
 
         package.preload["suwayomi/api"] = function()
             return {
@@ -886,7 +886,7 @@ describe("suwayomi/downloads/downloader", function()
 
         assert.is_false(result.ok)
         assert.are.equal("Could not write chapter archive.", result.error)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_path)
     end)
 
     it("reports a failure when finalizing the completed cbz fails", function()
@@ -958,7 +958,7 @@ describe("suwayomi/downloads/downloader", function()
 
         assert.is_false(result.ok)
         assert.are.equal("Could not finalize chapter archive.", result.error)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_path)
     end)
 
     it("does not finalize when archive writer close reports a disk error", function()
@@ -1032,7 +1032,7 @@ describe("suwayomi/downloads/downloader", function()
         assert.is_false(result.ok)
         assert.is_false(renamed)
         assert.are.equal("Could not close chapter archive. disk full", result.error)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_path)
     end)
 
     it("does not finalize when archive writer close throws", function()
@@ -1106,12 +1106,12 @@ describe("suwayomi/downloads/downloader", function()
         assert.is_false(result.ok)
         assert.is_false(renamed)
         assert.truthy(result.error:match("zip footer failed"))
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_path)
     end)
 
     it("treats finalize rename failure as skipped when the target cbz already exists", function()
-        local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part"
-        local chapter_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
+        local partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"
+        local chapter_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
         local removed_path
         local rename_attempted = false
 
@@ -1254,7 +1254,7 @@ describe("suwayomi/downloads/downloader", function()
 
         assert.is_false(result.ok)
         assert.are.equal("Downloaded chapter page was empty.", result.error)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part", removed_path)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_path)
     end)
 
     it("rejects non-image downloaded page content", function()
@@ -1352,8 +1352,8 @@ describe("suwayomi/downloads/downloader", function()
             credentials = {},
             pages = { "/page/0", "/page/1" },
             writer = writer,
-            chapter_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
-            partial_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz.part",
+            chapter_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz",
+            partial_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part",
             current = 2,
             written = 1,
         })

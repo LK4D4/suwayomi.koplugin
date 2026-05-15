@@ -92,7 +92,7 @@ describe("suwayomi/downloads/active_jobs", function()
         local downloader = options.downloader or {
             getTargetPath = function(_, download_directory, manga, chapter)
                 return download_directory .. "/" .. manga.title,
-                    download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                    download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
             end,
             getPartialPath = function(_, chapter_path)
                 return chapter_path .. ".part"
@@ -110,7 +110,7 @@ describe("suwayomi/downloads/active_jobs", function()
             end,
             downloadChapterWithProgress = function(self, _, download_directory, manga, chapter, progress_path)
                 download_calls = download_calls + 1
-                self:writeProgress(progress_path, "downloaded", 1, 1, download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz")
+                self:writeProgress(progress_path, "downloaded", 1, 1, download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz")
             end,
             chapterExists = function()
                 return false
@@ -400,7 +400,7 @@ describe("suwayomi/downloads/active_jobs", function()
         table.remove(context.scheduled, 1).callback()
 
         context.advance(3)
-        context.write_progress(manga, chapter, "downloading", 2, 5, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        context.write_progress(manga, chapter, "downloading", 2, 5, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz")
         table.remove(context.scheduled, 1).callback()
 
         local persisted = context.saved_queue()[1]
@@ -411,7 +411,7 @@ describe("suwayomi/downloads/active_jobs", function()
             state = "downloading",
             current = 2,
             total = 5,
-            path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+            path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz",
             updated_at = 103,
         }, persisted.progress)
     end)
@@ -428,7 +428,7 @@ describe("suwayomi/downloads/active_jobs", function()
         table.remove(context.scheduled, 1).callback()
 
         context.advance(1)
-        context.write_progress(manga, chapter, "downloading", 1, 5, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        context.write_progress(manga, chapter, "downloading", 1, 5, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz")
         table.remove(context.scheduled, 1).callback()
         local save_count_after_change = context.save_count()
 
@@ -457,7 +457,7 @@ describe("suwayomi/downloads/active_jobs", function()
         table.remove(context.scheduled, 1).callback()
         local first = context.active_job(manga, chapters[1])
         local second = context.active_job(manga, chapters[2])
-        context.write_progress(manga, chapters[1], "downloaded", 1, 1, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        context.write_progress(manga, chapters[1], "downloaded", 1, 1, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz")
         context.write_progress(manga, chapters[2], "downloading", 1, 2, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 2.cbz")
         context.set_subprocess_done(first.pid, true)
         context.set_subprocess_done(second.pid, false)
@@ -485,7 +485,7 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.equal(manga, context.archive_ready_calls[1].manga)
         assert.are.equal(chapter, context.archive_ready_calls[1].chapter)
         assert.are.equal(
-            "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+            "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz",
             context.archive_ready_calls[1].path
         )
     end)
@@ -495,14 +495,14 @@ describe("suwayomi/downloads/active_jobs", function()
             downloader = {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
                 end,
                 getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
                 startChapterDownload = function(_, _, download_directory, manga, chapter)
                     return {
                         ok = true,
                         skipped = true,
-                        path = download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz",
+                        path = download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz",
                     }
                 end,
                 chapterExists = function() return true end,
@@ -516,7 +516,7 @@ describe("suwayomi/downloads/active_jobs", function()
 
         assert.are.equal(1, #context.archive_ready_calls)
         assert.are.equal(
-            "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz",
+            "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz",
             context.archive_ready_calls[1].path
         )
     end)
@@ -526,7 +526,7 @@ describe("suwayomi/downloads/active_jobs", function()
             downloader = {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
                 end,
                 getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
                 writeProgress = function(_, progress_path)
@@ -596,11 +596,11 @@ describe("suwayomi/downloads/active_jobs", function()
         table.remove(context.scheduled, 1).callback()
 
         context.advance((30 * 60) - 1)
-        context.write_progress(manga, chapter, "downloading", 1, 2, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        context.write_progress(manga, chapter, "downloading", 1, 2, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz")
         table.remove(context.scheduled, 1).callback()
 
         context.advance(2)
-        context.write_progress(manga, chapter, "downloading", 2, 3, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz")
+        context.write_progress(manga, chapter, "downloading", 2, 3, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz")
         table.remove(context.scheduled, 1).callback()
 
         assert.are.equal("downloading", context.queue:getStatus(manga, chapter).state)
@@ -610,14 +610,14 @@ describe("suwayomi/downloads/active_jobs", function()
     end)
 
     it("treats failed progress as downloaded when the archive exists locally", function()
-        local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
+        local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
         local context = build_queue({
             subprocess_done = true,
             skip_subprocess_callback = true,
             downloader = {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
                 end,
                 getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
                 chapterExists = function(_, chapter_path)
@@ -639,14 +639,14 @@ describe("suwayomi/downloads/active_jobs", function()
     end)
 
     it("treats a finished subprocess as downloaded when progress is missing but the archive exists locally", function()
-        local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
+        local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
         local context = build_queue({
             subprocess_done = true,
             skip_subprocess_callback = true,
             downloader = {
                 getTargetPath = function(_, download_directory, manga, chapter)
                     return download_directory .. "/" .. manga.title,
-                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. ".cbz"
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
                 end,
                 getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
                 chapterExists = function(_, chapter_path)

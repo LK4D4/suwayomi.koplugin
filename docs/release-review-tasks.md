@@ -96,7 +96,7 @@ Fresh local verification from the review worktree:
     producing a clean download error.
   - Direction: validate in parser or `downloadBinary()` before `buildRequestURL()`.
 
-- [ ] Make chapter archive filenames collision-safe.
+- [x] Make chapter archive filenames collision-safe.
   - Area: `suwayomi/paths.lua:61`
   - Risk: duplicate chapter names under one manga/source can collide, causing
     skipped, overwritten, or wrong opened chapters.
