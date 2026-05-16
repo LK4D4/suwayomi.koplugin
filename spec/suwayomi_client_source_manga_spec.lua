@@ -333,6 +333,71 @@ describe("suwayomi/client source manga flows", function()
         assert.is_nil(updated_options.on_cancel_source_manga)
     end)
 
+    it("ignores stale source manga results after a newer source load starts", function()
+        local subprocess_job, started, canceled = buildSourceMangaSubprocessFake()
+        local menus = {}
+        local updates = {}
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    local menu = { name = "source-search-menu-" .. tostring(#menus + 1) }
+                    table.insert(menus, menu)
+                    return menu
+                end,
+                updateMangaMenu = function(menu, manga, _, menu_options)
+                    table.insert(updates, {
+                        menu = menu,
+                        manga = manga,
+                        menu_options = menu_options,
+                    })
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+            lang = "en",
+        }, {
+            type = "SEARCH",
+            query = "old",
+            skip_mode_menu = true,
+        })
+        client:showMangaForSource({
+            id = "s2",
+            display_name = "OtherDex",
+            lang = "en",
+        }, {
+            type = "SEARCH",
+            query = "new",
+            skip_mode_menu = true,
+        })
+
+        started[2].on_finish(started[2], {
+            ok = true,
+            manga = {
+                { id = "m2", title = "New Result" },
+            },
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Old Result" },
+            },
+        })
+
+        assert.are.equal(started[1], canceled[1])
+        assert.are.equal(1, #updates)
+        assert.are.equal(menus[2], updates[1].menu)
+        assert.are.equal("New Result", updates[1].manga[1].title)
+        assert.are.equal("OtherDex - Search: new - Page 1", updates[1].menu_options.title)
+    end)
+
     it("shows a friendly latest message when unknown support is rejected as unsupported", function()
         local messages
         local latest_options

@@ -84,7 +84,7 @@ Baseline at review time:
   - Direction: reject non-table source values before language and setting checks.
   - Test: mixed invalid rows plus one valid source renders only the valid row.
 
-- [ ] **Fence stale source manga worker results**
+- [x] **Fence stale source manga worker results**
   - Files: `suwayomi/client/source_manga.lua`
   - Risk: older worker can update an old browse menu after the user starts another source/search/page load.
   - Direction: track current source-load token, cancel previous active job, and ignore non-current finish/timeout.

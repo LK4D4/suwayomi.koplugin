@@ -239,16 +239,44 @@ function SuwayomiClient:showSourceMangaStatus(menu, title, message)
     return false
 end
 
-function SuwayomiClient:cancelSourceMangaLoad(state)
+function SuwayomiClient:isCurrentSourceMangaLoad(state)
+    return state
+        and self._active_source_manga_load == state
+        and self._source_manga_load_token == state.token
+end
+
+function SuwayomiClient:nextSourceMangaLoadToken()
+    self._source_manga_load_token = (self._source_manga_load_token or 0) + 1
+    return self._source_manga_load_token
+end
+
+function SuwayomiClient:supersedeSourceMangaLoad()
+    local previous = self._active_source_manga_load
+    if previous and not previous.canceled and not previous.finished then
+        self:cancelSourceMangaLoad(previous, { silent = true })
+    end
+end
+
+function SuwayomiClient:clearSourceMangaLoad(state)
+    if self._active_source_manga_load == state then
+        self._active_source_manga_load = nil
+    end
+end
+
+function SuwayomiClient:cancelSourceMangaLoad(state, options)
     if not state or state.canceled or state.finished then
         return
     end
+    options = options or {}
     state.canceled = true
     if state.active and state.runtime and state.runtime.job and state.runtime.job.cancel then
         state.runtime.job.cancel(state.active)
     end
     state.active = nil
-    self:showSourceMangaStatus(state.menu, state.title, self:translate("Loading canceled."))
+    self:clearSourceMangaLoad(state)
+    if not options.silent then
+        self:showSourceMangaStatus(state.menu, state.title, self:translate("Loading canceled."))
+    end
 end
 
 function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_options, result, existing_menu)
@@ -371,6 +399,8 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
         return false
     end
 
+    self:supersedeSourceMangaLoad()
+
     local runtime = self:resolveSourceMangaRuntime()
     if not runtime then
         return false
@@ -378,6 +408,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
 
     local title = self:buildBrowseResultTitle(source, browse_options)
     local state = {
+        token = self:nextSourceMangaLoadToken(),
         credentials = credentials,
         source = source,
         browse_options = browse_options,
@@ -389,6 +420,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
         { title = self:translate("Loading manga...") },
     }, nil, self:buildSourceMangaLoadingMenuOptions(state))
     self:trackScreen("browse-results", state.menu)
+    self._active_source_manga_load = state
 
     local active = runtime.job.start({
         active = {
@@ -409,11 +441,12 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
             return runtime.worker:readResult(path)
         end,
         on_finish = function(finished_active, result)
-            if state.canceled then
+            if state.canceled or not self:isCurrentSourceMangaLoad(state) then
                 return
             end
             state.finished = true
             state.active = nil
+            self:clearSourceMangaLoad(state)
             result = result or {
                 ok = false,
                 error = self:translate("Could not load manga."),
@@ -423,11 +456,12 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
             self:renderMangaForSourceResult(credentials, result_source, result_options, result, state.menu)
         end,
         on_timeout = function(timed_out_active)
-            if state.canceled then
+            if state.canceled or not self:isCurrentSourceMangaLoad(state) then
                 return
             end
             state.finished = true
             state.active = nil
+            self:clearSourceMangaLoad(state)
             timed_out_active.canceled = true
             self.plugin:showMessage(self:translate("Could not load manga."))
             self:showSourceMangaStatus(state.menu, title, self:translate("Could not load manga."))
@@ -436,11 +470,14 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
 
     if not active then
         state.finished = true
+        self:clearSourceMangaLoad(state)
         self:showSourceMangaStatus(state.menu, title, self:translate("Could not start manga loading."))
         return true
     end
 
-    state.active = active
+    if not state.finished then
+        state.active = active
+    end
     return true
 end
 
