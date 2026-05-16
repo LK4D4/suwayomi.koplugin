@@ -155,6 +155,9 @@ local function installController(options)
         return true
     end
     function plugin:getVisibleChapters(chapters)
+        if options.visible_chapters then
+            return options.visible_chapters
+        end
         return chapters
     end
     function plugin:isChapterDownloadAvailable(_, chapter)
@@ -457,5 +460,29 @@ describe("suwayomi/downloads/controller", function()
         assert.is_nil(state.interactive_enqueue_count)
         assert.are.same({ { id = "c6", name = "Ch. 6", downloaded = false } }, queue.enqueued.chapters)
         assert.are.same({ quick = true }, state.refresh_options)
+    end)
+
+    it("keeps download-ahead refills independent of visible scanlator filters", function()
+        local queue = {}
+        local chapters = {
+            { id = "c1", name = "Ch. 1", downloaded = true },
+            { id = "c2", name = "Ch. 2", downloaded = true },
+            { id = "c3", name = "Ch. 3", downloaded = false },
+        }
+        local plugin = installController({
+            queue = queue,
+            keep_next_limits = {
+                m1 = 3,
+            },
+            current_chapter_context = {
+                manga = { id = "m1", title = "Frieren" },
+                chapters = chapters,
+            },
+            visible_chapters = { chapters[1], chapters[2] },
+        })
+
+        assert.are.equal(1, plugin:applyMangaKeepNextUnreadDownloadsPolicy())
+
+        assert.are.same({ chapters[3] }, queue.enqueued.chapters)
     end)
 end)

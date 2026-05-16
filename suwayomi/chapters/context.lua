@@ -379,7 +379,7 @@ end
 
 function Methods:getNextUnreadChaptersForDownload(manga, limit)
     local chapters = {}
-    for _, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
+    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
         if self:canQueueChapterDownload(manga, chapter) then
             table.insert(chapters, chapter)
             if #chapters >= limit then

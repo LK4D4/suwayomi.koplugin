@@ -15,6 +15,7 @@ describe("suwayomi/chapters/actions", function()
     local function reset_modules()
         for _, name in ipairs({
             "suwayomi/chapters/actions",
+            "suwayomi/chapters/context",
             "suwayomi/chapters/local_downloads",
             "suwayomi/chapters/delete_actions",
             "suwayomi/chapters/read_actions",
@@ -24,6 +25,7 @@ describe("suwayomi/chapters/actions", function()
             "suwayomi/debug",
             "suwayomi/api",
             "suwayomi/readsync/worker",
+            "suwayomi/readsync/ledger",
             "suwayomi/browse/source_fetch_worker",
         }) do
             package.loaded[name] = nil
@@ -111,6 +113,9 @@ describe("suwayomi/chapters/actions", function()
         end
         package.preload["suwayomi/readsync/worker"] = function()
             return {}
+        end
+        package.preload["suwayomi/readsync/ledger"] = function()
+            return { methods = { mergeChaptersWithReadLedger = function() end } }
         end
         package.preload["suwayomi/browse/source_fetch_worker"] = function()
             return {}
@@ -252,6 +257,7 @@ describe("suwayomi/chapters/actions", function()
         package.preload["suwayomi/ui"] = nil
         package.preload["suwayomi/api"] = nil
         package.preload["suwayomi/readsync/worker"] = nil
+        package.preload["suwayomi/readsync/ledger"] = nil
         package.preload["suwayomi/browse/source_fetch_worker"] = nil
     end)
 
@@ -875,6 +881,46 @@ describe("suwayomi/chapters/actions", function()
         }))
 
         assert.is_nil(plugin.keep_next_policy_manga)
+    end)
+
+    it("does not scope manga-level next unread download confirmation to the current scanlator filter", function()
+        local team_a = { id = "c1", name = "Chapter 1", scanlator = "Team A", is_read = false }
+        local team_b = { id = "c2", name = "Chapter 2", scanlator = "Team B", is_read = false }
+        local plugin = build_plugin({
+            current_chapter_context = {
+                manga = manga,
+                chapters = {
+                    team_a,
+                    team_b,
+                },
+            },
+        })
+        plugin.current_scanlator_filter = "Team A"
+        function plugin:getDownloadDirectoryOrChoose()
+            return "/downloads"
+        end
+        function plugin:showBulkActionConfirmation(text, ok_text, callback)
+            self.confirmation = {
+                text = text,
+                ok_text = ok_text,
+                callback = callback,
+            }
+            return true
+        end
+        function plugin:enqueueSelectedChapterDownloads(target_manga, chapters)
+            self.enqueued = { manga = target_manga, chapters = chapters }
+            return #chapters
+        end
+        local context = require("suwayomi/chapters/context")
+        plugin.getChapterScanlator = context.methods.getChapterScanlator
+        plugin.getVisibleChapters = context.methods.getVisibleChapters
+        plugin.canQueueChapterDownload = context.methods.canQueueChapterDownload
+        plugin.getNextUnreadChaptersForDownload = context.methods.getNextUnreadChaptersForDownload
+
+        assert.is_true(plugin:confirmNextUnreadChapterDownloads(2))
+        plugin.confirmation.callback()
+
+        assert.are.same({ team_a, team_b }, plugin.enqueued.chapters)
     end)
 
     it("keeps burger action origin when opening nested bulk action menus", function()

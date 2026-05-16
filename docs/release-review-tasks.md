@@ -126,7 +126,7 @@ Baseline at review time:
   - Direction: add confirmation with selected count before `deleteSelectedChapters()`.
   - Test: selected delete does not call `os.remove` until confirmation callback runs.
 
-- [ ] **Avoid stale scanlator filter for manga-level download actions**
+- [x] **Avoid stale scanlator filter for manga-level download actions**
   - Files: `suwayomi/chapters/context.lua`
   - Risk: manga-level "Download next" and "Download ahead" can silently skip unread chapters outside a previous scanlator filter.
   - Direction: add an unfiltered helper or `ignore_filter` option for manga-level actions.

@@ -285,7 +285,7 @@ function Methods:getUnreadDownloadBufferCandidates(manga, limit)
     local missing = {}
     local unread_count = 0
 
-    for _, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
+    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
         if chapter.is_read ~= true then
             unread_count = unread_count + 1
             if not self:isChapterDownloadAvailable(manga, chapter) then
