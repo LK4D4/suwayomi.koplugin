@@ -242,6 +242,32 @@ describe("suwayomi/api/transport", function()
         assert.is_nil(requests[2].headers.Authorization)
     end)
 
+    it("only sends auth to exact same bracketed IPv6 origins", function()
+        install_ltn12()
+        local requests = {}
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    table.insert(requests, options)
+                    options.sink("PNG")
+                    return 1, 200, { ["content-type"] = "image/png" }
+                end,
+            }
+        end
+
+        local credentials = valid_credentials()
+        credentials.server_url = "https://[::1]:4567"
+
+        local same_origin = transport.downloadBinary(credentials, "https://[::1]:4567/api/v1/page/1")
+        assert.are.equal(true, same_origin.ok)
+        assert.are.equal("Basic YWxpY2U6c2VjcmV0", requests[1].headers.Authorization)
+
+        local different_origin = transport.downloadBinary(credentials, "https://[::2]:9999/api/v1/page/1")
+        assert.are.equal(true, different_origin.ok)
+        assert.is_nil(requests[2].headers.Authorization)
+    end)
+
     it("stops binary downloads when the byte cap is exceeded", function()
         install_ltn12()
         package.preload["ssl.https"] = function()

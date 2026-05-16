@@ -10,7 +10,7 @@ Baseline at review time:
 
 ## P1 Release Blockers
 
-- [ ] **Fix IPv6 same-origin auth checks**
+- [x] **Fix IPv6 same-origin auth checks**
   - Files: `suwayomi/api/transport.lua`
   - Risk: `parseOrigin()` can mis-parse bracketed IPv6 hosts, so `downloadBinary()` may send Basic auth to a wrong IPv6 origin.
   - Direction: parse bracketed IPv6 plus port exactly and default-deny auth on parse failure.

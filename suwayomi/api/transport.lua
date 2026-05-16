@@ -49,11 +49,32 @@ local function base64Encode(input)
 end
 
 local function parseOrigin(url)
-    local scheme, host, port = tostring(url or ""):match("^(https?)://([^/%?#:]+):?(%d*)")
-    if not scheme or not host then
+    local scheme, authority = tostring(url or ""):match("^(https?)://([^/%?#]*)")
+    if not scheme or not authority or authority == "" then
         return nil
     end
 
+    local host, port
+    if authority:sub(1, 1) == "[" then
+        local bracketed_host, rest = authority:match("^%[([^%]]+)%](.*)$")
+        if not bracketed_host then
+            return nil
+        end
+        host = bracketed_host
+        if rest == "" then
+            port = ""
+        else
+            port = rest:match("^:(%d+)$")
+            if not port then
+                return nil
+            end
+        end
+    else
+        host, port = authority:match("^([^:]+):?(%d*)$")
+        if not host or host == "" then
+            return nil
+        end
+    end
     if port == "" then
         port = scheme == "https" and "443" or "80"
     end
