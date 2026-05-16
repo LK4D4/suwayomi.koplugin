@@ -78,7 +78,7 @@ Baseline at review time:
   - Direction: normalize or validate path before `match()` and return API-style failure for invalid values.
   - Test: non-string page URL returns a download error.
 
-- [ ] **Ignore corrupt non-table source rows**
+- [x] **Ignore corrupt non-table source rows**
   - Files: `suwayomi/browse/source_catalog.lua`
   - Risk: corrupt source cache/result rows can crash Browse filtering.
   - Direction: reject non-table source values before language and setting checks.

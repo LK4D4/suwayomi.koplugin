@@ -374,6 +374,25 @@ describe("suwayomi/browse/source_catalog", function()
         assert.are.equal(1, debug_logs[1].filtered_source_count)
     end)
 
+    it("ignores corrupt non-table source rows when rendering fetched sources", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        controller:showFetchedSources({
+            ok = true,
+            sources = {
+                "broken",
+                true,
+                7,
+                { id = "english", lang = "en" },
+            },
+        })
+
+        assert.are.same({ "english" }, { ui_calls.shown.sources[1].id })
+        assert.are.equal(4, debug_logs[1].source_count)
+        assert.are.equal(1, debug_logs[1].filtered_source_count)
+    end)
+
     it("saves silent refreshed sources without reopening a closed source menu", function()
         local catalog = loadCatalog()
         local controller = buildController(catalog)

@@ -62,6 +62,10 @@ local function sortLanguages(left, right)
     return SourceLanguages.compare(left, right)
 end
 
+local function isSourceTable(source)
+    return type(source) == "table"
+end
+
 local function copyDefaultSourceLanguageFilter()
     return {
         [DEFAULT_SOURCE_LANGUAGE] = true,
@@ -114,10 +118,12 @@ function Methods:getSourceLanguageFilterChoices(sources)
     local languages = {}
     local selected_languages = self:getSourceLanguageFilterSet()
     for _, source in ipairs(sources or {}) do
-        local lang = normalizeLanguage(source and source.lang)
-        if lang and not seen[lang] then
-            seen[lang] = true
-            table.insert(languages, lang)
+        if isSourceTable(source) then
+            local lang = normalizeLanguage(source.lang)
+            if lang and not seen[lang] then
+                seen[lang] = true
+                table.insert(languages, lang)
+            end
         end
     end
     table.sort(languages, sortLanguages)
@@ -135,7 +141,11 @@ end
 
 
 function Methods:sourceMatchesBrowseSettings(source, selected_languages, browse_settings)
-    local lang = normalizeLanguage(source and source.lang)
+    if not isSourceTable(source) then
+        return false
+    end
+
+    local lang = normalizeLanguage(source.lang)
     if lang and not selected_languages[lang] then
         return false
     end
