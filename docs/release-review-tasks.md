@@ -16,7 +16,7 @@ Baseline at review time:
   - Direction: parse bracketed IPv6 plus port exactly and default-deny auth on parse failure.
   - Test: cover `[::1]:4567` same-origin auth and `[::2]:9999` no-auth behavior.
 
-- [ ] **Add byte cap to direct archive downloads**
+- [x] **Add byte cap to direct archive downloads**
   - Files: `suwayomi/api/transport.lua`
   - Risk: bad or oversized archive response can fill device storage before timeout.
   - Direction: enforce a maximum byte count in the archive sink and remove partial output on cap hit.
