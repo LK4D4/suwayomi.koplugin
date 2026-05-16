@@ -132,7 +132,7 @@ Baseline at review time:
   - Direction: add an unfiltered helper or `ignore_filter` option for manga-level actions.
   - Test: active `current_scanlator_filter` does not scope manga-level download actions.
 
-- [ ] **Check subprocess JSON write and close failures**
+- [x] **Check subprocess JSON write and close failures**
   - Files: `suwayomi/subprocess/job.lua`
   - Risk: disk-full or close errors can publish empty/truncated JSON.
   - Direction: check `handle:write()` and `handle:close()` results, remove temp output on failure, and return false.

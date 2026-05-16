@@ -6,6 +6,7 @@ describe("suwayomi/subprocess/job", function()
     local original_os_remove
     local files
     local removed
+    local open_options
 
     local function install_file_mock()
         original_io_open = io.open
@@ -13,6 +14,7 @@ describe("suwayomi/subprocess/job", function()
         original_os_remove = os.remove
         files = {}
         removed = {}
+        open_options = {}
 
         io.open = function(path, mode)
             if tostring(path):match("subprocess") then
@@ -20,12 +22,20 @@ describe("suwayomi/subprocess/job", function()
                     local chunks = {}
                     return {
                         write = function(_, ...)
+                            if open_options.write_fails then
+                                return nil, "disk full"
+                            end
                             for _, chunk in ipairs({...}) do
                                 table.insert(chunks, chunk)
                             end
+                            return true
                         end,
                         close = function()
+                            if open_options.close_fails then
+                                return nil, "close failed"
+                            end
                             files[path] = table.concat(chunks)
+                            return true
                         end,
                     }
                 end
@@ -103,6 +113,32 @@ describe("suwayomi/subprocess/job", function()
             parsed.values = type(parsed.values) == "table" and parsed.values or {}
             return parsed
         end))
+    end)
+
+    it("removes temporary result files when JSON writes fail", function()
+        local Job = require("suwayomi/subprocess/job")
+        open_options.write_fails = true
+
+        assert.is_false(Job.writeResult("/settings/subprocess_write_failure.json", {
+            ok = true,
+        }))
+
+        assert.is_true(removed["/settings/subprocess_write_failure.json.tmp"])
+        assert.is_nil(files["/settings/subprocess_write_failure.json.tmp"])
+        assert.is_nil(files["/settings/subprocess_write_failure.json"])
+    end)
+
+    it("removes temporary result files when JSON closes fail", function()
+        local Job = require("suwayomi/subprocess/job")
+        open_options.close_fails = true
+
+        assert.is_false(Job.writeResult("/settings/subprocess_close_failure.json", {
+            ok = true,
+        }))
+
+        assert.is_true(removed["/settings/subprocess_close_failure.json.tmp"])
+        assert.is_nil(files["/settings/subprocess_close_failure.json.tmp"])
+        assert.is_nil(files["/settings/subprocess_close_failure.json"])
     end)
 
     it("builds unique result paths under the settings directory", function()

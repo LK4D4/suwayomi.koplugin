@@ -38,8 +38,19 @@ function SubprocessJob.writeResult(result_path, result)
         return false
     end
 
-    handle:write(json.encode(result or {}))
-    handle:close()
+    local ok, err = handle:write(json.encode(result or {}))
+    if ok == false or (ok == nil and err ~= nil) then
+        handle:close()
+        os.remove(tmp_path)
+        return false
+    end
+
+    ok, err = handle:close()
+    if ok == false or (ok == nil and err ~= nil) then
+        os.remove(tmp_path)
+        return false
+    end
+
     if not os.rename(tmp_path, result_path) then
         os.remove(tmp_path)
         return false
