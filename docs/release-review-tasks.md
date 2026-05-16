@@ -90,7 +90,7 @@ Baseline at review time:
   - Direction: track current source-load token, cancel previous active job, and ignore non-current finish/timeout.
   - Test: two loads finish out of order; older result does not update the menu.
 
-- [ ] **Protect source manga and global search job startup**
+- [x] **Protect source manga and global search job startup**
   - Files: `suwayomi/client/source_manga.lua`, `suwayomi/client/global_search.lua`
   - Risk: launcher exception can leave loading/search UI stuck or abort queued global sources.
   - Direction: wrap `job.start` in `pcall`, render an error for source manga, and mark failed global sources while continuing.

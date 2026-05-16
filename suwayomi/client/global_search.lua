@@ -215,7 +215,8 @@ function SuwayomiClient:startGlobalSearchJob(search, index)
     local job = self:getSubprocessJob()
     local worker = self:getGlobalSearchWorker()
     local active
-    active = job.start({
+    local start_ok
+    start_ok, active = pcall(job.start, {
         active = {
             source = source,
             summary_index = index,
@@ -262,6 +263,9 @@ function SuwayomiClient:startGlobalSearchJob(search, index)
             end
         end,
     })
+    if not start_ok then
+        active = nil
+    end
     if active then
         search.active_jobs[index] = active
         search.active_count = (search.active_count or 0) + 1
@@ -271,6 +275,7 @@ function SuwayomiClient:startGlobalSearchJob(search, index)
             summary.status = "error"
             summary.error = self:translate("Could not start search.")
         end
+        self:updateGlobalSearchMenu(search)
     end
 end
 

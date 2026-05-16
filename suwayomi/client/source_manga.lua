@@ -422,7 +422,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
     self:trackScreen("browse-results", state.menu)
     self._active_source_manga_load = state
 
-    local active = runtime.job.start({
+    local start_ok, active = pcall(runtime.job.start, {
         active = {
             source = source,
             browse_options = browse_options,
@@ -467,6 +467,9 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
             self:showSourceMangaStatus(state.menu, title, self:translate("Could not load manga."))
         end,
     })
+    if not start_ok then
+        active = nil
+    end
 
     if not active then
         state.finished = true

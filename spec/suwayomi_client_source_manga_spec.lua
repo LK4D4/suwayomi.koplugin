@@ -291,6 +291,56 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal("MangaDex (EN) - Popular - Page 1", updated_options.title)
     end)
 
+    it("shows a source manga start error when subprocess startup throws", function()
+        local api_called = false
+        local updated_manga
+        local updated_options
+        local client, state = newClient({
+            subprocess_job = {
+                buildResultPath = function(prefix)
+                    return "/settings/" .. tostring(prefix) .. ".json"
+                end,
+                start = function()
+                    error("launcher failed")
+                end,
+            },
+            source_manga_worker = {
+                run = function()
+                    api_called = true
+                end,
+                readResult = function()
+                    return { ok = true, manga = {} }
+                end,
+            },
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-manga-loading" }
+                end,
+                updateMangaMenu = function(_, manga, _, menu_options)
+                    updated_manga = manga
+                    updated_options = menu_options
+                end,
+            },
+        })
+
+        assert.has_no.errors(function()
+            client:showMangaForSource({
+                id = "s1",
+                display_name = "MangaDex (EN)",
+                lang = "en",
+            }, {
+                skip_mode_menu = true,
+            })
+        end)
+
+        assert.is_false(api_called)
+        assert.are.same({}, state.shown_messages)
+        assert.are.equal("Could not start manga loading.", updated_manga[1].title)
+        assert.are.equal("MangaDex (EN) - Popular - Page 1", updated_options.title)
+    end)
+
     it("updates the source search menu when the subprocess returns manga", function()
         local subprocess_job, started = buildSourceMangaSubprocessFake()
         local updated_manga

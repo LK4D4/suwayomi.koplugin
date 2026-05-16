@@ -149,6 +149,71 @@ describe("suwayomi/client global search flows", function()
         assert.is_function(opened_options.on_next_page)
     end)
 
+    it("marks a global source error and continues queued sources when subprocess startup throws", function()
+        local started = {}
+        local shown_summaries
+        local update_count = 0
+        local subprocess_job = {
+            buildResultPath = function(prefix)
+                return "/settings/" .. tostring(prefix) .. "_" .. tostring(#started + 1) .. ".json"
+            end,
+            start = function(options)
+                local active = options.active or {}
+                if active.source.id == "s1" then
+                    error("launcher failed")
+                end
+                active.on_finish = options.on_finish
+                table.insert(started, active)
+                return active
+            end,
+            cancel = function() end,
+        }
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            global_search_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            global_search_max_active_sources = 1,
+            ui = {
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch(" frieren ")
+                end,
+                showGlobalSearchResultsMenu = function(summaries)
+                    shown_summaries = summaries
+                    return { name = "global-search" }
+                end,
+                updateGlobalSearchResultsMenu = function(_, summaries)
+                    update_count = update_count + 1
+                    shown_summaries = summaries
+                end,
+            },
+        })
+
+        assert.has_no.errors(function()
+            client:showGlobalSearch({
+                { id = "s1", name = "MangaDex", lang = "en" },
+                { id = "s2", name = "Comick", lang = "en" },
+            })
+        end)
+
+        assert.are.equal("error", shown_summaries[1].status)
+        assert.are.equal("Could not start search.", shown_summaries[1].error)
+        assert.are.equal(1, update_count)
+        assert.are.equal("s2", started[1].source.id)
+        assert.are.equal("searching", shown_summaries[2].status)
+
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Frieren" },
+            },
+            query = "frieren",
+        })
+
+        assert.are.equal("ok", shown_summaries[2].status)
+        assert.are.equal(1, shown_summaries[2].result_count)
+    end)
+
     it("keeps timed out global search slots active until cleanup", function()
         local subprocess_job, started = buildGlobalSearchSubprocessFake()
         local updated_summaries
