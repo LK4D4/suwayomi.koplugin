@@ -23,6 +23,14 @@ local function encodeKey(key)
     return table.concat(encoded)
 end
 
+local function lineSafe(value)
+    return tostring(value or ""):gsub("%c+", " ")
+end
+
+function ProgressFile.lineSafe(value)
+    return lineSafe(value)
+end
+
 function ProgressFile.buildPath(key, download_directory)
     local encoded_key = encodeKey(tostring(key or ""))
     if encoded_key == "" then
@@ -68,12 +76,12 @@ function ProgressFile.writeFallback(progress_path, state, current, total, path, 
     if not handle then
         return
     end
-    handle:write("state=", tostring(state or ""), "\n")
-    handle:write("current=", tostring(current or 0), "\n")
-    handle:write("total=", tostring(total or 0), "\n")
-    handle:write("path=", tostring(path or ""), "\n")
+    handle:write("state=", lineSafe(state), "\n")
+    handle:write("current=", lineSafe(current or 0), "\n")
+    handle:write("total=", lineSafe(total or 0), "\n")
+    handle:write("path=", lineSafe(path), "\n")
     if error_message then
-        handle:write("error=", tostring(error_message), "\n")
+        handle:write("error=", lineSafe(error_message), "\n")
     end
     handle:close()
     if not os.rename(tmp_path, progress_path) then

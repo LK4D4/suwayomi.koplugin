@@ -29,6 +29,14 @@ describe("suwayomi/paths", function()
         assert.are.equal("untitled", paths.sanitizePathSegment(""))
     end)
 
+    it("strips control characters from path segments", function()
+        local paths = load_paths()
+
+        assert.are.equal("Manga state=failed path=x", paths.sanitizePathSegment("Manga\nstate=failed\rpath=x"))
+        assert.are.equal("Chapter  01", paths.sanitizePathSegment("\tChapter\000 01\n"))
+        assert.are.equal("untitled", paths.sanitizePathSegment("\n\r\t"))
+    end)
+
     it("selects the source label from display name first", function()
         local paths = load_paths()
 

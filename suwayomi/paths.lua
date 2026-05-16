@@ -20,7 +20,11 @@ local function present(value)
 end
 
 function SuwayomiPaths.sanitizePathSegment(name)
-    local sanitized = tostring(name or ""):gsub("[\\/:*?\"<>|]", "_"):gsub("^%s+", ""):gsub("%s+$", "")
+    local sanitized = tostring(name or "")
+        :gsub("%c+", " ")
+        :gsub("[\\/:*?\"<>|]", "_")
+        :gsub("^%s+", "")
+        :gsub("%s+$", "")
     if sanitized == "" or sanitized == "." or sanitized == ".." then
         return "untitled"
     end

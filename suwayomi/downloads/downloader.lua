@@ -10,6 +10,7 @@
 local lfs = require("lfs")
 local Archiver = require("ffi/archiver")
 local SuwayomiAPI = require("suwayomi/api")
+local ProgressFile = require("suwayomi/downloads/progress_file")
 local SuwayomiPaths = require("suwayomi/paths")
 
 local Downloader = {}
@@ -189,12 +190,12 @@ function Downloader:writeProgress(progress_path, state, current, total, path, er
         return
     end
 
-    handle:write("state=", tostring(state or ""), "\n")
-    handle:write("current=", tostring(current or 0), "\n")
-    handle:write("total=", tostring(total or 0), "\n")
-    handle:write("path=", tostring(path or ""), "\n")
+    handle:write("state=", ProgressFile.lineSafe(state), "\n")
+    handle:write("current=", ProgressFile.lineSafe(current or 0), "\n")
+    handle:write("total=", ProgressFile.lineSafe(total or 0), "\n")
+    handle:write("path=", ProgressFile.lineSafe(path), "\n")
     if error_message then
-        handle:write("error=", tostring(error_message), "\n")
+        handle:write("error=", ProgressFile.lineSafe(error_message), "\n")
     end
     handle:close()
     if not os.rename(tmp_path, progress_path) then

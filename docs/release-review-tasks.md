@@ -108,7 +108,7 @@ Baseline at review time:
   - Direction: remove both page and direct partial paths when active jobs are terminated as failures.
   - Test: cancel and watchdog paths remove both partial variants.
 
-- [ ] **Strip control characters from path segments**
+- [x] **Strip control characters from path segments**
   - Files: `suwayomi/paths.lua`, `suwayomi/downloads/progress_file.lua`
   - Risk: manga/chapter/source metadata with newlines can corrupt progress files and create hostile filenames.
   - Direction: strip or map control characters in sanitized path segments and keep progress values line-safe.

@@ -119,6 +119,25 @@ describe("suwayomi/downloads/progress_file", function()
         }, progress_file.read("/books/.suwayomi_dl_progress_m1_398.txt"))
     end)
 
+    it("keeps fallback progress values line-safe", function()
+        progress_file.writeFallback(
+            "/books/.suwayomi_dl_progress_m1_398.txt",
+            "downloading",
+            2,
+            5,
+            "/books/Manga\nstate=failed\npath=x/chapter.cbz",
+            "first line\nstate=failed\npath=x"
+        )
+
+        assert.are.same({
+            state = "downloading",
+            current = 2,
+            total = 5,
+            path = "/books/Manga state=failed path=x/chapter.cbz",
+            error = "first line state=failed path=x",
+        }, progress_file.read("/books/.suwayomi_dl_progress_m1_398.txt"))
+    end)
+
     it("returns nil when no progress file exists", function()
         assert.is_nil(progress_file.read("/books/missing.txt"))
     end)
