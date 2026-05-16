@@ -102,7 +102,7 @@ Baseline at review time:
   - Direction: set `select_enabled = false` on non-openable summary and info rows.
   - Test: selecting those rows does not close or navigate the menu.
 
-- [ ] **Clean partial archives on cancel and watchdog failure**
+- [x] **Clean partial archives on cancel and watchdog failure**
   - Files: `suwayomi/downloads/active_jobs.lua`, `suwayomi/downloads/downloader.lua`
   - Risk: canceled or timed-out downloads leave stale `.part` and `.direct.part` files.
   - Direction: remove both page and direct partial paths when active jobs are terminated as failures.

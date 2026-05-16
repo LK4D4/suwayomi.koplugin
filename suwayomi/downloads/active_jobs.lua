@@ -217,6 +217,9 @@ function ActiveJobs:finishWithFailure(active, message)
     local failure_message = queue:formatFailureMessage(active.manga, active.chapter, message or _("Chapter download failed."))
     self:terminateJob(active)
     self:removeJob(active)
+    if queue.cleanupInterruptedDownload then
+        queue:cleanupInterruptedDownload(active)
+    end
     os.remove(active.progress_path)
     queue:setStatus(active.manga, active.chapter, { state = "failed" })
     queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {

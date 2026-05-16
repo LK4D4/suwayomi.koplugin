@@ -10,6 +10,15 @@ describe("suwayomi/downloads/active_jobs", function()
     local renamed_paths
     local progress_files
 
+    local function path_was_removed(path)
+        for _, removed_path in ipairs(removed_paths or {}) do
+            if removed_path == path then
+                return true
+            end
+        end
+        return false
+    end
+
     local function install_progress_file_mock()
         original_io_open = io.open
         original_os_remove = os.remove
@@ -96,6 +105,9 @@ describe("suwayomi/downloads/active_jobs", function()
             end,
             getPartialPath = function(_, chapter_path)
                 return chapter_path .. ".part"
+            end,
+            getDirectPartialPath = function(_, chapter_path)
+                return chapter_path .. ".direct.part"
             end,
             writeProgress = function(_, progress_path, state, current, total, path, error_message)
                 local handle = assert(io.open(progress_path, "w"))
@@ -557,11 +569,31 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.equal(message, context.messages[#context.messages])
     end)
 
+    it("removes partial archives when an active job is canceled", function()
+        local context = build_queue({
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+        local chapter_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
+
+        context.queue:enqueue(manga, chapter, "/books")
+        table.remove(context.scheduled, 1).callback()
+
+        local cancelled = context.queue:cancelPending(manga, chapter)
+
+        assert.is_true(cancelled)
+        assert.is_true(path_was_removed(chapter_path .. ".part"))
+        assert.is_true(path_was_removed(chapter_path .. ".direct.part"))
+    end)
+
     it("marks the active job failed when the watchdog expires", function()
         local context = build_queue({
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
+        local chapter_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
 
         context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
         table.remove(context.scheduled, 1).callback()
@@ -582,6 +614,8 @@ describe("suwayomi/downloads/active_jobs", function()
             "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): Chapter download timed out.",
             context.messages[#context.messages]
         )
+        assert.is_true(path_was_removed(chapter_path .. ".part"))
+        assert.is_true(path_was_removed(chapter_path .. ".direct.part"))
     end)
 
     it("does not time out an active job that is still reporting progress", function()
