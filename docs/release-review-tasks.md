@@ -22,7 +22,7 @@ Baseline at review time:
   - Direction: enforce a maximum byte count in the archive sink and remove partial output on cap hit.
   - Test: stream chunks over the cap and assert failure plus partial cleanup.
 
-- [ ] **Preserve source cache when extension refresh partially fails**
+- [x] **Preserve source cache when extension refresh partially fails**
   - Files: `suwayomi/browse/extension_worker.lua`, `suwayomi/browse/extensions.lua`
   - Risk: install/update/uninstall success followed by `fetchSources()` failure saves an empty source cache and empties the source menu.
   - Direction: carry source refresh success/error separately and only save/refresh source cache when source refresh succeeds.

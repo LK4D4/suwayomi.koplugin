@@ -177,7 +177,13 @@ end
 function Methods:finishExtensionWorker(active, result)
     self.extension_worker_active = nil
     self:closeLoadingMessage(active and active.loading_message)
-    if result and result.ok and type(result.sources) == "table" and result.action then
+    if result
+        and result.ok
+        and type(result.sources) == "table"
+        and result.action
+        and result.action ~= "fetch"
+        and result.source_refresh_ok ~= false
+    then
         self:saveSourceCache(active and active.credentials, result.sources)
         refreshVisibleSourceList(self, active and active.credentials, result.sources)
     end

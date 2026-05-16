@@ -139,14 +139,17 @@ function ExtensionWorker:run(credentials, request, result_path)
                 local extensions = SuwayomiAPI.fetchExtensions(credentials) or {}
                 local sources = fetchSourcesAfterAction(credentials, request.action, sourceCount(previous_sources))
                 local extensions_ok = extensions.ok == true
+                local sources_ok = sources.ok == true
                 return {
                     ok = true,
                     action = request.action,
                     updated_extension = updated.extension,
                     extension_refresh_ok = extensions_ok,
                     extension_refresh_error = not extensions_ok and extensions.error or nil,
+                    source_refresh_ok = sources_ok,
+                    source_refresh_error = not sources_ok and sources.error or nil,
                     extensions = fallbackExtensionList(extensions, updated.extension),
-                    sources = sources.ok and sources.sources or {},
+                    sources = sources_ok and sources.sources or {},
                 }
             else
                 updated.action = request.action

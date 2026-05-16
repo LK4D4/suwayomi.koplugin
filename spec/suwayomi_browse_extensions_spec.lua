@@ -431,6 +431,73 @@ describe("suwayomi/browse/extensions", function()
         assert.are.equal("Installing extension...", controller.closed_loading.message)
     end)
 
+    it("keeps old source cache when extension update source refresh fails", function()
+        local extensions = loadExtensions()
+        local refreshed_sources
+        local controller = buildController(extensions, {
+            current_sources_menu = { kind = "sources-menu" },
+            filterSourcesByLanguage = function(_, sources)
+                return sources
+            end,
+            showSourceList = function(_, sources, options)
+                refreshed_sources = {
+                    sources = sources,
+                    options = options,
+                }
+            end,
+        })
+        controller.saved_source_cache = {
+            credentials = { server_url = "https://suwayomi.example" },
+            sources = {
+                { id = "old-source", name = "Old Source" },
+            },
+        }
+
+        controller:finishExtensionWorker({
+            credentials = { server_url = "https://suwayomi.example" },
+            loading_message = { message = "Updating extension..." },
+        }, {
+            ok = true,
+            action = "update",
+            source_refresh_ok = false,
+            source_refresh_error = "Connection timed out while waiting for Suwayomi.",
+            sources = {},
+            extensions = {
+                { pkg_name = "pkg.mangadex", name = "MangaDex", is_installed = true },
+            },
+        })
+
+        assert.are.equal("old-source", controller.saved_source_cache.sources[1].id)
+        assert.is_nil(refreshed_sources)
+        assert.are.equal("pkg.mangadex", ui_calls.extensions_menu.extensions[1].pkg_name)
+        assert.are.equal("Updating extension...", controller.closed_loading.message)
+    end)
+
+    it("does not clear source cache from extension list fetch results", function()
+        local extensions = loadExtensions()
+        local controller = buildController(extensions)
+        controller.saved_source_cache = {
+            credentials = { server_url = "https://suwayomi.example" },
+            sources = {
+                { id = "old-source", name = "Old Source" },
+            },
+        }
+
+        controller:finishExtensionWorker({
+            credentials = { server_url = "https://suwayomi.example" },
+        }, {
+            ok = true,
+            action = "fetch",
+            sources = {},
+            extensions = {
+                { pkg_name = "pkg.mangadex", name = "MangaDex", is_installed = false },
+            },
+        })
+
+        assert.are.equal("old-source", controller.saved_source_cache.sources[1].id)
+        assert.are.equal("pkg.mangadex", ui_calls.extensions_menu.extensions[1].pkg_name)
+    end)
+
     it("refreshes an open source menu after extension install changes sources", function()
         local extensions = loadExtensions()
         local refreshed_sources
