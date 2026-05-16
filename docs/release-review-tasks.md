@@ -156,19 +156,19 @@ Baseline at review time:
   - Direction: add shared credential normalization with table guard, URL/string normalization, and auth enum defaulting.
   - Test: non-table credentials and `auth_method = "bad"` load safely with expected defaults.
 
-- [ ] **Reload credentials during read-sync retries**
+- [x] **Reload credentials during read-sync retries**
   - Files: `suwayomi/readsync/controller.lua`
   - Risk: retry loop can keep an empty credentials table captured before login and never pick up later saved settings.
   - Direction: reload settings on each retry or stop retrying when server URL is missing.
   - Test: first retry sees empty URL, second retry sees saved valid URL and starts worker.
 
-- [ ] **Clear pending read-sync when remote already matches**
+- [x] **Clear pending read-sync when remote already matches**
   - Files: `suwayomi/readsync/ledger.lua`
   - Risk: pending read-sync state can linger when fresh Suwayomi chapter state already equals desired state.
   - Direction: clear pending fields during merge when remote state matches `pending_read_state`.
   - Test: merge with matching remote read state removes pending flags.
 
-- [ ] **Gate release upload on lint and specs**
+- [x] **Gate release upload on lint and specs**
   - Files: `.github/workflows/release.yml`, `.github/workflows/test.yml`
   - Risk: tag release can publish `suwayomi_dl.koplugin.zip` without running the same checks as PR/branch CI.
   - Direction: add a test job to the release workflow or share the test workflow before build/upload.

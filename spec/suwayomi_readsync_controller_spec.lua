@@ -342,8 +342,18 @@ describe("suwayomi/readsync/controller", function()
         assert.are.equal(10, state.scheduled[3].delay)
     end)
 
-    it("blocks automatic read-sync retry when credentials are missing", function()
-        local controller, state = installController({ credentials = { server_url = "" } })
+    it("retries automatic read-sync after missing credentials are later saved", function()
+        local credentials = {
+            { server_url = "" },
+            { server_url = "https://suwayomi.example" },
+        }
+        local load_count = 0
+        local controller, state = installController({
+            loadCredentials = function()
+                load_count = load_count + 1
+                return credentials[load_count] or credentials[#credentials]
+            end,
+        })
         local plugin = buildPlugin(controller, {
             ledger = {
                 ["m1:c1"] = { chapter_id = "c1", read = true, pending_read_sync = true },
@@ -353,9 +363,15 @@ describe("suwayomi/readsync/controller", function()
         plugin:schedulePendingReadSync()
         state.scheduled[1].callback()
 
-        assert.are.equal(1, #state.scheduled)
+        assert.are.equal(2, #state.scheduled)
         assert.are.equal(0, #state.worker_runs)
         assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
+
+        state.scheduled[2].callback()
+
+        assert.are.equal("https://suwayomi.example", plugin.pending_read_sync_active.credentials.server_url)
+        state.get_child_callback()()
+        assert.are.equal("https://suwayomi.example", state.worker_runs[1].credentials.server_url)
     end)
 
     it("reloads credentials for automatic read-sync retries", function()

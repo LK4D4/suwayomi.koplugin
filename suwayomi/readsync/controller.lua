@@ -71,7 +71,7 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
         return false, 0
     end
     if not credentials or credentials.server_url == "" then
-        return false, 0
+        return false, #batch
     end
 
     local result_path = self:getReadSyncResultPath()

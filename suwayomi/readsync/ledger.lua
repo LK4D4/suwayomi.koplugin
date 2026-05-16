@@ -96,14 +96,33 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters)
                 pending_read_state = entry.read == true
             end
         end
+        local remote_matches_pending = pending_read_state ~= nil and suwayomi_is_read == pending_read_state
         local is_read = pending_read_state
+        if remote_matches_pending then
+            pending_read_state = nil
+            is_read = suwayomi_is_read
+        end
         if is_read == nil then
             is_read = suwayomi_is_read
         end
         item._suwayomi_is_read = suwayomi_is_read
         item.is_read = is_read
 
-        if is_read or pending_read_state ~= nil then
+        if remote_matches_pending then
+            if is_read or (entry and entry.path) then
+                ledger[key] = {
+                    manga_id = tostring(manga.id or ""),
+                    manga_title = manga.title,
+                    chapter_id = tostring(item.id or ""),
+                    chapter_name = item.name,
+                    read = is_read == true,
+                    path = entry and entry.path or nil,
+                }
+            else
+                ledger[key] = nil
+            end
+            changed = true
+        elseif is_read or pending_read_state ~= nil then
             ledger[key] = {
                 manga_id = tostring(manga.id or ""),
                 manga_title = manga.title,
