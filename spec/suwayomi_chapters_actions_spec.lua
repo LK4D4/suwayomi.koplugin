@@ -429,6 +429,75 @@ describe("suwayomi/chapters/actions", function()
         }, removed_paths)
     end)
 
+    it("confirms selected download deletion before removing local files", function()
+        local chapter2 = { id = "c2", name = "Chapter 2" }
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+                ["/downloads/Manga/Chapter 2.cbz"] = true,
+            },
+            current_chapter_context = {
+                manga = manga,
+                chapters = {
+                    chapter,
+                    chapter2,
+                },
+            },
+            ledger = {
+                ["m1:c1"] = {
+                    manga_id = "m1",
+                    chapter_id = "c1",
+                    path = "/downloads/Manga/Chapter 1.cbz",
+                    read = false,
+                },
+                ["m1:c2"] = {
+                    manga_id = "m1",
+                    chapter_id = "c2",
+                    path = "/downloads/Manga/Chapter 2.cbz",
+                    read = false,
+                },
+            },
+        })
+        function plugin:getSelectedChapters()
+            return { chapter, chapter2 }
+        end
+        function plugin:clearChapterSelection(skip_refresh)
+            self.selection_cleared = skip_refresh
+        end
+        function plugin:showBulkActionConfirmation(text, ok_text, callback)
+            self.confirmation = {
+                text = text,
+                ok_text = ok_text,
+                callback = callback,
+            }
+            return true
+        end
+
+        assert.is_true(plugin:performBulkChapterAction("delete_selected"))
+
+        assert.are.equal("Delete 2 selected downloads from device?", plugin.confirmation.text)
+        assert.are.equal("Delete", plugin.confirmation.ok_text)
+        assert.are.same({}, removed_paths)
+        assert.is_table(plugin.ledger["m1:c1"])
+        assert.is_table(plugin.ledger["m1:c2"])
+
+        plugin.confirmation.callback()
+
+        assert.is_nil(plugin.ledger["m1:c1"])
+        assert.is_nil(plugin.ledger["m1:c2"])
+        assert.are.equal(true, plugin.selection_cleared)
+        assert.are.same({
+            "/downloads/Manga/Chapter 1.cbz",
+            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
+            "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
+            "/downloads/Manga/Chapter 1.cbz.sdr",
+            "/downloads/Manga/Chapter 2.cbz",
+            "/downloads/Manga/Chapter 2.cbz.sdr/metadata.lua",
+            "/downloads/Manga/Chapter 2.cbz.sdr/metadata.lua.old",
+            "/downloads/Manga/Chapter 2.cbz.sdr",
+        }, removed_paths)
+    end)
+
     it("preserves read ledger entries while clearing their local path", function()
         local plugin = build_plugin({
             existing = {

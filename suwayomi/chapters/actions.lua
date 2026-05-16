@@ -304,6 +304,39 @@ function Methods:deleteSelectedChapters()
 end
 
 
+function Methods:confirmDeleteSelectedChapters()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
+    if #chapters == 0 then
+        self:showMessage(_("No chapters selected."))
+        return 0
+    end
+
+    if self.showBulkActionConfirmation then
+        return self:showBulkActionConfirmation(
+            T(
+                self:pluralize(
+                    #chapters,
+                    _("Delete %1 selected download from device?"),
+                    _("Delete %1 selected downloads from device?")
+                ),
+                #chapters
+            ),
+            _("Delete"),
+            function()
+                self:deleteSelectedChapters()
+            end
+        )
+    end
+
+    return self:deleteSelectedChapters()
+end
+
+
 function Methods:deleteReadChaptersFromDevice()
     local started_at = SuwayomiDebug.now()
     if not self.current_chapter_context then
@@ -545,7 +578,7 @@ function Methods:performBulkChapterAction(action_id, menu_context)
         return true
     end
     if action_id == "delete_selected" then
-        self:deleteSelectedChapters()
+        self:confirmDeleteSelectedChapters()
         return true
     end
     if action_id == "mark_read_selected" then

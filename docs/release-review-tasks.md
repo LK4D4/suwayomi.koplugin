@@ -120,7 +120,7 @@ Baseline at review time:
   - Direction: verify ZIP signature/structure before finalize, or expose enough bytes from transport for validation.
   - Test: direct endpoint returns `application/zip` plus non-ZIP body and downloader falls back or fails safely.
 
-- [ ] **Confirm selected-chapter deletion**
+- [x] **Confirm selected-chapter deletion**
   - Files: `suwayomi/chapters/actions.lua`
   - Risk: one bulk-menu tap can delete many local archives, sidecars, and ledger paths.
   - Direction: add confirmation with selected count before `deleteSelectedChapters()`.
