@@ -177,6 +177,64 @@ describe("suwayomi/downloads/downloader", function()
         return local_header .. central_dir .. eocd
     end
 
+    local function buildDataDescriptorZip()
+        local name = "0001.jpg"
+        local payload = "x"
+        local data_descriptor = "PK\007\008" .. u32le(0) .. u32le(#payload) .. u32le(#payload)
+        local local_header = "PK\003\004"
+            .. u16le(20) .. u16le(8) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(0) .. u32le(0)
+            .. u16le(#name) .. u16le(0)
+            .. name .. payload .. data_descriptor
+        local central_dir_offset = #local_header
+        local central_dir = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(8) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#payload) .. u32le(#payload)
+            .. u16le(#name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(0)
+            .. name
+        local eocd = "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(1) .. u16le(1)
+            .. u32le(#central_dir) .. u32le(central_dir_offset) .. u16le(0)
+        return local_header .. central_dir .. eocd
+    end
+
+    local function buildOutOfOrderCentralDirectoryZip()
+        local first_name = "0001.jpg"
+        local second_name = "0002.jpg"
+        local first_payload = "x"
+        local second_payload = "y"
+        local first_header = "PK\003\004"
+            .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#first_payload) .. u32le(#first_payload)
+            .. u16le(#first_name) .. u16le(0)
+            .. first_name .. first_payload
+        local second_offset = #first_header
+        local second_header = "PK\003\004"
+            .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#second_payload) .. u32le(#second_payload)
+            .. u16le(#second_name) .. u16le(0)
+            .. second_name .. second_payload
+        local central_dir_offset = #first_header + #second_header
+        local first_central = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#first_payload) .. u32le(#first_payload)
+            .. u16le(#first_name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(0)
+            .. first_name
+        local second_central = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#second_payload) .. u32le(#second_payload)
+            .. u16le(#second_name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(second_offset)
+            .. second_name
+        local central_dir = second_central .. first_central
+        local eocd = "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(2) .. u16le(2)
+            .. u32le(#central_dir) .. u32le(central_dir_offset) .. u16le(0)
+        return first_header .. second_header .. central_dir .. eocd
+    end
+
     local function buildMultiEntryStoredZip(count)
         local local_parts = {}
         local central_parts = {}
@@ -283,7 +341,20 @@ describe("suwayomi/downloads/downloader", function()
         }))
     end)
 
-    it("rejects direct archives using data descriptors", function()
+    it("accepts direct archives using data descriptors", function()
+        local archive = buildDataDescriptorZip()
+        local downloader = loadDownloaderForZipValidation()
+
+        assert.is_true(downloader:isZipArchiveResult({
+            content_type = "application/zip",
+            bytes = #archive,
+            header_bytes = archive:sub(1, 4),
+            head_bytes = archive,
+            tail_bytes = archive,
+        }))
+    end)
+
+    it("rejects direct archives using incomplete data descriptors", function()
         local forged_zip = buildDataDescriptorGapZip()
         local downloader = loadDownloaderForZipValidation()
 
@@ -293,6 +364,19 @@ describe("suwayomi/downloads/downloader", function()
             header_bytes = forged_zip:sub(1, 4),
             head_bytes = forged_zip,
             tail_bytes = forged_zip,
+        }))
+    end)
+
+    it("accepts direct archives whose central directory is not sorted by local offset", function()
+        local archive = buildOutOfOrderCentralDirectoryZip()
+        local downloader = loadDownloaderForZipValidation()
+
+        assert.is_true(downloader:isZipArchiveResult({
+            content_type = "application/zip",
+            bytes = #archive,
+            header_bytes = archive:sub(1, 4),
+            head_bytes = archive,
+            tail_bytes = archive,
         }))
     end)
 

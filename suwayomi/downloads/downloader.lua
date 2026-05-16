@@ -233,6 +233,13 @@ local function parseLocalHeader(archive_result, archive_path, offset)
     }
 end
 
+local function isAllowedDescriptorGap(uses_data_descriptor, gap)
+    if uses_data_descriptor then
+        return gap == 12 or gap == 16
+    end
+    return gap == 0
+end
+
 function Downloader:isZipArchiveResult(archive_result, archive_path)
     if not archive_result or (archive_result.bytes or 0) < 22 then
         return false
@@ -287,8 +294,7 @@ function Downloader:isZipArchiveResult(archive_result, archive_path)
 
     local central_dir_end = central_dir_size
     local central_index = 1
-    local previous_payload_end = 0
-    local first_entry
+    local entries = {}
     for _ = 1, entry_count do
         local entry = parseCentralDirectoryEntry(central_dir_bytes, central_index, central_dir_end)
         if not entry then
@@ -299,26 +305,41 @@ function Downloader:isZipArchiveResult(archive_result, archive_path)
             return false
         end
         local uses_data_descriptor = hasFlag(local_header.flags, 8)
-        if uses_data_descriptor
-            or hasFlag(entry.flags, 8)
-            or entry.local_header_offset ~= previous_payload_end
+        if uses_data_descriptor ~= hasFlag(entry.flags, 8)
             or entry.local_header_offset >= central_dir_offset
             or local_header.name_length ~= entry.name_length
-            or local_header.compressed_size ~= entry.compressed_size
             or entry.local_header_offset + local_header.header_length + entry.compressed_size > central_dir_offset
         then
             return false
         end
-        if entry.local_header_offset == 0 then
-            first_entry = entry
+        if not uses_data_descriptor and local_header.compressed_size ~= entry.compressed_size then
+            return false
         end
-        previous_payload_end = entry.local_header_offset + local_header.header_length + entry.compressed_size
+        table.insert(entries, {
+            local_header_offset = entry.local_header_offset,
+            payload_end = entry.local_header_offset + local_header.header_length + entry.compressed_size,
+            uses_data_descriptor = uses_data_descriptor,
+        })
         central_index = central_index + entry.length
     end
-    if central_index ~= central_dir_end + 1 or not first_entry then
+    if central_index ~= central_dir_end + 1 or #entries == 0 then
         return false
     end
-    if previous_payload_end ~= central_dir_offset then
+    table.sort(entries, function(left, right)
+        return left.local_header_offset < right.local_header_offset
+    end)
+
+    local previous_payload_end = 0
+    local previous_uses_data_descriptor = false
+    for _, entry in ipairs(entries) do
+        local gap = entry.local_header_offset - previous_payload_end
+        if not isAllowedDescriptorGap(previous_uses_data_descriptor, gap) then
+            return false
+        end
+        previous_payload_end = entry.payload_end
+        previous_uses_data_descriptor = entry.uses_data_descriptor
+    end
+    if not isAllowedDescriptorGap(previous_uses_data_descriptor, central_dir_offset - previous_payload_end) then
         return false
     end
 
