@@ -106,7 +106,9 @@ describe("suwayomi/reader_return", function()
         package.preload["ui/uimanager"] = function()
             return {
                 nextTick = function(_, callback)
-                    if callback then
+                    if options.defer_next_tick then
+                        state.next_tick_callback = callback
+                    elseif callback then
                         callback()
                     end
                 end,
@@ -415,6 +417,42 @@ describe("suwayomi/reader_return", function()
                 { id = "c1", name = "Chapter 1" },
             },
         })
+
+        assert.are.same({ "network-request" }, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("ignores stale reader-return results when context changes before deferred close", function()
+        local plugin = build_plugin({
+            defer_network_finish = true,
+            defer_next_tick = true,
+            contexts = {
+                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Manga",
+                    chapter_id = "c1",
+                    chapter_name = "Chapter 1",
+                },
+                ["/downloads/Local/Manga/Chapter 2.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 2.cbz",
+                    manga_id = "m2",
+                    manga_title = "Other Manga",
+                    chapter_id = "c2",
+                    chapter_name = "Chapter 2",
+                },
+            },
+        })
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+        state.network_requests[1].on_finish({
+            ok = true,
+            chapters = {
+                { id = "c1", name = "Chapter 1" },
+            },
+        })
+        plugin.ui.document.file = "/downloads/Local/Manga/Chapter 2.cbz"
+        state.next_tick_callback()
 
         assert.are.same({ "network-request" }, state.events)
         assert.is_nil(state.shown_manga)

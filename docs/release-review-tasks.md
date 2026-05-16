@@ -64,7 +64,7 @@ Baseline at review time:
   - Direction: use KOReader docsettings helper or derive `<base>.sdr/metadata.lua`.
   - Test: `/books/ch1.cbz` maps to `/books/ch1.sdr/metadata.lua`.
 
-- [ ] **Revalidate reader-return token inside deferred callback**
+- [x] **Revalidate reader-return token inside deferred callback**
   - Files: `suwayomi/reader_return.lua`
   - Risk: stale reader-return result can close the current reader and show the wrong manga after user changes book/request between finish and `nextTick`.
   - Direction: keep the token active until deferred callback runs and recheck token plus context before side effects.

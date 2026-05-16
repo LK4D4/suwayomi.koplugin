@@ -281,18 +281,21 @@ function Methods:startReaderReturnChapterRequest(context)
             if self.active_reader_return_request ~= request_token then
                 return
             end
-            self.active_reader_return_request = nil
             if not contextMatches(self:getCurrentReaderReturnContext(), context) then
+                self.active_reader_return_request = nil
                 return
             end
             if not result then
+                self.active_reader_return_request = nil
                 return
             end
             if not result.ok then
+                self.active_reader_return_request = nil
                 self:showMessage(_(result.error))
                 return
             end
             if not result.chapters or #result.chapters == 0 then
+                self.active_reader_return_request = nil
                 self:showMessage(_("This manga has no chapters."))
                 return
             end
@@ -303,9 +306,21 @@ function Methods:startReaderReturnChapterRequest(context)
                 source = copyTable(context.source),
             }
             self:closeReaderToFileManager(function()
+                if self.active_reader_return_request == request_token then
+                    self.active_reader_return_request = nil
+                end
                 self:showChapterResultForManga(manga, result, {
                     return_context = context,
                 })
+            end, function()
+                if self.active_reader_return_request ~= request_token then
+                    return false
+                end
+                if not contextMatches(self:getCurrentReaderReturnContext(), context) then
+                    self.active_reader_return_request = nil
+                    return false
+                end
+                return true
             end)
         end,
     })
@@ -321,8 +336,12 @@ function Methods:startReaderReturnChapterRequest(context)
     return true
 end
 
-function Methods:closeReaderToFileManager(callback)
+function Methods:closeReaderToFileManager(callback, should_continue)
     UIManager:nextTick(function()
+        if should_continue and not should_continue() then
+            return
+        end
+
         local ok_reader, ReaderUI = pcall(require, "apps/reader/readerui")
         if ok_reader and ReaderUI and ReaderUI.instance and ReaderUI.instance.onClose then
             ReaderUI.instance:onClose()
