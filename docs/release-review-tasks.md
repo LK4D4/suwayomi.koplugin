@@ -46,7 +46,7 @@ Baseline at review time:
   - Direction: update the active queue limit in place and call `process()`, or recreate with explicit cancel/recover handoff.
   - Test: changing the setting retains the same queue object and updates `max_active_chapters`.
 
-- [ ] **Deduplicate recovered download jobs before starting workers**
+- [x] **Deduplicate recovered download jobs before starting workers**
   - Files: `suwayomi/downloads/active_jobs.lua`, `suwayomi/downloads/queue.lua`, `suwayomi/downloads/job_store.lua`
   - Risk: duplicate persisted keys can start duplicate subprocesses writing the same progress file, partial archive, and CBZ.
   - Direction: dedupe persisted jobs by key during recovery and skip queued/active duplicates before launch.
