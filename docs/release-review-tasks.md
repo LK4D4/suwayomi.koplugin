@@ -40,7 +40,7 @@ Baseline at review time:
   - Direction: avoid recursive navigator pop while still calling the original close callback exactly once.
   - Test: `closeAll()` closes tracked widgets and invokes the original callback.
 
-- [ ] **Keep live download queue when changing parallel download count**
+- [x] **Keep live download queue when changing parallel download count**
   - Files: `suwayomi/plugin/settings_controller.lua`, `suwayomi/downloads/queue.lua`
   - Risk: saving the parallel-download setting drops the live queue while subprocesses may keep running unmanaged.
   - Direction: update the active queue limit in place and call `process()`, or recreate with explicit cancel/recover handoff.
