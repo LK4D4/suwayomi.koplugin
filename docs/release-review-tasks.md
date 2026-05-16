@@ -58,7 +58,7 @@ Baseline at review time:
   - Direction: convert unreadable or malformed results to `{ ok = false, error = "Could not complete network request." }`.
   - Test: missing file and malformed JSON both surface a normalized error.
 
-- [ ] **Fix KOReader metadata sidecar path**
+- [x] **Fix KOReader metadata sidecar path**
   - Files: `suwayomi/readsync/koreader_metadata.lua`
   - Risk: sidecar writes appear to target `metadata.<ext>.lua`, while KOReader uses `<book>.sdr/metadata.lua`; local read/unread updates can be ignored.
   - Direction: use KOReader docsettings helper or derive `<base>.sdr/metadata.lua`.

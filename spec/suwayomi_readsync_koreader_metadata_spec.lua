@@ -54,7 +54,7 @@ describe("suwayomi/readsync/koreader_metadata", function()
 
         local metadata, metadata_path = subject:loadKoreaderMetadataTable("/books/Frieren.cbz")
         assert.are.equal("/books/Frieren.cbz", metadata.doc_path)
-        assert.are.equal("/books/Frieren.sdr/metadata.cbz.lua", metadata_path)
+        assert.are.equal("/books/Frieren.sdr/metadata.lua", metadata_path)
 
         assert.are.same({}, subject:loadKoreaderHistoryPaths())
     end)

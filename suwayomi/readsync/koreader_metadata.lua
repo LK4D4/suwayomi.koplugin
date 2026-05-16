@@ -40,12 +40,12 @@ function Methods:getKoreaderMetadataPathForDocument(document_path)
         return nil
     end
 
-    local base_path, extension = document_path:match("^(.*)%.([^%.%/]+)$")
-    if not base_path or not extension then
+    local base_path = document_path:match("^(.*)%.[^%.%/]+$")
+    if not base_path then
         return nil
     end
 
-    return base_path .. ".sdr/metadata." .. extension .. ".lua"
+    return base_path .. ".sdr/metadata.lua"
 end
 
 
