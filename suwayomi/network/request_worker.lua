@@ -64,7 +64,7 @@ function RequestWorker:writeResult(result_path, result)
 end
 
 function RequestWorker:readResult(result_path)
-    return SubprocessJob.readResult(result_path, normalizeResult)
+    return normalizeResult(SubprocessJob.readResult(result_path, normalizeResult))
 end
 
 function RequestWorker:run(credentials, request, result_path)

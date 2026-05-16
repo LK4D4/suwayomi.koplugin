@@ -26,8 +26,12 @@ describe("suwayomi/network/request_worker", function()
                     written[result_path] = result
                     return true
                 end,
-                readResult = function(result_path)
-                    return written[result_path]
+                readResult = function(result_path, normalize)
+                    local result = written[result_path]
+                    if normalize then
+                        return normalize(result)
+                    end
+                    return result
                 end,
             }
         end
@@ -81,5 +85,21 @@ describe("suwayomi/network/request_worker", function()
             ok = true,
             manga = { id = "m1", in_library = true },
         }, written["/settings/update.json"])
+    end)
+
+    it("normalizes missing and malformed result files to network request errors", function()
+        local Worker = require("suwayomi/network/request_worker")
+
+        assert.are.same({
+            ok = false,
+            error = "Could not complete network request.",
+        }, Worker:readResult("/settings/missing.json"))
+
+        written["/settings/malformed.json"] = "not a result table"
+
+        assert.are.same({
+            ok = false,
+            error = "Could not complete network request.",
+        }, Worker:readResult("/settings/malformed.json"))
     end)
 end)

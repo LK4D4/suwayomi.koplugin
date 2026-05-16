@@ -52,7 +52,7 @@ Baseline at review time:
   - Direction: dedupe persisted jobs by key during recovery and skip queued/active duplicates before launch.
   - Test: duplicate persisted `downloading` jobs with `max_active_chapters = 2` start only one subprocess.
 
-- [ ] **Normalize missing or malformed network worker results**
+- [x] **Normalize missing or malformed network worker results**
   - Files: `suwayomi/network/request_worker.lua`
   - Risk: child crash, missing result file, or partial JSON can close loading UI with no user-facing failure.
   - Direction: convert unreadable or malformed results to `{ ok = false, error = "Could not complete network request." }`.
