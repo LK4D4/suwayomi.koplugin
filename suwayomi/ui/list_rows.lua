@@ -307,6 +307,11 @@ function ListRows.getGlobalSearchSummaryMandatory(summary)
     return formatResultCount(summary)
 end
 
+local function isGlobalSearchSummaryOpenable(summary)
+    return summary
+        and (summary.status == "ok" or summary.status == "pageable_empty")
+end
+
 function ListRows.buildGlobalSearchSummaryRow(summary, options)
     options = options or {}
     local source = type(summary) == "table" and summary.source or nil
@@ -321,11 +326,9 @@ function ListRows.buildGlobalSearchSummaryRow(summary, options)
         or row.subtitle
     row.mandatory = ListRows.getGlobalSearchSummaryMandatory(summary)
     row.summary = summary
+    row.select_enabled = isGlobalSearchSummaryOpenable(summary) or false
     row.callback = function()
-        if summary
-            and (summary.status == "ok" or summary.status == "pageable_empty")
-            and options.on_select
-        then
+        if row.select_enabled and options.on_select then
             options.on_select(summary)
         end
     end

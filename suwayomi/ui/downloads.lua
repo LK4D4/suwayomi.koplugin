@@ -71,14 +71,19 @@ local function appendEmptyStateRows(menu_table, snapshot, options)
     table.insert(menu_table, {
         text = _("Download folder"),
         subtitle = folder,
+        select_enabled = false,
     })
     table.insert(menu_table, {
         text = _("Queue"),
         subtitle = tostring(active_count) .. " active, "
             .. tostring(queued_count) .. " queued, "
             .. tostring(failed_count) .. " failed",
+        select_enabled = false,
     })
-    table.insert(menu_table, { text = _("No downloads queued.") })
+    table.insert(menu_table, {
+        text = _("No downloads queued."),
+        select_enabled = false,
+    })
 end
 
 function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)

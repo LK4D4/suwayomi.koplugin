@@ -96,7 +96,7 @@ Baseline at review time:
   - Direction: wrap `job.start` in `pcall`, render an error for source manga, and mark failed global sources while continuing.
   - Test: fake `job.start` throws in both flows.
 
-- [ ] **Disable selection on informational rows**
+- [x] **Disable selection on informational rows**
   - Files: `suwayomi/ui/list_rows.lua`, `suwayomi/ui/downloads.lua`
   - Risk: empty/error/searching rows are selectable despite no useful action.
   - Direction: set `select_enabled = false` on non-openable summary and info rows.

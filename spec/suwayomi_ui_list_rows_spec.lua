@@ -223,6 +223,7 @@ describe("suwayomi/ui/list_rows", function()
         assert.are.equal("Slow Source", menu_table[2].text)
         assert.are.equal("Error", menu_table[2].mandatory)
         assert.are.equal("Timed out", menu_table[2].subtitle)
+        assert.is_false(menu_table[2].select_enabled)
         assert.are.equal("More Source", menu_table[3].text)
         assert.are.equal("2+ results", menu_table[3].mandatory)
 
@@ -230,6 +231,36 @@ describe("suwayomi/ui/list_rows", function()
         menu_table[2].callback()
         menu_table[3].callback()
         assert.are.same({ "s1", "s3" }, selected)
+    end)
+
+    it("disables selection on non-openable global search summary rows", function()
+        local rows = require("suwayomi/ui/list_rows")
+        local summaries = {
+            {
+                source = { id = "s1", name = "Empty Source" },
+                status = "empty",
+            },
+            {
+                source = { id = "s2", name = "Searching Source" },
+                status = "searching",
+            },
+            {
+                source = { id = "s3", name = "Error Source" },
+                status = "error",
+                error = "Timed out",
+            },
+        }
+
+        local menu_table = rows.buildGlobalSearchSummaryMenuTable(summaries, {
+            on_select = function()
+                error("non-openable summary rows must not navigate")
+            end,
+        })
+
+        for _, row in ipairs(menu_table) do
+            assert.is_false(row.select_enabled)
+            row.callback()
+        end
     end)
 
     it("groups extension rows with installed entries above available entries", function()
