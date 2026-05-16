@@ -28,7 +28,7 @@ Baseline at review time:
   - Direction: carry source refresh success/error separately and only save/refresh source cache when source refresh succeeds.
   - Test: extension update succeeds, extension refresh succeeds, source refresh times out; assert old source cache/menu remains.
 
-- [ ] **Scope thumbnail cache by account**
+- [x] **Scope thumbnail cache by account**
   - Files: `suwayomi/ui/thumbnail_cache.lua`
   - Risk: switching accounts on the same Suwayomi host can reuse cached covers from the previous account.
   - Direction: include non-secret auth scope such as auth method and username in the thumbnail cache key.

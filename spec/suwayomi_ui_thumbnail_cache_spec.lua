@@ -71,6 +71,9 @@ describe("suwayomi/ui/thumbnail_cache", function()
         original_io_open = io.open
         original_os_remove = os.remove
         io.open = function(path, mode)
+            if mode == nil then
+                return original_io_open(path, mode)
+            end
             if mode == "rb" then
                 local file = written_files[path]
                 if not file then
@@ -151,8 +154,22 @@ describe("suwayomi/ui/thumbnail_cache", function()
             password = "secret",
             auth_method = "basic_auth",
         }, "/cover.png", "image/png")
+        local alice_new_password_path = cache.getPath({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "changed",
+            auth_method = "basic_auth",
+        }, "/cover.png", "image/png")
+        local alice_no_auth_path = cache.getPath({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "none",
+        }, "/cover.png", "image/png")
 
         assert.are_not.equal(alice_path, bob_path)
+        assert.are.equal(alice_path, alice_new_password_path)
+        assert.are_not.equal(alice_path, alice_no_auth_path)
         assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.png$", alice_path)
         assert.is_nil(alice_path:match("alice"))
         assert.is_nil(alice_path:match("secret"))
