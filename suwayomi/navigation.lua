@@ -110,12 +110,10 @@ end
 function Navigator:closeAll()
     while #self.entries > 0 do
         local entry = removeEntry(self.entries, #self.entries)
-        self.closing_widgets[entry.widget] = true
+        restoreCallback(entry)
         if self.ui_manager and self.ui_manager.close then
             self.ui_manager:close(entry.widget)
         end
-        self.closing_widgets[entry.widget] = nil
-        restoreCallback(entry)
     end
 end
 

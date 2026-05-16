@@ -135,7 +135,7 @@ describe("suwayomi/navigation", function()
         assert.is_false(navigator:contains(manga_actions))
     end)
 
-    it("closeAll does not call the wrapped original close_callback while navigator-initiated close is in progress", function()
+    it("closeAll calls the original close_callback exactly once", function()
         local Navigation = load_navigation()
         local navigator = Navigation.new(ui_manager)
         local original_calls = 0
@@ -149,7 +149,7 @@ describe("suwayomi/navigation", function()
         navigator:closeAll()
 
         assert.are.same({ widget }, closed)
-        assert.are.equal(0, original_calls)
+        assert.are.equal(1, original_calls)
         assert.is_false(navigator:contains(widget))
     end)
 end)

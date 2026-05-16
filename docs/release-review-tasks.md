@@ -34,7 +34,7 @@ Baseline at review time:
   - Direction: include non-secret auth scope such as auth method and username in the thumbnail cache key.
   - Test: same server and thumbnail URL with different usernames produce different cache paths.
 
-- [ ] **Run tracked close callbacks during navigation close-all**
+- [x] **Run tracked close callbacks during navigation close-all**
   - Files: `suwayomi/navigation.lua`
   - Risk: `closeAll()` can skip original close callbacks, leaving async workers alive after screens close.
   - Direction: avoid recursive navigator pop while still calling the original close callback exactly once.
