@@ -21,6 +21,9 @@ local DEFAULT_CREDENTIALS = {
     password = "",
     auth_method = "basic_auth",
 }
+local SUPPORTED_AUTH_METHODS = {
+    basic_auth = true,
+}
 
 local DEFAULT_SOURCE_LANGUAGES = { "en" }
 local DEFAULT_BROWSE_SETTINGS = {
@@ -94,11 +97,11 @@ function SuwayomiSettings:normalizeCredentials(credentials)
         credentials = {}
     end
     local auth_method = toStringOrDefault(credentials.auth_method, DEFAULT_CREDENTIALS.auth_method)
-    if auth_method == "" then
+    if not SUPPORTED_AUTH_METHODS[auth_method] then
         auth_method = DEFAULT_CREDENTIALS.auth_method
     end
     return {
-        server_url = toStringOrDefault(credentials.server_url, DEFAULT_CREDENTIALS.server_url),
+        server_url = self:normalizeServerURL(toStringOrDefault(credentials.server_url, DEFAULT_CREDENTIALS.server_url)),
         username = toStringOrDefault(credentials.username, DEFAULT_CREDENTIALS.username),
         password = toStringOrDefault(credentials.password, DEFAULT_CREDENTIALS.password),
         auth_method = auth_method,
@@ -237,15 +240,8 @@ end
 
 function SuwayomiSettings:save(credentials)
     credentials = self:normalizeCredentials(credentials)
-    local normalized = {
-        server_url = self:normalizeServerURL(credentials.server_url),
-        username = credentials.username,
-        password = credentials.password,
-        auth_method = credentials.auth_method,
-    }
-
-    self:open():saveSetting("credentials", normalized):flush()
-    return normalized
+    self:open():saveSetting("credentials", credentials):flush()
+    return credentials
 end
 
 function SuwayomiSettings:loadSourceLanguages()

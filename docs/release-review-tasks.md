@@ -150,7 +150,7 @@ Baseline at review time:
   - Direction: prefer safe-field allowlist or redact/hash user-data fields.
   - Test: `query`, `path`, `server_url`, `token`, `secret`, and `cookie` are redacted while counts/status remain visible.
 
-- [ ] **Normalize credentials on load and save**
+- [x] **Normalize credentials on load and save**
   - Files: `suwayomi/settings.lua`
   - Risk: corrupt `credentials` shape can crash startup, and unsupported `auth_method` can silently disable Basic Auth.
   - Direction: add shared credential normalization with table guard, URL/string normalization, and auth enum defaulting.

@@ -79,18 +79,18 @@ describe("suwayomi/settings", function()
         }, credentials)
     end)
 
-    it("coerces persisted credential fields to strings", function()
+    it("normalizes persisted credential fields", function()
         stored_data.credentials = {
-            server_url = 123,
+            server_url = "suwayomi.local:4567",
             username = false,
             password = 456,
-            auth_method = "",
+            auth_method = "bad",
         }
 
         local settings = require("suwayomi/settings")
         local credentials = settings:load()
 
-        assert.are.equal("123", credentials.server_url)
+        assert.are.equal("http://suwayomi.local:4567", credentials.server_url)
         assert.are.equal("false", credentials.username)
         assert.are.equal("456", credentials.password)
         assert.are.equal("basic_auth", credentials.auth_method)
@@ -102,7 +102,7 @@ describe("suwayomi/settings", function()
             server_url = "suwayomi.local:4567",
             username = "alice",
             password = "secret",
-            auth_method = "basic_auth",
+            auth_method = "bad",
         })
 
         assert.is_true(flushed)
