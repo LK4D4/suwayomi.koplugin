@@ -114,6 +114,217 @@ function Downloader:isArchiveContentType(content_type)
         or content_type:match("zip") ~= nil
 end
 
+function Downloader:isZipHeader(header_bytes)
+    header_bytes = tostring(header_bytes or "")
+    return header_bytes:sub(1, 4) == "PK\003\004"
+        or header_bytes:sub(1, 4) == "PK\005\006"
+        or header_bytes:sub(1, 4) == "PK\007\008"
+end
+
+local function readUInt16LE(bytes, index)
+    local first = bytes:byte(index)
+    local second = bytes:byte(index + 1)
+    if not first or not second then
+        return nil
+    end
+    return first + (second * 256)
+end
+
+local function readUInt32LE(bytes, index)
+    local low = readUInt16LE(bytes, index)
+    local high = readUInt16LE(bytes, index + 2)
+    if not low or not high then
+        return nil
+    end
+    return low + (high * 65536)
+end
+
+local function hasFlag(value, flag)
+    return value and value % (flag * 2) >= flag
+end
+
+local function parseCentralDirectoryEntry(bytes, index, limit)
+    if index + 45 > limit or bytes:sub(index, index + 3) ~= "PK\001\002" then
+        return nil
+    end
+
+    local name_length = readUInt16LE(bytes, index + 28)
+    local extra_length = readUInt16LE(bytes, index + 30)
+    local comment_length = readUInt16LE(bytes, index + 32)
+    local compressed_size = readUInt32LE(bytes, index + 20)
+    local local_header_offset = readUInt32LE(bytes, index + 42)
+    local flags = readUInt16LE(bytes, index + 8)
+    if not name_length
+        or name_length == 0
+        or not extra_length
+        or not comment_length
+        or not compressed_size
+        or not local_header_offset
+        or not flags
+    then
+        return nil
+    end
+
+    local length = 46 + name_length + extra_length + comment_length
+    if index + length - 1 > limit then
+        return nil
+    end
+
+    return {
+        length = length,
+        name_length = name_length,
+        compressed_size = compressed_size,
+        local_header_offset = local_header_offset,
+        flags = flags,
+    }
+end
+
+local function readArchiveBytes(archive_result, archive_path, offset, length)
+    local head_bytes = tostring(archive_result.head_bytes or archive_result.header_bytes or "")
+    if offset >= 0 and offset + length <= #head_bytes then
+        return head_bytes:sub(offset + 1, offset + length)
+    end
+
+    local tail_bytes = tostring(archive_result.tail_bytes or "")
+    local tail_offset = (archive_result.bytes or 0) - #tail_bytes
+    if offset >= tail_offset and offset + length <= tail_offset + #tail_bytes then
+        local start_index = offset - tail_offset + 1
+        return tail_bytes:sub(start_index, start_index + length - 1)
+    end
+
+    if not archive_path or archive_path == "" then
+        return nil
+    end
+    local handle = io.open(archive_path, "rb")
+    if not handle then
+        return nil
+    end
+    local seek_ok = handle:seek("set", offset)
+    local bytes
+    if seek_ok then
+        bytes = handle:read(length)
+    end
+    handle:close()
+    if type(bytes) ~= "string" or #bytes ~= length then
+        return nil
+    end
+    return bytes
+end
+
+local function parseLocalHeader(archive_result, archive_path, offset)
+    local header = readArchiveBytes(archive_result, archive_path, offset, 30)
+    if not header or header:sub(1, 4) ~= "PK\003\004" then
+        return nil
+    end
+
+    local flags = readUInt16LE(header, 7)
+    local compressed_size = readUInt32LE(header, 19)
+    local name_length = readUInt16LE(header, 27)
+    local extra_length = readUInt16LE(header, 29)
+    if not flags or not compressed_size or not name_length or not extra_length or name_length == 0 then
+        return nil
+    end
+
+    return {
+        flags = flags,
+        compressed_size = compressed_size,
+        name_length = name_length,
+        header_length = 30 + name_length + extra_length,
+    }
+end
+
+function Downloader:isZipArchiveResult(archive_result, archive_path)
+    if not archive_result or (archive_result.bytes or 0) < 22 then
+        return false
+    end
+    local header_signature = tostring(archive_result.header_bytes or ""):sub(1, 4)
+    if not self:isZipHeader(header_signature) then
+        return false
+    end
+
+    local tail_bytes = tostring(archive_result.tail_bytes or "")
+    local eocd_start
+    for index = math.max(#tail_bytes - 21, 1), 1, -1 do
+        if tail_bytes:sub(index, index + 3) == "PK\005\006" then
+            eocd_start = index
+            break
+        end
+    end
+    if not eocd_start or #tail_bytes - eocd_start + 1 < 22 then
+        return false
+    end
+
+    local comment_length = readUInt16LE(tail_bytes, eocd_start + 20)
+    if not comment_length or eocd_start + 21 + comment_length ~= #tail_bytes then
+        return false
+    end
+
+    local entry_count = readUInt16LE(tail_bytes, eocd_start + 10)
+    local central_dir_size = readUInt32LE(tail_bytes, eocd_start + 12)
+    local central_dir_offset = readUInt32LE(tail_bytes, eocd_start + 16)
+    if not entry_count or not central_dir_size or not central_dir_offset then
+        return false
+    end
+
+    local eocd_offset = archive_result.bytes - (#tail_bytes - eocd_start + 1)
+    if eocd_offset < 0 or central_dir_offset + central_dir_size ~= eocd_offset then
+        return false
+    end
+    if entry_count == 0 and central_dir_size == 0 then
+        return false
+    end
+    if header_signature ~= "PK\003\004" or entry_count == 0 or central_dir_size == 0 or central_dir_offset <= 0 then
+        return false
+    end
+
+    if central_dir_size < 46 then
+        return false
+    end
+    local central_dir_bytes = readArchiveBytes(archive_result, archive_path, central_dir_offset, central_dir_size)
+    if not central_dir_bytes then
+        return false
+    end
+
+    local central_dir_end = central_dir_size
+    local central_index = 1
+    local previous_payload_end = 0
+    local first_entry
+    for _ = 1, entry_count do
+        local entry = parseCentralDirectoryEntry(central_dir_bytes, central_index, central_dir_end)
+        if not entry then
+            return false
+        end
+        local local_header = parseLocalHeader(archive_result, archive_path, entry.local_header_offset)
+        if not local_header then
+            return false
+        end
+        local uses_data_descriptor = hasFlag(local_header.flags, 8)
+        if uses_data_descriptor
+            or hasFlag(entry.flags, 8)
+            or entry.local_header_offset ~= previous_payload_end
+            or entry.local_header_offset >= central_dir_offset
+            or local_header.name_length ~= entry.name_length
+            or local_header.compressed_size ~= entry.compressed_size
+            or entry.local_header_offset + local_header.header_length + entry.compressed_size > central_dir_offset
+        then
+            return false
+        end
+        if entry.local_header_offset == 0 then
+            first_entry = entry
+        end
+        previous_payload_end = entry.local_header_offset + local_header.header_length + entry.compressed_size
+        central_index = central_index + entry.length
+    end
+    if central_index ~= central_dir_end + 1 or not first_entry then
+        return false
+    end
+    if previous_payload_end ~= central_dir_offset then
+        return false
+    end
+
+    return true
+end
+
 function Downloader:finalizePartialArchive(partial_path, chapter_path)
     local renamed, rename_error = os.rename(partial_path, chapter_path)
     if renamed then
@@ -171,7 +382,10 @@ function Downloader:downloadDirectChapterArchive(credentials, download_directory
         self:cleanupPartialFile(partial_path)
         return nil
     end
-    if (archive_result.bytes or 0) <= 0 or not self:isArchiveContentType(archive_result.content_type) then
+    if (archive_result.bytes or 0) <= 0
+        or not self:isArchiveContentType(archive_result.content_type)
+        or not self:isZipArchiveResult(archive_result, partial_path)
+    then
         self:cleanupPartialFile(partial_path)
         return nil
     end

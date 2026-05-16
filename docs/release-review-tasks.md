@@ -114,7 +114,7 @@ Baseline at review time:
   - Direction: strip or map control characters in sanitized path segments and keep progress values line-safe.
   - Test: title containing `\nstate=failed\npath=x` cannot alter parsed progress state.
 
-- [ ] **Validate direct archive bytes before final CBZ rename**
+- [x] **Validate direct archive bytes before final CBZ rename**
   - Files: `suwayomi/downloads/downloader.lua`, `suwayomi/api/transport.lua`
   - Risk: server/proxy can return non-ZIP bytes with `application/zip`, producing a bad downloaded CBZ.
   - Direction: verify ZIP signature/structure before finalize, or expose enough bytes from transport for validation.

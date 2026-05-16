@@ -389,6 +389,11 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
     local client = request_url:match("^https://") and require("ssl.https") or require("socket.http")
     local headers = Transport.buildRequestHeaders(credentials)
     local response_bytes = 0
+    local header_chunks = {}
+    local header_bytes_count = 0
+    local head_chunks = {}
+    local head_bytes_count = 0
+    local tail_bytes = ""
     local write_error
     local started_at = now()
     local max_bytes = request_options.max_bytes or MAX_BINARY_RESPONSE_BYTES
@@ -412,6 +417,17 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
                     write_error = err or "write failed"
                     return nil, write_error
                 end
+                if header_bytes_count < 4 then
+                    local header_piece = chunk:sub(1, 4 - header_bytes_count)
+                    table.insert(header_chunks, header_piece)
+                    header_bytes_count = header_bytes_count + #header_piece
+                end
+                if head_bytes_count < 4096 then
+                    local head_piece = chunk:sub(1, 4096 - head_bytes_count)
+                    table.insert(head_chunks, head_piece)
+                    head_bytes_count = head_bytes_count + #head_piece
+                end
+                tail_bytes = (tail_bytes .. chunk):sub(-65557)
                 response_bytes = response_bytes + #chunk
             end
             return 1
@@ -448,6 +464,9 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
             bytes = response_bytes,
             content_type = response_headers["content-type"] or response_headers["Content-Type"],
             content_length = content_length,
+            header_bytes = table.concat(header_chunks),
+            head_bytes = table.concat(head_chunks),
+            tail_bytes = tail_bytes,
         }
     end
 

@@ -1,6 +1,234 @@
 package.path = "?.lua;" .. package.path
 
 describe("suwayomi/downloads/downloader", function()
+    local empty_zip = "PK\005\006\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+
+    local function u16le(value)
+        return string.char(value % 256, math.floor(value / 256) % 256)
+    end
+
+    local function u32le(value)
+        return string.char(
+            value % 256,
+            math.floor(value / 256) % 256,
+            math.floor(value / 65536) % 256,
+            math.floor(value / 16777216) % 256
+        )
+    end
+
+    local function buildStoredZip(name, content)
+        local local_header = "PK\003\004"
+            .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#content) .. u32le(#content)
+            .. u16le(#name) .. u16le(0)
+            .. name .. content
+        local central_dir_offset = #local_header
+        local central_dir = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#content) .. u32le(#content)
+            .. u16le(#name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(0)
+            .. name
+        local eocd = "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(1) .. u16le(1)
+            .. u32le(#central_dir) .. u32le(central_dir_offset) .. u16le(0)
+        return local_header .. central_dir .. eocd
+    end
+
+    local function buildForgedCentralDirZip()
+        local local_header = "PK\003\004" .. string.rep("\000", 26)
+        local central_dir = "PK\001\002" .. string.rep("\000", 42)
+        return local_header
+            .. central_dir
+            .. "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(1) .. u16le(1)
+            .. u32le(#central_dir) .. u32le(#local_header) .. u16le(0)
+    end
+
+    local function buildForgedMissingPayloadZip()
+        local name = "0001.jpg"
+        local local_header = "PK\003\004"
+            .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(8) .. u32le(8)
+            .. u16le(#name) .. u16le(0)
+            .. name
+        local central_dir_offset = #local_header
+        local central_dir = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(8) .. u32le(8)
+            .. u16le(#name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(0)
+            .. name
+        local eocd = "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(1) .. u16le(1)
+            .. u32le(#central_dir) .. u32le(central_dir_offset) .. u16le(0)
+        return local_header .. central_dir .. eocd
+    end
+
+    local function buildForgedLocalSizeMismatchZip()
+        local name = "0001.jpg"
+        local local_header = "PK\003\004"
+            .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(1) .. u32le(1)
+            .. u16le(#name) .. u16le(0)
+            .. name .. "x"
+        local central_dir_offset = #local_header
+        local central_dir = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(8) .. u32le(8)
+            .. u16le(#name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(0)
+            .. name
+        local eocd = "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(1) .. u16le(1)
+            .. u32le(#central_dir) .. u32le(central_dir_offset) .. u16le(0)
+        return local_header .. central_dir .. eocd
+    end
+
+    local function buildForgedMultiEntryMissingPayloadZip()
+        local first_name = "0001.jpg"
+        local second_name = "0002.jpg"
+        local first_payload = "x"
+        local first_header = "PK\003\004"
+            .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#first_payload) .. u32le(#first_payload)
+            .. u16le(#first_name) .. u16le(0)
+            .. first_name .. first_payload
+        local second_offset = #first_header
+        local second_header = "PK\003\004"
+            .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(8) .. u32le(8)
+            .. u16le(#second_name) .. u16le(0)
+            .. second_name
+        local central_dir_offset = #first_header + #second_header
+        local first_central = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#first_payload) .. u32le(#first_payload)
+            .. u16le(#first_name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(0)
+            .. first_name
+        local second_central = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(8) .. u32le(8)
+            .. u16le(#second_name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(second_offset)
+            .. second_name
+        local central_dir = first_central .. second_central
+        local eocd = "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(2) .. u16le(2)
+            .. u32le(#central_dir) .. u32le(central_dir_offset) .. u16le(0)
+        return first_header .. second_header .. central_dir .. eocd
+    end
+
+    local function buildForgedMultiEntryExtraFieldPayloadZip()
+        local first_name = "0001.jpg"
+        local second_name = "0002.jpg"
+        local first_payload = "x"
+        local first_header = "PK\003\004"
+            .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#first_payload) .. u32le(#first_payload)
+            .. u16le(#first_name) .. u16le(0)
+            .. first_name .. first_payload
+        local second_offset = #first_header
+        local second_extra = string.rep("\000", 8)
+        local second_header = "PK\003\004"
+            .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(8) .. u32le(8)
+            .. u16le(#second_name) .. u16le(#second_extra)
+            .. second_name .. second_extra
+        local central_dir_offset = #first_header + #second_header
+        local first_central = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#first_payload) .. u32le(#first_payload)
+            .. u16le(#first_name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(0)
+            .. first_name
+        local second_central = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(8) .. u32le(8)
+            .. u16le(#second_name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(second_offset)
+            .. second_name
+        local central_dir = first_central .. second_central
+        local eocd = "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(2) .. u16le(2)
+            .. u32le(#central_dir) .. u32le(central_dir_offset) .. u16le(0)
+        return first_header .. second_header .. central_dir .. eocd
+    end
+
+    local function buildDataDescriptorGapZip()
+        local name = "0001.jpg"
+        local payload = "x"
+        local local_header = "PK\003\004"
+            .. u16le(20) .. u16le(8) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#payload) .. u32le(#payload)
+            .. u16le(#name) .. u16le(0)
+            .. name .. payload .. "JUNK"
+        local central_dir_offset = #local_header
+        local central_dir = "PK\001\002"
+            .. u16le(20) .. u16le(20) .. u16le(8) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(#payload) .. u32le(#payload)
+            .. u16le(#name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+            .. u32le(0) .. u32le(0)
+            .. name
+        local eocd = "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(1) .. u16le(1)
+            .. u32le(#central_dir) .. u32le(central_dir_offset) .. u16le(0)
+        return local_header .. central_dir .. eocd
+    end
+
+    local function buildMultiEntryStoredZip(count)
+        local local_parts = {}
+        local central_parts = {}
+        local offset = 0
+        for index = 1, count do
+            local name = string.format("%04d.jpg", index)
+            local payload = "x"
+            local local_header = "PK\003\004"
+                .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+                .. u32le(0) .. u32le(#payload) .. u32le(#payload)
+                .. u16le(#name) .. u16le(0)
+                .. name .. payload
+            table.insert(local_parts, local_header)
+            table.insert(central_parts, "PK\001\002"
+                .. u16le(20) .. u16le(20) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+                .. u32le(0) .. u32le(#payload) .. u32le(#payload)
+                .. u16le(#name) .. u16le(0) .. u16le(0) .. u16le(0) .. u16le(0)
+                .. u32le(0) .. u32le(offset)
+                .. name)
+            offset = offset + #local_header
+        end
+        local local_bytes = table.concat(local_parts)
+        local central_dir = table.concat(central_parts)
+        local eocd = "PK\005\006"
+            .. u16le(0) .. u16le(0) .. u16le(count) .. u16le(count)
+            .. u32le(#central_dir) .. u32le(#local_bytes) .. u16le(0)
+        return local_bytes .. central_dir .. eocd
+    end
+
+    local function loadDownloaderForZipValidation()
+        package.preload["suwayomi/paths"] = function()
+            return {
+                sanitizePathSegment = function(value)
+                    return value
+                end,
+                getTargetPath = function()
+                    return "", ""
+                end,
+            }
+        end
+        package.preload["suwayomi/api"] = function()
+            return {}
+        end
+        package.preload.lfs = function()
+            return {}
+        end
+        package.preload["ffi/archiver"] = function()
+            return {}
+        end
+        return require("suwayomi/downloads/downloader")
+    end
+
     after_each(function()
         package.loaded["suwayomi/downloads/downloader"] = nil
         package.loaded["suwayomi/paths"] = nil
@@ -14,6 +242,95 @@ describe("suwayomi/downloads/downloader", function()
         package.preload.lfs = nil
         package.preload["ffi/archiver"] = nil
         package.preload["ffi/util"] = nil
+    end)
+
+    it("rejects direct archives when local and central sizes disagree", function()
+        local forged_zip = buildForgedLocalSizeMismatchZip()
+        local downloader = loadDownloaderForZipValidation()
+
+        assert.is_false(downloader:isZipArchiveResult({
+            content_type = "application/zip",
+            bytes = #forged_zip,
+            header_bytes = forged_zip:sub(1, 4),
+            head_bytes = forged_zip,
+            tail_bytes = forged_zip,
+        }))
+    end)
+
+    it("rejects multi-entry direct archives with missing payload bytes", function()
+        local forged_zip = buildForgedMultiEntryMissingPayloadZip()
+        local downloader = loadDownloaderForZipValidation()
+
+        assert.is_false(downloader:isZipArchiveResult({
+            content_type = "application/zip",
+            bytes = #forged_zip,
+            header_bytes = forged_zip:sub(1, 4),
+            head_bytes = forged_zip,
+            tail_bytes = forged_zip,
+        }))
+    end)
+
+    it("rejects multi-entry direct archives that hide payload inside local extra bytes", function()
+        local forged_zip = buildForgedMultiEntryExtraFieldPayloadZip()
+        local downloader = loadDownloaderForZipValidation()
+
+        assert.is_false(downloader:isZipArchiveResult({
+            content_type = "application/zip",
+            bytes = #forged_zip,
+            header_bytes = forged_zip:sub(1, 4),
+            head_bytes = forged_zip,
+            tail_bytes = forged_zip,
+        }))
+    end)
+
+    it("rejects direct archives using data descriptors", function()
+        local forged_zip = buildDataDescriptorGapZip()
+        local downloader = loadDownloaderForZipValidation()
+
+        assert.is_false(downloader:isZipArchiveResult({
+            content_type = "application/zip",
+            bytes = #forged_zip,
+            header_bytes = forged_zip:sub(1, 4),
+            head_bytes = forged_zip,
+            tail_bytes = forged_zip,
+        }))
+    end)
+
+    it("validates direct archives whose central directory is only available from the partial file", function()
+        local archive = buildMultiEntryStoredZip(1400)
+        local original_io_open = io.open
+        io.open = function(path, mode)
+            if path == "/tmp/large.cbz.part" and mode == "rb" then
+                return {
+                    offset = 1,
+                    seek = function(self, whence, offset)
+                        assert.are.equal("set", whence)
+                        self.offset = offset + 1
+                        return offset
+                    end,
+                    read = function(self, length)
+                        local chunk = archive:sub(self.offset, self.offset + length - 1)
+                        self.offset = self.offset + #chunk
+                        return chunk
+                    end,
+                    close = function() end,
+                }
+            end
+            return original_io_open(path, mode)
+        end
+
+        local downloader = loadDownloaderForZipValidation()
+        local ok = downloader:isZipArchiveResult({
+            content_type = "application/zip",
+            bytes = #archive,
+            header_bytes = archive:sub(1, 4),
+            head_bytes = archive:sub(1, 4096),
+            tail_bytes = archive:sub(-65536),
+        }, "/tmp/large.cbz.part")
+
+        io.open = original_io_open
+
+        assert.is_true(ok)
     end)
 
     it("skips downloading when the target cbz already exists", function()
@@ -166,6 +483,7 @@ describe("suwayomi/downloads/downloader", function()
     it("prefers the direct chapter archive endpoint when it returns a CBZ", function()
         local renamed_from
         local renamed_to
+        local archive = buildStoredZip("0001.jpg", "page-one")
 
         package.preload["suwayomi/api"] = function()
             return {
@@ -175,7 +493,10 @@ describe("suwayomi/downloads/downloader", function()
                     return {
                         ok = true,
                         content_type = "application/vnd.comicbook+zip",
-                        bytes = 13,
+                        bytes = #archive,
+                        header_bytes = archive:sub(1, 4),
+                        head_bytes = archive:sub(1, 4096),
+                        tail_bytes = archive,
                     }
                 end,
                 fetchChapterPages = function()
@@ -232,6 +553,524 @@ describe("suwayomi/downloads/downloader", function()
         assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", result.path)
         assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part", renamed_from)
         assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", renamed_to)
+    end)
+
+    it("falls back to page downloads when a direct archive has non-zip bytes", function()
+        local direct_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part"
+        local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"
+        local direct_attempted = false
+        local direct_partial_removed = false
+        local fetched_pages = false
+        local added_files = {}
+        local renamed_from
+        local renamed_to
+
+        package.preload["suwayomi/api"] = function()
+            return {
+                downloadChapterArchive = function(_, _, target_path)
+                    direct_attempted = true
+                    assert.are.equal(direct_partial_path, target_path)
+                    return {
+                        ok = true,
+                        content_type = "application/zip",
+                        bytes = 21,
+                        header_bytes = "HTML",
+                    }
+                end,
+                fetchChapterPages = function()
+                    fetched_pages = true
+                    return {
+                        ok = true,
+                        pages = { "/page/0" },
+                    }
+                end,
+                downloadBinary = function()
+                    return {
+                        ok = true,
+                        body = "page-one",
+                        content_type = "image/jpeg",
+                    }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function()
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function(_, path)
+                                assert.are.equal(page_partial_path, path)
+                                return true
+                            end,
+                            addFileFromMemory = function(_, entry_path, content)
+                                table.insert(added_files, { path = entry_path, content = content })
+                                return true
+                            end,
+                            close = function() end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_remove = os.remove
+        os.remove = function(path)
+            if path == direct_partial_path then
+                direct_partial_removed = true
+            end
+            return true
+        end
+        local original_rename = os.rename
+        os.rename = function(from, to)
+            renamed_from = from
+            renamed_to = to
+            return true
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.remove = original_remove
+        os.rename = original_rename
+
+        assert.is_true(result.ok)
+        assert.is_true(direct_attempted)
+        assert.is_true(direct_partial_removed)
+        assert.is_true(fetched_pages)
+        assert.are.same({ { path = "0001.jpg", content = "page-one" } }, added_files)
+        assert.are.equal(page_partial_path, renamed_from)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", renamed_to)
+    end)
+
+    it("falls back to page downloads when a direct archive has a truncated zip header", function()
+        local direct_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part"
+        local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"
+        local fetched_pages = false
+        local added_files = {}
+        local renamed_from
+
+        package.preload["suwayomi/api"] = function()
+            return {
+                downloadChapterArchive = function(_, _, target_path)
+                    assert.are.equal(direct_partial_path, target_path)
+                    return {
+                        ok = true,
+                        content_type = "application/zip",
+                        bytes = 9,
+                        header_bytes = "PK\003\004",
+                        tail_bytes = "PK\003\004bad",
+                    }
+                end,
+                fetchChapterPages = function()
+                    fetched_pages = true
+                    return {
+                        ok = true,
+                        pages = { "/page/0" },
+                    }
+                end,
+                downloadBinary = function()
+                    return {
+                        ok = true,
+                        body = "page-one",
+                        content_type = "image/jpeg",
+                    }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function()
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function(_, path)
+                                assert.are.equal(page_partial_path, path)
+                                return true
+                            end,
+                            addFileFromMemory = function(_, entry_path, content)
+                                table.insert(added_files, { path = entry_path, content = content })
+                                return true
+                            end,
+                            close = function() end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_rename = os.rename
+        os.rename = function(from)
+            renamed_from = from
+            return true
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.rename = original_rename
+
+        assert.is_true(result.ok)
+        assert.is_true(fetched_pages)
+        assert.are.equal(page_partial_path, renamed_from)
+        assert.are.same({
+            { path = "0001.jpg", content = "page-one" },
+        }, added_files)
+    end)
+
+    it("falls back to page downloads when a direct archive has only a local header before empty zip footer", function()
+        local direct_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part"
+        local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"
+        local bogus_zip = "PK\003\004" .. empty_zip
+        local fetched_pages = false
+        local renamed_from
+
+        package.preload["suwayomi/api"] = function()
+            return {
+                downloadChapterArchive = function(_, _, target_path)
+                    assert.are.equal(direct_partial_path, target_path)
+                    return {
+                        ok = true,
+                        content_type = "application/zip",
+                        bytes = #bogus_zip,
+                        header_bytes = bogus_zip:sub(1, 4),
+                        tail_bytes = bogus_zip,
+                    }
+                end,
+                fetchChapterPages = function()
+                    fetched_pages = true
+                    return {
+                        ok = true,
+                        pages = { "/page/0" },
+                    }
+                end,
+                downloadBinary = function()
+                    return {
+                        ok = true,
+                        body = "page-one",
+                        content_type = "image/jpeg",
+                    }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function()
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function(_, path)
+                                assert.are.equal(page_partial_path, path)
+                                return true
+                            end,
+                            addFileFromMemory = function()
+                                return true
+                            end,
+                            close = function() end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_rename = os.rename
+        os.rename = function(from)
+            renamed_from = from
+            return true
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.rename = original_rename
+
+        assert.is_true(result.ok)
+        assert.is_true(fetched_pages)
+        assert.are.equal(page_partial_path, renamed_from)
+    end)
+
+    it("falls back to page downloads when a direct archive has forged central directory markers", function()
+        local direct_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part"
+        local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"
+        local forged_zip = buildForgedCentralDirZip()
+        local fetched_pages = false
+        local renamed_from
+
+        package.preload["suwayomi/api"] = function()
+            return {
+                downloadChapterArchive = function(_, _, target_path)
+                    assert.are.equal(direct_partial_path, target_path)
+                    return {
+                        ok = true,
+                        content_type = "application/zip",
+                        bytes = #forged_zip,
+                        header_bytes = forged_zip:sub(1, 4),
+                        head_bytes = forged_zip,
+                        tail_bytes = forged_zip,
+                    }
+                end,
+                fetchChapterPages = function()
+                    fetched_pages = true
+                    return {
+                        ok = true,
+                        pages = { "/page/0" },
+                    }
+                end,
+                downloadBinary = function()
+                    return {
+                        ok = true,
+                        body = "page-one",
+                        content_type = "image/jpeg",
+                    }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function()
+                    return nil
+                end,
+                mkdir = function()
+                    return true
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function(_, path)
+                                assert.are.equal(page_partial_path, path)
+                                return true
+                            end,
+                            addFileFromMemory = function()
+                                return true
+                            end,
+                            close = function() end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_rename = os.rename
+        os.rename = function(from)
+            renamed_from = from
+            return true
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.rename = original_rename
+
+        assert.is_true(result.ok)
+        assert.is_true(fetched_pages)
+        assert.are.equal(page_partial_path, renamed_from)
+    end)
+
+    it("falls back to page downloads when a direct archive is empty zip", function()
+        local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"
+        local fetched_pages = false
+        local renamed_from
+
+        package.preload["suwayomi/api"] = function()
+            return {
+                downloadChapterArchive = function()
+                    return {
+                        ok = true,
+                        content_type = "application/zip",
+                        bytes = #empty_zip,
+                        header_bytes = empty_zip:sub(1, 4),
+                        head_bytes = empty_zip,
+                        tail_bytes = empty_zip,
+                    }
+                end,
+                fetchChapterPages = function()
+                    fetched_pages = true
+                    return { ok = true, pages = { "/page/0" } }
+                end,
+                downloadBinary = function()
+                    return { ok = true, body = "page-one", content_type = "image/jpeg" }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function() return nil end,
+                mkdir = function() return true end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {
+                Writer = {
+                    new = function()
+                        return {
+                            open = function(_, path)
+                                assert.are.equal(page_partial_path, path)
+                                return true
+                            end,
+                            addFileFromMemory = function() return true end,
+                            close = function() end,
+                        }
+                    end,
+                },
+            }
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local original_rename = os.rename
+        os.rename = function(from)
+            renamed_from = from
+            return true
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        os.rename = original_rename
+
+        assert.is_true(result.ok)
+        assert.is_true(fetched_pages)
+        assert.are.equal(page_partial_path, renamed_from)
+    end)
+
+    it("rejects direct archive bytes with junk between the central directory and footer", function()
+        local archive = buildStoredZip("0001.jpg", "page-one")
+        local forged = archive:sub(1, #archive - 22) .. "JUNK" .. archive:sub(#archive - 21)
+
+        package.preload["suwayomi/api"] = function()
+            return {}
+        end
+        package.preload.lfs = function()
+            return {}
+        end
+        package.preload["ffi/archiver"] = function()
+            return {}
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    return tostring(base or "") .. "/" .. tostring(segment or "")
+                end,
+            }
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+
+        assert.is_false(downloader:isZipArchiveResult({
+            bytes = #forged,
+            header_bytes = forged:sub(1, 4),
+            head_bytes = forged,
+            tail_bytes = forged,
+        }))
+    end)
+
+    it("rejects direct archive bytes when declared payload is missing before the central directory", function()
+        local forged = buildForgedMissingPayloadZip()
+
+        package.preload["suwayomi/api"] = function()
+            return {}
+        end
+        package.preload.lfs = function()
+            return {}
+        end
+        package.preload["ffi/archiver"] = function()
+            return {}
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    return tostring(base or "") .. "/" .. tostring(segment or "")
+                end,
+            }
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+
+        assert.is_false(downloader:isZipArchiveResult({
+            bytes = #forged,
+            header_bytes = forged:sub(1, 4),
+            head_bytes = forged,
+            tail_bytes = forged,
+        }))
     end)
 
     it("falls back to page downloads when the direct archive endpoint is unavailable", function()

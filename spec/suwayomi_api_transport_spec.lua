@@ -395,8 +395,9 @@ describe("suwayomi/api/transport", function()
             return {
                 request = function(options)
                     request = options
-                    options.sink("CBZ")
-                    return 1, 200, { ["content-length"] = "3", ["content-type"] = "application/vnd.comicbook+zip" }
+                    options.sink("PK")
+                    options.sink("\003\004archive")
+                    return 1, 200, { ["content-length"] = "11", ["content-type"] = "application/vnd.comicbook+zip" }
                 end,
             }
         end
@@ -404,8 +405,11 @@ describe("suwayomi/api/transport", function()
         local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path)
         assert.are.equal(true, result.ok)
         assert.are.equal(target_path, result.path)
-        assert.are.equal(3, result.bytes)
-        assert.are.equal(3, result.content_length)
+        assert.are.equal(11, result.bytes)
+        assert.are.equal(11, result.content_length)
+        assert.are.equal("PK\003\004", result.header_bytes)
+        assert.are.equal("PK\003\004archive", result.head_bytes)
+        assert.are.equal("PK\003\004archive", result.tail_bytes)
         assert.are.equal("https://suwayomi.example/api/v1/chapter/398/download?markAsRead=false", request.url)
         assert.are.equal("Basic YWxpY2U6c2VjcmV0", request.headers.Authorization)
 
