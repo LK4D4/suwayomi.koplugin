@@ -88,9 +88,34 @@ local function now()
     return os.time()
 end
 
-local function sanitizeValue(key, value)
-    key = tostring(key or ""):lower()
-    if key:match("password")
+local safe_log_keys = {
+    attempt = true,
+    attempted = true,
+    code = true,
+    code_type = true,
+    delay_seconds = true,
+    elapsed_ms = true,
+    event = true,
+    ok = true,
+    operation = true,
+    plugin = true,
+    request_bytes = true,
+    response_bytes = true,
+    same_origin = true,
+    status = true,
+    status_code = true,
+    success = true,
+}
+
+local function isSafeLogKey(key)
+    return safe_log_keys[key]
+        or key:match("_count$") ~= nil
+        or key:match("_ms$") ~= nil
+        or key:match("_seconds$") ~= nil
+end
+
+local function isSensitiveLogKey(key)
+    return key:match("password")
         or key:match("authorization")
         or key:match("credential")
         or key:match("username")
@@ -99,11 +124,18 @@ local function sanitizeValue(key, value)
         or key:match("source")
         or key:match("path")
         or key:match("url")
-    then
+        or key:match("token")
+        or key:match("secret")
+        or key:match("cookie")
+end
+
+local function sanitizeValue(key, value)
+    key = tostring(key or ""):lower()
+    if isSensitiveLogKey(key) then
         return "<redacted>"
     end
     if type(value) == "table" then
-        return "<table>"
+        return "<redacted>"
     end
     local scalar = tostring(value)
     if scalar:match("^https?://")
@@ -111,6 +143,9 @@ local function sanitizeValue(key, value)
         or scalar:match("^%a:[/\\]")
         or scalar:match("[/\\][^/\\]+[/\\]")
     then
+        return "<redacted>"
+    end
+    if not isSafeLogKey(key) then
         return "<redacted>"
     end
     return scalar

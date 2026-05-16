@@ -137,7 +137,18 @@ describe("suwayomi/debug", function()
             title = "Sousou no Frieren",
             source_name = "MangaDex",
             server_url = "https://suwayomi.example/api/graphql",
+            token = "token-123",
+            secret = "secret-123",
+            cookie = "sid=abc",
             path = "/storage/emulated/0/Books/Frieren/Ch. 1.cbz",
+            unknown_field = "plain but user-provided",
+            status = "cached",
+            code = 200,
+            code_type = "number",
+            request_bytes = 128,
+            response_bytes = 256,
+            same_origin = false,
+            queued_count = 3,
         })
 
         assert.truthy(logs[1]:match("username=<redacted>"))
@@ -145,10 +156,24 @@ describe("suwayomi/debug", function()
         assert.truthy(logs[1]:match("title=<redacted>"))
         assert.truthy(logs[1]:match("source_name=<redacted>"))
         assert.truthy(logs[1]:match("server_url=<redacted>"))
+        assert.truthy(logs[1]:match("token=<redacted>"))
+        assert.truthy(logs[1]:match("secret=<redacted>"))
+        assert.truthy(logs[1]:match("cookie=<redacted>"))
         assert.truthy(logs[1]:match("path=<redacted>"))
+        assert.truthy(logs[1]:match("unknown_field=<redacted>"))
+        assert.truthy(logs[1]:match("status=cached"))
+        assert.truthy(logs[1]:match("code=200"))
+        assert.truthy(logs[1]:match("code_type=number"))
+        assert.truthy(logs[1]:match("request_bytes=128"))
+        assert.truthy(logs[1]:match("response_bytes=256"))
+        assert.truthy(logs[1]:match("same_origin=false"))
+        assert.truthy(logs[1]:match("queued_count=3"))
         assert.is_nil(logs[1]:match("frieren"))
         assert.is_nil(logs[1]:match("suwayomi.example"))
         assert.is_nil(logs[1]:match("/storage"))
+        assert.is_nil(logs[1]:match("token%-123"))
+        assert.is_nil(logs[1]:match("sid=abc"))
+        assert.is_nil(logs[1]:match("plain but user%-provided"))
     end)
 
     it("skips fast timing events when a slow threshold is configured", function()

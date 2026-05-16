@@ -144,7 +144,7 @@ Baseline at review time:
   - Direction: cap result payload size, chunk large library results, or add measured decode guardrails.
   - Test: large-result stress test verifies payload size or decode-time bound.
 
-- [ ] **Harden debug redaction**
+- [x] **Harden debug redaction**
   - Files: `suwayomi/debug.lua`
   - Risk: QA debug logs can leak search terms, paths, URLs, server URL, titles, tokens, cookies, or secrets.
   - Direction: prefer safe-field allowlist or redact/hash user-data fields.
