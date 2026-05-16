@@ -12,10 +12,10 @@
 - Run commands from the plugin root so `package.path = "?.lua;" .. package.path` works.
 - Use LuaJIT locally. On fresh Ubuntu/dev containers: `sudo apt-get install -y luajit luarocks`.
 - Install local deps with user-local LuaRocks packages: `busted`, `dkjson`, `luasocket`, `luasec`, and `luacheck`.
-- POSIX lint: `PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes spec suwayomi main.lua _meta.lua`
-- POSIX tests: `PATH="$HOME/.luarocks/bin:$PATH" busted spec`
-- Windows PowerShell lint: `$env:PATH = "$env:APPDATA\luarocks\bin;$env:PATH"; luacheck --codes spec suwayomi main.lua _meta.lua`
-- Windows PowerShell tests: `$env:PATH = "$env:APPDATA\luarocks\bin;$env:PATH"; busted spec`
+- POSIX lint: `luacheck --codes spec suwayomi main.lua _meta.lua`
+- POSIX tests: `busted spec`
+- Windows PowerShell lint: `luacheck --codes spec suwayomi main.lua _meta.lua`
+- Windows PowerShell tests: `busted spec`
 - Run one spec file with `busted spec/<file>`. Do not add a separate `luac` syntax pass; Luacheck already parses the project paths.
 
 ## Verification
