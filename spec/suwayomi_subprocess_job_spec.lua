@@ -44,10 +44,18 @@ describe("suwayomi/subprocess/job", function()
                 if not content then
                     return nil
                 end
+                local read_offset = 1
                 return {
                     read = function(_, what)
                         if what == "*a" then
-                            return content
+                            local chunk = content:sub(read_offset)
+                            read_offset = #content + 1
+                            return chunk
+                        end
+                        if type(what) == "number" then
+                            local chunk = content:sub(read_offset, read_offset + what - 1)
+                            read_offset = read_offset + #chunk
+                            return chunk
                         end
                     end,
                     close = function() end,
@@ -113,6 +121,13 @@ describe("suwayomi/subprocess/job", function()
             parsed.values = type(parsed.values) == "table" and parsed.values or {}
             return parsed
         end))
+    end)
+
+    it("rejects oversized result files before JSON decode", function()
+        local Job = require("suwayomi/subprocess/job")
+        files["/settings/subprocess_oversized.json"] = '{"ok":true,"value":"' .. string.rep("x", 32) .. '"}'
+
+        assert.is_nil(Job.readResult("/settings/subprocess_oversized.json", nil, 16))
     end)
 
     it("removes temporary result files when JSON writes fail", function()

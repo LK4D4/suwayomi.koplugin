@@ -138,7 +138,7 @@ Baseline at review time:
   - Direction: check `handle:write()` and `handle:close()` results, remove temp output on failure, and return false.
   - Test: simulated write and close failures do not leave final result files.
 
-- [ ] **Bound UI-thread result decode cost**
+- [x] **Bound UI-thread result decode cost**
   - Files: `suwayomi/subprocess/job.lua`, `suwayomi/network/request_worker.lua`, library request callers
   - Risk: huge worker result files can still freeze KOReader while the UI thread reads and decodes JSON.
   - Direction: cap result payload size, chunk large library results, or add measured decode guardrails.

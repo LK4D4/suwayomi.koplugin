@@ -1,7 +1,7 @@
 -- Boundary: Shared subprocess job helper.
 --
 -- Responsibility: launch one-shot subprocess workers, poll for completion, and
--- move compact JSON result files across the process boundary.
+-- move bounded JSON result files across the process boundary.
 -- Owned state: a module-local result path counter and caller-owned active jobs.
 -- Dependencies: dkjson, settings path lookup, KOReader ui_manager/ffi_util collaborators.
 -- External data: result files and subprocess state are normalized before callbacks run.
@@ -9,6 +9,7 @@
 local json = require("dkjson")
 local SubprocessJob = {
     result_counter = 0,
+    max_result_bytes = 4 * 1024 * 1024,
 }
 
 local function defaultNow()
@@ -58,14 +59,21 @@ function SubprocessJob.writeResult(result_path, result)
     return true
 end
 
-function SubprocessJob.readResult(result_path, normalize)
+function SubprocessJob.readResult(result_path, normalize, max_result_bytes)
     local handle = result_path and io.open(result_path, "r")
     if not handle then
         return nil
     end
 
-    local content = handle:read("*a") or ""
+    local limit = tonumber(max_result_bytes) or SubprocessJob.max_result_bytes
+    local content = handle:read(limit + 1)
+    if content == nil then
+        content = handle:read("*a") or ""
+    end
     handle:close()
+    if #content > limit then
+        return nil
+    end
 
     local parsed = json.decode(content)
     if type(parsed) ~= "table" then

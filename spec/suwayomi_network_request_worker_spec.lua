@@ -1,6 +1,7 @@
 package.path = "?.lua;" .. package.path
 
 describe("suwayomi/network/request_worker", function()
+    local original_io_open
     local written
     local library_offsets
 
@@ -17,6 +18,7 @@ describe("suwayomi/network/request_worker", function()
 
     before_each(function()
         clear_modules()
+        original_io_open = io.open
         written = {}
         library_offsets = {}
 
@@ -58,7 +60,10 @@ describe("suwayomi/network/request_worker", function()
         end
     end)
 
-    after_each(clear_modules)
+    after_each(function()
+        io.open = original_io_open
+        clear_modules()
+    end)
 
     it("paginates library manga inside the worker process", function()
         local Worker = require("suwayomi/network/request_worker")
@@ -101,5 +106,41 @@ describe("suwayomi/network/request_worker", function()
             ok = false,
             error = "Could not complete network request.",
         }, Worker:readResult("/settings/malformed.json"))
+    end)
+
+    it("normalizes oversized result files to network request errors", function()
+        package.loaded["suwayomi/network/request_worker"] = nil
+        package.loaded["suwayomi/subprocess/job"] = nil
+        package.preload["suwayomi/subprocess/job"] = nil
+
+        local oversized_content = '{"ok":true,"manga":[{"id":"' .. string.rep("x", 4 * 1024 * 1024 + 1) .. '"}]}'
+        io.open = function(path, mode)
+            if path == "/settings/oversized.json" and mode == "r" then
+                local read_offset = 1
+                return {
+                    read = function(_, what)
+                        if what == "*a" then
+                            local chunk = oversized_content:sub(read_offset)
+                            read_offset = #oversized_content + 1
+                            return chunk
+                        end
+                        if type(what) == "number" then
+                            local chunk = oversized_content:sub(read_offset, read_offset + what - 1)
+                            read_offset = read_offset + #chunk
+                            return chunk
+                        end
+                    end,
+                    close = function() end,
+                }
+            end
+            return original_io_open(path, mode)
+        end
+
+        local Worker = require("suwayomi/network/request_worker")
+
+        assert.are.same({
+            ok = false,
+            error = "Could not complete network request.",
+        }, Worker:readResult("/settings/oversized.json"))
     end)
 end)
