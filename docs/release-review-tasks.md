@@ -72,7 +72,7 @@ Baseline at review time:
 
 ## P2 Important Fixes
 
-- [ ] **Reject malformed page URLs without crashing**
+- [x] **Reject malformed page URLs without crashing**
   - Files: `suwayomi/api/transport.lua`
   - Risk: non-string page URL can crash download flow.
   - Direction: normalize or validate path before `match()` and return API-style failure for invalid values.

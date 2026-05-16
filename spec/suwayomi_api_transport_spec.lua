@@ -186,8 +186,9 @@ describe("suwayomi/api/transport", function()
 
     it("rejects invalid binary page URLs before loading HTTP helpers", function()
         forbid_ltn12()
-        local invalid = transport.downloadBinary(valid_credentials(), nil)
+        local ok, invalid = pcall(transport.downloadBinary, valid_credentials(), { "/api/v1/page/1" })
 
+        assert.are.equal(true, ok)
         assert.are.equal(false, invalid.ok)
         assert.are.equal("Invalid chapter page URL.", invalid.error)
     end)
