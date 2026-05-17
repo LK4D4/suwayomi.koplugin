@@ -188,7 +188,7 @@ Baseline at review time:
   - Direction: wire the KOReader hold hook if supported, or remove the dead option path.
   - Test: title-bar hold callback is invoked, or API no longer advertises it.
 
-- [ ] **Report skipped and failed delete-read cleanup counts**
+- [x] **Report skipped and failed delete-read cleanup counts**
   - Files: `suwayomi/chapters/actions.lua`
   - Risk: cleanup message can say only "Deleted N chapters" even when active, missing, or failed paths were skipped.
   - Direction: include skipped, active, missing, and failed counts in the user message.

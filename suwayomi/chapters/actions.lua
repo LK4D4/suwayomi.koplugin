@@ -375,6 +375,7 @@ function Methods:deleteReadChaptersFromDevice()
 
     self:refreshChapterMenu()
     self:showMessage(self:formatReadDownloadDeleteMessage(deleted, {
+        skipped = missing + active + failed,
         missing = missing,
         active = active,
         failed = failed,
@@ -438,15 +439,22 @@ function Methods:formatReadDownloadDeleteMessage(deleted, details)
         deleted
     )
     details = details or {}
+    local skipped = details.skipped or (details.active or 0) + (details.missing or 0) + (details.failed or 0)
+    if skipped > 0 then
+        message = message .. " " .. T(
+            self:pluralize(skipped, _("Skipped %1 download."), _("Skipped %1 downloads.")),
+            skipped
+        )
+    end
     if (details.active or 0) > 0 then
         message = message .. " " .. T(
-            self:pluralize(details.active, _("Skipped %1 active download."), _("Skipped %1 active downloads.")),
+            self:pluralize(details.active, _("%1 active download."), _("%1 active downloads.")),
             details.active
         )
     end
     if (details.missing or 0) > 0 then
         message = message .. " " .. T(
-            self:pluralize(details.missing, _("Missing %1 download."), _("Missing %1 downloads.")),
+            self:pluralize(details.missing, _("%1 missing download."), _("%1 missing downloads.")),
             details.missing
         )
     end
