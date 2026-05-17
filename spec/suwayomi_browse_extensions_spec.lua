@@ -61,6 +61,9 @@ local function stubDependencies(options)
     package.preload["suwayomi/settings"] = function()
         return {
             load = function()
+                if options.loadCredentials then
+                    return options.loadCredentials()
+                end
                 return options.credentials or { server_url = "https://suwayomi.example" }
             end,
         }
@@ -80,19 +83,19 @@ local function loadExtensions(options)
     return require("suwayomi/browse/extensions")
 end
 
-local function loadExtensionsWithSubprocessStub(onStart)
+local function loadExtensionsWithSubprocessStub(onStart, options)
     resetModules()
-    stubDependencies()
+    stubDependencies(options)
     package.preload["suwayomi/subprocess/job"] = function()
         return {
             buildResultPath = function()
                 return "/settings/extensions.json"
             end,
-            start = function(options)
+            start = function(start_options)
                 if onStart then
-                    onStart(options)
+                    onStart(start_options)
                 end
-                return options.active
+                return start_options.active
             end,
             schedulePoll = function() end,
             poll = function() end,
@@ -328,6 +331,39 @@ describe("suwayomi/browse/extensions", function()
         assert.is_true(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
             action = "fetch",
         }))
+    end)
+
+    it("drops stale extension worker results after credentials change", function()
+        local started_options
+        local current_credentials = { server_url = "https://new.example" }
+        local old_credentials = { server_url = "https://old.example" }
+        local extensions = loadExtensionsWithSubprocessStub(function(options)
+            started_options = options
+        end, {
+            loadCredentials = function()
+                return current_credentials
+            end,
+        })
+        local controller = buildController(extensions, {
+            current_extension_credentials = current_credentials,
+        })
+
+        assert.is_true(controller:startExtensionWorker(old_credentials, {
+            action = "fetch",
+        }))
+        started_options.active.loading_message = { message = "Loading extensions..." }
+        started_options.on_finish(started_options.active, {
+            ok = true,
+            action = "fetch",
+            extensions = {
+                { pkg_name = "pkg.old", name = "Old Server Extension" },
+            },
+        })
+
+        assert.is_nil(controller.extension_worker_active)
+        assert.are.equal("Loading extensions...", controller.closed_loading.message)
+        assert.are.equal(current_credentials, controller.current_extension_credentials)
+        assert.is_nil(ui_calls.extensions_menu)
     end)
 
     it("uses action-aware timeout feedback for extension mutations", function()

@@ -47,6 +47,17 @@ local function lower(value)
     return tostring(value or ""):lower()
 end
 
+local function credentialField(credentials, field)
+    return tostring(type(credentials) == "table" and credentials[field] or "")
+end
+
+local function credentialsMatch(left, right)
+    return credentialField(left, "server_url") == credentialField(right, "server_url")
+        and credentialField(left, "auth_method") == credentialField(right, "auth_method")
+        and credentialField(left, "username") == credentialField(right, "username")
+        and credentialField(left, "password") == credentialField(right, "password")
+end
+
 local function addSearchField(fields, value)
     if value == nil or value == "" then
         return
@@ -177,6 +188,9 @@ end
 function Methods:finishExtensionWorker(active, result)
     self.extension_worker_active = nil
     self:closeLoadingMessage(active and active.loading_message)
+    if not credentialsMatch(active and active.credentials, SuwayomiSettings:load()) then
+        return false
+    end
     if result
         and result.ok
         and type(result.sources) == "table"
@@ -192,6 +206,7 @@ function Methods:finishExtensionWorker(active, result)
         action = result and result.action,
         force_new = active and active.options and active.options.force_new,
     })
+    return true
 end
 
 function Methods:pollExtensionWorker()

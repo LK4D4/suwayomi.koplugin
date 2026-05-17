@@ -13,7 +13,7 @@ Fresh review baseline:
 
 ## P1 Release Blockers
 
-- [ ] Drop stale extension worker results after credentials change.
+- [x] Drop stale extension worker results after credentials change.
   - Files: `suwayomi/browse/extensions.lua`, `spec/suwayomi_browse_extensions_spec.lua`
   - Risk: old server/auth can repaint the current Browse UI, then later extension install/update/uninstall can target the old server.
   - Direction: mirror the stale credential guard used by source fetch results before applying worker output or setting `current_extension_credentials`.
