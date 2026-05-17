@@ -45,7 +45,7 @@ Fresh review baseline:
   - Direction: wire cancel/back close to clear the active onboarding connection test and ignore stale completion.
   - Test: close setup while test active; assert worker canceled and no stale success/failure state is applied.
 
-- [ ] Avoid false "no chapters loaded" warning for Open first unread.
+- [x] Avoid false "no chapters loaded" warning for Open first unread.
   - Files: `suwayomi/manga/controller.lua`, `spec/suwayomi_manga_controller_spec.lua`
   - Risk: valid first-unread action can show a warning before async chapter load/preload opens the chapter.
   - Direction: defer empty-context warning until after async load path has had a chance to populate chapters.

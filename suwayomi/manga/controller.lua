@@ -27,6 +27,22 @@ end
 
 local Methods = {}
 
+local function getLoadedMangaChapterContext(owner, manga)
+    if not owner or not owner.current_chapter_context or not manga then
+        return nil
+    end
+    if owner.isCurrentChapterContextForManga and not owner:isCurrentChapterContextForManga(manga) then
+        return nil
+    end
+    if not owner.isCurrentChapterContextForManga and owner.current_chapter_context.manga ~= manga then
+        return nil
+    end
+    if #(owner.current_chapter_context.chapters or {}) == 0 then
+        return nil
+    end
+    return owner.current_chapter_context
+end
+
 local function findReturnedChapterItemNumber(chapters, context)
     if type(chapters) ~= "table" or type(context) ~= "table" then
         return nil
@@ -196,8 +212,14 @@ function Methods:startLoadMangaChapterContext(manga, on_ready)
     end, _("Could not load chapters."), "chapter_context")
 end
 
-function Methods:withMangaChapterContext(manga, on_ready)
-    local context = self:ensureMangaChapterContext(manga)
+function Methods:withMangaChapterContext(manga, on_ready, options)
+    options = options or {}
+    local context
+    if options.defer_empty_context_warning then
+        context = getLoadedMangaChapterContext(self, manga)
+    else
+        context = self:ensureMangaChapterContext(manga)
+    end
     if context then
         if on_ready then
             on_ready(context)
@@ -487,7 +509,7 @@ function Methods:performMangaAction(manga, action_id, options)
         return true
     end
     if action_id == "open_first_unread" then
-        if self:ensureMangaChapterContext(manga) then
+        if getLoadedMangaChapterContext(self, manga) then
             local chapter = self:getFirstUnreadChapterForManga(manga)
             if chapter then
                 return self:openChapter(manga, chapter)
@@ -499,7 +521,9 @@ function Methods:performMangaAction(manga, action_id, options)
             if resolved_chapter then
                 self:openChapter(manga, resolved_chapter)
             end
-        end)
+        end, {
+            defer_empty_context_warning = true,
+        })
     end
     if action_id == "refresh_chapters" then
         return self:refreshMangaChapters(manga, options)

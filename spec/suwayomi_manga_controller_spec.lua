@@ -448,6 +448,25 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("c2", plugin.opened_chapters[1].chapter.id)
     end)
 
+    it("does not warn about missing chapter context before loading first unread", function()
+        local plugin, state = installController({
+            defer_network_finish = true,
+        })
+        local manga = { id = "m1", title = "Frieren" }
+        plugin.ensureMangaChapterContext = function(owner, target_manga)
+            if owner.current_chapter_context and owner.current_chapter_context.manga == target_manga then
+                return owner.current_chapter_context
+            end
+            owner:showMessage("This manga has no chapters loaded.")
+            return nil
+        end
+
+        assert.is_true(plugin:performMangaAction(manga, "open_first_unread"))
+
+        assert.are.same({}, plugin.messages)
+        assert.are.equal("fetch_chapters_for_manga", state.network_requests[1].request.action)
+    end)
+
     it("ignores stale chapter loads when a newer manga request wins", function()
         local plugin, state = installController({
             defer_network_finish = true,
