@@ -105,7 +105,7 @@ Fresh review baseline:
   - Direction: when chapter list refreshes for the same manga, drop selected IDs not present in the current visible/current chapter set.
   - Test: same-manga refresh removes stale selected IDs and updates selected count/actions.
 
-- [ ] Verify CBZ exists before accepting terminal downloaded/skipped progress.
+- [x] Verify CBZ exists before accepting terminal downloaded/skipped progress.
   - Files: `suwayomi/downloads/active_jobs.lua`, download queue/active job specs
   - Risk: stale/corrupt progress can mark missing CBZ downloaded, remove retry state, and notify archive-ready for a dead path.
   - Direction: check archive existence before clearing persistent job or notifying ready state for terminal progress.

@@ -107,10 +107,15 @@ describe("suwayomi/downloads/queue", function()
             end,
             downloadChapterWithProgress = function(self, _, download_directory, manga, chapter, progress_path)
                 download_calls = download_calls + 1
-                self:writeProgress(progress_path, "downloaded", 1, 1, download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz")
+                local chapter_path = download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
+                if options.mark_archive_exists_after_download then
+                    options.existing_archive_paths = options.existing_archive_paths or {}
+                    options.existing_archive_paths[chapter_path] = true
+                end
+                self:writeProgress(progress_path, "downloaded", 1, 1, chapter_path)
             end,
-            chapterExists = function()
-                return false
+            chapterExists = function(_, chapter_path)
+                return options.existing_archive_paths and options.existing_archive_paths[chapter_path] == true or false
             end,
         }
 
@@ -258,7 +263,9 @@ describe("suwayomi/downloads/queue", function()
     end)
 
     it("persists queued downloads and removes them after success", function()
-        local context = build_queue()
+        local context = build_queue({
+            mark_archive_exists_after_download = true,
+        })
         local ok = context.queue:enqueue(
             { id = "m1", title = "Sousou no Frieren" },
             { id = "398", name = "Official_Vol. 1 Ch. 1" },
@@ -524,6 +531,7 @@ describe("suwayomi/downloads/queue", function()
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
         local context = build_queue({
+            mark_archive_exists_after_download = true,
             saved_queue = {
                 {
                     key = "m1:398",
@@ -784,6 +792,7 @@ describe("suwayomi/downloads/queue", function()
 
     it("requeues interrupted persistent downloads on recovery", function()
         local context = build_queue({
+            mark_archive_exists_after_download = true,
             saved_queue = {
                 {
                     key = "m1:398",
