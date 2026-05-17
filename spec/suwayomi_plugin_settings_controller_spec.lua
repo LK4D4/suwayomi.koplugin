@@ -304,6 +304,50 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("Connection test passed.", state.messages[#state.messages])
     end)
 
+    it("keeps settings root groups and callback routes stable", function()
+        local plugin, state = installController()
+        local menu = plugin:buildSettingsMenu()
+        local connection_menu = findMenuItem(menu, "Connection")
+        local library_menu = findMenuItem(menu, "Library")
+        local browse_menu = findMenuItem(menu, "Browse")
+        local downloads_menu = findMenuItem(menu, "Downloads")
+
+        assert.are.equal("Setup wizard", menu[1].text)
+        assert.are.equal("Connection", menu[2].text)
+        assert.are.equal("Library", menu[3].text)
+        assert.are.equal("Browse", menu[4].text)
+        assert.are.equal("Downloads", menu[5].text)
+
+        menu[1].callback(state.touchmenu)
+        assert.truthy(state.onboarding_connection_options)
+
+        connection_menu.sub_item_table[1].callback(state.touchmenu)
+        assert.truthy(state.login_dialog_options)
+
+        connection_menu.sub_item_table[2].callback(state.touchmenu)
+        assert.truthy(state.started_connection_job)
+
+        library_menu.sub_item_table[1].callback(state.touchmenu)
+        assert.are.same({ "automatic", "always", "never" }, state.category_menu_options.choices)
+
+        browse_menu.sub_item_table[1].callback(state.touchmenu)
+        browse_menu.sub_item_table[2].callback(state.touchmenu)
+        assert.is_true(state.saved_browse_settings.show_nsfw_sources)
+        assert.is_true(state.saved_browse_settings.hide_in_library_results)
+
+        downloads_menu.sub_item_table[1].callback(state.touchmenu)
+        assert.truthy(state.choose_download_callback)
+
+        downloads_menu.sub_item_table[2].callback(state.touchmenu)
+        assert.are.same({ 1, 2, 3, 4 }, state.parallel_menu_options.choices)
+
+        downloads_menu.sub_item_table[3].callback(state.touchmenu)
+        assert.is_true(state.saved_delete_chapters_settings.delete_after_mark_read)
+
+        downloads_menu.sub_item_table[4].callback(state.touchmenu)
+        assert.are.same({ 0, 1, 2, 3, 4, 5 }, state.delete_finished_menu_options.choices)
+    end)
+
     it("runs first-run setup as connection test then download folder", function()
         local plugin, state = installController({
             credentials = { server_url = "" },

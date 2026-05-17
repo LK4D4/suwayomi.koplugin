@@ -831,6 +831,28 @@ describe("suwayomi/ui", function()
         assert.are.equal(shown_dialog, callback_menu)
     end)
 
+    it("renders settings root with the shared list menu style", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showSettingsMenu({
+            {
+                text = "Connection",
+                sub_item_table = {
+                    {
+                        text = "Login information",
+                        callback = function() end,
+                    },
+                },
+            },
+        })
+
+        assert.are.equal("Suwayomi Settings", shown_dialog.title)
+        assert.are.equal("list_menu", shown_dialog.renderer)
+        assertFileManagerListStyle(shown_dialog)
+        assert.are.equal("Connection", shown_dialog.item_table[1].text)
+        assert.truthy(shown_dialog.item_table[1].sub_item_table)
+    end)
+
     it("shows a confirmation dialog", function()
         local ui = require("suwayomi/ui")
         local confirmed = false
@@ -864,17 +886,113 @@ describe("suwayomi/ui", function()
         })
 
         assert.are.equal("Parallel chapter downloads", shown_dialog.title)
+        assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal(32, shown_dialog.state_w)
         assert.are.equal("1", shown_dialog.item_table[1].text)
         assert.is_true(shown_dialog.item_table[1].radio)
         assert.is_false(shown_dialog.item_table[1].checked_func())
-        assert.are.equal("2", shown_dialog.item_table[2].text)
+        assert.are.equal("* 2", shown_dialog.item_table[2].text)
         assert.is_true(shown_dialog.item_table[2].checked_func())
         assert.is_true(shown_dialog.item_table[2].state.checked)
 
         shown_dialog.item_table[3].callback()
 
         assert.are.equal(3, selected)
+    end)
+
+    it("renders library picker behavior as a shared choice menu", function()
+        local ui = require("suwayomi/ui")
+        local selected
+
+        ui.showLibraryCategoryPickerBehaviorMenu({
+            current = "always",
+            choices = { "automatic", "always", "never" },
+            onSelect = function(value)
+                selected = value
+            end,
+        })
+
+        assert.are.equal("Library category picker", shown_dialog.title)
+        assert.are.equal("list_menu", shown_dialog.renderer)
+        assert.are.equal("Automatic", shown_dialog.item_table[1].text)
+        assert.are.equal("* Always ask", shown_dialog.item_table[2].text)
+        assert.is_true(shown_dialog.item_table[2].checked_func())
+
+        shown_dialog.item_table[3].callback()
+
+        assert.are.equal("never", selected)
+    end)
+
+    it("renders delete-finished choices as a shared choice menu", function()
+        local ui = require("suwayomi/ui")
+        local selected
+
+        ui.showDeleteFinishedWhileReadingMenu({
+            current = 2,
+            choices = { 0, 1, 2 },
+            onSelect = function(value)
+                selected = value
+            end,
+        })
+
+        assert.are.equal("Delete finished chapters", shown_dialog.title)
+        assert.are.equal("list_menu", shown_dialog.renderer)
+        assert.are.equal("Disabled", shown_dialog.item_table[1].text)
+        assert.are.equal("* Second to last read chapter", shown_dialog.item_table[3].text)
+        assert.is_true(shown_dialog.item_table[3].checked_func())
+
+        shown_dialog.item_table[2].callback()
+
+        assert.are.equal(1, selected)
+    end)
+
+    it("updates settings choice menus without dropping selection callbacks", function()
+        local ui = require("suwayomi/ui")
+        local selected
+        local update_count = 0
+        local menu = {
+            updateItems = function()
+                update_count = update_count + 1
+            end,
+        }
+
+        ui.updateParallelDownloadsMenu(menu, {
+            current = 4,
+            choices = { 1, 4 },
+            onSelect = function(value)
+                selected = value
+            end,
+        })
+
+        assert.are.equal("* 4", menu.item_table[2].text)
+        menu.item_table[1].callback()
+        assert.are.equal(1, selected)
+        assert.are.equal(1, update_count)
+
+        ui.updateLibraryCategoryPickerBehaviorMenu(menu, {
+            current = "never",
+            choices = { "always", "never" },
+            onSelect = function(value)
+                selected = value
+            end,
+        })
+
+        assert.are.equal("* Never ask", menu.item_table[2].text)
+        menu.item_table[1].callback()
+        assert.are.equal("always", selected)
+
+        ui.updateDeleteFinishedWhileReadingMenu(menu, {
+            current = 1,
+            choices = { 0, 1 },
+            onSelect = function(value)
+                selected = value
+            end,
+        })
+
+        assert.are.equal("* Last read chapter", menu.item_table[2].text)
+        menu.item_table[1].callback()
+        assert.are.equal(0, selected)
+        assert.are.equal(3, update_count)
     end)
 
     it("closes the language menu from Done before running the close callback", function()

@@ -58,13 +58,11 @@ function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
 end
 
 function SuwayomiUI.showSettingsMenu(items)
-    local menu = Menu:new{
+    local menu = getListMenu().show({
         title = _("Suwayomi Settings"),
         item_table = items or {},
-    }
+    })
     bindMenuCallbacks(menu.item_table, menu)
-    local UIManager = require("ui/uimanager")
-    UIManager:show(menu)
     return menu
 end
 
@@ -414,38 +412,39 @@ end
 
 function SuwayomiUI.showParallelDownloadsMenu(options)
     options = options or {}
-    local UIManager = require("ui/uimanager")
-    local menu = Menu:new{
+    local menu = getListMenu().show({
         title = _("Parallel chapter downloads"),
         item_table = SuwayomiUI.buildParallelDownloadsMenuTable(options),
-        state_w = getStateMarkWidth(),
-    }
-    UIManager:show(menu)
+    })
+    menu.state_w = getStateMarkWidth()
     return menu
 end
 
 function SuwayomiUI.showLibraryCategoryPickerBehaviorMenu(options)
     options = options or {}
-    local UIManager = require("ui/uimanager")
-    local menu = Menu:new{
+    local menu = getListMenu().show({
         title = _("Library category picker"),
         item_table = SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options),
-        state_w = getStateMarkWidth(),
-    }
-    UIManager:show(menu)
+    })
+    menu.state_w = getStateMarkWidth()
     return menu
 end
 
 function SuwayomiUI.showDeleteFinishedWhileReadingMenu(options)
     options = options or {}
-    local UIManager = require("ui/uimanager")
-    local menu = Menu:new{
+    local menu = getListMenu().show({
         title = _("Delete finished chapters"),
         item_table = SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options),
-        state_w = getStateMarkWidth(),
-    }
-    UIManager:show(menu)
+    })
+    menu.state_w = getStateMarkWidth()
     return menu
+end
+
+local function formatSelectedChoiceText(selected, label)
+    if selected then
+        return "* " .. tostring(label)
+    end
+    return tostring(label)
 end
 
 function SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options)
@@ -458,10 +457,11 @@ function SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options)
     local menu_table = {}
     local current = options.current or "automatic"
     for _, behavior in ipairs(options.choices or { "automatic", "always", "never" }) do
+        local selected = behavior == current
         table.insert(menu_table, {
-            text = labels[behavior] or behavior,
+            text = formatSelectedChoiceText(selected, labels[behavior] or behavior),
             radio = true,
-            state = newStateMark("radio", behavior == current),
+            state = newStateMark("radio", selected),
             checked_func = function()
                 return behavior == current
             end,
@@ -490,10 +490,11 @@ function SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options)
     local menu_table = {}
     local current = tonumber(options.current) or 0
     for _, value in ipairs(options.choices or { 0, 1, 2, 3, 4, 5 }) do
+        local selected = value == current
         table.insert(menu_table, {
-            text = labels[value] or tostring(value),
+            text = formatSelectedChoiceText(selected, labels[value] or tostring(value)),
             radio = true,
-            state = newStateMark("radio", value == current),
+            state = newStateMark("radio", selected),
             checked_func = function()
                 return value == current
             end,
@@ -536,10 +537,11 @@ function SuwayomiUI.buildParallelDownloadsMenuTable(options)
     local menu_table = {}
     local current = tonumber(options.current) or 2
     for _, value in ipairs(options.choices or { 1, 2, 3, 4 }) do
+        local selected = value == current
         table.insert(menu_table, {
-            text = tostring(value),
+            text = formatSelectedChoiceText(selected, value),
             radio = true,
-            state = newStateMark("radio", value == current),
+            state = newStateMark("radio", selected),
             checked_func = function()
                 return value == current
             end,
