@@ -23,7 +23,7 @@ The public runtime facades are intentionally small and stable:
 - `suwayomi/ui.lua` exposes KOReader menu/dialog helpers. It delegates Browse menus to `suwayomi/ui/browse.lua`, shared manga/source/chapter row formatting to `suwayomi/ui/list_rows.lua`, KOReader thumbnail list rendering to `suwayomi/ui/list_menu.lua`, Downloads menus to `suwayomi/ui/downloads.lua`, directory picking to `suwayomi/ui/directory.lua`, and shared menu plumbing to `suwayomi/ui/menu_utils.lua`.
 - `suwayomi/downloads/queue.lua` is the public device-local download queue. It owns enqueue/retry/cancel/recovery/snapshot/status APIs and delegates active subprocess scheduling to `suwayomi/downloads/active_jobs.lua`, persistence to `suwayomi/downloads/job_store.lua`, progress-file IO to `suwayomi/downloads/progress_file.lua`, and chapter-row status text to `suwayomi/downloads/status_formatter.lua`.
 - `suwayomi/client.lua` is the public Library/Browse client facade. It wires injected dependencies and installs focused flow modules from `suwayomi/client/`.
-- `suwayomi/chapters/actions.lua` is the chapter action facade for download, delete, read/unread, selected/bulk, and manga-level chapter actions.
+- `suwayomi/chapters/actions.lua` is the chapter action facade for download, delete, read/unread, selected/bulk, and shared manga-level chapter actions.
 - `suwayomi/readsync/controller.lua` is the read-sync orchestration facade, with ledger and KOReader sidecar/history behavior split into sibling modules.
 
 Callers should require slash-style modules under `suwayomi/`, for example `require("suwayomi/api")`. New runtime modules should stay in that namespace instead of adding top-level `suwayomi_*.lua` files.
@@ -70,6 +70,7 @@ Browse and Library:
 - `suwayomi/browse/source_manga_worker.lua`: subprocess worker for source Popular/Latest/Search manga result pages.
 - `suwayomi/browse/chapter_count_worker.lua`: subprocess worker for browse-result chapter-count enrichment.
 - `suwayomi/manga/controller.lua`: async manga actions, refresh, library membership, chapter-context preload, first-unread helpers, and manga-level download/read actions.
+- `suwayomi/manga/action_menu.lua`: shared manga action definitions used by manga row action menus and chapter-list title menus.
 
 Downloads:
 
@@ -121,7 +122,7 @@ common changes and the specs that usually cover them.
 | Source manga loading, source-specific search, browse result pagination, and browse chapter-count enrichment | `suwayomi/client/source_manga.lua`, `suwayomi/client/browse_chapter_counts.lua`, `suwayomi/browse/source_manga_worker.lua`, `suwayomi/browse/chapter_count_worker.lua` | `spec/suwayomi_client_source_manga_spec.lua`, worker specs |
 | Global search prompt/results, partial worker scheduling, cancellation, or timeouts | `suwayomi/client/global_search.lua`, `suwayomi/browse/global_search_worker.lua` | `spec/suwayomi_client_global_search_spec.lua`, worker specs |
 | Library loading, category picker behavior, library paging, and library row refresh after manga actions | `suwayomi/client/library.lua`, `suwayomi/network/request_job.lua`, `suwayomi/network/request_worker.lua`, `suwayomi/client.lua` | `spec/suwayomi_client_library_spec.lua`, `spec/suwayomi_client_spec.lua` |
-| Manga-level actions, async chapter loading/refresh/preload, library membership, and first-unread behavior | `suwayomi/manga/controller.lua`, `suwayomi/network/request_job.lua`, `suwayomi/network/request_worker.lua`, `suwayomi/client.lua` | manga/client/controller specs |
+| Manga-level actions, async chapter loading/refresh/preload, library membership, shared action-menu shape, and first-unread behavior | `suwayomi/manga/controller.lua`, `suwayomi/manga/action_menu.lua`, `suwayomi/network/request_job.lua`, `suwayomi/network/request_worker.lua`, `suwayomi/client.lua` | manga/client/controller specs |
 | Reader return from a CBZ back to Suwayomi chapters | `suwayomi/reader_return.lua`, `suwayomi/network/request_job.lua`, `suwayomi/network/request_worker.lua` | `spec/suwayomi_reader_return_spec.lua` |
 | Chapter menu behavior, selected/bulk actions, local archive delete/open, or read/unread actions | `suwayomi/chapters/menu.lua`, `suwayomi/chapters/actions.lua`, `suwayomi/chapters/local_downloads.lua`, `suwayomi/chapters/delete_actions.lua`, `suwayomi/chapters/read_actions.lua` | chapter specs |
 | Download queue, active jobs, progress files, status text, or one-chapter CBZ writing | `suwayomi/downloads/queue.lua`, `suwayomi/downloads/active_jobs.lua`, `suwayomi/downloads/progress_file.lua`, `suwayomi/downloads/status_formatter.lua`, `suwayomi/downloads/downloader.lua` | queue/download specs |

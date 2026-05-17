@@ -23,12 +23,12 @@ describe("suwayomi/chapters/menu", function()
 
         local actions = plugin:getBulkDownloadActions()
 
-        assert.are.equal("Download next 5", actions[1].text)
-        assert.are.equal("Download next 10", actions[2].text)
-        assert.are.equal("Download next 50", actions[3].text)
-        assert.are.equal("Keep next 5 downloaded", actions[4].text)
-        assert.are.equal("Keep next 10 downloaded", actions[5].text)
-        assert.are.equal("Keep next 50 downloaded", actions[6].text)
+        assert.are.equal("Download first unread", actions[1].text)
+        assert.are.equal("Download next 5", actions[2].text)
+        assert.are.equal("Download next 10", actions[3].text)
+        assert.are.equal("Download next 50", actions[4].text)
+        assert.are.equal("Download all unread", actions[5].text)
+        assert.are.equal("Download all chapters", actions[6].text)
     end)
 
     it("builds chapter title actions through the shared title menu", function()
@@ -51,8 +51,20 @@ describe("suwayomi/chapters/menu", function()
         function plugin:buildChapterMenuItems()
             return { { name = "Chapter 1" } }
         end
+        function plugin:isChapterDownloaded()
+            return true
+        end
+        function plugin:getSelectedChapterCount()
+            return 0
+        end
+        function plugin:getChapterScanlatorChoices()
+            return {}
+        end
+        function plugin:getFirstUnreadChapterForManga()
+            return { id = "c1", name = "Chapter 1", is_read = false }
+        end
         function plugin:getBulkChapterActions()
-            return { { id = "bulk_downloads", text = "Bulk downloads" } }
+            return ChapterMenu.methods.getBulkChapterActions(plugin)
         end
         function plugin:performBulkChapterAction(action_id, menu_context)
             performed_action = action_id
@@ -68,12 +80,24 @@ describe("suwayomi/chapters/menu", function()
             }
         end
 
-        local options = plugin:buildChapterMenuOptions({ title = "Frieren" }, { { name = "Chapter 1" } }, {})
+        local manga = { id = "m1", title = "Frieren", in_library = true }
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = { { id = "c1", name = "Chapter 1", is_read = false } },
+        }
+
+        local options = plugin:buildChapterMenuOptions(manga, { { name = "Chapter 1" } }, {})
 
         assert.are.equal("Frieren", options.title)
         assert.are.equal("appbar.menu", options.title_bar_left_icon)
-        assert.are.equal("Chapter downloads", captured_title_options.title)
-        assert.are.equal("bulk_downloads", captured_title_options.actions[1].id)
+        assert.are.equal("Manga actions", captured_title_options.title)
+        assert.are.equal("select_all", captured_title_options.actions[1].id)
+        assert.are.equal("open_first_unread", captured_title_options.actions[2].id)
+        assert.are.equal("refresh_chapters", captured_title_options.actions[3].id)
+        assert.are.equal("bulk_downloads", captured_title_options.actions[4].id)
+        assert.are.equal("keep_downloaded", captured_title_options.actions[5].id)
+        assert.are.equal("delete_read_downloaded", captured_title_options.actions[6].id)
+        assert.are.equal("remove_from_library", captured_title_options.actions[7].id)
         assert.is_true(captured_title_options.vertical)
         assert.is_true(captured_title_options.destructive_actions_at_bottom)
 
@@ -140,7 +164,7 @@ describe("suwayomi/chapters/menu", function()
 
         assert.are.equal("Chapter downloads", shown_menus[3].title)
         assert.are.equal(anchor, shown_menus[3].anchor)
-        assert.are.equal("bulk_downloads", shown_menus[3].actions[2].id)
+        assert.are.equal("bulk_downloads", shown_menus[3].actions[3].id)
 
         package.preload["suwayomi/ui"] = nil
         package.loaded["suwayomi/ui"] = nil
@@ -178,7 +202,7 @@ describe("suwayomi/chapters/menu", function()
         local options = plugin:buildQuickChapterMenuOptions({ title = "Frieren" }, { { name = "Chapter 1" } })
 
         assert.are.equal("appbar.menu", options.title_bar_left_icon)
-        assert.are.equal("Chapter downloads", captured_title_options.title)
+        assert.are.equal("Manga actions", captured_title_options.title)
         assert.are.equal("select_all", captured_title_options.actions[1].id)
     end)
 
@@ -247,10 +271,12 @@ describe("suwayomi/chapters/menu", function()
 
         assert.are.equal("select_all", bulk_actions[1].id)
         assert.is_nil(bulk_actions[1].submenu)
-        assert.are.equal("bulk_downloads", bulk_actions[2].id)
-        assert.is_true(bulk_actions[2].submenu)
-        assert.are.equal("scanlator_filter", bulk_actions[3].id)
+        assert.are.equal("bulk_downloads", bulk_actions[3].id)
         assert.is_true(bulk_actions[3].submenu)
+        assert.are.equal("keep_downloaded", bulk_actions[4].id)
+        assert.is_true(bulk_actions[4].submenu)
+        assert.are.equal("scanlator_filter", bulk_actions[6].id)
+        assert.is_true(bulk_actions[6].submenu)
     end)
 
     it("quick refresh reflects updated read state instead of stale cached row status", function()

@@ -8,6 +8,7 @@
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
+local MangaActionMenu = require("suwayomi/manga/action_menu")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
 local T = FFIUtil.template
@@ -49,7 +50,7 @@ function Methods:getChapterTitleBarMenuOptions()
         return {}
     end
     return self:getTitleBarMenuOptions({
-        title = _("Chapter downloads"),
+        title = _("Manga actions"),
         actions = self:getBulkChapterActions(),
         vertical = true,
         destructive_actions_at_bottom = true,
@@ -291,27 +292,20 @@ function Methods:getBulkChapterActions()
         table.insert(actions, { id = "select_all", text = _("Select all") })
     end
 
-    table.insert(actions, { id = "bulk_downloads", text = _("Bulk downloads"), submenu = true })
+    local manga_actions = MangaActionMenu.buildMainActions(self, self.current_chapter_context and self.current_chapter_context.manga, {})
+    for _, action in ipairs(manga_actions) do
+        table.insert(actions, action)
+    end
     if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
         table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter"), submenu = true })
     end
-    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read downloads"), destructive = true })
 
     return actions
 end
 
 
 function Methods:getBulkDownloadActions()
-    local actions = {}
-
-    table.insert(actions, { id = "download_next_5_unread", text = _("Download next 5") })
-    table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10") })
-    table.insert(actions, { id = "download_next_50_unread", text = _("Download next 50") })
-    table.insert(actions, { id = "keep_next_5_unread", text = _("Keep next 5 downloaded") })
-    table.insert(actions, { id = "keep_next_10_unread", text = _("Keep next 10 downloaded") })
-    table.insert(actions, { id = "keep_next_50_unread", text = _("Keep next 50 downloaded") })
-
-    return actions
+    return MangaActionMenu.buildBulkDownloadActions()
 end
 
 
@@ -366,6 +360,24 @@ function Methods:showBulkDownloadActions(menu_context)
         end,
     }, function(action)
         self:performBulkChapterAction(action.id)
+    end)
+end
+
+
+function Methods:showKeepDownloadedActions(menu_context)
+    if not SuwayomiUI.showChapterActionsMenu then
+        return
+    end
+
+    SuwayomiUI.showChapterActionsMenu({
+        title = _("Download ahead"),
+        actions = MangaActionMenu.buildKeepDownloadedActions(),
+        anchor = menu_context and menu_context.anchor,
+        on_back = function()
+            self:showBulkChapterActions(menu_context)
+        end,
+    }, function(action)
+        self:performBulkChapterAction(action.id, menu_context)
     end)
 end
 

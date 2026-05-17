@@ -10,6 +10,7 @@ local modules_to_clear = {
     "suwayomi/ui",
     "suwayomi/debug",
     "suwayomi/network/request_job",
+    "suwayomi/manga/action_menu",
     "suwayomi/manga/controller",
 }
 
@@ -316,27 +317,25 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("Open chapters", state.manga_actions_options.actions[1].text)
         assert.are.equal("Open first unread", state.manga_actions_options.actions[2].text)
         assert.are.equal("Refresh chapters", state.manga_actions_options.actions[3].text)
+        assert.are.equal("Bulk downloads", state.manga_actions_options.actions[4].text)
+        assert.is_true(state.manga_actions_options.actions[4].submenu)
+        assert.are.equal("Download ahead", state.manga_actions_options.actions[5].text)
+        assert.is_true(state.manga_actions_options.actions[5].submenu)
         assert.are.equal("Remove from library", state.manga_actions_options.actions[#state.manga_actions_options.actions].text)
         assert.is_true(state.manga_actions_options.actions[#state.manga_actions_options.actions].destructive)
-        assert.are.equal("more", state.manga_actions_options.actions[#state.manga_actions_options.actions - 1].id)
-        assert.is_true(state.manga_actions_options.actions[#state.manga_actions_options.actions - 1].submenu)
         assert.are.equal("manga-actions", state.tracked_screens[1].route_id)
         assert.are.equal("manga-actions-menu", state.tracked_screens[1].widget.name)
 
-        state.manga_actions_callback({ id = "more" })
-        assert.are.equal("More...", state.manga_actions_options.title)
-        assert.are.equal("Download next 5", state.manga_actions_options.actions[1].text)
-        assert.are.equal("Download ahead", state.manga_actions_options.actions[5].text)
-        assert.is_true(state.manga_actions_options.actions[5].submenu)
-        assert.are.equal("Delete read downloads", state.manga_actions_options.actions[#state.manga_actions_options.actions].text)
-        assert.is_true(state.manga_actions_options.actions[#state.manga_actions_options.actions].destructive)
+        state.manga_actions_callback({ id = "bulk_downloads" })
+        assert.are.equal("Bulk downloads", state.manga_actions_options.title)
+        assert.are.equal("Download first unread", state.manga_actions_options.actions[1].text)
+        assert.are.equal("Download next 5", state.manga_actions_options.actions[2].text)
+        assert.are.equal("Download all chapters", state.manga_actions_options.actions[6].text)
         assert.is_function(state.manga_actions_options.on_back)
 
         state.manga_actions_options.on_back()
         assert.are.equal("Frieren", state.manga_actions_options.title)
-        assert.are.equal("more", state.manga_actions_options.actions[#state.manga_actions_options.actions - 1].id)
-
-        state.manga_actions_callback({ id = "more" })
+        assert.are.equal("bulk_downloads", state.manga_actions_options.actions[4].id)
 
         state.manga_actions_callback({ id = "keep_downloaded" })
         assert.are.equal("Download ahead", state.manga_actions_options.title)
@@ -345,8 +344,26 @@ describe("suwayomi/manga/controller", function()
         assert.is_function(state.manga_actions_options.on_back)
 
         state.manga_actions_options.on_back()
-        assert.are.equal("More...", state.manga_actions_options.title)
+        assert.are.equal("Frieren", state.manga_actions_options.title)
         assert.are.equal("Download ahead", state.manga_actions_options.actions[5].text)
+    end)
+
+    it("builds manga actions without loading missing chapter context", function()
+        local plugin, state = installController({
+            first_unread_downloaded = true,
+        })
+        plugin.getFirstUnreadChapterForManga = function()
+            error("should not load chapter context while building actions")
+        end
+        local manga = {
+            id = "m1",
+            title = "Frieren",
+            first_unread_chapter = { id = "c2", name = "Ch. 2" },
+        }
+
+        plugin:showMangaActions(manga)
+
+        assert.are.equal("Open first unread", state.manga_actions_options.actions[2].text)
     end)
 
     it("adds and removes library manga through API and confirmation wiring", function()

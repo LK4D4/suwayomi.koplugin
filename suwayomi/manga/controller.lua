@@ -9,6 +9,7 @@ local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
 local NetworkRequestJob = require("suwayomi/network/request_job")
+local MangaActionMenu = require("suwayomi/manga/action_menu")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
 local T = FFIUtil.template
@@ -292,39 +293,14 @@ end
 
 
 function Methods:canOpenFirstUnreadMangaChapter(manga)
-    local chapter = manga and manga.first_unread_chapter
-    if not chapter then
-        return false
-    end
-
-    return self:isChapterDownloaded(manga, chapter) == true
+    return MangaActionMenu.canOpenFirstUnread(self, manga)
 end
 
 
 function Methods:getMangaActions(manga)
-    local actions = {
-        { id = "open_chapters", text = _("Open chapters") },
-    }
-    local destructive_action
-
-    if self:canOpenFirstUnreadMangaChapter(manga) then
-        table.insert(actions, { id = "open_first_unread", text = _("Open first unread") })
-    end
-
-    table.insert(actions, { id = "refresh_chapters", text = _("Refresh chapters") })
-    if manga and manga.in_library == true then
-        destructive_action = { id = "remove_from_library", text = _("Remove from library"), destructive = true }
-    else
-        table.insert(actions, { id = "add_to_library", text = _("Add to library") })
-    end
-    table.insert(actions, { id = "download_first_unread", text = _("Download first unread") })
-    table.insert(actions, { id = "download_next_10_unread", text = _("Download next 10") })
-    table.insert(actions, { id = "more", text = _("More..."), submenu = true })
-    if destructive_action then
-        table.insert(actions, destructive_action)
-    end
-
-    return actions
+    return MangaActionMenu.buildMainActions(self, manga, {
+        include_open_chapters = true,
+    })
 end
 
 
@@ -454,20 +430,18 @@ end
 
 
 function Methods:showMoreMangaActions(manga, options)
+    return self:showBulkDownloadMangaActions(manga, options)
+end
+
+
+function Methods:showBulkDownloadMangaActions(manga, options)
     options = options or {}
     if not SuwayomiUI.showMangaActionsMenu then
         return false
     end
     local menu = SuwayomiUI.showMangaActionsMenu({
-        title = _("More..."),
-        actions = {
-            { id = "download_next_5_unread", text = _("Download next 5") },
-            { id = "download_next_50_unread", text = _("Download next 50") },
-            { id = "download_all_unread", text = _("Download all unread") },
-            { id = "download_all_chapters", text = _("Download all chapters") },
-            { id = "keep_downloaded", text = _("Download ahead"), submenu = true },
-            { id = "delete_read_downloaded", text = _("Delete read downloads"), destructive = true },
-        },
+        title = _("Bulk downloads"),
+        actions = MangaActionMenu.buildBulkDownloadActions(),
         on_back = function()
             self:showMangaActions(manga, options)
         end,
@@ -490,14 +464,9 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
     end
     local menu = SuwayomiUI.showMangaActionsMenu({
         title = _("Download ahead"),
-        actions = {
-            { id = "keep_next_5_unread", text = _("Keep next 5 downloaded") },
-            { id = "keep_next_10_unread", text = _("Keep next 10 downloaded") },
-            { id = "keep_next_50_unread", text = _("Keep next 50 downloaded") },
-            { id = "keep_next_0_unread", text = _("Stop download ahead") },
-        },
+        actions = MangaActionMenu.buildKeepDownloadedActions(),
         on_back = function()
-            self:showMoreMangaActions(manga, options)
+            self:showMangaActions(manga, options)
         end,
     }, function(action)
         if action then
@@ -542,7 +511,11 @@ function Methods:performMangaAction(manga, action_id, options)
         return self:confirmRemoveMangaFromLibrary(manga, options)
     end
     if action_id == "more" then
-        self:showMoreMangaActions(manga, options)
+        self:showBulkDownloadMangaActions(manga, options)
+        return true
+    end
+    if action_id == "bulk_downloads" then
+        self:showBulkDownloadMangaActions(manga, options)
         return true
     end
     if action_id == "keep_downloaded" then

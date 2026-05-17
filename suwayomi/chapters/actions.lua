@@ -8,6 +8,7 @@
 local ChapterDeleteActions = require("suwayomi/chapters/delete_actions")
 local ChapterLocalDownloads = require("suwayomi/chapters/local_downloads")
 local ChapterReadActions = require("suwayomi/chapters/read_actions")
+local MangaActionMenu = require("suwayomi/manga/action_menu")
 local SuwayomiDebug = require("suwayomi/debug")
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
@@ -545,9 +546,18 @@ function Methods:performBulkChapterAction(action_id, menu_context)
         self:showBulkDownloadActions(menu_context)
         return true
     end
+    if action_id == "keep_downloaded" then
+        self:showKeepDownloadedActions(menu_context)
+        return true
+    end
     if action_id == "scanlator_filter" then
         self:showScanlatorFilterActions(menu_context)
         return true
+    end
+    if MangaActionMenu.isSharedAction(action_id) and self.current_chapter_context and self.performMangaAction then
+        return self:performMangaAction(self.current_chapter_context.manga, action_id, {
+            menu_context = menu_context,
+        })
     end
     local next_unread_count = tostring(action_id or ""):match("^download_next_(%d+)_unread$")
     if next_unread_count then
