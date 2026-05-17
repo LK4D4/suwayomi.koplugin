@@ -87,7 +87,7 @@ Fresh review baseline:
   - Direction: treat non-string directory values as unset before path joins.
   - Test: scalar/table download directory settings fall back to chooser/default behavior.
 
-- [ ] Guard release tag against `_meta.lua` version drift.
+- [x] Guard release tag against `_meta.lua` version drift.
   - Files: `.github/workflows/release.yml`, `_meta.lua`
   - Risk: `v*` tag can publish a zip whose KOReader metadata still reports an older version.
   - Direction: fail release if tag name does not match `_meta.lua` `version`.

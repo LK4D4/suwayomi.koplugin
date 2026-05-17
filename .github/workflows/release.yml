@@ -22,6 +22,9 @@ jobs:
 
       - uses: leafo/gh-actions-luarocks@v6
 
+      - name: Verify release tag matches metadata version
+        run: luajit .github/scripts/check-release-version.lua _meta.lua "$GITHUB_REF_NAME"
+
       - name: Install dependencies
         run: |
           luarocks install busted
