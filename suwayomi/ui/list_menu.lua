@@ -830,6 +830,7 @@ function ListMenu.show(options)
         item_table = options.item_table or {},
         items_per_page = options.items_per_page,
         itemnumber = options.itemnumber,
+        state_w = options.state_w,
         is_borderless = true,
         is_popout = false,
         title_bar_fm_style = true,

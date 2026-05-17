@@ -138,6 +138,8 @@ function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
         anchor = options.anchor,
         close_callback = options.close_callback,
         on_back = options.on_back,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
     }, function(action)
         if action and action.id and onSelectCallback then
             onSelectCallback(action.id)

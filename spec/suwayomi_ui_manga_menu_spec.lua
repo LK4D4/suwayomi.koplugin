@@ -451,6 +451,23 @@ describe("suwayomi/ui/manga_menu", function()
         assert.are.equal("Chapter 5", menu.item_group[1].entry.text)
     end)
 
+    it("passes state marker width into shared list menus before layout", function()
+        local list_menu = require("suwayomi/ui/list_menu")
+
+        local menu = list_menu.show{
+            title = "Choices",
+            state_w = 32,
+            item_table = {
+                {
+                    text = "* 2",
+                    state = { mark_type = "radio", checked = true },
+                },
+            },
+        }
+
+        assert.are.equal(32, menu.state_w)
+    end)
+
     it("renders chapter rows with the shared row widget and no thumbnail gutter", function()
         local list_menu = require("suwayomi/ui/list_menu")
 

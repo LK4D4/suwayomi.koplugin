@@ -196,6 +196,21 @@ local function buildBackActionButton(options, dialogProvider, UIManager)
     }
 end
 
+local function buildTitleBarLeftActionButton(options, dialogProvider)
+    if type(options.on_title_bar_left_tap) ~= "function" then
+        return nil
+    end
+    return {
+        id = "title_bar_left",
+        text = _("Menu"),
+        callback = function()
+            return options.on_title_bar_left_tap(dialogProvider())
+        end,
+        hold_callback = type(options.on_title_bar_left_hold) == "function" and function()
+            return options.on_title_bar_left_hold(dialogProvider())
+        end or nil,
+    }
+end
 
 local function appendActionButtonRows(buttons, actions, columns, dialogProvider, UIManager, onSelectCallback)
     local row = {}
@@ -233,9 +248,13 @@ local function buildActionMenuButtons(options, dialogProvider, UIManager, onSele
     local normal_actions = options.actions or {}
     local destructive_actions = {}
     local back_button = buildBackActionButton(options, dialogProvider, UIManager)
+    local title_bar_left_button = not back_button and buildTitleBarLeftActionButton(options, dialogProvider)
 
     if back_button then
         table.insert(buttons, { back_button })
+        table.insert(buttons, {})
+    elseif title_bar_left_button then
+        table.insert(buttons, { title_bar_left_button })
         table.insert(buttons, {})
     end
 
@@ -415,8 +434,8 @@ function SuwayomiUI.showParallelDownloadsMenu(options)
     local menu = getListMenu().show({
         title = _("Parallel chapter downloads"),
         item_table = SuwayomiUI.buildParallelDownloadsMenuTable(options),
+        state_w = getStateMarkWidth(),
     })
-    menu.state_w = getStateMarkWidth()
     return menu
 end
 
@@ -425,8 +444,8 @@ function SuwayomiUI.showLibraryCategoryPickerBehaviorMenu(options)
     local menu = getListMenu().show({
         title = _("Library category picker"),
         item_table = SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options),
+        state_w = getStateMarkWidth(),
     })
-    menu.state_w = getStateMarkWidth()
     return menu
 end
 
@@ -435,8 +454,8 @@ function SuwayomiUI.showDeleteFinishedWhileReadingMenu(options)
     local menu = getListMenu().show({
         title = _("Delete finished chapters"),
         item_table = SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options),
+        state_w = getStateMarkWidth(),
     })
-    menu.state_w = getStateMarkWidth()
     return menu
 end
 
