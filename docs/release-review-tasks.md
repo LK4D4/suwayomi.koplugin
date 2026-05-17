@@ -99,7 +99,7 @@ Fresh review baseline:
   - Direction: build or stage the release payload during Test workflow and assert it includes only `_meta.lua`, `main.lua`, `README.md`, and `suwayomi/`.
   - Test: CI fails if docs/spec/.github/AGENTS or other dev-only files enter payload.
 
-- [ ] Prune selected chapter state after same-manga refresh.
+- [x] Prune selected chapter state after same-manga refresh.
   - Files: `suwayomi/chapters/context.lua`, `suwayomi/chapters/actions.lua`, chapter specs
   - Risk: UI can show selected actions for stale chapter IDs, then act on a smaller set or say no chapters selected.
   - Direction: when chapter list refreshes for the same manga, drop selected IDs not present in the current visible/current chapter set.

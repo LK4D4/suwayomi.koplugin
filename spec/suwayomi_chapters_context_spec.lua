@@ -173,6 +173,47 @@ describe("suwayomi/chapters/context", function()
         assert.are.same(team_b, plugin:getFirstUnreadChapterForManga(manga))
     end)
 
+    it("prunes stale selected chapters when refreshing the same manga", function()
+        local controller = require("suwayomi/chapters/context")
+        local manga = { id = "m1", title = "Manga" }
+        local visible = { id = "1", name = "One", scanlator = "Team A" }
+        local hidden = { id = "2", name = "Two", scanlator = "Team B" }
+        local plugin = {
+            current_chapter_context = {
+                manga = manga,
+                chapters = {
+                    visible,
+                    hidden,
+                    { id = "9", name = "Nine", scanlator = "Team A" },
+                },
+            },
+            current_scanlator_filter = "Team A",
+            selected_chapters = {
+                ["m1:1"] = true,
+                ["m1:2"] = true,
+                ["m1:9"] = true,
+            },
+            selection_mode = true,
+        }
+        function fake_settings:loadMangaScanlatorFilter()
+            return "Team A"
+        end
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:setCurrentMangaChapterContext(manga, {
+            visible,
+            hidden,
+        })
+
+        assert.are.same({ ["m1:1"] = true }, plugin.selected_chapters)
+        assert.are.equal(1, plugin:getSelectedChapterCount())
+        assert.are.same({ visible }, plugin:getSelectedChapters(manga, plugin.current_chapter_context.chapters))
+        assert.is_true(plugin.selection_mode)
+        assert.are.equal("1 selected - Team A", plugin:formatChapterListTitle(manga))
+    end)
+
     it("restores saved scanlator filter when setting chapter context", function()
         local controller = require("suwayomi/chapters/context")
         local manga = { id = "m1", title = "Manga" }

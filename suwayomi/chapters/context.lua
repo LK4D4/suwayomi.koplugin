@@ -104,6 +104,7 @@ end
 
 
 function Methods:setCurrentMangaChapterContext(manga, chapters)
+    local same_manga = self:isCurrentChapterContextForManga(manga)
     if self.current_chapter_context and not self:isCurrentChapterContextForManga(manga) then
         self:clearChapterSelection(true)
     end
@@ -112,6 +113,9 @@ function Methods:setCurrentMangaChapterContext(manga, chapters)
         manga = manga,
         chapters = chapters or {},
     }
+    if same_manga then
+        self:pruneChapterSelectionForCurrentContext()
+    end
     return self.current_chapter_context
 end
 
@@ -249,6 +253,26 @@ function Methods:getSelectedChapters(manga, chapters)
         end
     end
     return selected
+end
+
+
+function Methods:pruneChapterSelectionForCurrentContext()
+    if not self.selected_chapters then
+        return
+    end
+
+    local context = self.current_chapter_context
+    local valid_keys = {}
+    for _, chapter in ipairs(self:getVisibleChapters(context and context.chapters or {})) do
+        valid_keys[self:getChapterSelectionKey(context and context.manga, chapter)] = true
+    end
+
+    for key, selected in pairs(self.selected_chapters) do
+        if selected and not valid_keys[key] then
+            self.selected_chapters[key] = nil
+        end
+    end
+    self.selection_mode = self:getSelectedChapterCount() > 0
 end
 
 
