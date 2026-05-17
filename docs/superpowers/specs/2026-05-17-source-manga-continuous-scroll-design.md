@@ -171,4 +171,3 @@ Out of scope:
 - Callback name: `on_page_changed` is more general; `on_last_page` is narrower.
 - Append loading row shape: non-selectable `Loading more...` row versus transient toast only.
 - Auto-load cap exact value: recommended 3 filtered API pages per user navigation event.
-
