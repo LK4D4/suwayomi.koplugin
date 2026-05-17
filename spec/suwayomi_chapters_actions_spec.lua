@@ -883,7 +883,7 @@ describe("suwayomi/chapters/actions", function()
         assert.is_nil(plugin.keep_next_policy_manga)
     end)
 
-    it("does not scope manga-level next unread download confirmation to the current scanlator filter", function()
+    it("scopes manga-level next unread download confirmation to the current scanlator filter", function()
         local team_a = { id = "c1", name = "Chapter 1", scanlator = "Team A", is_read = false }
         local team_b = { id = "c2", name = "Chapter 2", scanlator = "Team B", is_read = false }
         local plugin = build_plugin({
@@ -920,7 +920,7 @@ describe("suwayomi/chapters/actions", function()
         assert.is_true(plugin:confirmNextUnreadChapterDownloads(2))
         plugin.confirmation.callback()
 
-        assert.are.same({ team_a, team_b }, plugin.enqueued.chapters)
+        assert.are.same({ team_a }, plugin.enqueued.chapters)
     end)
 
     it("keeps burger action origin when opening nested bulk action menus", function()

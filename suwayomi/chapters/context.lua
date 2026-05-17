@@ -8,6 +8,7 @@
 local _ = require("gettext")
 local FFIUtil = require("ffi/util")
 local T = FFIUtil.template
+local SuwayomiSettings = require("suwayomi/settings")
 
 local ChapterContext = {}
 ChapterContext.__index = ChapterContext
@@ -35,7 +36,7 @@ function Methods:setCurrentMangaChapterContext(manga, chapters)
     if self.current_chapter_context and not self:isCurrentChapterContextForManga(manga) then
         self:clearChapterSelection(true)
     end
-    self.current_scanlator_filter = nil
+    self.current_scanlator_filter = self:getValidMangaScanlatorFilter(manga, chapters)
     self.current_chapter_context = {
         manga = manga,
         chapters = chapters or {},
@@ -82,7 +83,7 @@ function Methods:getUnreadChaptersForManga(manga)
     if not context then
         return chapters
     end
-    for _, chapter in ipairs(context.chapters or {}) do
+    for _, chapter in ipairs(self:getVisibleChapters(context.chapters or {})) do
         if chapter.is_read ~= true then
             table.insert(chapters, chapter)
         end
@@ -96,7 +97,7 @@ function Methods:getAllChaptersForManga(manga)
     if not context then
         return {}
     end
-    return context.chapters or {}
+    return self:getVisibleChapters(context.chapters or {})
 end
 
 
@@ -204,6 +205,20 @@ function Methods:getChapterScanlatorChoices(chapters)
         end
     end
     return choices
+end
+
+
+function Methods:getValidMangaScanlatorFilter(manga, chapters)
+    local filter = self:loadMangaScanlatorFilter(manga)
+    if not filter then
+        return nil
+    end
+    for _, scanlator in ipairs(self:getChapterScanlatorChoices(chapters)) do
+        if scanlator == filter then
+            return filter
+        end
+    end
+    return nil
 end
 
 
@@ -379,7 +394,7 @@ end
 
 function Methods:getNextUnreadChaptersForDownload(manga, limit)
     local chapters = {}
-    for _, chapter in ipairs((self.current_chapter_context and self.current_chapter_context.chapters) or {}) do
+    for _, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
         if self:canQueueChapterDownload(manga, chapter) then
             table.insert(chapters, chapter)
             if #chapters >= limit then
@@ -402,8 +417,27 @@ function Methods:getReadChaptersFromCurrentContext()
 end
 
 
+function Methods:loadMangaScanlatorFilter(manga)
+    if SuwayomiSettings.loadMangaScanlatorFilter then
+        return SuwayomiSettings:loadMangaScanlatorFilter(manga)
+    end
+    return nil
+end
+
+
+function Methods:saveMangaScanlatorFilter(manga, scanlator)
+    if SuwayomiSettings.saveMangaScanlatorFilter then
+        return SuwayomiSettings:saveMangaScanlatorFilter(manga, scanlator)
+    end
+    return scanlator
+end
+
+
 function Methods:setScanlatorFilter(scanlator)
-    self.current_scanlator_filter = scanlator
+    self.current_scanlator_filter = self:saveMangaScanlatorFilter(
+        self.current_chapter_context and self.current_chapter_context.manga,
+        scanlator
+    )
     self:clearChapterSelection(true)
     self:refreshChapterMenu()
     return true

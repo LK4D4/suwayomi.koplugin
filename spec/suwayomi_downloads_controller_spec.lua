@@ -462,7 +462,7 @@ describe("suwayomi/downloads/controller", function()
         assert.are.same({ quick = true }, state.refresh_options)
     end)
 
-    it("keeps download-ahead refills independent of visible scanlator filters", function()
+    it("scopes download-ahead refills to visible scanlator-filtered chapters", function()
         local queue = {}
         local chapters = {
             { id = "c1", name = "Ch. 1", downloaded = true },
@@ -481,8 +481,8 @@ describe("suwayomi/downloads/controller", function()
             visible_chapters = { chapters[1], chapters[2] },
         })
 
-        assert.are.equal(1, plugin:applyMangaKeepNextUnreadDownloadsPolicy())
+        assert.are.equal(0, plugin:applyMangaKeepNextUnreadDownloadsPolicy())
 
-        assert.are.same({ chapters[3] }, queue.enqueued.chapters)
+        assert.is_nil(queue.enqueued)
     end)
 end)

@@ -342,6 +342,25 @@ describe("suwayomi/settings", function()
         assert.are.equal(0, settings:loadMangaKeepNextUnreadDownloads({ id = "m2" }))
     end)
 
+    it("loads and saves per-manga scanlator filters", function()
+        local settings = require("suwayomi/settings")
+        local manga = { id = "m1", title = "Frieren" }
+
+        assert.is_nil(settings:loadMangaScanlatorFilter(manga))
+
+        assert.are.equal("Team A", settings:saveMangaScanlatorFilter(manga, "Team A"))
+        assert.is_true(flushed)
+        assert.are.equal("Team A", stored_data.manga_scanlator_filters.m1)
+        assert.are.equal("Team A", settings:loadMangaScanlatorFilter(manga))
+
+        assert.is_nil(settings:saveMangaScanlatorFilter(manga, ""))
+        assert.is_nil(stored_data.manga_scanlator_filters.m1)
+
+        stored_data.manga_scanlator_filters = { m1 = "Team B", m2 = false }
+        assert.are.equal("Team B", settings:loadMangaScanlatorFilter(manga))
+        assert.is_nil(settings:loadMangaScanlatorFilter({ id = "m2" }))
+    end)
+
     it("loads an empty chapter ledger by default", function()
         local settings = require("suwayomi/settings")
 

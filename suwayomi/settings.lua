@@ -200,7 +200,7 @@ function SuwayomiSettings:normalizeMangaKeepNextUnreadDownloads(value)
     return DEFAULT_MANGA_KEEP_NEXT_UNREAD_DOWNLOADS
 end
 
-function SuwayomiSettings:getMangaKeepNextUnreadDownloadsKey(manga)
+function SuwayomiSettings:getMangaSettingsKey(manga)
     if type(manga) ~= "table" then
         return nil
     end
@@ -209,6 +209,21 @@ function SuwayomiSettings:getMangaKeepNextUnreadDownloadsKey(manga)
         return nil
     end
     return tostring(key)
+end
+
+function SuwayomiSettings:getMangaKeepNextUnreadDownloadsKey(manga)
+    return self:getMangaSettingsKey(manga)
+end
+
+function SuwayomiSettings:normalizeMangaScanlatorFilter(scanlator)
+    if type(scanlator) ~= "string" and type(scanlator) ~= "number" then
+        return nil
+    end
+    local normalized = tostring(scanlator)
+    if normalized == "" then
+        return nil
+    end
+    return normalized
 end
 
 function SuwayomiSettings:open()
@@ -404,6 +419,38 @@ function SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, limit)
         limits[key] = nil
     end
     self:open():saveSetting("manga_keep_next_unread_downloads", limits):flush()
+    return normalized
+end
+
+function SuwayomiSettings:loadMangaScanlatorFilter(manga)
+    local key = self:getMangaSettingsKey(manga)
+    if not key then
+        return nil
+    end
+    local filters = self:open():readSetting("manga_scanlator_filters", {})
+    if type(filters) ~= "table" then
+        return nil
+    end
+    return self:normalizeMangaScanlatorFilter(filters[key])
+end
+
+function SuwayomiSettings:saveMangaScanlatorFilter(manga, scanlator)
+    local key = self:getMangaSettingsKey(manga)
+    local normalized = self:normalizeMangaScanlatorFilter(scanlator)
+    if not key then
+        return normalized
+    end
+
+    local filters = self:open():readSetting("manga_scanlator_filters", {})
+    if type(filters) ~= "table" then
+        filters = {}
+    end
+    if normalized then
+        filters[key] = normalized
+    else
+        filters[key] = nil
+    end
+    self:open():saveSetting("manga_scanlator_filters", filters):flush()
     return normalized
 end
 
