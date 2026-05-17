@@ -246,6 +246,10 @@ function Methods:showOnboardingConnectionStep(options)
         onTestConnection = function(credentials)
             self:startOnboardingConnectionTest(credentials)
         end,
+        onClose = function()
+            self:clearOnboardingConnectionTest()
+            self.onboarding_connection_dialog = nil
+        end,
         canContinue = function(credentials)
             return self:hasOnboardingConnectionTestPassed(credentials)
         end,

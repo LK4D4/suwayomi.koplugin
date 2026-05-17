@@ -490,6 +490,35 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.is_nil(state.choose_download_callback)
     end)
 
+    it("cancels in-flight onboarding connection tests when setup closes", function()
+        local plugin, state = installController({
+            credentials = {
+                server_url = "https://suwayomi.example",
+                username = "alice",
+                password = "secret",
+                auth_method = "basic_auth",
+            },
+            download_directory = "/storage/emulated/0/Books/Manga",
+        })
+        plugin:showOnboardingSetup({ first_run = false })
+        state.onboarding_connection_options.onTestConnection(state.credentials)
+        local active = plugin.onboarding_connection_test_active
+
+        state.onboarding_connection_options.onClose()
+        plugin:finishOnboardingConnectionTest(active, {
+            ok = true,
+            message = "Connection test passed.",
+        })
+
+        assert.is_true(active.canceled)
+        assert.are.equal(active, state.canceled_connection_job)
+        assert.is_nil(plugin.onboarding_connection_test_active)
+        assert.is_nil(plugin.onboarding_connection_test_key)
+        assert.is_false(state.onboarding_connection_options.canContinue(state.credentials))
+        assert.are.equal("testing", state.connection_status_updates[#state.connection_status_updates].status)
+        assert.are.same({}, state.messages)
+    end)
+
     it("closes settings before landing home after settings-launched setup", function()
         local plugin, state = installController({
             credentials = { server_url = "https://suwayomi.example" },

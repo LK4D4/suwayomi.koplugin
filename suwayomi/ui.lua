@@ -708,6 +708,16 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
     local credentials = options.credentials or {}
     local UIManager = require("ui/uimanager")
     local dialog
+    local close_ran = false
+    local function runClose()
+        if close_ran then
+            return
+        end
+        close_ran = true
+        if options.onClose then
+            options.onClose()
+        end
+    end
     local function canContinue()
         if not options.canContinue then
             return true
@@ -741,6 +751,7 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
                     text = _("Cancel"),
                     id = "close",
                     callback = function()
+                        runClose()
                         UIManager:close(dialog)
                     end,
                 },
@@ -776,6 +787,7 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
                 },
             },
         },
+        close_callback = runClose,
     }
 
     UIManager:show(dialog)

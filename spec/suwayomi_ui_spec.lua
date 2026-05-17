@@ -432,6 +432,23 @@ describe("suwayomi/ui", function()
         assert.are.equal("Suwayomi setup: connection (failed)", shown_dialog.title)
     end)
 
+    it("runs onboarding close callback when setup dialog closes", function()
+        local ui = require("suwayomi/ui")
+        local close_count = 0
+
+        ui.showOnboardingConnectionDialog({
+            onClose = function()
+                close_count = close_count + 1
+            end,
+        })
+
+        shown_dialog.buttons[1][1].callback()
+        shown_dialog.close_callback()
+
+        assert.are.equal(shown_dialog, closed_dialog)
+        assert.are.equal(1, close_count)
+    end)
+
     it("shows a chapter menu", function()
         local ui = require("suwayomi/ui")
         local selected = {}

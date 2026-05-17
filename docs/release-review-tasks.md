@@ -39,7 +39,7 @@ Fresh review baseline:
   - Direction: reject non-table nodes and missing required IDs consistently in source, library update, page, and bulk-read parser paths.
   - Test: malformed source/update/page/bulk-read nodes return structured parse errors instead of crashes or `"nil"` IDs.
 
-- [ ] Cancel onboarding connection test when setup dialog closes.
+- [x] Cancel onboarding connection test when setup dialog closes.
   - Files: `suwayomi/plugin/settings_controller.lua`, `suwayomi/ui.lua`, plugin settings specs
   - Risk: user can cancel setup while the probe keeps running; stale result can update closed UI state or show a late toast.
   - Direction: wire cancel/back close to clear the active onboarding connection test and ignore stale completion.
