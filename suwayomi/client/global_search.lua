@@ -101,6 +101,9 @@ function SuwayomiClient:buildGlobalSearchMenuOptions(search)
         menu_options.close_callback = cancel
         menu_options.on_cancel_search = cancel
     end
+    menu_options.on_retry_summary = function(summary)
+        return self:retryGlobalSearchSummary(search, summary)
+    end
     menu_options.thumbnail_credentials = search and search.credentials
     return menu_options
 end
@@ -156,6 +159,45 @@ function SuwayomiClient:openGlobalSearchSummary(summary, fallback_query)
             skip_mode_menu = true,
         })
     end
+end
+
+function SuwayomiClient:findGlobalSearchSummaryIndex(search, summary)
+    for index, candidate in ipairs(search and search.summaries or {}) do
+        if candidate == summary then
+            return index
+        end
+    end
+end
+
+function SuwayomiClient:isGlobalSearchSummaryRetryable(summary)
+    return summary and (summary.status == "error" or summary.status == "timed_out")
+end
+
+function SuwayomiClient:retryGlobalSearchSummary(search, summary)
+    if not search or search.canceled or not self:isGlobalSearchSummaryRetryable(summary) then
+        return
+    end
+    local index = self:findGlobalSearchSummaryIndex(search, summary)
+    if not index then
+        return
+    end
+
+    local active = search.active_jobs and search.active_jobs[index]
+    if active then
+        local job = self:getSubprocessJob()
+        job.cancel(active)
+        self:releaseGlobalSearchJob(search, active)
+    end
+
+    search.finished = false
+    summary.status = "searching"
+    summary.error = nil
+    summary.manga = {}
+    summary.result_count = 0
+    summary.has_next_page = nil
+    self:updateGlobalSearchMenu(search)
+    self:startGlobalSearchJob(search, index)
+    self:finishGlobalSearchIfComplete(search)
 end
 
 function SuwayomiClient:markGlobalSearchCanceled(search)

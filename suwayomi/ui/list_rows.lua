@@ -312,6 +312,10 @@ local function isGlobalSearchSummaryOpenable(summary)
         and (summary.status == "ok" or summary.status == "pageable_empty")
 end
 
+local function isGlobalSearchSummaryRetryable(summary)
+    return summary and (summary.status == "error" or summary.status == "timed_out")
+end
+
 function ListRows.buildGlobalSearchSummaryRow(summary, options)
     options = options or {}
     local source = type(summary) == "table" and summary.source or nil
@@ -324,11 +328,19 @@ function ListRows.buildGlobalSearchSummaryRow(summary, options)
     row.subtitle = summary and summary.status == "error"
         and tostring(summary.error or _("Unknown error"))
         or row.subtitle
-    row.mandatory = ListRows.getGlobalSearchSummaryMandatory(summary)
+    if options.on_retry and isGlobalSearchSummaryRetryable(summary) then
+        row.mandatory = _("Retry")
+    else
+        row.mandatory = ListRows.getGlobalSearchSummaryMandatory(summary)
+    end
     row.summary = summary
-    row.select_enabled = isGlobalSearchSummaryOpenable(summary) or false
+    row.select_enabled = isGlobalSearchSummaryOpenable(summary)
+        or (options.on_retry and isGlobalSearchSummaryRetryable(summary))
+        or false
     row.callback = function()
-        if row.select_enabled and options.on_select then
+        if options.on_retry and isGlobalSearchSummaryRetryable(summary) then
+            options.on_retry(summary)
+        elseif row.select_enabled and options.on_select then
             options.on_select(summary)
         end
     end

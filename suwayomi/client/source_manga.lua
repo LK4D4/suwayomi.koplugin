@@ -137,10 +137,11 @@ function SuwayomiClient:isLatestUnsupportedError(error_text)
         or message:match("does%s+not%s+support%s+latest") ~= nil
 end
 
-function SuwayomiClient:showSourceSearchPrompt(source)
+function SuwayomiClient:showSourceSearchPrompt(source, options)
     if not self.ui.showSourceSearchPrompt then
         return
     end
+    options = options or {}
 
     return self.ui.showSourceSearchPrompt(source, function(query)
         local search_query = trim(query)
@@ -153,7 +154,9 @@ function SuwayomiClient:showSourceSearchPrompt(source)
             query = search_query,
             skip_mode_menu = true,
         })
-    end)
+    end, {
+        query = options.query,
+    })
 end
 
 function SuwayomiClient:showSourceModeMenu(source)
@@ -244,18 +247,83 @@ function SuwayomiClient:buildSourceMangaLoadingMenuOptions(state)
     return menu_options
 end
 
-function SuwayomiClient:showSourceMangaStatus(menu, title, message, detail_title)
+function SuwayomiClient:showSourceMangaStatus(menu, title, message, detail_title, rows)
     if menu and self.ui.updateMangaMenu then
         local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
             title = detail_title or title,
         }))
         menu_options.title = title
-        self.ui.updateMangaMenu(menu, {
+        self.ui.updateMangaMenu(menu, rows or {
             { title = message },
         }, nil, menu_options)
         return true
     end
     return false
+end
+
+function SuwayomiClient:buildSourceMangaFailureMessage(source, browse_options, error_text)
+    if browse_options.type ~= "SEARCH" then
+        return self:translate(error_text)
+    end
+    local operation = self:getSourceModeScreenTitle(browse_options)
+    local source_name = self:getSourceDisplayName(source)
+    local prefix = operation .. " " .. self:translate("failed for") .. " " .. source_name
+    local detail = trim(error_text)
+    if detail ~= "" and detail ~= self:translate("Could not load manga.") then
+        return prefix .. ": " .. detail
+    end
+    return prefix .. "."
+end
+
+function SuwayomiClient:buildSourceMangaFailureRows(source, browse_options, message)
+    if browse_options.type ~= "SEARCH" then
+        return nil
+    end
+    local retry_options = {
+        type = browse_options.type,
+        query = browse_options.query,
+        page = browse_options.page,
+        skip_mode_menu = true,
+    }
+    local rows = {
+        {
+            text = message,
+            raw_menu_row = true,
+            select_enabled = false,
+        },
+        {
+            text = self:translate("Retry"),
+            raw_menu_row = true,
+            callback = function()
+                return self:showMangaForSource(source, retry_options)
+            end,
+        },
+    }
+    table.insert(rows, {
+        text = self:translate("Edit search"),
+        raw_menu_row = true,
+        callback = function()
+            return self:showSourceSearchPrompt(source, {
+                query = browse_options.query,
+            })
+        end,
+    })
+    return rows
+end
+
+function SuwayomiClient:showSourceMangaFailureStatus(menu, source, browse_options, error_text, options)
+    options = options or {}
+    local failure_message = self:buildSourceMangaFailureMessage(source, browse_options, error_text)
+    if options.show_toast == true then
+        self.plugin:showMessage(failure_message)
+    end
+    return self:showSourceMangaStatus(
+        menu,
+        self:buildBrowseResultScreenTitle(source, browse_options),
+        failure_message,
+        self:buildBrowseResultTitle(source, browse_options),
+        self:buildSourceMangaFailureRows(source, browse_options, failure_message)
+    )
 end
 
 function SuwayomiClient:isCurrentSourceMangaLoad(state)
@@ -317,12 +385,12 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
             )
             return
         end
-        self.plugin:showMessage(self:translate(result.error))
-        self:showSourceMangaStatus(
+        self:showSourceMangaFailureStatus(
             existing_menu,
-            self:buildBrowseResultScreenTitle(source, browse_options),
-            self:translate(result.error),
-            self:buildBrowseResultTitle(source, browse_options)
+            source,
+            browse_options,
+            result.error,
+            { show_toast = true }
         )
         return
     end
@@ -486,8 +554,13 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
             state.active = nil
             self:clearSourceMangaLoad(state)
             timed_out_active.canceled = true
-            self.plugin:showMessage(self:translate("Could not load manga."))
-            self:showSourceMangaStatus(state.menu, title, self:translate("Could not load manga."), state.detail_title)
+            self:showSourceMangaFailureStatus(
+                state.menu,
+                state.source,
+                state.browse_options,
+                self:translate("Timed out."),
+                { show_toast = true }
+            )
         end,
     })
     if not start_ok then
@@ -497,7 +570,12 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
     if not active then
         state.finished = true
         self:clearSourceMangaLoad(state)
-        self:showSourceMangaStatus(state.menu, title, self:translate("Could not start manga loading."), state.detail_title)
+        self:showSourceMangaFailureStatus(
+            state.menu,
+            state.source,
+            state.browse_options,
+            self:translate("Could not start manga loading.")
+        )
         return true
     end
 

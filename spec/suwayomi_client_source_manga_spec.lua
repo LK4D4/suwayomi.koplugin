@@ -388,6 +388,133 @@ describe("suwayomi/client source manga flows", function()
         assert.is_nil(updated_options.on_cancel_source_manga)
     end)
 
+    it("shows source search failures with retry and edit actions", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updated_rows
+        local search_prompt_options
+        local client, state = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-search-menu" }
+                end,
+                updateMangaMenu = function(_, manga)
+                    updated_rows = manga
+                end,
+                showSourceSearchPrompt = function(_, _, options)
+                    search_prompt_options = options
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "ComicK",
+            lang = "en",
+        }, {
+            type = "SEARCH",
+            query = "frieren",
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = false,
+            source = { id = "s1", display_name = "ComicK", lang = "en" },
+            browse_options = { type = "SEARCH", query = "frieren", page = 1 },
+            error = "HTTP 403 from ComicK.",
+        })
+
+        assert.are.same({ "Search failed for ComicK: HTTP 403 from ComicK." }, state.shown_messages)
+        assert.are.equal("Search failed for ComicK: HTTP 403 from ComicK.", updated_rows[1].text)
+        assert.are.equal("Retry", updated_rows[2].text)
+        assert.are.equal("Edit search", updated_rows[3].text)
+
+        updated_rows[2].callback()
+        assert.are.equal(2, #started)
+        assert.are.equal("frieren", started[2].browse_options.query)
+
+        updated_rows[3].callback()
+        assert.are.equal("frieren", search_prompt_options.query)
+    end)
+
+    it("shows source search timeout failures with retry and edit actions", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updated_rows
+        local client, state = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-search-menu" }
+                end,
+                updateMangaMenu = function(_, manga)
+                    updated_rows = manga
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "ComicK",
+            lang = "en",
+        }, {
+            type = "SEARCH",
+            query = "frieren",
+            skip_mode_menu = true,
+        })
+        started[1].on_timeout(started[1])
+
+        assert.are.same({ "Search failed for ComicK: Timed out." }, state.shown_messages)
+        assert.are.equal("Search failed for ComicK: Timed out.", updated_rows[1].text)
+        assert.are.equal("Retry", updated_rows[2].text)
+        assert.are.equal("Edit search", updated_rows[3].text)
+    end)
+
+    it("shows source search start failures with retry and edit actions", function()
+        local updated_rows
+        local client = newClient({
+            disable_source_manga_runtime = true,
+            subprocess_job = {
+                buildResultPath = function()
+                    return "/settings/source_manga.json"
+                end,
+                start = function()
+                    return nil
+                end,
+                cancel = function() end,
+            },
+            source_manga_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-search-menu" }
+                end,
+                updateMangaMenu = function(_, manga)
+                    updated_rows = manga
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "ComicK",
+            lang = "en",
+        }, {
+            type = "SEARCH",
+            query = "frieren",
+            skip_mode_menu = true,
+        })
+
+        assert.are.equal("Search failed for ComicK: Could not start manga loading.", updated_rows[1].text)
+        assert.are.equal("Retry", updated_rows[2].text)
+        assert.are.equal("Edit search", updated_rows[3].text)
+    end)
+
     it("ignores stale source manga results after a newer source load starts", function()
         local subprocess_job, started, canceled = buildSourceMangaSubprocessFake()
         local menus = {}

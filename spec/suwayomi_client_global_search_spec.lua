@@ -214,6 +214,105 @@ describe("suwayomi/client global search flows", function()
         assert.are.equal(1, shown_summaries[2].result_count)
     end)
 
+    it("retries failed global search sources from the results menu", function()
+        local started = {}
+        local menu_options
+        local shown_summaries
+        local fail_first_start = true
+        local subprocess_job = {
+            buildResultPath = function(prefix)
+                return "/settings/" .. tostring(prefix) .. "_" .. tostring(#started + 1) .. ".json"
+            end,
+            start = function(options)
+                local active = options.active or {}
+                if fail_first_start then
+                    fail_first_start = false
+                    error("launcher failed")
+                end
+                active.on_finish = options.on_finish
+                table.insert(started, active)
+                return active
+            end,
+            cancel = function() end,
+        }
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            global_search_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch(" frieren ")
+                end,
+                showGlobalSearchResultsMenu = function(summaries, _, options)
+                    shown_summaries = summaries
+                    menu_options = options
+                    return { name = "global-search" }
+                end,
+                updateGlobalSearchResultsMenu = function(_, summaries, _, options)
+                    shown_summaries = summaries
+                    menu_options = options
+                end,
+            },
+        })
+
+        client:showGlobalSearch({
+            { id = "s1", name = "ComicK", lang = "en" },
+        })
+
+        assert.are.equal("error", shown_summaries[1].status)
+        assert.are.equal("Could not start search.", shown_summaries[1].error)
+
+        menu_options.on_retry_summary(shown_summaries[1])
+
+        assert.are.equal(1, #started)
+        assert.are.equal("s1", started[1].source.id)
+        assert.are.equal("searching", shown_summaries[1].status)
+    end)
+
+    it("finishes a global search when retry startup fails again", function()
+        local menu_options
+        local shown_summaries
+        local subprocess_job = {
+            buildResultPath = function(prefix)
+                return "/settings/" .. tostring(prefix) .. ".json"
+            end,
+            start = function()
+                error("launcher failed")
+            end,
+            cancel = function() end,
+        }
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            global_search_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch(" frieren ")
+                end,
+                showGlobalSearchResultsMenu = function(summaries, _, options)
+                    shown_summaries = summaries
+                    menu_options = options
+                    return { name = "global-search" }
+                end,
+                updateGlobalSearchResultsMenu = function(_, summaries, _, options)
+                    shown_summaries = summaries
+                    menu_options = options
+                end,
+            },
+        })
+
+        client:showGlobalSearch({
+            { id = "s1", name = "ComicK", lang = "en" },
+        })
+        menu_options.on_retry_summary(shown_summaries[1])
+
+        assert.are.equal("error", shown_summaries[1].status)
+        assert.are.equal("Could not start search.", shown_summaries[1].error)
+        assert.is_nil(menu_options.on_cancel_search)
+    end)
+
     it("keeps timed out global search slots active until cleanup", function()
         local subprocess_job, started = buildGlobalSearchSubprocessFake()
         local updated_summaries

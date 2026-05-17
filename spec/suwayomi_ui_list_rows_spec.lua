@@ -263,6 +263,39 @@ describe("suwayomi/ui/list_rows", function()
         end
     end)
 
+    it("wires retry callbacks for failed global search summary rows", function()
+        local rows = require("suwayomi/ui/list_rows")
+        local retried = {}
+        local summaries = {
+            {
+                source = { id = "s1", name = "Error Source" },
+                status = "error",
+                error = "HTTP 403",
+            },
+            {
+                source = { id = "s2", name = "Slow Source" },
+                status = "timed_out",
+            },
+        }
+
+        local menu_table = rows.buildGlobalSearchSummaryMenuTable(summaries, {
+            on_retry = function(summary)
+                table.insert(retried, summary.source.id)
+            end,
+        })
+
+        assert.is_true(menu_table[1].select_enabled)
+        assert.are.equal("Retry", menu_table[1].mandatory)
+        assert.are.equal("HTTP 403", menu_table[1].subtitle)
+        assert.is_true(menu_table[2].select_enabled)
+        assert.are.equal("Retry", menu_table[2].mandatory)
+
+        menu_table[1].callback()
+        menu_table[2].callback()
+
+        assert.are.same({ "s1", "s2" }, retried)
+    end)
+
     it("groups extension rows with installed entries above available entries", function()
         local rows = require("suwayomi/ui/list_rows")
         local selected = {}

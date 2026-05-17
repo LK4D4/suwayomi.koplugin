@@ -177,7 +177,8 @@ function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
     return menu
 end
 
-function BrowseUI.showSourceSearchPrompt(source, onSearchCallback)
+function BrowseUI.showSourceSearchPrompt(source, onSearchCallback, options)
+    options = options or {}
     local UIManager = require("ui/uimanager")
     local dialog
     dialog = MultiInputDialog:new{
@@ -185,7 +186,7 @@ function BrowseUI.showSourceSearchPrompt(source, onSearchCallback)
         fields = {
             {
                 hint = _("Search query"),
-                text = "",
+                text = options.query or "",
             },
         },
         buttons = {
@@ -334,6 +335,7 @@ function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, optio
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = ListRows.buildGlobalSearchSummaryMenuTable(summaries, {
             on_select = onSelectCallback,
+            on_retry = options.on_retry_summary,
         }),
         close_callback = options.close_callback,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
@@ -353,6 +355,7 @@ function BrowseUI.updateGlobalSearchResultsMenu(menu, summaries, onSelectCallbac
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = ListRows.buildGlobalSearchSummaryMenuTable(summaries, {
             on_select = onSelectCallback,
+            on_retry = options.on_retry_summary,
         }),
         close_callback = options.close_callback,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
@@ -374,7 +377,11 @@ local function buildMangaMenuTable(manga_list, onSelectCallback, options)
         show_in_library = true,
         on_select = onSelectCallback,
     })) do
-        table.insert(menu_table, row)
+        if type(row.manga) == "table" and row.manga.raw_menu_row == true then
+            table.insert(menu_table, row.manga)
+        else
+            table.insert(menu_table, row)
+        end
     end
     if options.on_next_page then
         table.insert(menu_table, {
