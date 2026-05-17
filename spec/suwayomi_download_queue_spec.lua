@@ -803,6 +803,86 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_paths[1])
     end)
 
+    it("treats scalar persisted queue data as empty during recovery", function()
+        local context = build_queue({
+            saved_queue = "legacy-queue",
+        })
+
+        assert.has_no.errors(function()
+            context.queue:recover()
+        end)
+        assert.are.same({}, context.saved_queue())
+        assert.are.equal(0, #context.scheduled)
+    end)
+
+    it("recovers valid jobs from mixed persisted queue data", function()
+        local context = build_queue({
+            saved_queue = {
+                "corrupt",
+                {
+                    key = "m1:398",
+                    state = "downloading",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+                legacy_map = {
+                    key = "m1:399",
+                    state = "queued",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "399", name = "Official_Vol. 1 Ch. 2" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        assert.are.equal(1, #context.saved_queue())
+        assert.are.equal("m1:398", context.saved_queue()[1].key)
+        assert.are.equal("queued", context.saved_queue()[1].state)
+        assert.are.equal(1, #context.queue.items)
+        assert.are.equal("m1:398", context.queue.items[1].key)
+        assert.are.equal(1, #context.scheduled)
+    end)
+
+    it("recovers gapped numeric persisted queue jobs in key order", function()
+        local context = build_queue({
+            saved_queue = {
+                [1] = {
+                    key = "m1:398",
+                    state = "queued",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+                [3] = {
+                    key = "m1:399",
+                    state = "queued",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "399", name = "Official_Vol. 1 Ch. 2" },
+                },
+                by_key = {
+                    key = "m1:400",
+                    state = "queued",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "400", name = "Official_Vol. 1 Ch. 3" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        assert.are.equal(2, #context.saved_queue())
+        assert.are.equal("m1:398", context.saved_queue()[1].key)
+        assert.are.equal("m1:399", context.saved_queue()[2].key)
+        assert.are.equal(2, #context.queue.items)
+        assert.are.equal("m1:398", context.queue.items[1].key)
+        assert.are.equal("m1:399", context.queue.items[2].key)
+    end)
+
     it("requeues interrupted downloads with preserved recovery progress", function()
         local context = build_queue({
             saved_queue = {

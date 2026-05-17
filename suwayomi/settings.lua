@@ -353,15 +353,47 @@ function SuwayomiSettings:saveDownloadDirectory(path)
 end
 
 function SuwayomiSettings:loadDownloadQueue()
-    return self:open():readSetting("download_queue", {})
+    local normalized, changed = self:normalizeDownloadQueue(self:open():readSetting("download_queue", {}))
+    if changed then
+        self:open():saveSetting("download_queue", normalized):flush()
+    end
+    return normalized
+end
+
+function SuwayomiSettings:normalizeDownloadQueue(jobs)
+    local normalized = {}
+    if type(jobs) ~= "table" then
+        return normalized, jobs ~= nil
+    end
+
+    local changed = false
+    local numeric_keys = {}
+    for key in pairs(jobs) do
+        if type(key) == "number" and key > 0 and math.floor(key) == key then
+            table.insert(numeric_keys, key)
+        else
+            changed = true
+        end
+    end
+    table.sort(numeric_keys)
+
+    for index, key in ipairs(numeric_keys) do
+        if key ~= index then
+            changed = true
+        end
+        local job = jobs[key]
+        if type(job) == "table" then
+            table.insert(normalized, job)
+        else
+            changed = true
+        end
+    end
+
+    return normalized, changed
 end
 
 function SuwayomiSettings:saveDownloadQueue(jobs)
-    local normalized = {}
-    for _, job in ipairs(jobs or {}) do
-        table.insert(normalized, job)
-    end
-
+    local normalized = self:normalizeDownloadQueue(jobs)
     self:open():saveSetting("download_queue", normalized):flush()
     return normalized
 end

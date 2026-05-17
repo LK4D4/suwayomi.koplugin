@@ -246,6 +246,69 @@ describe("suwayomi/settings", function()
         assert.are.same({}, settings:loadDownloadQueue())
     end)
 
+    it("treats scalar download queue settings as empty", function()
+        stored_data.download_queue = "legacy-queue"
+
+        local settings = require("suwayomi/settings")
+
+        assert.are.same({}, settings:loadDownloadQueue())
+    end)
+
+    it("flushes scalar download queue settings as an empty list", function()
+        stored_data.download_queue = "legacy-queue"
+
+        local settings = require("suwayomi/settings")
+
+        assert.are.same({}, settings:loadDownloadQueue())
+        assert.is_true(flushed)
+        assert.are.same({}, stored_data.download_queue)
+    end)
+
+    it("preserves list download queue jobs while dropping malformed entries", function()
+        local job = {
+            key = "m1:398",
+            state = "queued",
+            download_directory = "/books",
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+        }
+        stored_data.download_queue = {
+            job,
+            "corrupt",
+            by_key = "legacy-map-entry",
+        }
+
+        local settings = require("suwayomi/settings")
+
+        assert.are.same({ job }, settings:loadDownloadQueue())
+    end)
+
+    it("preserves gapped numeric download queue jobs in key order", function()
+        local first_job = {
+            key = "m1:398",
+            state = "queued",
+            download_directory = "/books",
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+        }
+        local second_job = {
+            key = "m1:399",
+            state = "queued",
+            download_directory = "/books",
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapter = { id = "399", name = "Official_Vol. 1 Ch. 2" },
+        }
+        stored_data.download_queue = {
+            [1] = first_job,
+            [3] = second_job,
+            by_key = { key = "legacy-map-entry" },
+        }
+
+        local settings = require("suwayomi/settings")
+
+        assert.are.same({ first_job, second_job }, settings:loadDownloadQueue())
+    end)
+
     it("saves download queue jobs and flushes the settings file", function()
         local jobs = {
             {

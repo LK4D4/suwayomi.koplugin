@@ -25,7 +25,7 @@ Fresh review baseline:
   - Direction: add timeout/cleanup handling that clears only the matching active job token after subprocess termination/reap.
   - Test: simulate timeout/reap path and assert a later sync can start.
 
-- [ ] Normalize persisted download queue before recovery.
+- [x] Normalize persisted download queue before recovery.
   - Files: `suwayomi/settings.lua`, `suwayomi/downloads/job_store.lua`, `suwayomi/downloads/queue.lua`, settings/download queue specs
   - Risk: corrupt or legacy scalar `download_queue` can crash startup recovery through `ipairs`.
   - Direction: treat non-list persisted queue data as empty or recoverable invalid data before `JobStore` and queue recovery iterate it.

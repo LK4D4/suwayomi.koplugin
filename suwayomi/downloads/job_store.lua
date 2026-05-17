@@ -11,6 +11,38 @@
 local JobStore = {}
 JobStore.__index = JobStore
 
+local function normalizeJobList(jobs)
+    local normalized = {}
+    if type(jobs) ~= "table" then
+        return normalized, jobs ~= nil
+    end
+
+    local changed = false
+    local numeric_keys = {}
+    for key in pairs(jobs) do
+        if type(key) == "number" and key > 0 and math.floor(key) == key then
+            table.insert(numeric_keys, key)
+        else
+            changed = true
+        end
+    end
+    table.sort(numeric_keys)
+
+    for index, key in ipairs(numeric_keys) do
+        if key ~= index then
+            changed = true
+        end
+        local job = jobs[key]
+        if type(job) == "table" then
+            table.insert(normalized, job)
+        else
+            changed = true
+        end
+    end
+
+    return normalized, changed
+end
+
 function JobStore:new(options)
     options = options or {}
     return setmetatable({
@@ -25,14 +57,19 @@ function JobStore:load()
     if not self.settings or not self.settings.loadDownloadQueue then
         return {}
     end
-    return self.settings:loadDownloadQueue() or {}
+    local jobs, changed = normalizeJobList(self.settings:loadDownloadQueue())
+    if changed and self.settings.saveDownloadQueue then
+        self.settings:saveDownloadQueue(jobs)
+    end
+    return jobs
 end
 
 function JobStore:save(jobs)
+    local normalized = normalizeJobList(jobs)
     if not self.settings or not self.settings.saveDownloadQueue then
-        return jobs or {}
+        return normalized
     end
-    return self.settings:saveDownloadQueue(jobs or {})
+    return self.settings:saveDownloadQueue(normalized)
 end
 
 function JobStore:normalizeProgress(progress)

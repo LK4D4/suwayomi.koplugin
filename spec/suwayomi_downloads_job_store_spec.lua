@@ -129,6 +129,29 @@ describe("suwayomi/downloads/job_store", function()
         }))
     end)
 
+    it("loads non-list persisted queue data as empty", function()
+        local store = build_store("legacy-queue")
+
+        assert.are.same({}, store:load())
+    end)
+
+    it("loads valid list jobs while dropping malformed persisted entries", function()
+        local valid_job = {
+            key = "m1:398",
+            state = "queued",
+            download_directory = "/books",
+            manga = { id = "m1", title = "Sousou no Frieren" },
+            chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+        }
+        local store = build_store({
+            valid_job,
+            true,
+            by_key = { key = "legacy-map" },
+        })
+
+        assert.are.same({ valid_job }, store:load())
+    end)
+
     it("upserts, finds, and removes jobs through the download_queue settings key", function()
         local store, saved, save_count = build_store()
         local job = store:buildJob({ id = "m1", title = "Manga" }, { id = "c1", name = "Chapter" }, "/books")
