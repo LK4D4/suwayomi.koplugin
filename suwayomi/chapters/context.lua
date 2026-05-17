@@ -13,6 +13,9 @@ local SuwayomiSettings = require("suwayomi/settings")
 local ChapterContext = {}
 ChapterContext.__index = ChapterContext
 
+local CHAPTER_SCREEN_MANGA_TITLE_MAX_LENGTH = 47
+local CHAPTER_SCREEN_SOURCE_TITLE_MAX_LENGTH = 24
+
 -- Controllers expose new(deps) for a consistent boundary; methods remain plugin-bound mixins so this refactor can move code without changing callback behavior.
 function ChapterContext:new(deps)
     deps = deps or {}
@@ -22,6 +25,74 @@ function ChapterContext:new(deps)
 end
 
 local Methods = {}
+
+local function firstNonEmptyString(...)
+    for index = 1, select("#", ...) do
+        local value = select(index, ...)
+        if value ~= nil and value ~= "" then
+            return tostring(value)
+        end
+    end
+    return nil
+end
+
+local function truncateTitlePart(value, max_length)
+    if not value or #value <= max_length then
+        return value
+    end
+    local prefix_char_count = max_length - 3
+    local char_count = 0
+    local index = 1
+    local cutoff_index
+    while index <= #value do
+        if char_count == prefix_char_count and not cutoff_index then
+            cutoff_index = index - 1
+        end
+        char_count = char_count + 1
+        local byte = value:byte(index)
+        if byte < 0x80 then
+            index = index + 1
+        elseif byte < 0xE0 then
+            index = index + 2
+        elseif byte < 0xF0 then
+            index = index + 3
+        else
+            index = index + 4
+        end
+    end
+    if char_count <= max_length then
+        return value
+    end
+    return value:sub(1, cutoff_index or (max_length - 3)) .. "..."
+end
+
+local function getMangaSourceTitle(manga)
+    if type(manga) ~= "table" or type(manga.source) ~= "table" then
+        return nil
+    end
+    return firstNonEmptyString(
+        manga.source.displayName,
+        manga.source.display_name,
+        manga.source.name,
+        manga.source.raw_name,
+        manga.source.id
+    )
+end
+
+local function formatChapterScreenContext(manga)
+    if type(manga) ~= "table" then
+        return nil
+    end
+    local manga_title = truncateTitlePart(
+        firstNonEmptyString(manga.title, manga.name, manga.id),
+        CHAPTER_SCREEN_MANGA_TITLE_MAX_LENGTH
+    )
+    local source_title = truncateTitlePart(getMangaSourceTitle(manga), CHAPTER_SCREEN_SOURCE_TITLE_MAX_LENGTH)
+    if manga_title and source_title then
+        return manga_title .. " - " .. source_title
+    end
+    return manga_title or source_title
+end
 
 function Methods:isCurrentChapterContextForManga(manga)
     if not self.current_chapter_context or not manga then
@@ -249,10 +320,14 @@ function Methods:formatChapterListTitle(manga)
     return title
 end
 
-function Methods:formatChapterListScreenTitle()
+function Methods:formatChapterListScreenTitle(manga)
     local selected_count = self:getSelectedChapterCount()
     if self.selection_mode then
         return T(_("%1 selected"), selected_count)
+    end
+    local context = formatChapterScreenContext(manga)
+    if context then
+        return _("Chapters") .. " - " .. context
     end
     return _("Chapters")
 end
