@@ -176,7 +176,7 @@ Baseline at review time:
 
 ## P3 Polish
 
-- [ ] **Ignore late global-search finish after timeout**
+- [x] **Ignore late global-search finish after timeout**
   - Files: `suwayomi/client/global_search.lua`
   - Risk: future or fake job helper can flip a timed-out summary back to success.
   - Direction: return from finish when active job is canceled or summary no longer says `searching`.
