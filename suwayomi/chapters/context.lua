@@ -139,7 +139,7 @@ function Methods:getFirstUnreadChapterForManga(manga)
         return nil
     end
 
-    for _, chapter in ipairs(context.chapters or {}) do
+    for _, chapter in ipairs(self:getVisibleChapters(context.chapters or {})) do
         if chapter.is_read ~= true then
             return chapter
         end

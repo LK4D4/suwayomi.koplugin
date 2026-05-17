@@ -22,18 +22,25 @@ end
 local function getFirstUnreadFromContext(owner, manga)
     local context = owner and owner.current_chapter_context
     if not isContextForManga(context, manga) then
-        return nil
+        return nil, false
     end
-    for _, chapter in ipairs(context.chapters or {}) do
+    local chapters = context.chapters or {}
+    if owner.getVisibleChapters then
+        chapters = owner:getVisibleChapters(chapters) or {}
+    end
+    for _, chapter in ipairs(chapters) do
         if chapter.is_read ~= true then
-            return chapter
+            return chapter, true
         end
     end
-    return nil
+    return nil, true
 end
 
 local function canOpenFirstUnread(owner, manga)
-    local chapter = getFirstUnreadFromContext(owner, manga) or (manga and manga.first_unread_chapter)
+    local chapter, has_context = getFirstUnreadFromContext(owner, manga)
+    if not chapter and not has_context then
+        chapter = manga and manga.first_unread_chapter
+    end
     if not chapter or not owner or not owner.isChapterDownloaded then
         return false
     end

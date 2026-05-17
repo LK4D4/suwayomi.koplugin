@@ -51,7 +51,7 @@ Fresh review baseline:
   - Direction: defer empty-context warning until after async load path has had a chance to populate chapters.
   - Test: first-time action with chapters not yet loaded does not emit the false warning.
 
-- [ ] Respect scanlator filter in Open first unread.
+- [x] Respect scanlator filter in Open first unread.
   - Files: `suwayomi/chapters/context.lua`, `suwayomi/manga/action_menu.lua`, chapter/manga specs
   - Risk: title action can open a hidden chapter from another scanlator while the filtered list shows only the selected scanlator.
   - Direction: share the filtered chapter iteration used by next-unread download behavior.

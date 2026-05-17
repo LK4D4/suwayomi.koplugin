@@ -366,6 +366,71 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("Open first unread", state.manga_actions_options.actions[2].text)
     end)
 
+    it("builds first-unread action from visible scanlator-filtered chapters only", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Frieren" }
+        local team_a = { id = "c1", name = "Ch. 1", scanlator = "Team A", is_read = false }
+        local team_b = { id = "c2", name = "Ch. 2", scanlator = "Team B", is_read = false }
+        plugin.current_scanlator_filter = "Team B"
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = {
+                team_a,
+                team_b,
+            },
+        }
+        function plugin:getVisibleChapters(chapters)
+            local visible = {}
+            for _, chapter in ipairs(chapters or {}) do
+                if chapter.scanlator == self.current_scanlator_filter then
+                    table.insert(visible, chapter)
+                end
+            end
+            return visible
+        end
+        function plugin:isChapterDownloaded(_, chapter)
+            return chapter == team_b
+        end
+
+        plugin:showMangaActions(manga)
+
+        assert.is_true(hasAction(state.manga_actions_options.actions, "open_first_unread"))
+    end)
+
+    it("hides first-unread action when filtered context has no unread visible chapters", function()
+        local plugin, state = installController()
+        local hidden = { id = "c1", name = "Ch. 1", scanlator = "Team A", is_read = false }
+        local manga = {
+            id = "m1",
+            title = "Frieren",
+            first_unread_chapter = hidden,
+        }
+        plugin.current_scanlator_filter = "Team B"
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = {
+                hidden,
+                { id = "c2", name = "Ch. 2", scanlator = "Team B", is_read = true },
+            },
+        }
+        function plugin:getVisibleChapters(chapters)
+            local visible = {}
+            for _, chapter in ipairs(chapters or {}) do
+                if chapter.scanlator == self.current_scanlator_filter then
+                    table.insert(visible, chapter)
+                end
+            end
+            return visible
+        end
+        function plugin:isChapterDownloaded(_, chapter)
+            return chapter == hidden
+        end
+
+        plugin:showMangaActions(manga)
+
+        assert.is_false(hasAction(state.manga_actions_options.actions, "open_first_unread"))
+    end)
+
     it("adds and removes library manga through API and confirmation wiring", function()
         local plugin, state = installController()
         local manga = { id = "m1", title = "Frieren", in_library = false }

@@ -152,6 +152,27 @@ describe("suwayomi/chapters/context", function()
         }, plugin:getNextUnreadChaptersForDownload(manga, 2))
     end)
 
+    it("scopes first unread lookup to the current scanlator filter", function()
+        local controller = require("suwayomi/chapters/context")
+        local manga = { id = "m1", title = "Manga" }
+        local team_b = { id = "2", name = "Two", scanlator = "Team B", is_read = false }
+        local plugin = {
+            current_scanlator_filter = "Team B",
+            current_chapter_context = {
+                manga = manga,
+                chapters = {
+                    { id = "1", name = "One", scanlator = "Team A", is_read = false },
+                    team_b,
+                },
+            },
+        }
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        assert.are.same(team_b, plugin:getFirstUnreadChapterForManga(manga))
+    end)
+
     it("restores saved scanlator filter when setting chapter context", function()
         local controller = require("suwayomi/chapters/context")
         local manga = { id = "m1", title = "Manga" }
