@@ -297,33 +297,19 @@ function Methods:handleChapterTap(manga, chapter)
 end
 
 
-function Methods:getChaptersThrough(chapter)
+function Methods:getChaptersBefore(chapter)
     local chapters = {}
     if not self.current_chapter_context or not self.current_chapter_context.chapters then
         return chapters
     end
 
-    local found = false
     for _, current in ipairs(self:getVisibleChapters(self.current_chapter_context.chapters)) do
-        table.insert(chapters, current)
         if tostring(current.id or "") == tostring(chapter.id or "") then
-            found = true
-            break
+            return chapters
         end
+        table.insert(chapters, current)
     end
-    if not found then
-        return {}
-    end
-    return chapters
-end
-
-
-function Methods:getChaptersBefore(chapter)
-    local chapters = self:getChaptersThrough(chapter)
-    if #chapters > 0 then
-        table.remove(chapters)
-    end
-    return chapters
+    return {}
 end
 
 

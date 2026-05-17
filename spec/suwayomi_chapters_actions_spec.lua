@@ -234,9 +234,6 @@ describe("suwayomi/chapters/actions", function()
             getChaptersBefore = function(_, selected)
                 return options.chapters_before or { selected }
             end,
-            getChaptersThrough = function(_, selected)
-                return options.chapters_through or { selected }
-            end,
         }
 
         local Actions = require("suwayomi/chapters/actions")
@@ -433,6 +430,18 @@ describe("suwayomi/chapters/actions", function()
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
             "/downloads/Manga/Chapter 1.cbz.sdr",
         }, removed_paths)
+    end)
+
+    it("does not dispatch the removed mark-through chapter action", function()
+        local plugin = build_plugin()
+        local called = false
+        function plugin:markChaptersReadThrough()
+            called = true
+            return true
+        end
+
+        assert.is_false(plugin:performChapterAction(manga, chapter, "mark_through_read"))
+        assert.is_false(called)
     end)
 
     it("confirms selected download deletion before removing local files", function()

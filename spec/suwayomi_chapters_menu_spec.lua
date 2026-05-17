@@ -243,6 +243,32 @@ describe("suwayomi/chapters/menu", function()
         assert.is_true(bulk_actions[#bulk_actions].destructive)
     end)
 
+    it("offers mark previous read without the ambiguous mark-through action", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local plugin = {}
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+        function plugin:isChapterDownloaded()
+            return false
+        end
+
+        local actions = plugin:getChapterActions({ id = "m1" }, {
+            id = "c1",
+            name = "Chapter 1",
+            is_read = false,
+        })
+        local action_ids = {}
+        for _, action in ipairs(actions) do
+            action_ids[action.id] = true
+        end
+
+        assert.is_true(action_ids.mark_previous_read)
+        assert.is_nil(action_ids.mark_through_read)
+    end)
+
     it("marks bulk chapter actions that open submenus", function()
         helper.stubControllerDependencies()
         package.loaded["suwayomi/chapters/menu"] = nil

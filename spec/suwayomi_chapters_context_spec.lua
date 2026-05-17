@@ -56,7 +56,7 @@ describe("suwayomi/chapters/context", function()
         })
     end)
 
-    it("builds previous/through ranges from visible scanlator-filtered chapters", function()
+    it("builds previous ranges from visible scanlator-filtered chapters", function()
         local controller = require("suwayomi/chapters/context")
         local plugin = {
             current_scanlator_filter = "Team A",
@@ -75,10 +75,6 @@ describe("suwayomi/chapters/context", function()
         assert.are.same({
             { id = "1", name = "One", scanlator = "Team A" },
         }, plugin:getChaptersBefore({ id = "3" }))
-        assert.are.same({
-            { id = "1", name = "One", scanlator = "Team A" },
-            { id = "3", name = "Three", scanlator = "Team A" },
-        }, plugin:getChaptersThrough({ id = "3" }))
     end)
 
     it("scopes manga-level next unread downloads to the current scanlator filter", function()

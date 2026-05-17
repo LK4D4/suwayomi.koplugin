@@ -166,10 +166,6 @@ function Methods:markChaptersBeforeRead(manga, chapter)
     return self:markChapterListRead(manga, self:getChaptersBefore(chapter))
 end
 
-function Methods:markChaptersReadThrough(manga, chapter)
-    return self:markChapterListRead(manga, self:getChaptersThrough(chapter))
-end
-
 ChapterReadActions.methods = Methods
 
 return ChapterReadActions

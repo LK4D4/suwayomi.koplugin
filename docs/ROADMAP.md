@@ -21,7 +21,7 @@ For the first remote-source release, prioritize this scenario:
 2. The reader searches across enabled sources, or searches/browses within one source.
 3. The reader opens a manga chapter list.
 4. The reader filters the chapter list by scanlator/translation group when duplicate translations exist.
-5. The reader marks already-read chapters as read, either selected chapters or everything before/through a chapter.
+5. The reader marks already-read chapters as read, either selected chapters or previous chapters before a selected chapter.
 6. The reader downloads the whole manga, all unread chapters, or a one-shot next-chapter batch.
 7. The reader can enable a download-ahead buffer that queues only missing downloads for the next unread window.
 8. After reading, the plugin best-effort syncs read state.
@@ -295,7 +295,7 @@ Goal: add WebUI-inspired manga and chapter actions that fit the Library, Browse,
 - [x] Add explicit removal of read local downloads without deleting active downloads
 - [x] Preserve scanlator on parsed chapter nodes
 - [x] Add chapter-list filter by scanlator/translation group
-- [x] Keep existing selected-chapter and mark previous/through-here actions available because they cover the "already read this far" setup flow
+- [x] Keep existing selected-chapter and mark-previous actions available because they cover the "already read this far" setup flow
 - [ ] Consider manga-level `Mark all read` / `Mark all unread` only if it can share existing selected/bulk read-state helpers safely
 - [x] Refresh visible row state after add/remove/refresh when possible
 

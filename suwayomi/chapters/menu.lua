@@ -264,7 +264,6 @@ function Methods:getChapterActions(manga, chapter)
     else
         table.insert(actions, { id = "mark_read", text = _("Mark as read") })
         table.insert(actions, { id = "mark_previous_read", text = _("Mark previous as read") })
-        table.insert(actions, { id = "mark_through_read", text = _("Mark through here") })
     end
     if downloaded then
         table.insert(actions, { id = "delete", text = _("Delete from device"), destructive = true })

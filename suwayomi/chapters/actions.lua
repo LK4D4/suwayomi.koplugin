@@ -94,9 +94,6 @@ function Methods:performChapterAction(manga, chapter, action_id)
     if action_id == "mark_previous_read" then
         return self:markChaptersBeforeRead(manga, chapter)
     end
-    if action_id == "mark_through_read" then
-        return self:markChaptersReadThrough(manga, chapter)
-    end
     if action_id == "mark_unread" then
         return self:markChapterUnread(manga, chapter)
     end

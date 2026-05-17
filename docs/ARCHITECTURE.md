@@ -90,7 +90,7 @@ Chapters and read state:
 - `suwayomi/chapters/actions.lua`: chapter and selected-chapter action facade.
 - `suwayomi/chapters/local_downloads.lua`: local archive existence/open/delete helpers.
 - `suwayomi/chapters/delete_actions.lua`: device delete and batch cleanup flows.
-- `suwayomi/chapters/read_actions.lua`: read/unread actions and previous/through-here orchestration.
+- `suwayomi/chapters/read_actions.lua`: read/unread actions and mark-previous orchestration.
 - `suwayomi/readsync/ledger.lua`: local read ledger persistence.
 - `suwayomi/readsync/koreader_metadata.lua`: KOReader sidecar/history inspection.
 - `suwayomi/readsync/worker.lua`: background read-sync worker behavior.
