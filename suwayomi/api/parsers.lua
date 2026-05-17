@@ -141,6 +141,9 @@ function Parsers.parseSourcesResponse(response_body)
 
     local parsed_sources = {}
     for _, source in ipairs(sources) do
+        if type(source) ~= "table" or source.id == nil then
+            return nil, "Suwayomi server returned invalid source data."
+        end
         table.insert(parsed_sources, {
             id = tostring(source.id),
             name = source.displayName or ((source.name or tostring(source.id)) .. (source.lang and source.lang ~= "" and source.lang ~= "localsourcelang" and (" (" .. string.upper(source.lang) .. ")") or "")),
@@ -345,6 +348,9 @@ function Parsers.parseUpdateMangaLibraryResponse(response_body)
         local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
         return nil, graph_error or "Suwayomi server did not update manga library state."
     end
+    if manga.id == nil then
+        return nil, "Suwayomi server returned invalid manga data."
+    end
 
     return {
         id = tostring(manga.id),
@@ -440,6 +446,9 @@ function Parsers.parseChapterPagesResponse(response_body)
         local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
         return nil, graph_error or "Suwayomi server did not return chapter pages."
     end
+    if chapter.id == nil then
+        return nil, "Suwayomi server returned invalid chapter data."
+    end
     for _, page_url in ipairs(pages) do
         if type(page_url) ~= "string" or page_url == "" then
             return nil, "Suwayomi server returned invalid chapter page URLs."
@@ -506,6 +515,9 @@ function Parsers.parseMarkChapterReadResponse(response_body)
         local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
         return nil, graph_error or "Suwayomi server did not update chapter read state."
     end
+    if chapter.id == nil then
+        return nil, "Suwayomi server returned invalid chapter data."
+    end
 
     return {
         id = tostring(chapter.id),
@@ -531,6 +543,9 @@ function Parsers.parseMarkChaptersReadResponse(response_body)
 
     local chapters = {}
     for _, chapter in ipairs(chapter_nodes) do
+        if type(chapter) ~= "table" or chapter.id == nil then
+            return nil, "Suwayomi server returned invalid chapter data."
+        end
         table.insert(chapters, {
             id = tostring(chapter.id),
             is_read = chapter.isRead == true,

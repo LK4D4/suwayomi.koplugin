@@ -33,7 +33,7 @@ Fresh review baseline:
 
 ## P2 Release Risks
 
-- [ ] Harden API parsers against malformed child nodes and missing IDs.
+- [x] Harden API parsers against malformed child nodes and missing IDs.
   - Files: `suwayomi/api/parsers.lua`, API parser specs
   - Risk: partial GraphQL responses can crash workers or turn missing IDs into the string `"nil"`.
   - Direction: reject non-table nodes and missing required IDs consistently in source, library update, page, and bulk-read parser paths.

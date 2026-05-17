@@ -226,4 +226,53 @@ describe("suwayomi/api/parsers", function()
         assert.is_nil(categories)
         assert.are.equal("Suwayomi server returned invalid category data.", category_error)
     end)
+
+    it("rejects malformed source, update, page, and bulk-read nodes explicitly", function()
+        local sources, sources_error = parsers.parseSourcesResponse([[
+            { "data": { "sources": { "nodes": [
+                { "name": "Missing id" }
+            ] } } }
+        ]])
+        assert.is_nil(sources)
+        assert.are.equal("Suwayomi server returned invalid source data.", sources_error)
+
+        local scalar_sources, scalar_sources_error = parsers.parseSourcesResponse([[
+            { "data": { "sources": { "nodes": [
+                "not a source"
+            ] } } }
+        ]])
+        assert.is_nil(scalar_sources)
+        assert.are.equal("Suwayomi server returned invalid source data.", scalar_sources_error)
+
+        local updated, update_error = parsers.parseUpdateMangaLibraryResponse([[
+            { "data": { "updateManga": { "manga": { "title": "Missing id" } } } }
+        ]])
+        assert.is_nil(updated)
+        assert.are.equal("Suwayomi server returned invalid manga data.", update_error)
+
+        local pages, pages_error = parsers.parseChapterPagesResponse([[
+            { "data": { "fetchChapterPages": {
+                "pages": [ "/api/v1/page/0" ],
+                "chapter": { "name": "Missing id" }
+            } } }
+        ]])
+        assert.is_nil(pages)
+        assert.are.equal("Suwayomi server returned invalid chapter data.", pages_error)
+
+        local bulk, bulk_error = parsers.parseMarkChaptersReadResponse([[
+            { "data": { "updateChapters": { "chapters": [
+                { "isRead": true }
+            ] } } }
+        ]])
+        assert.is_nil(bulk)
+        assert.are.equal("Suwayomi server returned invalid chapter data.", bulk_error)
+
+        local scalar_bulk, scalar_bulk_error = parsers.parseMarkChaptersReadResponse([[
+            { "data": { "updateChapters": { "chapters": [
+                "not a chapter"
+            ] } } }
+        ]])
+        assert.is_nil(scalar_bulk)
+        assert.are.equal("Suwayomi server returned invalid chapter data.", scalar_bulk_error)
+    end)
 end)
