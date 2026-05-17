@@ -280,8 +280,10 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("Browse", menu[4].text)
         assert.are.equal("Downloads", menu[5].text)
         assert.are.equal("Login information", connection_menu.sub_item_table[1].text)
-        assert.is_nil(connection_menu.sub_item_table[2])
+        assert.are.equal("Test connection", connection_menu.sub_item_table[2].text)
+        assert.is_nil(connection_menu.sub_item_table[3])
         assert.is_true(connection_menu.sub_item_table[1].keep_menu_open)
+        assert.is_true(connection_menu.sub_item_table[2].keep_menu_open)
 
         menu[1].callback()
         assert.truthy(state.onboarding_connection_options)
@@ -292,6 +294,14 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("https://new.example", state.saved_credentials.server_url)
         assert.are.equal(1, state.refresh_count)
         assert.are.equal("Suwayomi login settings saved for https://new.example.", state.messages[#state.messages])
+
+        connection_menu.sub_item_table[2].callback(state.touchmenu)
+        assert.are.equal("https://new.example", state.started_connection_job.active.credentials.server_url)
+        state.started_connection_job.on_finish(state.started_connection_job.active, {
+            ok = true,
+            message = "Connection test passed.",
+        })
+        assert.are.equal("Connection test passed.", state.messages[#state.messages])
     end)
 
     it("runs first-run setup as connection test then download folder", function()
