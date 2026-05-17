@@ -37,3 +37,6 @@ jobs:
 
     - name: Run tests
       run: busted spec
+
+    - name: Smoke check release payload
+      run: bash .github/scripts/stage-release-payload.sh

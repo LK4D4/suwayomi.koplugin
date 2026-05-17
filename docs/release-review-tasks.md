@@ -93,7 +93,7 @@ Fresh review baseline:
   - Direction: fail release if tag name does not match `_meta.lua` `version`.
   - Test: add workflow/script check or local equivalent for tag/version sync.
 
-- [ ] Add PR CI smoke check for release payload.
+- [x] Add PR CI smoke check for release payload.
   - Files: `.github/workflows/test.yml`, `.github/workflows/release.yml`
   - Risk: payload packaging regressions are discovered only at tag-release time.
   - Direction: build or stage the release payload during Test workflow and assert it includes only `_meta.lua`, `main.lua`, `README.md`, and `suwayomi/`.

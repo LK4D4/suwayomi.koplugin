@@ -41,9 +41,7 @@ jobs:
 
       - name: Build project
         run: |
-          mkdir suwayomi_dl.koplugin
-          cp _meta.lua main.lua README.md suwayomi_dl.koplugin/
-          cp -R suwayomi suwayomi_dl.koplugin/
+          bash .github/scripts/stage-release-payload.sh
           zip -r suwayomi_dl.koplugin.zip suwayomi_dl.koplugin/
 
       - name: Release
