@@ -106,6 +106,9 @@ describe("suwayomi/ui/list_menu", function()
         package.preload["ui/widget/container/inputcontainer"] = function()
             return {
                 extend = function(_, definition)
+                    definition.new = definition.new or function(_, options)
+                        return options or {}
+                    end
                     return definition
                 end,
             }
@@ -278,6 +281,66 @@ describe("suwayomi/ui/list_menu", function()
         assert.is_true(menu:onClose())
         assert.is_true(intercepted)
         assert.is_false(base_closed)
+    end)
+
+    it("notifies callers after visible page changes", function()
+        local ListMenu = require("suwayomi/ui/list_menu")
+        local calls = {}
+        local menu = {
+            page = 2,
+            item_table = {
+                { text = "A" },
+                { text = "B" },
+                { text = "C" },
+            },
+            layout = {},
+            item_group = {
+                clear = function() end,
+            },
+            page_info = {
+                resetLayout = function() end,
+            },
+            return_button = {
+                resetLayout = function() end,
+            },
+            content_group = {
+                resetLayout = function() end,
+            },
+            _recalculateDimen = function(self)
+                self.perpage = 1
+                self.page_num = 3
+                self.item_width = 320
+                self.item_height = 64
+                self.item_dimen = { h = 64, copy = function(value) return value end }
+            end,
+            updatePageInfo = function() end,
+            mergeTitleBarIntoLayout = function() end,
+            show_parent = "menu",
+            line_color = "black",
+        }
+
+        ListMenu.install(menu, {
+            on_page_changed = function(changed_menu, page)
+                table.insert(calls, { menu = changed_menu, page = page })
+            end,
+        })
+
+        menu:updateItems()
+
+        assert.are.equal(1, #calls)
+        assert.are.equal(menu, calls[1].menu)
+        assert.are.equal(2, calls[1].page)
+
+        menu:updateItems()
+
+        assert.are.equal(1, #calls)
+
+        menu.page = 3
+        menu:updateItems()
+
+        assert.are.equal(2, #calls)
+        assert.are.equal(menu, calls[2].menu)
+        assert.are.equal(3, calls[2].page)
     end)
 
     it("uses compact rows for section headers", function()

@@ -745,6 +745,10 @@ function ListMenu.updateItems(menu, select_number, no_recalculate_dimen)
         return "ui", refresh_dimen, true
     end)
     ListMenu.startVisibleThumbnailJobs(menu, visible_items)
+    if type(menu._suwayomi_on_page_changed) == "function" and menu.page ~= menu._suwayomi_last_notified_page then
+        menu._suwayomi_last_notified_page = menu.page
+        menu._suwayomi_on_page_changed(menu, menu.page)
+    end
 end
 
 local function cancelThumbnailJobs(menu)
@@ -765,6 +769,11 @@ end
 function ListMenu.install(menu, options)
     menu._suwayomi_thumbnail_credentials = options and options.thumbnail_credentials
     menu._suwayomi_on_close = options and options.on_close
+    local on_page_changed = options and options.on_page_changed
+    if menu._suwayomi_on_page_changed ~= on_page_changed then
+        menu._suwayomi_last_notified_page = nil
+    end
+    menu._suwayomi_on_page_changed = on_page_changed
     menu._suwayomi_thumbnail_active = menu._suwayomi_thumbnail_active or {}
     menu._suwayomi_thumbnail_active_count = menu._suwayomi_thumbnail_active_count or 0
     menu._suwayomi_thumbnail_generation = menu._suwayomi_thumbnail_generation or 0
@@ -820,6 +829,11 @@ local function applyOptions(menu, options)
     menu_utils.applyCloseCallback(menu, options)
     menu._suwayomi_thumbnail_credentials = options and options.thumbnail_credentials
     menu._suwayomi_on_close = options and options.on_close
+    local on_page_changed = options and options.on_page_changed
+    if menu._suwayomi_on_page_changed ~= on_page_changed then
+        menu._suwayomi_last_notified_page = nil
+    end
+    menu._suwayomi_on_page_changed = on_page_changed
 end
 
 function ListMenu.show(options)
