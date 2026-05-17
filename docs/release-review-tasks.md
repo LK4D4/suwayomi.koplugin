@@ -111,7 +111,7 @@ Fresh review baseline:
   - Direction: check archive existence before clearing persistent job or notifying ready state for terminal progress.
   - Test: terminal `downloaded` or `skipped` progress with missing archive becomes failed/retained and sends no archive-ready notification.
 
-- [ ] Deduplicate failed jobs against recovered active/queued jobs.
+- [x] Deduplicate failed jobs against recovered active/queued jobs.
   - Files: `suwayomi/downloads/queue.lua`, `spec/suwayomi_download_queue_spec.lua`
   - Risk: corrupt settings can show same chapter active and failed; clearing failed can wipe status for active key.
   - Direction: apply recovered key dedup to failed jobs too.

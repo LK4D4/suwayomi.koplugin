@@ -1016,6 +1016,61 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal(1, #context.scheduled)
     end)
 
+    it("deduplicates recovered failed jobs against queued and downloading jobs", function()
+        local downloading_manga = { id = "m-downloading", title = "Frieren" }
+        local downloading_chapter = { id = "144", name = "Ch. 144" }
+        local queued_manga = { id = "m-queued", title = "Dandadan" }
+        local queued_chapter = { id = "192", name = "Ch. 192" }
+        local context = build_queue({
+            saved_queue = {
+                {
+                    key = "m-downloading:144",
+                    state = "downloading",
+                    download_directory = "/books",
+                    manga = downloading_manga,
+                    chapter = downloading_chapter,
+                },
+                {
+                    key = "m-downloading:144",
+                    state = "failed",
+                    download_directory = "/books",
+                    manga = downloading_manga,
+                    chapter = downloading_chapter,
+                    progress = { state = "failed", error = "old timeout" },
+                },
+                {
+                    key = "m-queued:192",
+                    state = "queued",
+                    download_directory = "/books",
+                    manga = queued_manga,
+                    chapter = queued_chapter,
+                },
+                {
+                    key = "m-queued:192",
+                    state = "failed",
+                    download_directory = "/books",
+                    manga = queued_manga,
+                    chapter = queued_chapter,
+                    progress = { state = "failed", error = "old network error" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        assert.are.equal(2, #context.saved_queue())
+        assert.are.equal("m-downloading:144", context.saved_queue()[1].key)
+        assert.are.equal("queued", context.saved_queue()[1].state)
+        assert.are.equal("m-queued:192", context.saved_queue()[2].key)
+        assert.are.equal("queued", context.saved_queue()[2].state)
+        assert.are.equal("queued", context.queue:getStatus(downloading_manga, downloading_chapter).state)
+        assert.are.equal("queued", context.queue:getStatus(queued_manga, queued_chapter).state)
+        assert.are.equal(0, #context.queue:getSnapshot().failed)
+        assert.are.equal(0, context.queue:clearFailed())
+        assert.are.equal("queued", context.queue:getStatus(downloading_manga, downloading_chapter).state)
+        assert.are.equal("queued", context.queue:getStatus(queued_manga, queued_chapter).state)
+    end)
+
     it("keeps failed jobs with progress failed during recovery", function()
         local context = build_queue({
             saved_queue = {

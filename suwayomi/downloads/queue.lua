@@ -460,6 +460,12 @@ function DownloadQueue:recover()
     local recovered_jobs = {}
     local should_process = false
     local seen_recovered_keys = {}
+    local recoverable_active_keys = {}
+    for _, job in ipairs(jobs) do
+        if job.manga and job.chapter and job.download_directory and (job.state == "queued" or job.state == "downloading") then
+            recoverable_active_keys[self:getKey(job.manga, job.chapter)] = true
+        end
+    end
     for _, job in ipairs(jobs) do
         if job.manga and job.chapter and job.download_directory and (job.state == "queued" or job.state == "downloading") then
             local recovered
@@ -479,19 +485,27 @@ function DownloadQueue:recover()
             else
                 seen_recovered_keys[key] = true
                 recovered.key = key
-            table.insert(recovered_jobs, recovered)
-            table.insert(self.items, {
-                key = recovered.key,
-                download_directory = recovered.download_directory,
-                manga = recovered.manga,
-                chapter = recovered.chapter,
-                downloader = self.downloader,
-            })
-            self:setStatus(recovered.manga, recovered.chapter, { state = "queued" })
-            should_process = true
+                table.insert(recovered_jobs, recovered)
+                table.insert(self.items, {
+                    key = recovered.key,
+                    download_directory = recovered.download_directory,
+                    manga = recovered.manga,
+                    chapter = recovered.chapter,
+                    downloader = self.downloader,
+                })
+                self:setStatus(recovered.manga, recovered.chapter, { state = "queued" })
+                should_process = true
             end
         elseif job.manga and job.chapter and job.state == "failed" then
-            if self:jobArchiveExists(job, job.progress) then
+            local key = self:getKey(job.manga, job.chapter)
+            if recoverable_active_keys[key] then
+                self:logDebug({
+                    operation = "downloadQueue.recover",
+                    event = "duplicate",
+                    key = key,
+                    chapter_id = job.chapter and job.chapter.id,
+                })
+            elseif self:jobArchiveExists(job, job.progress) then
                 self.statuses[job.key or self:getKey(job.manga, job.chapter)] = nil
             else
                 table.insert(recovered_jobs, job)
