@@ -47,6 +47,77 @@ describe("suwayomi/api/parsers", function()
         ]]))
     end)
 
+    it("parses source filter schema responses", function()
+        local parsed = assert(parsers.parseSourceFiltersResponse([[
+            { "data": { "source": {
+                "id": "s1",
+                "displayName": "MangaDex",
+                "name": "mangadex",
+                "filters": [
+                    { "__typename": "HeaderFilter", "name": "Tags" },
+                    { "__typename": "CheckBoxFilter", "name": "Completed", "default": false },
+                    { "__typename": "TriStateFilter", "name": "Official", "default": "IGNORE" },
+                    { "__typename": "SelectFilter", "name": "Demographic", "values": ["Any", "Shounen"], "default": 0 },
+                    { "__typename": "TextFilter", "name": "Author", "default": "" },
+                    { "__typename": "SortFilter", "name": "Sort", "values": ["Relevance"], "default": { "index": 0, "ascending": false } },
+                    { "__typename": "GroupFilter", "name": "Genres", "filters": [
+                        { "__typename": "CheckBoxFilter", "name": "Fantasy", "default": false },
+                        { "__typename": "UnknownNestedFilter", "name": "Nested unknown" }
+                    ] },
+                    { "__typename": "UnknownFilter", "name": "Show read-only" },
+                    { "__typename": "SelectFilter", "name": "Bad select" },
+                    { "__typename": "SortFilter", "name": "Bad sort", "values": ["Relevance"] },
+                    { "__typename": "GroupFilter", "name": "Bad group" },
+                    "bad"
+                ]
+            } } }
+        ]]))
+
+        assert.are.equal("s1", parsed.source.id)
+        assert.are.equal("MangaDex", parsed.source.display_name)
+        assert.are.equal("mangadex", parsed.source.name)
+        assert.are.equal(8, #parsed.filters)
+        assert.are.equal("HeaderFilter", parsed.filters[1].type)
+        assert.are.equal("CheckBoxFilter", parsed.filters[2].type)
+        assert.are.equal(false, parsed.filters[2].default)
+        assert.are.equal("TriStateFilter", parsed.filters[3].type)
+        assert.are.equal("IGNORE", parsed.filters[3].default)
+        assert.are.same({ "Any", "Shounen" }, parsed.filters[4].values)
+        assert.are.equal(0, parsed.filters[4].default)
+        assert.are.equal("", parsed.filters[5].default)
+        assert.are.same({ index = 0, ascending = false }, parsed.filters[6].default)
+        assert.are.equal("GroupFilter", parsed.filters[7].type)
+        assert.are.equal("Fantasy", parsed.filters[7].filters[1].name)
+        assert.are.equal("UnknownNestedFilter", parsed.filters[7].filters[2].type)
+        assert.is_true(parsed.filters[7].filters[2].unsupported)
+        assert.are.equal("UnknownFilter", parsed.filters[8].type)
+        assert.is_true(parsed.filters[8].unsupported)
+    end)
+
+    it("reports source filter parser and schema errors", function()
+        local invalid, invalid_error = parsers.parseSourceFiltersResponse("{")
+        assert.is_nil(invalid)
+        assert.are.equal("Invalid response from Suwayomi server.", invalid_error)
+
+        local missing, missing_error = parsers.parseSourceFiltersResponse([[{ "data": { "source": null } }]])
+        assert.is_nil(missing)
+        assert.are.equal("Suwayomi server did not return source filters.", missing_error)
+
+        local graph, graph_error = parsers.parseSourceFiltersResponse([[{"errors":[{"message":"No source found"}]}]])
+        assert.is_nil(graph)
+        assert.are.equal("No source found", graph_error)
+
+        assert.is_true(parsers.isSourceFiltersFieldError([[
+            { "errors": [ { "message": "Cannot query field \"filters\" on type \"SourceType\"" } ] }
+        ]]))
+        assert.is_true(parsers.isSourceFiltersFieldError([[
+            { "errors": [ { "message": "FieldUndefined: filters" } ] }
+        ]]))
+        assert.is_false(parsers.isSourceFiltersFieldError([[
+            { "errors": [ { "message": "Authentication failed" } ] }
+        ]]))
+    end)
+
     it("parses manga, library manga, categories, and refresh responses", function()
         local manga, has_next_page = parsers.parseMangaResponse([[
             { "data": { "fetchSourceManga": { "hasNextPage": true, "mangas": [

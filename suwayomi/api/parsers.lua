@@ -46,6 +46,73 @@ local function parseExtensionNode(extension)
     }
 end
 
+local function normalizeFilterType(filter)
+    local typename = filter.__typename or filter.type
+    if typename then
+        return tostring(typename)
+    end
+    return nil
+end
+
+local function parseFilterNode(filter)
+    if type(filter) ~= "table" then
+        return nil
+    end
+
+    local filter_type = normalizeFilterType(filter)
+    if not filter_type then
+        return nil
+    end
+    local name = filter.name ~= nil and tostring(filter.name) or ""
+    local parsed = {
+        type = filter_type,
+        name = name,
+    }
+    if filter_type == "HeaderFilter" or filter_type == "SeparatorFilter" then
+        return parsed
+    elseif filter_type == "CheckBoxFilter" then
+        parsed.default = filter.default == true
+        return parsed
+    elseif filter_type == "TriStateFilter" then
+        parsed.default = filter.default or "IGNORE"
+        return parsed
+    elseif filter_type == "SelectFilter" then
+        if type(filter.values) ~= "table" then
+            return nil
+        end
+        parsed.values = filter.values
+        parsed.default = tonumber(filter.default) or 0
+        return parsed
+    elseif filter_type == "TextFilter" then
+        parsed.default = filter.default ~= nil and tostring(filter.default) or ""
+        return parsed
+    elseif filter_type == "SortFilter" then
+        if type(filter.values) ~= "table" or type(filter.default) ~= "table" then
+            return nil
+        end
+        parsed.values = filter.values
+        parsed.default = {
+            index = tonumber(filter.default.index) or 0,
+            ascending = filter.default.ascending == true,
+        }
+        return parsed
+    elseif filter_type == "GroupFilter" then
+        if type(filter.filters) ~= "table" then
+            return nil
+        end
+        parsed.filters = {}
+        for _, child in ipairs(filter.filters) do
+            local parsed_child = parseFilterNode(child)
+            if parsed_child then
+                table.insert(parsed.filters, parsed_child)
+            end
+        end
+        return parsed
+    end
+    parsed.unsupported = true
+    return parsed
+end
+
 local function parseChapterNode(chapter)
     if type(chapter) ~= "table" or chapter.id == nil then
         return nil
@@ -195,6 +262,55 @@ function Parsers.isOptionalExtensionMetadataFieldError(response_body)
             or message:match("Unknown field")
             or message:match("FieldUndefined")
         if mentions_optional_field and looks_like_schema_error then
+            return true
+        end
+    end
+    return false
+end
+
+function Parsers.parseSourceFiltersResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local source = payload and payload.data and payload.data.source
+    if type(source) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not return source filters."
+    end
+
+    local filters = {}
+    for _, filter in ipairs(type(source.filters) == "table" and source.filters or {}) do
+        local parsed = parseFilterNode(filter)
+        if parsed then
+            table.insert(filters, parsed)
+        end
+    end
+
+    return {
+        source = {
+            id = source.id ~= nil and tostring(source.id) or nil,
+            display_name = source.displayName,
+            name = source.name,
+        },
+        filters = filters,
+    }
+end
+
+function Parsers.isSourceFiltersFieldError(response_body)
+    local payload = json.decode(response_body, 1, nil)
+    if type(payload) ~= "table" or type(payload.errors) ~= "table" then
+        return false
+    end
+
+    for _, graph_error in ipairs(payload.errors) do
+        local message = tostring(graph_error and graph_error.message or "")
+        local mentions_filters = message:match("filters")
+        local looks_like_schema_error = message:match("Cannot query field")
+            or message:match("Unknown field")
+            or message:match("FieldUndefined")
+        if mentions_filters and looks_like_schema_error then
             return true
         end
     end

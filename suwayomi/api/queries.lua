@@ -20,6 +20,24 @@ end
 
 local EXTENSION_FIELDS = "pkgName name lang versionName versionCode isNsfw isInstalled hasUpdate isObsolete iconUrl apkName repo"
 local LEGACY_EXTENSION_FIELDS = "pkgName name lang versionName versionCode isNsfw isInstalled hasUpdate isObsolete"
+local SOURCE_FILTER_FIELDS = table.concat({
+    "__typename",
+    "... on HeaderFilter { name }",
+    "... on SeparatorFilter { name }",
+    "... on SelectFilter { name values default }",
+    "... on TextFilter { name default }",
+    "... on CheckBoxFilter { name default }",
+    "... on TriStateFilter { name default }",
+    "... on SortFilter { name values default { index ascending } }",
+}, " ")
+local GROUP_FILTER_FIELDS_DEPTH_1 = SOURCE_FILTER_FIELDS
+    .. " ... on GroupFilter { name filters { "
+    .. SOURCE_FILTER_FIELDS
+    .. " } }"
+local GROUP_FILTER_FIELDS = SOURCE_FILTER_FIELDS
+    .. " ... on GroupFilter { name filters { "
+    .. GROUP_FILTER_FIELDS_DEPTH_1
+    .. " } }"
 
 function Queries._buildSourcesQuery()
     return json.encode({
@@ -36,6 +54,17 @@ end
 function Queries._buildLegacySourcesQuery()
     return json.encode({
         query = "query getSources { sources { nodes { id name displayName lang } } }",
+    })
+end
+
+function Queries._buildSourceFiltersQuery(source_id)
+    return json.encode({
+        query = "query GET_SOURCE_FILTERS($id: Long!) { source(id: $id) { id displayName name filters { "
+            .. GROUP_FILTER_FIELDS
+            .. " } } }",
+        variables = {
+            id = tostring(source_id or ""),
+        },
     })
 end
 
@@ -90,7 +119,7 @@ function Queries._buildMangaQuery(options)
     if options.query and options.query ~= "" then
         input.query = options.query
     end
-    if options.filters then
+    if input.type == "SEARCH" and options.filters then
         input.filters = options.filters
     end
 

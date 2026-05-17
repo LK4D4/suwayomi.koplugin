@@ -23,6 +23,7 @@ local query_exports = {
     "_buildConnectionTestQuery",
     "_buildSourcesQuery",
     "_buildLegacySourcesQuery",
+    "_buildSourceFiltersQuery",
     "_buildMangaQuery",
     "_buildLibraryMangaQuery",
     "_buildCategoryQuery",
@@ -43,6 +44,8 @@ local query_exports = {
 
 local parser_exports = {
     "parseSourcesResponse",
+    "parseSourceFiltersResponse",
+    "isSourceFiltersFieldError",
     "parseExtensionsResponse",
     "parseUpdateExtensionResponse",
     "parseMangaResponse",
@@ -187,6 +190,34 @@ function SuwayomiAPI.updateExtension(credentials, pkg_name, action)
     return {
         ok = true,
         extension = extension,
+    }
+end
+
+function SuwayomiAPI.fetchSourceFilters(credentials, source_id)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildSourceFiltersQuery(source_id), "fetchSourceFilters")
+    if not result.ok then
+        return result
+    end
+    if parsers.isSourceFiltersFieldError(result.response_body) then
+        return {
+            ok = false,
+            error = "Source filters are not supported by this server.",
+        }
+    end
+
+    local parsed, parse_error = SuwayomiAPI.parseSourceFiltersResponse(result.response_body)
+    if not parsed then
+        logDebugEvent({ operation = "fetchSourceFilters", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        source = parsed.source,
+        filters = parsed.filters,
     }
 end
 

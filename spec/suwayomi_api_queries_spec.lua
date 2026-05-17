@@ -29,6 +29,25 @@ describe("suwayomi/api/queries", function()
         assert.is_nil(legacy_query:match("supportsLatest"))
     end)
 
+    it("builds a source filter schema query", function()
+        local payload = decode_request(queries._buildSourceFiltersQuery("2499283573021220255"))
+
+        assert.truthy(payload.query:match("GET_SOURCE_FILTERS"))
+        assert.truthy(payload.query:match("source%(id:%s*%$id%)"))
+        assert.truthy(payload.query:match("%.%.%. on HeaderFilter"))
+        assert.truthy(payload.query:match("%.%.%. on SeparatorFilter"))
+        assert.truthy(payload.query:match("%.%.%. on CheckBoxFilter"))
+        assert.truthy(payload.query:match("%.%.%. on TriStateFilter"))
+        assert.truthy(payload.query:match("%.%.%. on SortFilter"))
+        assert.truthy(payload.query:match("default%s*{%s*index%s+ascending%s*}"))
+        assert.truthy(payload.query:match("%.%.%. on GroupFilter"))
+        assert.truthy(payload.query:match("filters"))
+        assert.are.equal("2499283573021220255", payload.variables.id)
+
+        local string_id_payload = decode_request(queries._buildSourceFiltersQuery("local"))
+        assert.are.equal("local", string_id_payload.variables.id)
+    end)
+
     it("builds manga browse queries with normalized input", function()
         local payload = decode_request(queries._buildMangaQuery({
             source_id = "2499283573021220255",
@@ -45,6 +64,14 @@ describe("suwayomi/api/queries", function()
         assert.are.equal("SEARCH", payload.variables.input.type)
         assert.are.equal("frieren", payload.variables.input.query)
         assert.are.equal("fantasy", payload.variables.input.filters.genre)
+
+        local popular = decode_request(queries._buildMangaQuery({
+            source_id = "2499283573021220255",
+            page = "1",
+            type = "POPULAR",
+            filters = { genre = "fantasy" },
+        }))
+        assert.is_nil(popular.variables.input.filters)
     end)
 
     it("builds library and category queries", function()

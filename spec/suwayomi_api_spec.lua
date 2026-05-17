@@ -107,9 +107,12 @@ describe("suwayomi/api facade", function()
             "_buildLegacyFetchExtensionsMutation",
             "_buildUpdateExtensionMutation",
             "_buildLegacyUpdateExtensionMutation",
+            "_buildSourceFiltersQuery",
             "parseSourcesResponse",
             "parseExtensionsResponse",
             "parseUpdateExtensionResponse",
+            "parseSourceFiltersResponse",
+            "isSourceFiltersFieldError",
             "parseMangaResponse",
             "parseLibraryMangaResponse",
             "parseCategoryResponse",
@@ -127,6 +130,7 @@ describe("suwayomi/api facade", function()
             "buildChapterArchiveDownloadURL",
             "downloadBinary",
             "downloadChapterArchive",
+            "fetchSourceFilters",
         }
 
         for _, name in ipairs(names) do
@@ -233,6 +237,36 @@ describe("suwayomi/api facade", function()
         assert.truthy(update_request.bodies[1]:match("repo"))
         assert.is_nil(update_request.bodies[2]:match("repo"))
         assert.truthy(update_request.bodies[2]:match("\"install\":true"))
+    end)
+
+    it("fetches source filters through the facade", function()
+        local request = install_graphql_stub([[{"data":{"source":{"id":"s1","displayName":"MangaDex","name":"mangadex","filters":[]}}}]])
+
+        local result = api.fetchSourceFilters(valid_credentials(), "s1")
+
+        assert.is_true(result.ok)
+        assert.are.equal("s1", result.source.id)
+        assert.are.equal("MangaDex", result.source.display_name)
+        assert.are.same({}, result.filters)
+        assert.truthy(request.bodies[1]:match("GET_SOURCE_FILTERS"))
+    end)
+
+    it("returns unsupported source filters schema errors and logs parse errors", function()
+        install_graphql_stub([[{"errors":[{"message":"Cannot query field \"filters\" on type \"SourceType\""}]}]])
+        local unsupported = api.fetchSourceFilters(valid_credentials(), "s1")
+        assert.is_false(unsupported.ok)
+        assert.are.equal("Source filters are not supported by this server.", unsupported.error)
+
+        local events = {}
+        api.setDebugLogger(function(event)
+            table.insert(events, event)
+        end)
+        install_graphql_stub("{")
+        local malformed = api.fetchSourceFilters(valid_credentials(), "s1")
+        assert.is_false(malformed.ok)
+        assert.are.equal("Invalid response from Suwayomi server.", malformed.error)
+        assert.are.equal("fetchSourceFilters", events[#events].operation)
+        assert.are.equal("parse_error", events[#events].event)
     end)
 
     it("fetches manga, library manga, categories, updates library state, and refreshes manga", function()
