@@ -232,6 +232,16 @@ describe("suwayomi/settings", function()
         assert.are.equal("", settings:loadDownloadDirectory())
     end)
 
+    it("treats non-string download directory settings as unset", function()
+        local settings = require("suwayomi/settings")
+
+        stored_data.download_directory = true
+        assert.are.equal("", settings:loadDownloadDirectory())
+
+        stored_data.download_directory = { path = "/books" }
+        assert.are.equal("", settings:loadDownloadDirectory())
+    end)
+
     it("saves the download directory and flushes the settings file", function()
         local settings = require("suwayomi/settings")
         settings:saveDownloadDirectory("/storage/emulated/0/Books/Manga")

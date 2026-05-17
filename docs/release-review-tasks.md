@@ -81,7 +81,7 @@ Fresh review baseline:
   - Direction: compare current credentials at timer fire/start time and cancel if changed.
   - Test: schedule refresh, mutate credentials before timer fires, assert no worker starts with old credentials.
 
-- [ ] Normalize persisted download directory.
+- [x] Normalize persisted download directory.
   - Files: `suwayomi/settings.lua`, `suwayomi/downloads/directory.lua`, `suwayomi/paths.lua`, settings/directory/path specs
   - Risk: non-string truthy setting can bypass chooser and crash path construction or create bad target paths.
   - Direction: treat non-string directory values as unset before path joins.

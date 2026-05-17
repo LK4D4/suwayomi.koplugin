@@ -11,6 +11,13 @@ local FFIUtil = require("ffi/util")
 
 local SuwayomiPaths = {}
 
+local function normalizeDownloadDirectory(download_directory)
+    if type(download_directory) ~= "string" or download_directory == "" then
+        return nil
+    end
+    return download_directory
+end
+
 local function present(value)
     value = tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if value == "" then
@@ -55,6 +62,10 @@ function SuwayomiPaths.getSourceLabel(manga)
 end
 
 function SuwayomiPaths.getMangaDirectory(download_directory, manga)
+    download_directory = normalizeDownloadDirectory(download_directory)
+    if not download_directory then
+        return nil
+    end
     local source_dir = FFIUtil.joinPath(download_directory, SuwayomiPaths.sanitizePathSegment(SuwayomiPaths.getSourceLabel(manga)))
     return FFIUtil.joinPath(source_dir, SuwayomiPaths.sanitizePathSegment(manga and manga.title))
 end
@@ -74,14 +85,21 @@ function SuwayomiPaths.getChapterFilename(chapter)
 end
 
 function SuwayomiPaths.getChapterPath(download_directory, manga, chapter)
+    local manga_dir = SuwayomiPaths.getMangaDirectory(download_directory, manga)
+    if not manga_dir then
+        return nil
+    end
     return FFIUtil.joinPath(
-        SuwayomiPaths.getMangaDirectory(download_directory, manga),
+        manga_dir,
         SuwayomiPaths.getChapterFilename(chapter)
     )
 end
 
 function SuwayomiPaths.getTargetPath(download_directory, manga, chapter)
     local manga_dir = SuwayomiPaths.getMangaDirectory(download_directory, manga)
+    if not manga_dir then
+        return nil, nil
+    end
     local chapter_path = FFIUtil.joinPath(
         manga_dir,
         SuwayomiPaths.getChapterFilename(chapter)

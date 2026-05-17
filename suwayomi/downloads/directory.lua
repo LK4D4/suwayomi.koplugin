@@ -29,6 +29,13 @@ local function directoryExists(lfs, path)
     return path and path ~= "" and lfs.attributes(path, "mode") == "directory"
 end
 
+local function normalizeDownloadDirectory(path)
+    if type(path) ~= "string" then
+        return ""
+    end
+    return path
+end
+
 local function joinPath(base, name)
     if base:sub(-1) == "/" then
         return base .. name
@@ -79,7 +86,7 @@ function Methods:getDownloadDirectoryChooserStartDir()
         return nil
     end
 
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    local download_directory = normalizeDownloadDirectory(SuwayomiSettings:loadDownloadDirectory())
     if directoryExists(lfs, download_directory) then
         return download_directory
     end
@@ -104,7 +111,7 @@ function Methods:getDownloadDirectoryChooserStartDir()
 end
 
 function Methods:getDownloadDirectorySummary()
-    local path = SuwayomiSettings:loadDownloadDirectory()
+    local path = normalizeDownloadDirectory(SuwayomiSettings:loadDownloadDirectory())
     if not path or path == "" then
         return _("not set")
     end
@@ -131,7 +138,7 @@ function Methods:chooseDownloadDirectory(callback, options)
 end
 
 function Methods:getDownloadDirectoryOrChoose(callback, options)
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    local download_directory = normalizeDownloadDirectory(SuwayomiSettings:loadDownloadDirectory())
     if download_directory and download_directory ~= "" then
         return download_directory
     end

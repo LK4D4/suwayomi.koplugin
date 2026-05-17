@@ -230,6 +230,24 @@ describe("suwayomi/downloads/directory", function()
         assert.are.equal(0, #ui.calls)
     end)
 
+    it("opens the chooser when the saved directory is not a string", function()
+        local Directory = load_directory({
+            download_directory = { path = "/books" },
+        })
+        local plugin = {
+            messages = {},
+            showMessage = function(self, message)
+                table.insert(self.messages, message)
+            end,
+        }
+        for name, method in pairs(Directory.methods) do
+            plugin[name] = method
+        end
+
+        assert.is_nil(plugin:getDownloadDirectoryOrChoose(function() end))
+        assert.are.equal(1, #ui.calls)
+    end)
+
     it("opens the chooser and retries via callback when no directory is saved", function()
         local Directory = load_directory()
         local callback_path

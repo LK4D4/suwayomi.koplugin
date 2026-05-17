@@ -75,6 +75,13 @@ local function toStringOrDefault(value, default)
     return tostring(value)
 end
 
+local function normalizeDownloadDirectory(value)
+    if type(value) ~= "string" then
+        return DEFAULT_DOWNLOAD_DIRECTORY
+    end
+    return value
+end
+
 local function rollingHash(text, seed, multiplier)
     local hash = seed
     multiplier = multiplier or 131
@@ -343,11 +350,11 @@ function SuwayomiSettings:saveSourceCache(credentials_or_url, sources, updated_a
 end
 
 function SuwayomiSettings:loadDownloadDirectory()
-    return self:open():readSetting("download_directory", DEFAULT_DOWNLOAD_DIRECTORY)
+    return normalizeDownloadDirectory(self:open():readSetting("download_directory", DEFAULT_DOWNLOAD_DIRECTORY))
 end
 
 function SuwayomiSettings:saveDownloadDirectory(path)
-    local normalized = path or ""
+    local normalized = normalizeDownloadDirectory(path)
     self:open():saveSetting("download_directory", normalized):flush()
     return normalized
 end

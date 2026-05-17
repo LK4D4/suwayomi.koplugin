@@ -115,6 +115,20 @@ describe("suwayomi/paths", function()
         assert.are.equal("/books/MangaDex (EN)/Frieren_ Beyond Journey's End/Vol. 1 _ Ch. 1.cbz", chapter_path)
     end)
 
+    it("treats non-string download directory bases as unset before joining paths", function()
+        local paths = load_paths()
+
+        local manga_dir, chapter_path = paths.getTargetPath({ path = "/books" }, {
+            title = "Frieren",
+            source = { displayName = "MangaDex (EN)" },
+        }, {
+            name = "Chapter 1",
+        })
+
+        assert.is_nil(manga_dir)
+        assert.is_nil(chapter_path)
+    end)
+
     it("keeps duplicate chapter names collision-safe with stable ids", function()
         local paths = load_paths()
         local manga = {
