@@ -64,7 +64,8 @@ local function appendEmptyStateRows(menu_table, snapshot, options)
     local queued_count = #(snapshot.queued or {})
     local failed_count = #(snapshot.failed or {})
     local folder = options.download_directory_summary
-    if not folder or folder == "" then
+    local has_folder = folder and folder ~= ""
+    if not has_folder then
         folder = _("not set")
     end
 
@@ -82,6 +83,12 @@ local function appendEmptyStateRows(menu_table, snapshot, options)
     })
     table.insert(menu_table, {
         text = _("No downloads queued."),
+        select_enabled = false,
+    })
+    table.insert(menu_table, {
+        text = has_folder
+            and string.format(_("Downloaded chapters are in %s."), folder)
+            or _("Set a download folder in Settings > Downloads."),
         select_enabled = false,
     })
 end
