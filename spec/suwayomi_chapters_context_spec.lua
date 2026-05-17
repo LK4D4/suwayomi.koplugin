@@ -56,6 +56,38 @@ describe("suwayomi/chapters/context", function()
         })
     end)
 
+    it("keeps chapter screen titles short while preserving detail titles", function()
+        local controller = require("suwayomi/chapters/context")
+        local manga = { id = "m1", title = "Very Long Manga Title That Would Truncate In Header" }
+        local plugin = {
+            selected_chapters = {},
+        }
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        assert.are.equal("Chapters", plugin:formatChapterListScreenTitle(manga))
+        assert.are.equal("Very Long Manga Title That Would Truncate In Header", plugin:formatChapterListTitle(manga))
+
+        plugin.current_scanlator_filter = "Very Long Scanlator Name That Would Truncate In Header"
+        assert.are.equal("Chapters", plugin:formatChapterListScreenTitle(manga))
+        assert.are.equal(
+            "Very Long Manga Title That Would Truncate In Header - Very Long Scanlator Name That Would Truncate In Header",
+            plugin:formatChapterListTitle(manga)
+        )
+
+        plugin.selection_mode = true
+        plugin.selected_chapters = {
+            ["m1:c1"] = true,
+            ["m1:c2"] = true,
+        }
+        assert.are.equal("2 selected", plugin:formatChapterListScreenTitle(manga))
+        assert.are.equal(
+            "2 selected - Very Long Scanlator Name That Would Truncate In Header",
+            plugin:formatChapterListTitle(manga)
+        )
+    end)
+
     it("builds previous ranges from visible scanlator-filtered chapters", function()
         local controller = require("suwayomi/chapters/context")
         local plugin = {
