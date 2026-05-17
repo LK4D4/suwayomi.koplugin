@@ -105,18 +105,24 @@ function Methods:getOnboardingConnectionResultPath()
 end
 
 
-function Methods:startOnboardingConnectionTest(credentials)
+function Methods:startOnboardingConnectionTest(credentials, options)
+    options = options or {}
     if self.onboarding_connection_test_active then
         self:showMessage(_("Connection test already running."))
         return false
     end
 
     self.onboarding_connection_test_key = nil
-    SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "testing")
+    local update_dialog = options.update_dialog ~= false
+    if update_dialog then
+        SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "testing")
+    end
     local active = {
         credentials = credentials,
         result_path = self:getOnboardingConnectionResultPath(),
         loading_message = self:showLoadingMessage(_("Testing Suwayomi connection...")),
+        show_continue_message = options.show_continue_message ~= false,
+        update_dialog = update_dialog,
     }
     active = SubprocessJob.start({
         active = active,
@@ -136,7 +142,9 @@ function Methods:startOnboardingConnectionTest(credentials)
         on_timeout = function(timed_out_active)
             self.onboarding_connection_test_active = nil
             self:closeLoadingMessage(timed_out_active and timed_out_active.loading_message)
-            SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
+            if timed_out_active and timed_out_active.update_dialog ~= false then
+                SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
+            end
             self:showMessage(_("Suwayomi connection test timed out."))
             if timed_out_active then
                 timed_out_active.canceled = true
@@ -146,7 +154,9 @@ function Methods:startOnboardingConnectionTest(credentials)
         on_error = function(err)
             self.onboarding_connection_test_active = nil
             self:closeLoadingMessage(active.loading_message)
-            SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
+            if active.update_dialog then
+                SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
+            end
             self:showMessage(T(_("Could not start connection test: %1"), err or _("unknown error")))
         end,
     })
@@ -163,13 +173,29 @@ function Methods:finishOnboardingConnectionTest(active, result)
     self:closeLoadingMessage(active and active.loading_message)
     if result and result.ok == true then
         self.onboarding_connection_test_key = self:getOnboardingCredentialsKey(active and active.credentials)
-        SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "passed")
+        if active and active.update_dialog ~= false then
+            SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "passed")
+        end
         local message = result.message or _("Connection test passed.")
-        self:showMessage(message .. " " .. _("You can continue."))
+        if active and active.show_continue_message == false then
+            self:showMessage(message)
+        else
+            self:showMessage(message .. " " .. _("You can continue."))
+        end
         return
     end
-    SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
+    if active and active.update_dialog ~= false then
+        SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
+    end
     self:showMessage((result and result.error) or _("Could not connect to Suwayomi."))
+end
+
+
+function Methods:startSettingsConnectionTest()
+    return self:startOnboardingConnectionTest(SuwayomiSettings:load(), {
+        show_continue_message = false,
+        update_dialog = false,
+    })
 end
 
 
@@ -468,6 +494,13 @@ function Methods:buildSettingsMenu()
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:showLoginDialog(touchmenu_instance)
+                    end,
+                },
+                {
+                    text = _("Test connection"),
+                    keep_menu_open = true,
+                    callback = function()
+                        self:startSettingsConnectionTest()
                     end,
                 },
             },
