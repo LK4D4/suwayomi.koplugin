@@ -384,7 +384,9 @@ describe("suwayomi/client source manga flows", function()
         })
 
         assert.are.equal("Frieren", updated_manga[1].title)
-        assert.is_function(updated_options.on_next_page)
+        assert.is_nil(updated_options.on_next_page)
+        assert.is_nil(updated_options.on_previous_page)
+        assert.is_function(updated_options.on_page_changed)
         assert.is_nil(updated_options.on_cancel_source_manga)
     end)
 
@@ -681,7 +683,7 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal(2, state.log_events[1].manga_count)
     end)
 
-    it("passes browse result title and paging callbacks that preserve source context", function()
+    it("passes browse result title without visible paging callbacks", function()
         local fetched_options = {}
         local menu_options = {}
         local client = newClient({
@@ -714,23 +716,16 @@ describe("suwayomi/client source manga flows", function()
             query = "frieren",
             skip_mode_menu = true,
         })
-        menu_options[1].on_next_page()
-        menu_options[2].on_previous_page()
-
         assert.are.same({
-            { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
-            { source_id = "s1", page = 2, type = "SEARCH", query = "frieren" },
             { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
         }, fetched_options)
         assert.are.equal("Search - Page 1", menu_options[1].title)
-        assert.are.equal("Search - Page 2", menu_options[2].title)
         assert.is_nil(menu_options[1].on_previous_page)
-        assert.is_function(menu_options[1].on_next_page)
-        assert.is_function(menu_options[2].on_previous_page)
-        assert.is_nil(menu_options[2].on_next_page)
+        assert.is_nil(menu_options[1].on_next_page)
+        assert.is_function(menu_options[1].on_page_changed)
     end)
 
-    it("shows a next-page-only menu when hide-in-library filters all visible rows", function()
+    it("shows no pagination rows when hide-in-library filters all visible rows", function()
         local shown_manga
         local shown_options
         local client, state = newClient({
@@ -767,11 +762,12 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal(0, #shown_manga)
         assert.are.equal("Popular - Page 1", shown_options.title)
         assert.is_nil(shown_options.on_previous_page)
-        assert.is_function(shown_options.on_next_page)
+        assert.is_nil(shown_options.on_next_page)
+        assert.is_function(shown_options.on_page_changed)
         assert.are.equal(0, #state.shown_messages)
     end)
 
-    it("shows a previous-page-only menu when page greater than one filters all visible rows", function()
+    it("shows no pagination rows when page greater than one filters all visible rows", function()
         local shown_manga
         local shown_options
         local client, state = newClient({
@@ -810,9 +806,346 @@ describe("suwayomi/client source manga flows", function()
 
         assert.are.equal(0, #shown_manga)
         assert.are.equal("Search - Page 2", shown_options.title)
-        assert.is_function(shown_options.on_previous_page)
+        assert.is_nil(shown_options.on_previous_page)
         assert.is_nil(shown_options.on_next_page)
         assert.are.equal(0, #state.shown_messages)
+    end)
+
+    it("appends the next source page when the local menu reaches the last page", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updates = {}
+        local shown_menu
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    shown_menu = { name = "browse-menu", page = 1, page_num = 2 }
+                    return shown_menu
+                end,
+                updateMangaMenu = function(menu, manga, _, menu_options)
+                    table.insert(updates, {
+                        menu = menu,
+                        manga = manga,
+                        menu_options = menu_options,
+                    })
+                end,
+            },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+        }, {
+            type = "SEARCH",
+            query = "frieren",
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Page 1" },
+            },
+            has_next_page = true,
+        })
+
+        shown_menu.page = 2
+        updates[1].menu_options.on_page_changed(shown_menu, 2)
+
+        assert.are.equal(2, #started)
+        assert.are.same({
+            type = "SEARCH",
+            query = "frieren",
+            page = 2,
+        }, started[2].browse_options)
+
+        started[2].on_finish(started[2], {
+            ok = true,
+            manga = {
+                { id = "m2", title = "Page 2" },
+            },
+            has_next_page = false,
+        })
+
+        assert.are.equal(2, #updates[#updates].manga)
+        assert.are.equal("Page 1", updates[#updates].manga[1].title)
+        assert.are.equal("Page 2", updates[#updates].manga[2].title)
+        assert.are.equal(shown_menu, updates[#updates].menu)
+    end)
+
+    it("keeps appending while the refreshed menu remains on the last local page", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updates = {}
+        local shown_menu
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    shown_menu = { name = "browse-menu", page = 2, page_num = 2 }
+                    return shown_menu
+                end,
+                updateMangaMenu = function(menu, manga, _, menu_options)
+                    table.insert(updates, {
+                        menu = menu,
+                        manga = manga,
+                        menu_options = menu_options,
+                    })
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Page 1" },
+            },
+            has_next_page = true,
+        })
+
+        updates[1].menu_options.on_page_changed(shown_menu, 2)
+        started[2].on_finish(started[2], {
+            ok = true,
+            manga = {
+                { id = "m2", title = "Page 2" },
+            },
+            has_next_page = true,
+        })
+
+        assert.are.equal(3, #started)
+        assert.are.same({
+            type = "POPULAR",
+            page = 3,
+        }, started[3].browse_options)
+
+        started[3].on_finish(started[3], {
+            ok = true,
+            manga = {
+                { id = "m3", title = "Page 3" },
+            },
+            has_next_page = false,
+        })
+
+        assert.are.equal(3, #updates[#updates].manga)
+        assert.are.equal("Page 3", updates[#updates].manga[3].title)
+    end)
+
+    it("deduplicates appended manga by stable id while keeping rows without ids", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updates = {}
+        local shown_menu
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    shown_menu = { name = "browse-menu", page = 2, page_num = 2 }
+                    return shown_menu
+                end,
+                updateMangaMenu = function(menu, manga, _, menu_options)
+                    table.insert(updates, {
+                        menu = menu,
+                        manga = manga,
+                        menu_options = menu_options,
+                    })
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Page 1" },
+                { title = "No Id 1" },
+            },
+            has_next_page = true,
+        })
+
+        updates[1].menu_options.on_page_changed(shown_menu, 2)
+        started[2].on_finish(started[2], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Duplicate Page 1" },
+                { id = "m2", title = "Page 2" },
+                { title = "No Id 2" },
+            },
+            has_next_page = false,
+        })
+
+        assert.are.equal(4, #updates[#updates].manga)
+        assert.are.equal("Page 1", updates[#updates].manga[1].title)
+        assert.are.equal("No Id 1", updates[#updates].manga[2].title)
+        assert.are.equal("Page 2", updates[#updates].manga[3].title)
+        assert.are.equal("No Id 2", updates[#updates].manga[4].title)
+    end)
+
+    it("does not start duplicate append loads while one is already loading", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local menu_options
+        local shown_menu
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    shown_menu = { name = "browse-menu", page = 2, page_num = 2 }
+                    return shown_menu
+                end,
+                updateMangaMenu = function(_, _, _, options)
+                    menu_options = options
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Page 1" },
+            },
+            has_next_page = true,
+        })
+
+        menu_options.on_page_changed(shown_menu, 2)
+        menu_options.on_page_changed(shown_menu, 2)
+
+        assert.are.equal(2, #started)
+    end)
+
+    it("does not append when not on the last local page or source has no next page", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local menu_options
+        local shown_menu
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    shown_menu = { name = "browse-menu", page = 1, page_num = 2 }
+                    return shown_menu
+                end,
+                updateMangaMenu = function(_, _, _, options)
+                    menu_options = options
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Only Page" },
+            },
+            has_next_page = true,
+        })
+
+        menu_options.on_page_changed(shown_menu, 1)
+        assert.are.equal(1, #started)
+
+        subprocess_job, started = buildSourceMangaSubprocessFake()
+        local no_next_menu_options
+        local no_next_menu
+        client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    no_next_menu = { name = "browse-menu", page = 2, page_num = 2 }
+                    return no_next_menu
+                end,
+                updateMangaMenu = function(_, _, _, options)
+                    no_next_menu_options = options
+                end,
+            },
+        })
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Only Page" },
+            },
+            has_next_page = false,
+        })
+        no_next_menu_options.on_page_changed(no_next_menu, 2)
+
+        assert.are.equal(1, #started)
+    end)
+
+    it("keeps previous rows when append loading fails", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updates = {}
+        local shown_menu
+        local client, state = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    shown_menu = { name = "browse-menu", page = 2, page_num = 2 }
+                    return shown_menu
+                end,
+                updateMangaMenu = function(menu, manga, _, menu_options)
+                    table.insert(updates, {
+                        menu = menu,
+                        manga = manga,
+                        menu_options = menu_options,
+                    })
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Page 1" },
+            },
+            has_next_page = true,
+        })
+
+        updates[1].menu_options.on_page_changed(shown_menu, 2)
+        started[2].on_finish(started[2], {
+            ok = false,
+            error = "HTTP 500",
+        })
+
+        assert.are.same({ "HTTP 500" }, state.shown_messages)
+        assert.are.equal(1, #updates[#updates].manga)
+        assert.are.equal("Page 1", updates[#updates].manga[1].title)
     end)
 
     it("keeps browsed manga visible and refreshes row state after library changes", function()

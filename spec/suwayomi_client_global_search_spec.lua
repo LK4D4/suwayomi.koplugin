@@ -146,7 +146,8 @@ describe("suwayomi/client global search flows", function()
 
         selected_callback(updated_summaries[1])
         assert.are.equal("Search - Page 1", opened_options.title)
-        assert.is_function(opened_options.on_next_page)
+        assert.is_nil(opened_options.on_next_page)
+        assert.is_function(opened_options.on_page_changed)
     end)
 
     it("marks a global source error and continues queued sources when subprocess startup throws", function()

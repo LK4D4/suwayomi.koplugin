@@ -101,32 +101,10 @@ function SuwayomiClient:buildBrowseResultScreenTitle(_, options)
         .. tostring(options.page or 1)
 end
 
-function SuwayomiClient:buildBrowseResultMenuOptions(source, options, has_next_page)
+function SuwayomiClient:buildBrowseResultMenuOptions(source, options)
     local detail_title = self:buildBrowseResultTitle(source, options)
     local menu_options = copyOptions({}, self:getTitleBarMenuOptions({ title = detail_title }))
     menu_options.title = self:buildBrowseResultScreenTitle(source, options)
-
-    if (options.page or 1) > 1 then
-        menu_options.on_previous_page = function()
-            return self:showMangaForSource(source, {
-                type = options.type,
-                query = options.query,
-                page = (options.page or 1) - 1,
-                skip_mode_menu = true,
-            })
-        end
-    end
-    if has_next_page == true then
-        menu_options.on_next_page = function()
-            return self:showMangaForSource(source, {
-                type = options.type,
-                query = options.query,
-                page = (options.page or 1) + 1,
-                skip_mode_menu = true,
-            })
-        end
-    end
-
     return menu_options
 end
 
@@ -366,6 +344,148 @@ function SuwayomiClient:cancelSourceMangaLoad(state, options)
     end
 end
 
+function SuwayomiClient:shouldAppendSourceMangaPage(session, menu, page)
+    if not session
+        or session.closed
+        or session.loading_more
+        or session.has_next_page ~= true
+    then
+        return false
+    end
+    local local_page = tonumber(page) or tonumber(menu and menu.page) or 1
+    local local_page_count = tonumber(menu and menu.page_num) or local_page
+    return local_page >= local_page_count
+end
+
+function SuwayomiClient:appendUniqueSourceMangaRows(session, page_manga)
+    local seen_ids = {}
+    for _, manga in ipairs(session.manga_list or {}) do
+        if type(manga) == "table" and manga.id ~= nil then
+            seen_ids[tostring(manga.id)] = true
+        end
+    end
+
+    for _, manga in ipairs(page_manga or {}) do
+        local manga_id = type(manga) == "table" and manga.id or nil
+        if manga_id == nil then
+            table.insert(session.manga_list, manga)
+        else
+            local dedupe_id = tostring(manga_id)
+            if not seen_ids[dedupe_id] then
+                seen_ids[dedupe_id] = true
+                table.insert(session.manga_list, manga)
+            end
+        end
+    end
+end
+
+function SuwayomiClient:appendSourceMangaResult(session, result, refresh)
+    session.loading_more = false
+    session.active = nil
+    if session.closed or self._source_manga_load_token ~= session.token then
+        return
+    end
+    result = result or {
+        ok = false,
+        error = self:translate("Could not load manga."),
+    }
+    if not result.ok then
+        self.plugin:showMessage(self:buildSourceMangaFailureMessage(
+            session.source,
+            session.next_options or session.browse_options,
+            result.error
+        ))
+        refresh()
+        return
+    end
+
+    local page_manga = result.manga or {}
+    session.current_api_page = tonumber((result.browse_options or session.next_options or {}).page)
+        or session.current_api_page
+    if #page_manga == 0 then
+        session.has_next_page = false
+        refresh()
+        return
+    end
+    self:appendUniqueSourceMangaRows(session, page_manga)
+    session.has_next_page = result.has_next_page == true
+    refresh()
+    if self:shouldAppendSourceMangaPage(session, session.menu) then
+        self:startSourceMangaAppendLoad(session, refresh)
+    end
+end
+
+function SuwayomiClient:startSourceMangaAppendLoad(session, refresh)
+    local runtime = self:resolveSourceMangaRuntime()
+    if not runtime then
+        session.has_next_page = false
+        self.plugin:showMessage(self:translate("Could not start manga loading."))
+        refresh()
+        return
+    end
+    session.runtime = runtime
+
+    local next_options = {
+        type = session.browse_options.type,
+        query = session.browse_options.query,
+        page = (tonumber(session.current_api_page) or 1) + 1,
+    }
+    session.loading_more = true
+    session.next_options = next_options
+
+    local start_ok, active = pcall(runtime.job.start, {
+        active = {
+            source = session.source,
+            browse_options = next_options,
+            result_path = runtime.job.buildResultPath
+                and runtime.job.buildResultPath("source_manga_append")
+                or nil,
+        },
+        ffi_util = runtime.ffi_util,
+        ui_manager = runtime.ui_manager,
+        poll_interval_seconds = self:getSourceMangaPollIntervalSeconds(),
+        timeout_seconds = self:getSourceMangaTimeoutSeconds(),
+        run = function(path)
+            runtime.worker:run(session.credentials, session.source, next_options, path)
+        end,
+        read_result = function(path)
+            return runtime.worker:readResult(path)
+        end,
+        on_finish = function(finished_active, result)
+            if session.closed or session.active ~= finished_active then
+                return
+            end
+            local result_options = result and result.browse_options
+                or finished_active.browse_options
+                or next_options
+            if result then
+                result.browse_options = result_options
+            end
+            self:appendSourceMangaResult(session, result, refresh)
+        end,
+        on_timeout = function(timed_out_active)
+            if session.closed or session.active ~= timed_out_active then
+                return
+            end
+            timed_out_active.canceled = true
+            self:appendSourceMangaResult(session, {
+                ok = false,
+                browse_options = next_options,
+                error = self:translate("Timed out."),
+            }, refresh)
+        end,
+    })
+    if not start_ok or not active then
+        session.loading_more = false
+        session.active = nil
+        session.has_next_page = false
+        self.plugin:showMessage(self:translate("Could not start manga loading."))
+        refresh()
+        return
+    end
+    session.active = active
+end
+
 function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_options, result, existing_menu)
     if not result then
         return
@@ -397,6 +517,15 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
 
     local page = tonumber(browse_options.page) or 1
     local manga_list = result.manga or {}
+    local session = {
+        token = self._source_manga_load_token,
+        credentials = credentials,
+        source = source,
+        browse_options = browse_options,
+        current_api_page = page,
+        manga_list = manga_list,
+        has_next_page = result.has_next_page == true,
+    }
     local visible_manga = self:filterBrowseManga(manga_list)
     self:log({
         operation = "showMangaForSource",
@@ -406,14 +535,14 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
         page = page,
         manga_count = #visible_manga,
     })
-    local menu_options = self:buildBrowseResultMenuOptions(source, browse_options, result.has_next_page)
+    local menu_options = self:buildBrowseResultMenuOptions(source, browse_options)
     menu_options.thumbnail_credentials = credentials
     if existing_menu and menu_options.close_callback == nil then
         menu_options.close_callback = function() end
     end
     if #visible_manga == 0
-        and not menu_options.on_previous_page
-        and not menu_options.on_next_page
+        and page <= 1
+        and session.has_next_page ~= true
     then
         if not self:showSourceMangaStatus(
             existing_menu,
@@ -441,33 +570,43 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
         end
     end
     refreshMangaMenu = function()
-        visible_manga = self:filterBrowseManga(manga_list)
+        visible_manga = self:filterBrowseManga(session.manga_list)
         if not manga_menu then
             pending_manga_menu_refresh = true
             return
         end
+        session.menu = manga_menu
         if self.ui.updateMangaMenu then
             self.ui.updateMangaMenu(manga_menu, visible_manga, selectManga, menu_options)
         end
     end
+    menu_options.on_page_changed = function(menu, changed_page)
+        if self:shouldAppendSourceMangaPage(session, menu, changed_page) then
+            self:startSourceMangaAppendLoad(session, refreshMangaMenu)
+        end
+    end
 
     local chapter_count_runtime = self:resolveChapterCountRuntime()
-    if chapter_count_runtime then
-        local previous_close_callback = menu_options.close_callback
-        menu_options.close_callback = function(...)
-            if chapter_count_enrichment then
-                self:cancelBrowseChapterCountEnrichment(chapter_count_enrichment)
-            end
-            if previous_close_callback then
-                return previous_close_callback(...)
-            end
+    local previous_close_callback = menu_options.close_callback
+    menu_options.close_callback = function(...)
+        session.closed = true
+        if session.active and session.runtime and session.runtime.job and session.runtime.job.cancel then
+            session.runtime.job.cancel(session.active)
+        end
+        if chapter_count_enrichment then
+            self:cancelBrowseChapterCountEnrichment(chapter_count_enrichment)
+        end
+        if previous_close_callback then
+            return previous_close_callback(...)
         end
     end
 
     if existing_menu and self.ui.updateMangaMenu then
+        session.menu = existing_menu
         self.ui.updateMangaMenu(existing_menu, visible_manga, selectManga, menu_options)
     else
         manga_menu = self.ui.showMangaMenu(visible_manga, selectManga, menu_options)
+        session.menu = manga_menu
         self:trackScreen("browse-results", manga_menu)
     end
     if pending_manga_menu_refresh then
