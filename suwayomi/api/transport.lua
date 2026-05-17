@@ -118,6 +118,20 @@ local function formatReachabilityError(code)
     return "Could not reach the Suwayomi server: " .. tostring(code)
 end
 
+local function isRetryableTransportCode(code)
+    return code == "wantread"
+        or code == "wantwrite"
+        or code == "timeout"
+        or code == "closed"
+        or code == "connection reset"
+        or code == "connection refused"
+        or code == RESPONSE_TIMEOUT_ERROR
+end
+
+local function isRetryableHttpStatus(code)
+    return code == 408 or code == 429 or (type(code) == "number" and code >= 500 and code <= 599)
+end
+
 local function buildGuardedTableSink(target, options)
     options = options or {}
     target = target or {}
@@ -331,6 +345,7 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event, reques
         return {
             ok = false,
             error = "Downloaded response was too large.",
+            retryable = false,
         }
     end
 
@@ -338,6 +353,7 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event, reques
         return {
             ok = false,
             error = formatReachabilityError(code),
+            retryable = isRetryableTransportCode(code),
         }
     end
 
@@ -345,6 +361,7 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event, reques
         return {
             ok = false,
             error = formatReachabilityError(code),
+            retryable = isRetryableTransportCode(code),
         }
     end
 
@@ -357,6 +374,8 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event, reques
     return {
         ok = false,
         error = error_message[code] or "Could not download chapter page.",
+        retryable = isRetryableHttpStatus(code),
+        status_code = code,
     }
 end
 
@@ -454,6 +473,7 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
         return {
             ok = false,
             error = "Downloaded response was too large.",
+            retryable = false,
         }
     end
 
@@ -475,6 +495,7 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
         return {
             ok = false,
             error = "Downloaded response was too large.",
+            retryable = false,
         }
     end
     if write_error then
@@ -482,18 +503,21 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
             ok = false,
             error = "Could not write chapter archive.",
             detail = write_error,
+            retryable = write_error == RESPONSE_TIMEOUT_ERROR,
         }
     end
     if not ok then
         return {
             ok = false,
             error = formatReachabilityError(code),
+            retryable = isRetryableTransportCode(code),
         }
     end
     if type(code) ~= "number" then
         return {
             ok = false,
             error = formatReachabilityError(code),
+            retryable = isRetryableTransportCode(code),
         }
     end
 
@@ -505,6 +529,8 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
     return {
         ok = false,
         error = error_message[code] or "Could not download chapter archive.",
+        retryable = isRetryableHttpStatus(code),
+        status_code = code,
     }
 end
 

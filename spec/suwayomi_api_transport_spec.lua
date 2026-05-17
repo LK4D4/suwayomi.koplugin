@@ -286,6 +286,7 @@ describe("suwayomi/api/transport", function()
 
         assert.are.equal(false, result.ok)
         assert.are.equal("Downloaded response was too large.", result.error)
+        assert.is_false(result.retryable)
     end)
 
     it("stops GraphQL responses when the total response deadline is exceeded", function()
@@ -386,6 +387,35 @@ describe("suwayomi/api/transport", function()
         assert.are.equal("Chapter page not found.", not_found.error)
     end)
 
+    it("marks only transient binary HTTP statuses as retryable", function()
+        install_ltn12()
+        local statuses = {
+            { code = 400, retryable = false },
+            { code = 408, retryable = true },
+            { code = 429, retryable = true },
+            { code = 500, retryable = true },
+        }
+
+        for _, status in ipairs(statuses) do
+            package.loaded["socket.http"] = nil
+            package.preload["socket.http"] = function()
+                return {
+                    request = function()
+                        return 1, status.code, {}
+                    end,
+                }
+            end
+
+            local result = transport.downloadBinary({
+                server_url = "http://suwayomi.example",
+            }, "/api/v1/manga/85/chapter/1/page/0")
+
+            assert.are.equal(false, result.ok)
+            assert.are.equal(status.retryable, result.retryable)
+            assert.are.equal(status.code, result.status_code)
+        end
+    end)
+
     it("downloads chapter archives to disk and removes failed partial files", function()
         local target_path = os.tmpname()
         os.remove(target_path)
@@ -431,6 +461,35 @@ describe("suwayomi/api/transport", function()
         assert.is_nil(io.open(target_path, "rb"))
     end)
 
+    it("marks only transient archive HTTP statuses as retryable", function()
+        local target_path = os.tmpname()
+        os.remove(target_path)
+        local statuses = {
+            { code = 400, retryable = false },
+            { code = 408, retryable = true },
+            { code = 429, retryable = true },
+            { code = 503, retryable = true },
+        }
+
+        for _, status in ipairs(statuses) do
+            package.loaded["ssl.https"] = nil
+            package.preload["ssl.https"] = function()
+                return {
+                    request = function()
+                        return 1, status.code
+                    end,
+                }
+            end
+
+            local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path)
+
+            assert.are.equal(false, result.ok)
+            assert.are.equal(status.retryable, result.retryable)
+            assert.are.equal(status.code, result.status_code)
+            assert.is_nil(io.open(target_path, "rb"))
+        end
+    end)
+
     it("rejects oversized chapter archives reported by Content-Length", function()
         local target_path = os.tmpname()
         os.remove(target_path)
@@ -449,6 +508,7 @@ describe("suwayomi/api/transport", function()
 
         assert.are.equal(false, result.ok)
         assert.are.equal("Downloaded response was too large.", result.error)
+        assert.is_false(result.retryable)
         assert.is_nil(io.open(target_path, "rb"))
     end)
 
@@ -471,6 +531,7 @@ describe("suwayomi/api/transport", function()
 
         assert.are.equal(false, result.ok)
         assert.are.equal("Downloaded response was too large.", result.error)
+        assert.is_false(result.retryable)
         assert.is_nil(io.open(target_path, "rb"))
     end)
 
