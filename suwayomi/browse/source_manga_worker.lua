@@ -38,6 +38,9 @@ local function normalizeBrowseOptions(options)
     }
     if browse_options.type == "SEARCH" then
         browse_options.query = tostring(options.query or "")
+        if type(options.filters) == "table" then
+            browse_options.filters = options.filters
+        end
     end
     return browse_options
 end
@@ -50,6 +53,7 @@ local function buildRequestOptions(source, browse_options)
     }
     if request_options.type == "SEARCH" then
         request_options.query = browse_options.query
+        request_options.filters = browse_options.filters
     end
     return request_options
 end

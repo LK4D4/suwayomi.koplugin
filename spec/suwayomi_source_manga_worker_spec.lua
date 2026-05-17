@@ -80,9 +80,11 @@ describe("suwayomi/browse/source_manga_worker", function()
     end)
 
     it("fetches one source manga page and writes a normalized result", function()
+        local received_options
         package.preload["suwayomi/api"] = function()
             return {
                 fetchMangaForSource = function(credentials, options)
+                    received_options = options
                     return {
                         ok = true,
                         server_url = credentials.server_url,
@@ -100,7 +102,14 @@ describe("suwayomi/browse/source_manga_worker", function()
         local result = worker:run(
             { server_url = "https://suwayomi.example" },
             { id = "s1", name = "MangaDex", lang = "en" },
-            { type = "SEARCH", query = "frieren", page = 2 },
+            {
+                type = "SEARCH",
+                query = "frieren",
+                page = 2,
+                filters = {
+                    { position = 0, textState = "77" },
+                },
+            },
             "/settings/source_manga.json"
         )
 
@@ -109,9 +118,84 @@ describe("suwayomi/browse/source_manga_worker", function()
         assert.are.equal("SEARCH", result.browse_options.type)
         assert.are.equal("frieren", result.browse_options.query)
         assert.are.equal(2, result.browse_options.page)
+        assert.are.same({
+            { position = 0, textState = "77" },
+        }, result.browse_options.filters)
+        assert.are.same(result.browse_options.filters, received_options.filters)
         assert.are.equal(1, #result.manga)
         assert.is_true(result.has_next_page)
         assert.are.same(result, worker:readResult("/settings/source_manga.json"))
+    end)
+
+    it("does not pass filters for popular or latest source manga pages", function()
+        local received_options
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchMangaForSource = function(_, options)
+                    received_options = options
+                    return {
+                        ok = true,
+                        manga = {},
+                    }
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/browse/source_manga_worker")
+        local result = worker:run(
+            { server_url = "https://suwayomi.example" },
+            { id = "s1", name = "MangaDex", lang = "en" },
+            {
+                type = "POPULAR",
+                page = 1,
+                filters = {
+                    { position = 1, type = "textState", state = "ignored" },
+                },
+            },
+            "/settings/source_manga_popular.json"
+        )
+
+        assert.is_true(result.ok)
+        assert.is_nil(result.browse_options.filters)
+        assert.is_nil(received_options.filters)
+        assert.are.same(result, worker:readResult("/settings/source_manga_popular.json"))
+    end)
+
+    it("preserves already-built source filter changes", function()
+        local received_options
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchMangaForSource = function(_, options)
+                    received_options = options
+                    return {
+                        ok = true,
+                        manga = {},
+                    }
+                end,
+            }
+        end
+
+        local filter_changes = {
+            { position = 0, checkBoxState = true },
+            { position = 1, groupChange = { position = 0, triState = "INCLUDE" } },
+        }
+        local worker = require("suwayomi/browse/source_manga_worker")
+        local result = worker:run(
+            { server_url = "https://suwayomi.example" },
+            { id = "s1", name = "MangaDex", lang = "en" },
+            {
+                type = "SEARCH",
+                query = "",
+                page = 1,
+                filters = filter_changes,
+            },
+            "/settings/source_manga_filter_changes.json"
+        )
+
+        assert.is_true(result.ok)
+        assert.are.same(filter_changes, result.browse_options.filters)
+        assert.are.same(filter_changes, received_options.filters)
+        assert.are.same(result, worker:readResult("/settings/source_manga_filter_changes.json"))
     end)
 
     it("writes source manga errors without crashing", function()

@@ -9,6 +9,7 @@
 
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
+local SourceFilters = require("suwayomi/source_filters")
 
 local SuwayomiSettings = {
     settings_file = DataStorage:getSettingsDir() .. "/suwayomi_dl.lua",
@@ -347,6 +348,65 @@ function SuwayomiSettings:saveSourceCache(credentials_or_url, sources, updated_a
 
     self:open():saveSetting("source_cache", normalized):flush()
     return normalized
+end
+
+local function emptySourceFilterDraft()
+    return {
+        query = "",
+        filters = {},
+    }
+end
+
+function SuwayomiSettings:loadSourceFilterDraft(credentials_or_url, source_id)
+    local server_url, auth_identity = self:getSourceCacheScope(credentials_or_url)
+    local drafts = self:open():readSetting("source_filter_drafts", nil)
+    if type(drafts) ~= "table"
+        or drafts.server_url ~= server_url
+        or tostring(drafts.auth_identity or "") ~= auth_identity
+        or type(drafts.sources) ~= "table"
+    then
+        return emptySourceFilterDraft()
+    end
+
+    local draft = drafts.sources[tostring(source_id or "")]
+    if draft == nil then
+        return emptySourceFilterDraft()
+    end
+    return SourceFilters.normalizeDraft(draft)
+end
+
+local function loadDraftStore(settings, credentials_or_url)
+    local server_url, auth_identity = settings:getSourceCacheScope(credentials_or_url)
+    local drafts = settings:open():readSetting("source_filter_drafts", nil)
+    if type(drafts) ~= "table"
+        or drafts.server_url ~= server_url
+        or tostring(drafts.auth_identity or "") ~= auth_identity
+        or type(drafts.sources) ~= "table"
+    then
+        drafts = {
+            server_url = server_url,
+            auth_identity = auth_identity,
+            sources = {},
+        }
+    end
+    return drafts
+end
+
+function SuwayomiSettings:saveSourceFilterDraft(credentials_or_url, source_id, draft)
+    local source_key = tostring(source_id or "")
+    local normalized = SourceFilters.normalizeDraft(draft)
+    local drafts = loadDraftStore(self, credentials_or_url)
+    drafts.sources[source_key] = normalized
+    self:open():saveSetting("source_filter_drafts", drafts):flush()
+    return normalized
+end
+
+function SuwayomiSettings:clearSourceFilterDraft(credentials_or_url, source_id)
+    local source_key = tostring(source_id or "")
+    local drafts = loadDraftStore(self, credentials_or_url)
+    drafts.sources[source_key] = nil
+    self:open():saveSetting("source_filter_drafts", drafts):flush()
+    return emptySourceFilterDraft()
 end
 
 function SuwayomiSettings:loadDownloadDirectory()

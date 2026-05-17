@@ -9,6 +9,7 @@ describe("suwayomi/settings", function()
         stored_data = {}
 
         package.loaded["suwayomi/settings"] = nil
+        package.loaded["suwayomi/source_filters"] = nil
         package.loaded.datastorage = nil
         package.loaded.luasettings = nil
 
@@ -224,6 +225,82 @@ describe("suwayomi/settings", function()
         assert.matches("^%x+$", stored_data.source_cache.auth_identity)
         assert.is_nil(stored_data.source_cache.auth_identity:match("alice"))
         assert.is_nil(stored_data.source_cache.auth_identity:match("secret"))
+    end)
+
+    it("loads an empty normalized source filter draft by default", function()
+        local settings = require("suwayomi/settings")
+
+        assert.are.same({
+            query = "",
+            filters = {},
+        }, settings:loadSourceFilterDraft("https://suwayomi.example", "source-a"))
+    end)
+
+    it("saves normalized source filter drafts by server auth scope and source", function()
+        local settings = require("suwayomi/settings")
+        local alice = {
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }
+        local bob = {
+            server_url = "https://suwayomi.example",
+            username = "bob",
+            password = "secret",
+            auth_method = "basic_auth",
+        }
+
+        local saved = settings:saveSourceFilterDraft(alice, "source-a", {
+            query = 123,
+            filters = {
+                { position = "1", type = "textState", state = 77 },
+                "bad",
+            },
+        })
+
+        assert.is_true(flushed)
+        assert.are.same({
+            query = "123",
+            filters = {
+                { position = 1, type = "textState", state = "77" },
+            },
+        }, saved)
+        assert.are.same(saved, settings:loadSourceFilterDraft(alice, "source-a"))
+        assert.are.same({
+            query = "",
+            filters = {},
+        }, settings:loadSourceFilterDraft(alice, "source-b"))
+        assert.are.same({
+            query = "",
+            filters = {},
+        }, settings:loadSourceFilterDraft(bob, "source-a"))
+        assert.matches("^%x+$", stored_data.source_filter_drafts.auth_identity)
+        assert.is_nil(stored_data.source_filter_drafts.auth_identity:match("alice"))
+        assert.is_nil(stored_data.source_filter_drafts.auth_identity:match("secret"))
+    end)
+
+    it("clears one source filter draft without changing other sources", function()
+        local settings = require("suwayomi/settings")
+        local credentials = {
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }
+
+        settings:saveSourceFilterDraft(credentials, "source-a", { query = "one" })
+        settings:saveSourceFilterDraft(credentials, "source-b", { query = "two" })
+        flushed = false
+
+        settings:clearSourceFilterDraft(credentials, "source-a")
+
+        assert.is_true(flushed)
+        assert.are.same({
+            query = "",
+            filters = {},
+        }, settings:loadSourceFilterDraft(credentials, "source-a"))
+        assert.are.equal("two", settings:loadSourceFilterDraft(credentials, "source-b").query)
     end)
 
     it("loads an empty download directory by default", function()

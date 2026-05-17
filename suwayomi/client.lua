@@ -16,6 +16,7 @@ function SuwayomiClient:new(options)
         ui = options.ui,
         subprocess_job = options.subprocess_job,
         global_search_worker = options.global_search_worker,
+        source_filter_worker = options.source_filter_worker,
         source_manga_worker = options.source_manga_worker,
         chapter_count_worker = options.chapter_count_worker,
         network_request_job = options.network_request_job,

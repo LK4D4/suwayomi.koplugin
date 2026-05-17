@@ -26,6 +26,13 @@ function SuwayomiClient:getGlobalSearchWorker()
     return self.global_search_worker
 end
 
+function SuwayomiClient:getSourceFilterWorker()
+    if not self.source_filter_worker then
+        self.source_filter_worker = require("suwayomi/browse/source_filter_worker")
+    end
+    return self.source_filter_worker
+end
+
 function SuwayomiClient:getSourceMangaWorker()
     if not self.source_manga_worker then
         self.source_manga_worker = require("suwayomi/browse/source_manga_worker")
