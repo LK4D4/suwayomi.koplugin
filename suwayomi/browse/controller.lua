@@ -61,6 +61,9 @@ function Methods:scheduleSourceCacheRefresh(credentials)
     self.source_cache_refresh_scheduled = true
     UIManager:scheduleIn(self.source_cache_refresh_delay_seconds, function()
         self.source_cache_refresh_scheduled = false
+        if not credentialsMatch(credentials, SuwayomiSettings:load()) then
+            return
+        end
         self:startSourceFetchWorker(credentials, {
             refresh = true,
             silent = true,

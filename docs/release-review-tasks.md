@@ -75,7 +75,7 @@ Fresh review baseline:
   - Direction: coerce non-table context stores to an empty table before assignment.
   - Test: scalar persisted contexts do not crash `rememberChapterContext`.
 
-- [ ] Recheck credentials before scheduled silent source refresh starts.
+- [x] Recheck credentials before scheduled silent source refresh starts.
   - Files: `suwayomi/browse/controller.lua`, browse controller specs
   - Risk: delayed background refresh can still send old credentials after login/server change, even if stale result is later dropped.
   - Direction: compare current credentials at timer fire/start time and cancel if changed.

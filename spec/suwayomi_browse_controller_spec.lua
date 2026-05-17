@@ -25,6 +25,14 @@ local function installControllerWithSourceFetchStub(config)
     clearModules()
     helper.stubControllerDependencies()
     local started_options
+    local scheduled_callback
+    package.preload["ui/uimanager"] = function()
+        return {
+            scheduleIn = function(_, _, callback)
+                scheduled_callback = callback
+            end,
+        }
+    end
     package.preload["suwayomi/browse/source_catalog"] = function()
         return { methods = {} }
     end
@@ -67,6 +75,8 @@ local function installControllerWithSourceFetchStub(config)
 
     return require("suwayomi/browse/controller"), function()
         return started_options
+    end, function()
+        return scheduled_callback
     end
 end
 
@@ -171,6 +181,30 @@ describe("suwayomi/browse/controller", function()
         assert.is_false(result)
         assert.is_nil(rendered)
         assert.are.equal("Loading sources...", controller.closed_loading.message)
+    end)
+
+    it("cancels scheduled silent source refresh when credentials change before timer fires", function()
+        local config = {
+            credentials = {
+                server_url = "https://new.example",
+                username = "bob",
+                password = "secret",
+                auth_method = "basic_auth",
+            },
+        }
+        local controller_module, get_started_options, get_scheduled_callback = installControllerWithSourceFetchStub(config)
+        local controller = buildController(controller_module)
+
+        controller:scheduleSourceCacheRefresh({
+            server_url = "https://old.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        })
+        get_scheduled_callback()()
+
+        assert.is_nil(get_started_options())
+        assert.is_nil(controller.source_fetch_active)
     end)
 
     it("opens onboarding setup when browse credentials are missing", function()
