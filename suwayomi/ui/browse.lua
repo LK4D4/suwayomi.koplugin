@@ -7,21 +7,14 @@
 -- External data: source and manga rows come from API/cache layers and are only
 -- formatted for display here.
 
-local Menu = require("ui/widget/menu")
-local ButtonDialog = require("ui/widget/buttondialog")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local _ = require("gettext")
 local ListRows = require("suwayomi/ui/list_rows")
-local menu_utils = require("suwayomi/ui/menu_utils")
 
 local BrowseUI = {}
 
 local function getListMenu()
     return require("suwayomi/ui/list_menu")
-end
-
-local function newPluginMenu(options)
-    return Menu:new(menu_utils.applyNativeTitleBarStyle(options))
 end
 
 function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
@@ -81,100 +74,75 @@ end
 
 function BrowseUI.showExtensionActionMenu(extension, onSelectCallback, options)
     options = options or {}
-    local buttons = {}
-    local UIManager = require("ui/uimanager")
-    local dialog
+    local actions = {}
 
-    local function addActionButton(action, text, destructive)
-        table.insert(buttons, {
-            {
-                text = text,
-                id = action,
-                destructive = destructive == true or nil,
-                callback = function()
-                    local function selectAction()
-                        if onSelectCallback then
-                            onSelectCallback(action)
-                        end
-                    end
-                    UIManager:close(dialog)
-                    if UIManager.nextTick then
-                        UIManager:nextTick(selectAction)
-                    else
-                        selectAction()
-                    end
-                end,
-            },
+    local function addAction(action_id, text, destructive)
+        table.insert(actions, {
+            id = action_id,
+            text = text,
+            destructive = destructive == true or nil,
         })
     end
 
     if type(extension) == "table" and extension.is_installed ~= true then
-        addActionButton("install", _("Install"))
+        addAction("install", _("Install"))
     elseif type(extension) == "table" and extension.has_update == true then
-        addActionButton("update", _("Update"))
+        addAction("update", _("Update"))
     end
     if type(extension) == "table" and extension.is_installed == true then
-        addActionButton("uninstall", _("Uninstall"), true)
+        addAction("uninstall", _("Uninstall"), true)
     end
 
-    if #buttons == 0 then
-        table.insert(buttons, {
-            {
-                text = _("No actions available"),
-                callback = function()
-                    UIManager:close(dialog)
-                end,
-            },
-        })
+    if #actions == 0 then
+        table.insert(actions, { text = _("No actions available") })
     end
 
-    dialog = ButtonDialog:new{
+    return require("suwayomi/ui").showActionMenu({
         title = ListRows.getExtensionTitle(extension),
-        buttons = buttons,
+        actions = actions,
         anchor = options.anchor,
         close_callback = options.close_callback,
-    }
-    UIManager:show(dialog)
-    return dialog
+        vertical = true,
+        destructive_actions_at_bottom = true,
+    }, function(action)
+        if action and action.id and onSelectCallback then
+            onSelectCallback(action.id)
+        end
+    end)
 end
 
 function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
     options = options or {}
-    local menu_table = {
+    local actions = {
         {
+            id = "POPULAR",
             text = _("Popular"),
-            callback = function()
-                if onSelectCallback then onSelectCallback("POPULAR") end
-            end,
         },
     }
 
     if not source or source.supports_latest ~= false then
-        table.insert(menu_table, {
+        table.insert(actions, {
+            id = "LATEST",
             text = _("Latest"),
-            callback = function()
-                if onSelectCallback then onSelectCallback("LATEST") end
-            end,
         })
     end
 
-    table.insert(menu_table, {
+    table.insert(actions, {
+        id = "SEARCH",
         text = _("Search"),
-        callback = function()
-            if onSelectCallback then onSelectCallback("SEARCH") end
-        end,
     })
 
-    local menu = newPluginMenu{
+    return require("suwayomi/ui").showActionMenu({
         title = source and (source.name or source.display_name or source.displayName) or _("Suwayomi Source"),
-        title_bar_left_icon = options and options.title_bar_left_icon,
-        item_table = menu_table,
-    }
-    menu_utils.applyTitleBarOptions(menu, options)
-    menu_utils.applyCloseCallback(menu, options)
-    local UIManager = require("ui/uimanager")
-    UIManager:show(menu)
-    return menu
+        actions = actions,
+        anchor = options.anchor,
+        close_callback = options.close_callback,
+        on_back = options.on_back,
+    }, function(action)
+        if action and action.id and onSelectCallback then
+            onSelectCallback(action.id)
+        end
+    end)
 end
 
 function BrowseUI.showSourceSearchPrompt(source, onSearchCallback, options)

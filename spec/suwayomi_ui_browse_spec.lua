@@ -13,13 +13,17 @@ describe("suwayomi/ui/browse", function()
         events = {}
 
         package.loaded["suwayomi/ui/browse"] = nil
+        package.loaded["suwayomi/ui"] = nil
         package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
         package.loaded["ui/widget/buttondialog"] = nil
+        package.loaded["ui/widget/confirmbox"] = nil
         package.loaded["ui/widget/multiinputdialog"] = nil
         package.loaded["ui/uimanager"] = nil
+        package.loaded["suwayomi/ui/directory"] = nil
+        package.loaded["suwayomi/ui/downloads"] = nil
         package.loaded["suwayomi/ui/manga_menu"] = nil
 
         package.preload.gettext = function()
@@ -40,6 +44,14 @@ describe("suwayomi/ui/browse", function()
             return {
                 new = function(_, options)
                     options.is_button_dialog = true
+                    return options
+                end,
+            }
+        end
+
+        package.preload["ui/widget/confirmbox"] = function()
+            return {
+                new = function(_, options)
                     return options
                 end,
             }
@@ -94,15 +106,26 @@ describe("suwayomi/ui/browse", function()
                 end,
             }
         end
+
+        package.preload["suwayomi/ui/directory"] = function()
+            return {}
+        end
+
+        package.preload["suwayomi/ui/downloads"] = function()
+            return {}
+        end
     end)
 
     after_each(function()
         package.preload.gettext = nil
         package.preload["ui/widget/menu"] = nil
         package.preload["ui/widget/buttondialog"] = nil
+        package.preload["ui/widget/confirmbox"] = nil
         package.preload["ui/widget/multiinputdialog"] = nil
         package.preload["ui/uimanager"] = nil
         package.preload["suwayomi/ui/list_menu"] = nil
+        package.preload["suwayomi/ui/directory"] = nil
+        package.preload["suwayomi/ui/downloads"] = nil
         package.preload["suwayomi/ui/manga_menu"] = nil
     end)
 
@@ -159,7 +182,7 @@ describe("suwayomi/ui/browse", function()
         assert.is_true(closed)
     end)
 
-    it("shows extension rows and extension install/update actions", function()
+    it("shows extension rows", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}
 
@@ -202,6 +225,15 @@ describe("suwayomi/ui/browse", function()
         shown_dialog.item_table[4].callback()
 
         assert.are.equal("pkg.mangadex", selected[1].pkg_name)
+    end)
+
+    it("shows extension actions through the shared action dialog", function()
+        local browse = require("suwayomi/ui/browse")
+        local selected = {}
+        local closed = false
+        local anchor = function()
+            return { x = 4, y = 8, w = 16, h = 32 }
+        end
 
         local actions = {}
         browse.showExtensionActionMenu({
@@ -210,9 +242,20 @@ describe("suwayomi/ui/browse", function()
             is_installed = false,
         }, function(action)
             table.insert(actions, action)
-        end)
+            table.insert(selected, action)
+        end, {
+            anchor = anchor,
+            close_callback = function()
+                closed = true
+            end,
+        })
         assert.is_true(shown_dialog.is_button_dialog)
+        assert.are.equal("MangaDex", shown_dialog.title)
+        assert.are.equal(anchor, shown_dialog.anchor)
+        shown_dialog.close_callback()
+        assert.is_true(closed)
         assert.are.equal("Install", shown_dialog.buttons[1][1].text)
+        assert.are.equal("install", shown_dialog.buttons[1][1].id)
         shown_dialog.buttons[1][1].callback()
 
         browse.showExtensionActionMenu({
@@ -225,9 +268,13 @@ describe("suwayomi/ui/browse", function()
         end)
         assert.is_true(shown_dialog.is_button_dialog)
         assert.are.equal("Update", shown_dialog.buttons[1][1].text)
+        assert.are.equal("update", shown_dialog.buttons[1][1].id)
         shown_dialog.buttons[1][1].callback()
-        assert.are.equal("Uninstall", shown_dialog.buttons[2][1].text)
-        shown_dialog.buttons[2][1].callback()
+        assert.are.same({}, shown_dialog.buttons[2])
+        assert.are.equal("Uninstall", shown_dialog.buttons[3][1].text)
+        assert.are.equal("uninstall", shown_dialog.buttons[3][1].id)
+        assert.is_true(shown_dialog.buttons[3][1].destructive)
+        shown_dialog.buttons[3][1].callback()
 
         browse.showExtensionActionMenu({
             pkg_name = "pkg.installed",
@@ -239,14 +286,26 @@ describe("suwayomi/ui/browse", function()
         end)
         assert.is_true(shown_dialog.is_button_dialog)
         assert.are.equal("Uninstall", shown_dialog.buttons[1][1].text)
+        assert.are.equal("uninstall", shown_dialog.buttons[1][1].id)
+        assert.is_true(shown_dialog.buttons[1][1].destructive)
+        shown_dialog.buttons[1][1].callback()
+
+        browse.showExtensionActionMenu(nil, function(action)
+            table.insert(actions, action)
+        end)
+        assert.is_true(shown_dialog.is_button_dialog)
+        assert.are.equal("No actions available", shown_dialog.buttons[1][1].text)
         shown_dialog.buttons[1][1].callback()
 
         assert.are.same({ "install", "update", "uninstall", "uninstall" }, actions)
+        assert.are.same({ "install" }, selected)
     end)
 
-    it("shows a source mode menu and hides latest when unsupported", function()
+    it("shows a source mode action dialog and hides latest when unsupported", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}
+        local closed = false
+        local went_back = false
 
         browse.showSourceModeMenu({
             id = "s1",
@@ -254,16 +313,32 @@ describe("suwayomi/ui/browse", function()
             supports_latest = false,
         }, function(mode)
             table.insert(selected, mode)
-        end)
+        end, {
+            close_callback = function()
+                closed = true
+            end,
+            on_back = function()
+                went_back = true
+            end,
+        })
 
+        assert.is_true(shown_dialog.is_button_dialog)
         assert.are.equal("MangaDex", shown_dialog.title)
-        assert.are.equal("Popular", shown_dialog.item_table[1].text)
-        assert.are.equal("Search", shown_dialog.item_table[2].text)
-        assert.is_nil(shown_dialog.item_table[3])
+        assert.are.equal("< Back", shown_dialog.buttons[1][1].text)
+        assert.are.same({}, shown_dialog.buttons[2])
+        assert.are.equal("Popular", shown_dialog.buttons[3][1].text)
+        assert.are.equal("POPULAR", shown_dialog.buttons[3][1].id)
+        assert.are.equal("Search", shown_dialog.buttons[3][2].text)
+        assert.are.equal("SEARCH", shown_dialog.buttons[3][2].id)
+        assert.is_nil(shown_dialog.buttons[4])
 
-        shown_dialog.item_table[1].callback()
-        shown_dialog.item_table[2].callback()
+        shown_dialog.close_callback()
+        shown_dialog.buttons[1][1].callback()
+        shown_dialog.buttons[3][1].callback()
+        shown_dialog.buttons[3][2].callback()
 
+        assert.is_true(closed)
+        assert.is_true(went_back)
         assert.are.same({ "POPULAR", "SEARCH" }, selected)
     end)
 
@@ -281,8 +356,11 @@ describe("suwayomi/ui/browse", function()
             selected_mode = mode
         end)
 
-        assert.are.equal("Latest", shown_dialog.item_table[2].text)
-        shown_dialog.item_table[2].callback()
+        assert.is_true(shown_dialog.is_button_dialog)
+        assert.are.equal("Popular", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Latest", shown_dialog.buttons[1][2].text)
+        assert.are.equal("Search", shown_dialog.buttons[2][1].text)
+        shown_dialog.buttons[1][2].callback()
         assert.are.equal("LATEST", selected_mode)
 
         browse.showSourceSearchPrompt({
