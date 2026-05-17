@@ -88,8 +88,9 @@ describe("suwayomi/plugin/title_menu", function()
 
         assert.are.equal("appbar.menu", options.title_bar_left_icon)
         assert.is_function(options.on_title_bar_left_tap)
+        assert.is_function(options.on_title_bar_left_hold)
 
-        options.on_title_bar_left_tap(source_menu)
+        options.on_title_bar_left_hold(source_menu)
 
         assert.are.equal("Library", shown_action_menu.title)
         assert.are.equal("home", shown_action_menu.actions[1].id)

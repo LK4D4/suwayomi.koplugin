@@ -182,7 +182,7 @@ Baseline at review time:
   - Direction: return from finish when active job is canceled or summary no longer says `searching`.
   - Test: timeout then finish leaves row in timed-out state.
 
-- [ ] **Wire or remove title-bar left-hold plumbing**
+- [x] **Wire or remove title-bar left-hold plumbing**
   - Files: `suwayomi/ui/browse.lua`, `suwayomi/ui/menu_utils.lua`
   - Risk: callers can pass `on_title_bar_left_hold`, but no UI binding appears to invoke it.
   - Direction: wire the KOReader hold hook if supported, or remove the dead option path.
