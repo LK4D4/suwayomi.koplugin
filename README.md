@@ -76,7 +76,7 @@ Manual installation:
 7. Tap **Settings** > **Downloads** > **Download directory** to change where manga will be downloaded. The same Downloads settings section also controls optional local-file deletion after mark-read or finished-reading events.
 8. Tap **Library** to open manga already in your Suwayomi library, or **Browse** to explore sources.
 9. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, or **Search**.
-10. Use **Next page** and **Previous page** on source result pages when available.
+10. Source results load more API pages automatically as KOReader paging reaches the end of loaded rows.
 11. Use the title-bar burger menu on Suwayomi Library/Browse/Search screens to return to the hub.
 12. Tap a manga result to open manga actions, or tap a chapter to open the chapter actions dialog.
 13. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
