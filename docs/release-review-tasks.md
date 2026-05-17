@@ -63,7 +63,7 @@ Fresh review baseline:
   - Direction: preserve action success while warning about `extension_refresh_error` or `source_refresh_error`.
   - Test: worker returns partial refresh error; UI reports warning and avoids misleading full-success state.
 
-- [ ] Bound or page large library worker results.
+- [x] Bound or page large library worker results.
   - Files: `suwayomi/network/request_worker.lua`, library/network worker specs
   - Risk: very large libraries can exceed the 4 MiB result cap and fail with generic network-request error.
   - Direction: avoid unbounded `all_manga` result growth or emit a clearer bounded failure before parent rejects the result file.

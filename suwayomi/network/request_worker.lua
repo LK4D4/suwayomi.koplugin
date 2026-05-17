@@ -3,13 +3,28 @@
 -- Responsibility: run selected API facade calls in a subprocess and persist a
 -- compact result file for the UI process.
 -- Owned state: none.
--- Dependencies: Suwayomi API facade and shared subprocess result IO.
+-- Dependencies: dkjson, Suwayomi API facade, and shared subprocess result IO.
 -- External data: request tables and API results are normalized before writing.
 
+local json = require("dkjson")
 local SuwayomiAPI = require("suwayomi/api")
 local SubprocessJob = require("suwayomi/subprocess/job")
 
 local RequestWorker = {}
+local LIBRARY_TOO_LARGE_ERROR = "Suwayomi library is too large to load at once."
+
+local function libraryResultExceedsLimit(manga, total_count)
+    local limit = tonumber(SubprocessJob.max_result_bytes)
+    if not limit or limit <= 0 then
+        return false
+    end
+    local encoded = json.encode({
+        ok = true,
+        manga = manga,
+        total_count = total_count,
+    })
+    return type(encoded) == "string" and #encoded > limit
+end
 
 local function fetchLibraryMangaPages(credentials)
     local page_size = 100
@@ -31,6 +46,13 @@ local function fetchLibraryMangaPages(credentials)
             table.insert(all_manga, manga)
         end
         total_count = tonumber(result.total_count) or #all_manga
+
+        if libraryResultExceedsLimit(all_manga, total_count) then
+            return {
+                ok = false,
+                error = LIBRARY_TOO_LARGE_ERROR,
+            }
+        end
 
         if #page_manga == 0 or #page_manga < page_size or #all_manga >= total_count then
             break

@@ -77,6 +77,55 @@ describe("suwayomi/network/request_worker", function()
         assert.are.equal(101, #written["/settings/library.json"].manga)
     end)
 
+    it("fails clearly before library worker results exceed the subprocess cap", function()
+        package.loaded["suwayomi/network/request_worker"] = nil
+        package.loaded["suwayomi/subprocess/job"] = nil
+        package.loaded["suwayomi/api"] = nil
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                max_result_bytes = 512,
+                writeResult = function(result_path, result)
+                    written[result_path] = result
+                    return true
+                end,
+                readResult = function(result_path, normalize)
+                    local result = written[result_path]
+                    if normalize then
+                        return normalize(result)
+                    end
+                    return result
+                end,
+            }
+        end
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchLibraryManga = function(_, options)
+                    table.insert(library_offsets, options.offset)
+                    local manga = {}
+                    for index = 1, 100 do
+                        manga[#manga + 1] = {
+                            id = tostring(options.offset + index),
+                            title = string.rep("x", 32),
+                        }
+                    end
+                    return { ok = true, manga = manga, total_count = 300 }
+                end,
+            }
+        end
+
+        local Worker = require("suwayomi/network/request_worker")
+
+        Worker:run({ server_url = "https://suwayomi.example" }, {
+            action = "fetch_library_manga_pages",
+        }, "/settings/large_library.json")
+
+        assert.are.same({ 0 }, library_offsets)
+        assert.are.same({
+            ok = false,
+            error = "Suwayomi library is too large to load at once.",
+        }, written["/settings/large_library.json"])
+    end)
+
     it("updates manga library state inside the worker process", function()
         local Worker = require("suwayomi/network/request_worker")
 
