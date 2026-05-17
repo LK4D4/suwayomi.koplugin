@@ -580,6 +580,7 @@ describe("suwayomi/ui/browse", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}
         local paging = {}
+        local on_page_changed = function() end
 
         browse.showMangaMenu({
             { id = "m1", title = "Already Added", in_library = true },
@@ -595,10 +596,12 @@ describe("suwayomi/ui/browse", function()
             on_next_page = function()
                 table.insert(paging, "next")
             end,
+            on_page_changed = on_page_changed,
         })
 
         assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_dialog.title)
         assert.are.equal("list_menu", shown_dialog.renderer)
+        assert.are.equal(on_page_changed, shown_dialog.on_page_changed)
         assert.are.equal("Previous page", shown_dialog.item_table[1].text)
         assert.are.equal("Already Added", shown_dialog.item_table[2].text)
         assert.are.equal("In Library", shown_dialog.item_table[2].mandatory)
@@ -621,6 +624,7 @@ describe("suwayomi/ui/browse", function()
         local title_bar_title
         local left_icon
         local closed = false
+        local on_page_changed = function() end
         local menu = {
             title = "MangaDex - Popular - Page 1",
             title_bar = {
@@ -644,12 +648,14 @@ describe("suwayomi/ui/browse", function()
             close_callback = function()
                 closed = true
             end,
+            on_page_changed = on_page_changed,
         })
 
         assert.are.equal("MangaDex - Popular - Page 2", menu.title)
         assert.are.equal("list_menu", menu.renderer)
         assert.are.same({ title = "MangaDex - Popular - Page 2", refresh = true }, title_bar_title)
         assert.are.equal("appbar.menu", left_icon)
+        assert.are.equal(on_page_changed, menu.updated_options.on_page_changed)
         assert.is_true(menu.updated)
 
         menu.close_callback()
