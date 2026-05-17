@@ -24,6 +24,7 @@ local function installController(options)
     options = options or {}
     clearModules()
     local state = {
+        events = {},
         messages = {},
         refresh_count = 0,
         saved_languages = options.languages or { "en", "ru" },
@@ -211,6 +212,7 @@ local function installController(options)
     end
     function plugin:showMessage(message)
         table.insert(self.messages, message)
+        table.insert(state.events, "message:" .. message)
     end
     function plugin:showLoadingMessage(message)
         state.loading_message = { message = message }
@@ -228,9 +230,11 @@ local function installController(options)
     end
     function plugin:closeSuwayomiPlugin()
         state.closed_plugin = true
+        table.insert(state.events, "close")
     end
     function plugin:showHome()
         state.home_count = (state.home_count or 0) + 1
+        table.insert(state.events, "home")
     end
     function plugin:pluralize(value, singular, plural)
         return value == 1 and singular or plural
@@ -335,7 +339,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         state.choose_download_callback("/storage/emulated/0/Books/Manga")
 
-        assert.are.equal("Suwayomi setup complete.", state.messages[#state.messages])
+        assert.are.equal("Test connection before continuing.", state.messages[#state.messages])
         assert.is_true(state.closed_plugin)
         assert.are.equal(1, state.home_count)
     end)
@@ -504,9 +508,39 @@ describe("suwayomi/plugin/settings_controller", function()
             next_tick = true,
             suppress_saved_message = true,
         }, state.choose_download_options)
-        assert.are.equal("Suwayomi setup complete.", state.messages[#state.messages])
+        assert.are.equal(0, #state.messages)
         assert.is_true(state.closed_plugin)
         assert.are.equal(1, state.home_count)
+    end)
+
+    it("lands home without a completion toast after setup folder selection", function()
+        local plugin, state = installController({
+            credentials = { server_url = "https://suwayomi.example" },
+            download_directory = "/storage/emulated/0/Books/Manga",
+        })
+        plugin.startOnboardingConnectionTest = function(self, credentials)
+            self.onboarding_connection_test_key = self:getOnboardingCredentialsKey(credentials)
+        end
+
+        plugin:buildSettingsMenu()[1].callback()
+        state.onboarding_connection_options.onTestConnection({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        })
+        assert.is_true(state.onboarding_connection_options.onContinue({
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            password = "secret",
+            auth_method = "basic_auth",
+        }))
+        state.choose_download_callback("/storage/emulated/0/Books/Manga")
+
+        assert.are.same({
+            "close",
+            "home",
+        }, state.events)
     end)
 
     it("uses a device-friendly timeout for onboarding connection tests", function()

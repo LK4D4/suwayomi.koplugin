@@ -188,7 +188,6 @@ end
 
 
 function Methods:finishOnboardingSetup()
-    self:showMessage(_("Suwayomi setup complete."))
     if self.showHome then
         UIManager:nextTick(function()
             if self.closeSuwayomiPlugin then
@@ -196,7 +195,9 @@ function Methods:finishOnboardingSetup()
             end
             self:showHome()
         end)
+        return
     end
+    self:showMessage(_("Suwayomi setup complete."))
 end
 
 
@@ -229,8 +230,7 @@ function Methods:showOnboardingConnectionStep(options)
                 return false
             end
 
-            local saved_credentials = SuwayomiSettings:save(credentials)
-            self:showMessage(T(_("Suwayomi login settings saved for %1."), saved_credentials.server_url))
+            SuwayomiSettings:save(credentials)
             local download_directory = SuwayomiSettings:loadDownloadDirectory()
             local should_choose_directory = options.first_run == false
                 or not download_directory
