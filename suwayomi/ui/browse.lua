@@ -132,6 +132,11 @@ function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
         text = _("Search"),
     })
 
+    table.insert(actions, {
+        id = "FILTERS",
+        text = _("Source filters"),
+    })
+
     return require("suwayomi/ui").showActionMenu({
         title = source and (source.name or source.display_name or source.displayName) or _("Suwayomi Source"),
         actions = actions,
@@ -185,6 +190,388 @@ function BrowseUI.showSourceSearchPrompt(source, onSearchCallback, options)
     UIManager:show(dialog)
     dialog:onShowKeyboard()
     return dialog
+end
+
+local function copyDraft(draft)
+    draft = type(draft) == "table" and draft or {}
+    local copied = {
+        query = draft.query ~= nil and tostring(draft.query) or "",
+        filters = {},
+    }
+    for _, entry in ipairs(type(draft.filters) == "table" and draft.filters or {}) do
+        local copied_entry = {}
+        for key, value in pairs(entry) do
+            if key == "group_change" and type(value) == "table" then
+                local child = {}
+                for child_key, child_value in pairs(value) do
+                    child[child_key] = child_value
+                end
+                copied_entry[key] = child
+            else
+                copied_entry[key] = value
+            end
+        end
+        table.insert(copied.filters, copied_entry)
+    end
+    return copied
+end
+
+local function findDraftEntry(draft, position, state_type)
+    for _, entry in ipairs(draft.filters or {}) do
+        if entry.position == position and entry.type == state_type then
+            return entry
+        end
+    end
+    local entry = {
+        position = position,
+        type = state_type,
+    }
+    table.insert(draft.filters, entry)
+    return entry
+end
+
+local function findGroupDraftEntry(draft, group_position, position, state_type)
+    for _, entry in ipairs(draft.filters or {}) do
+        local group_change = type(entry.group_change) == "table" and entry.group_change or nil
+        if entry.position == group_position
+            and group_change
+            and group_change.position == position
+            and group_change.type == state_type
+        then
+            return group_change
+        end
+    end
+    local entry = {
+        position = group_position,
+        group_change = {
+            position = position,
+            type = state_type,
+        },
+    }
+    table.insert(draft.filters, entry)
+    return entry.group_change
+end
+
+local function findDraftStateEntry(draft, position, state_type, group_position)
+    if group_position then
+        return findGroupDraftEntry(draft, group_position, position, state_type)
+    end
+    return findDraftEntry(draft, position, state_type)
+end
+
+local function getDraftState(draft, position, state_type, default, group_position)
+    for _, entry in ipairs(draft.filters or {}) do
+        local candidate = entry
+        if group_position then
+            candidate = entry.position == group_position
+                and type(entry.group_change) == "table"
+                and entry.group_change
+                or nil
+        end
+        if candidate and candidate.position == position and candidate.type == state_type then
+            return candidate.state
+        end
+    end
+    return default
+end
+
+local function stateText(value)
+    return value and _("On") or _("Off")
+end
+
+local function sortStateText(filter, state)
+    local values = type(filter.values) == "table" and filter.values or {}
+    state = type(state) == "table" and state or {}
+    local index = tonumber(state.index) or 0
+    local label = values[index + 1] or tostring(index)
+    local direction = state.ascending == false and _("Descending") or _("Ascending")
+    return label .. " - " .. direction
+end
+
+local function showTextFilterDialog(filter, current, onSave)
+    local UIManager = require("ui/uimanager")
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = filter.name or _("Text filter"),
+        fields = {
+            {
+                hint = filter.name or _("Text"),
+                text = current or "",
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    id = "close",
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+                {
+                    text = _("Save"),
+                    is_enter_default = true,
+                    callback = function()
+                        local fields = dialog:getFields()
+                        UIManager:close(dialog)
+                        onSave(fields[1] or "")
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+    return dialog
+end
+
+local function buildSourceFilterRows(filters, draft, context)
+    context = context or {}
+    local rows = {}
+    for index, filter in ipairs(filters or {}) do
+        filter = type(filter) == "table" and filter or {}
+        local filter_type = tostring(filter.type or "")
+        if filter_type == "HeaderFilter" or filter_type == "SeparatorFilter" then
+            table.insert(rows, {
+                text = filter.name or "",
+                select_enabled = false,
+            })
+        elseif filter_type == "CheckBoxFilter" then
+            local value = getDraftState(draft, index, "checkBoxState", filter.default == true, context.group_position)
+            local row = {
+                text = filter.name or "",
+                mandatory = stateText(value),
+                keep_menu_open = true,
+            }
+            row.callback = function()
+                local entry = findDraftStateEntry(draft, index, "checkBoxState", context.group_position)
+                entry.state = getDraftState(
+                    draft,
+                    index,
+                    "checkBoxState",
+                    filter.default == true,
+                    context.group_position
+                ) ~= true
+                row.mandatory = stateText(entry.state)
+            end
+            table.insert(rows, row)
+        elseif filter_type == "TriStateFilter" then
+            local value = tostring(getDraftState(draft, index, "triState", filter.default or "IGNORE", context.group_position))
+            local row = {
+                text = filter.name or "",
+                mandatory = value,
+                keep_menu_open = true,
+            }
+            row.callback = function()
+                local next_value = "INCLUDE"
+                if row.mandatory == "INCLUDE" then
+                    next_value = "EXCLUDE"
+                elseif row.mandatory == "EXCLUDE" then
+                    next_value = "IGNORE"
+                end
+                local entry = findDraftStateEntry(draft, index, "triState", context.group_position)
+                entry.state = next_value
+                row.mandatory = next_value
+            end
+            table.insert(rows, row)
+        elseif filter_type == "SelectFilter" then
+            local value = tonumber(getDraftState(draft, index, "selectState", filter.default or 0, context.group_position)) or 0
+            local values = type(filter.values) == "table" and filter.values or {}
+            local row = {
+                text = filter.name or "",
+                mandatory = values[value + 1] or tostring(value),
+                sub_item_table = {},
+            }
+            for value_index, label in ipairs(values) do
+                local state = value_index - 1
+                table.insert(row.sub_item_table, {
+                    text = label,
+                    radio = true,
+                    checked_func = function()
+                        return (tonumber(getDraftState(
+                            draft,
+                            index,
+                            "selectState",
+                            filter.default or 0,
+                            context.group_position
+                        )) or 0) == state
+                    end,
+                    callback = function()
+                        local entry = findDraftStateEntry(draft, index, "selectState", context.group_position)
+                        entry.state = state
+                        row.mandatory = label
+                    end,
+                    keep_menu_open = true,
+                })
+            end
+            if #row.sub_item_table == 0 then
+                row.select_enabled = false
+            end
+            table.insert(rows, row)
+        elseif filter_type == "TextFilter" then
+            local row = {
+                text = filter.name or "",
+                mandatory = tostring(getDraftState(draft, index, "textState", filter.default or "", context.group_position)),
+            }
+            row.callback = function()
+                return showTextFilterDialog(filter, row.mandatory, function(value)
+                    local entry = findDraftStateEntry(draft, index, "textState", context.group_position)
+                    entry.state = value
+                    row.mandatory = value
+                end)
+            end
+            table.insert(rows, row)
+        elseif filter_type == "SortFilter" then
+            local default = type(filter.default) == "table" and filter.default or { index = 0, ascending = true }
+            local state = getDraftState(draft, index, "sortState", default, context.group_position)
+            if type(state) ~= "table" then
+                state = default
+            end
+            local row = {
+                text = filter.name or "",
+                mandatory = sortStateText(filter, state),
+                sub_item_table = {},
+            }
+            local values = type(filter.values) == "table" and filter.values or {}
+            for value_index, label in ipairs(values) do
+                local sort_index = value_index - 1
+                table.insert(row.sub_item_table, {
+                    text = label,
+                    radio = true,
+                    checked_func = function()
+                        local current = getDraftState(draft, index, "sortState", default, context.group_position)
+                        return type(current) == "table" and current.index == sort_index
+                    end,
+                    callback = function()
+                        local entry = findDraftStateEntry(draft, index, "sortState", context.group_position)
+                        local current = type(entry.state) == "table" and entry.state or default
+                        entry.state = {
+                            index = sort_index,
+                            ascending = current.ascending ~= false,
+                        }
+                        row.mandatory = sortStateText(filter, entry.state)
+                    end,
+                    keep_menu_open = true,
+                })
+            end
+            table.insert(row.sub_item_table, {
+                text = _("Ascending"),
+                radio = true,
+                checked_func = function()
+                    local current = getDraftState(draft, index, "sortState", default, context.group_position)
+                    return type(current) ~= "table" or current.ascending ~= false
+                end,
+                callback = function()
+                    local entry = findDraftStateEntry(draft, index, "sortState", context.group_position)
+                    local current = type(entry.state) == "table" and entry.state or default
+                    entry.state = {
+                        index = tonumber(current.index) or 0,
+                        ascending = true,
+                    }
+                    row.mandatory = sortStateText(filter, entry.state)
+                end,
+                keep_menu_open = true,
+            })
+            table.insert(row.sub_item_table, {
+                text = _("Descending"),
+                radio = true,
+                checked_func = function()
+                    local current = getDraftState(draft, index, "sortState", default, context.group_position)
+                    return type(current) == "table" and current.ascending == false
+                end,
+                callback = function()
+                    local entry = findDraftStateEntry(draft, index, "sortState", context.group_position)
+                    local current = type(entry.state) == "table" and entry.state or default
+                    entry.state = {
+                        index = tonumber(current.index) or 0,
+                        ascending = false,
+                    }
+                    row.mandatory = sortStateText(filter, entry.state)
+                end,
+                keep_menu_open = true,
+            })
+            table.insert(rows, row)
+        elseif filter_type == "GroupFilter" then
+            local sub_rows = buildSourceFilterRows(filter.filters, draft, { group_position = index })
+            local row = {
+                text = filter.name or "",
+                mandatory = _("Group"),
+                sub_item_table = sub_rows,
+            }
+            if #sub_rows == 0 then
+                row.select_enabled = false
+            end
+            table.insert(rows, row)
+        else
+            table.insert(rows, {
+                text = filter.name or filter_type,
+                mandatory = _("Unsupported"),
+                select_enabled = false,
+            })
+        end
+    end
+    return rows
+end
+
+function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
+    options = options or {}
+    draft = copyDraft(draft)
+    local title = (source and (source.name or source.display_name or source.displayName) or _("Source")) .. _(" filters")
+    local title_options = options.title_options or {}
+    local menu_options = {
+        actions = {
+            { id = "apply_source_filters", text = _("Apply filters") },
+            { id = "reset_source_filters", text = _("Reset filters") },
+            { id = "source_filter_search_text", text = _("Search text") },
+        },
+        onSelect = function(action)
+            local action_id = action and action.id
+            if action_id == "apply_source_filters" and options.on_apply then
+                return options.on_apply(copyDraft(draft))
+            elseif action_id == "reset_source_filters" and options.on_reset then
+                return options.on_reset()
+            elseif action_id == "source_filter_search_text" and options.on_search_text then
+                return options.on_search_text(copyDraft(draft))
+            end
+        end,
+    }
+    local show_options = {}
+    for key, value in pairs(title_options) do
+        show_options[key] = value
+    end
+    show_options.title = title_options.title or title
+    show_options.item_table = buildSourceFilterRows(filters, draft)
+    table.insert(show_options.item_table, {
+        text = _("Apply filters"),
+        callback = function()
+            if options.on_apply then
+                return options.on_apply(copyDraft(draft))
+            end
+        end,
+    })
+    table.insert(show_options.item_table, {
+        text = _("Reset filters"),
+        callback = function()
+            if options.on_reset then
+                return options.on_reset()
+            end
+        end,
+    })
+    table.insert(show_options.item_table, {
+        text = _("Search text"),
+        callback = function()
+            if options.on_search_text then
+                return options.on_search_text(copyDraft(draft))
+            end
+        end,
+    })
+    show_options.menu_options = menu_options
+    if not show_options.on_title_bar_left_hold and title_options.onSelect == nil then
+        show_options.on_title_bar_left_hold = function()
+            return menu_options.onSelect({ id = "apply_source_filters" })
+        end
+    end
+    return getListMenu().show(show_options)
 end
 
 function BrowseUI.showExtensionSearchPrompt(currentQuery, onSearchCallback)

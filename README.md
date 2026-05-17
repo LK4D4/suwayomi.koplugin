@@ -17,7 +17,7 @@ This plugin is experimental and still under active development.
 - Native KOReader UI integration
 - Native Suwayomi hub with Library, Browse, Downloads, Sync, Settings, and Close actions
 - Library entry point with category picker behavior settings
-- Browse sources, search across visible sources, search within a source, page source results, and open manga/chapter actions directly from the server
+- Browse sources, search across visible sources, search within a source with optional source filters, page source results, and open manga/chapter actions directly from the server
 - Browse available Suwayomi extensions from KOReader and install, update, or uninstall extensions on the server
 - Cached source list with silent background refresh
 - Basic auth login against a self-hosted Suwayomi server
@@ -39,10 +39,10 @@ This plugin is experimental and still under active development.
 - Manual `Sync` action for flushing pending read/unread changes immediately
 
 Current limitations:
-- Remote source browse/latest workflows can be usable. Global search now keeps per-source failures isolated and can be cancelled, and source-specific result loading is cancellable, but source-specific search still depends on the selected source and may end in a timeout or source error instead of results.
+- Remote source browse/latest workflows can be usable. Global search now keeps per-source failures isolated and can be cancelled, and source-specific result loading is cancellable, but source-specific search and source filters still depend on the selected source/server and may end in a timeout or source error instead of results.
 - Some Suwayomi extensions mark broadly used sources, including MangaDex and Comick in the tested server setup, as NSFW. Enable **Settings** > **Browse** > **Show NSFW sources** if expected sources are missing.
 - Source-specific quirks are expected. In the May 2026 live test, MangaDex search returned results quickly, but one tested result had no chapters from Suwayomi; Comick Latest returned manga and chapters, while Comick text search timed out at the server.
-- Full source filter editing is still deferred; source-specific search currently uses text search without dynamic source filters.
+- Source filters are available for source-specific search when the Suwayomi server and selected source expose a filter schema.
 - `Downloads` currently shows KOReader-local active, queued, and failed downloads. Completed history and server-side Suwayomi download queue management are not implemented.
 - Downloaded files are KOReader-device-local CBZ files under the configured download directory. The plugin does not manage Suwayomi's server-side download queue.
 
@@ -75,7 +75,7 @@ Manual installation:
 6. Optionally tap **Browse**, then open the title-bar menu to filter source languages, show/hide NSFW sources, or hide in-library source results.
 7. Tap **Settings** > **Downloads** > **Download directory** to change where manga will be downloaded. The same Downloads settings section also controls optional local-file deletion after mark-read or finished-reading events.
 8. Tap **Library** to open manga already in your Suwayomi library, or **Browse** to explore sources.
-9. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, or **Search**.
+9. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, **Search**, or **Source filters**.
 10. Source results load more API pages automatically as KOReader paging reaches the end of loaded rows.
 11. Use the title-bar burger menu on Suwayomi Library/Browse/Search screens to return to the hub.
 12. Tap a manga result to open manga actions, or tap a chapter to open the chapter actions dialog.
@@ -105,7 +105,6 @@ When Suwayomi provides stable chapter metadata, the filename adds a duplicate-sa
 
 The current client MVP intentionally does not implement:
 
-- Full dynamic source filter editing
 - Source preference editing
 - Extension repository editing or source enable/disable management
 - Server-side Suwayomi download queue, download settings, or completed history management

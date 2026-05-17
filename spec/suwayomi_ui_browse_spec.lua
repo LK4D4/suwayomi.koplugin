@@ -301,7 +301,7 @@ describe("suwayomi/ui/browse", function()
         assert.are.same({ "install" }, selected)
     end)
 
-    it("shows a source mode action dialog and hides latest when unsupported", function()
+    it("shows a source mode action dialog with source filters and hides latest when unsupported", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}
         local closed = false
@@ -330,16 +330,115 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("POPULAR", shown_dialog.buttons[3][1].id)
         assert.are.equal("Search", shown_dialog.buttons[3][2].text)
         assert.are.equal("SEARCH", shown_dialog.buttons[3][2].id)
-        assert.is_nil(shown_dialog.buttons[4])
+        assert.are.equal("Source filters", shown_dialog.buttons[4][1].text)
+        assert.are.equal("FILTERS", shown_dialog.buttons[4][1].id)
 
         shown_dialog.close_callback()
         shown_dialog.buttons[1][1].callback()
         shown_dialog.buttons[3][1].callback()
         shown_dialog.buttons[3][2].callback()
+        shown_dialog.buttons[4][1].callback()
 
         assert.is_true(closed)
         assert.is_true(went_back)
-        assert.are.same({ "POPULAR", "SEARCH" }, selected)
+        assert.are.same({ "POPULAR", "SEARCH", "FILTERS" }, selected)
+    end)
+
+    it("shows source filter editor rows and title actions", function()
+        local browse = require("suwayomi/ui/browse")
+        local applied
+        local reset = false
+        local search_text = false
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "MangaDex",
+        }, {
+            { type = "HeaderFilter", name = "Genres" },
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+            { type = "TriStateFilter", name = "Licensed", default = "IGNORE" },
+            { type = "SelectFilter", name = "Length", values = { "Any", "Long" }, default = 0 },
+            { type = "TextFilter", name = "Author", default = "" },
+            { type = "SortFilter", name = "Sort by", values = { "Name", "Updated" }, default = { index = 0, ascending = true } },
+            {
+                type = "GroupFilter",
+                name = "Nested",
+                filters = {
+                    { type = "CheckBoxFilter", name = "Awarded", default = false },
+                },
+            },
+            { type = "UnknownFilter", name = "Mystery", unsupported = true },
+        }, {
+            filters = {
+                { position = 2, type = "checkBoxState", state = true },
+            },
+        }, {
+            on_apply = function(draft)
+                applied = draft
+            end,
+            on_reset = function()
+                reset = true
+            end,
+            on_search_text = function()
+                search_text = true
+            end,
+        })
+
+        assert.are.equal("MangaDex filters", shown_dialog.title)
+        assert.are.equal("Genres", shown_dialog.item_table[1].text)
+        assert.is_false(shown_dialog.item_table[1].select_enabled)
+        assert.are.equal("Completed", shown_dialog.item_table[2].text)
+        assert.are.equal("On", shown_dialog.item_table[2].mandatory)
+        assert.are.equal("Licensed", shown_dialog.item_table[3].text)
+        assert.are.equal("IGNORE", shown_dialog.item_table[3].mandatory)
+        assert.are.equal("Length", shown_dialog.item_table[4].text)
+        assert.are.equal("Any", shown_dialog.item_table[4].mandatory)
+        assert.are.equal("Author", shown_dialog.item_table[5].text)
+        assert.are.equal("", shown_dialog.item_table[5].mandatory)
+        assert.are.equal("Sort by", shown_dialog.item_table[6].text)
+        assert.are.equal("Name - Ascending", shown_dialog.item_table[6].mandatory)
+        assert.are.equal("Nested", shown_dialog.item_table[7].text)
+        assert.are.equal("Group", shown_dialog.item_table[7].mandatory)
+        assert.are.equal("Awarded", shown_dialog.item_table[7].sub_item_table[1].text)
+        assert.are.equal("Mystery", shown_dialog.item_table[8].text)
+        assert.are.equal("Unsupported", shown_dialog.item_table[8].mandatory)
+        assert.is_false(shown_dialog.item_table[8].select_enabled)
+        assert.are.equal("Apply filters", shown_dialog.item_table[9].text)
+        assert.are.equal("Reset filters", shown_dialog.item_table[10].text)
+        assert.are.equal("Search text", shown_dialog.item_table[11].text)
+
+        local editor = shown_dialog
+        shown_dialog.item_table[2].callback()
+        editor.item_table[3].callback()
+        editor.item_table[4].sub_item_table[2].callback()
+        editor.item_table[5].callback()
+        shown_dialog.getFields = function()
+            return { "isekai" }
+        end
+        shown_dialog.buttons[1][2].callback()
+        editor.item_table[6].sub_item_table[2].callback()
+        editor.item_table[6].sub_item_table[4].callback()
+        editor.item_table[7].sub_item_table[1].callback()
+        editor.item_table[9].callback()
+        assert.are.same({
+            query = "",
+            filters = {
+                { position = 2, type = "checkBoxState", state = false },
+                { position = 3, type = "triState", state = "INCLUDE" },
+                { position = 4, type = "selectState", state = 1 },
+                { position = 5, type = "textState", state = "isekai" },
+                { position = 6, type = "sortState", state = { index = 1, ascending = false } },
+                {
+                    position = 7,
+                    group_change = { position = 1, type = "checkBoxState", state = true },
+                },
+            },
+        }, applied)
+
+        editor.item_table[10].callback()
+        editor.item_table[11].callback()
+        assert.is_true(reset)
+        assert.is_true(search_text)
     end)
 
     it("shows latest for unknown source support and collects search queries", function()

@@ -6,6 +6,7 @@
 -- External data: validated by the moved methods before UI rendering or worker use.
 
 local util = require("suwayomi/client/util")
+local SourceFilters = require("suwayomi/source_filters")
 local copyOptions = util.copyOptions
 local trim = util.trim
 
@@ -64,6 +65,9 @@ end
 function SuwayomiClient:getSourceModeTitle(options)
     local mode = options.type or "POPULAR"
     if mode == "SEARCH" then
+        if trim(options.query) == "" and type(options.filters) == "table" and #options.filters > 0 then
+            return self:translate("Filter")
+        end
         return self:translate("Search") .. ": " .. tostring(options.query or "")
     end
     if mode == "LATEST" then
@@ -85,6 +89,9 @@ end
 function SuwayomiClient:getSourceModeScreenTitle(options)
     local mode = options.type or "POPULAR"
     if mode == "SEARCH" then
+        if trim(options.query) == "" and type(options.filters) == "table" and #options.filters > 0 then
+            return self:translate("Filter")
+        end
         return self:translate("Search")
     end
     if mode == "LATEST" then
@@ -149,6 +156,9 @@ function SuwayomiClient:showSourceModeMenu(source)
         if mode == "SEARCH" then
             return self:showSourceSearchPrompt(source)
         end
+        if mode == "FILTERS" then
+            return self:showSourceFilters(source)
+        end
         return self:showMangaForSource(source, {
             type = mode,
             skip_mode_menu = true,
@@ -167,8 +177,300 @@ function SuwayomiClient:buildSourceMangaRequestOptions(source, browse_options)
     }
     if request_options.type == "SEARCH" then
         request_options.query = browse_options.query
+        request_options.filters = browse_options.filters
     end
     return request_options
+end
+
+function SuwayomiClient:resolveSourceFilterRuntime()
+    local ok_job, job = pcall(function()
+        return self:getSubprocessJob()
+    end)
+    local ok_worker, worker = pcall(function()
+        return self:getSourceFilterWorker()
+    end)
+    local ok_ffi, ffi_util = pcall(function()
+        return self:getFFIUtil()
+    end)
+    local ok_ui, ui_manager = pcall(function()
+        return self:getUIManager()
+    end)
+    if not ok_job or not ok_worker or not ok_ffi or not ok_ui then
+        return nil
+    end
+    if type(job) ~= "table" or type(worker) ~= "table" then
+        return nil
+    end
+    return {
+        job = job,
+        worker = worker,
+        ffi_util = ffi_util,
+        ui_manager = ui_manager,
+    }
+end
+
+function SuwayomiClient:loadSourceFilterDraft(credentials, source)
+    if self.settings and self.settings.loadSourceFilterDraft then
+        return self.settings:loadSourceFilterDraft(credentials, source and source.id)
+    end
+    return { query = "", filters = {} }
+end
+
+function SuwayomiClient:saveSourceFilterDraft(credentials, source, draft)
+    if self.settings and self.settings.saveSourceFilterDraft then
+        return self.settings:saveSourceFilterDraft(credentials, source and source.id, draft)
+    end
+    return SourceFilters.normalizeDraft(draft)
+end
+
+function SuwayomiClient:clearSourceFilterDraft(credentials, source)
+    if self.settings and self.settings.clearSourceFilterDraft then
+        return self.settings:clearSourceFilterDraft(credentials, source and source.id)
+    end
+end
+
+function SuwayomiClient:isCurrentSourceFilterLoad(state)
+    return state
+        and self._active_source_filter_load == state
+        and self._source_filter_load_token == state.token
+end
+
+function SuwayomiClient:nextSourceFilterLoadToken()
+    self._source_filter_load_token = (self._source_filter_load_token or 0) + 1
+    return self._source_filter_load_token
+end
+
+function SuwayomiClient:clearSourceFilterLoad(state)
+    if self._active_source_filter_load == state then
+        self._active_source_filter_load = nil
+    end
+end
+
+function SuwayomiClient:cancelSourceFilterLoad(state, options)
+    if not state or state.canceled or state.finished then
+        return
+    end
+    options = options or {}
+    state.canceled = true
+    if state.active and state.runtime and state.runtime.job and state.runtime.job.cancel then
+        state.runtime.job.cancel(state.active)
+    end
+    state.active = nil
+    self:clearSourceFilterLoad(state)
+    if not options.silent then
+        self:showSourceMangaStatus(
+            state.menu,
+            state.title,
+            self:translate("Loading canceled."),
+            state.detail_title
+        )
+    end
+end
+
+function SuwayomiClient:supersedeSourceFilterLoad()
+    local previous = self._active_source_filter_load
+    if previous and not previous.canceled and not previous.finished then
+        self:cancelSourceFilterLoad(previous, { silent = true })
+    end
+end
+
+function SuwayomiClient:buildSourceFilterLoadingMenuOptions(state)
+    local cancel = function()
+        return self:cancelSourceFilterLoad(state)
+    end
+    local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
+        title = state.detail_title,
+        actions = {
+            { id = "cancel_source_filters", text = self:translate("Cancel loading") },
+        },
+        onSelect = function(action)
+            if action and action.id == "cancel_source_filters" then
+                return cancel()
+            end
+        end,
+    }))
+    menu_options.title = state.title
+    menu_options.close_callback = cancel
+    menu_options.on_cancel_source_filters = cancel
+    return menu_options
+end
+
+function SuwayomiClient:showSourceFilterSearchPrompt(source, schema, draft, credentials)
+    if not self.ui.showSourceSearchPrompt then
+        return self:openSourceFilterEditor(credentials, source, schema, draft)
+    end
+    return self.ui.showSourceSearchPrompt(source, function(query)
+        draft = SourceFilters.normalizeDraft(draft)
+        draft.query = trim(query)
+        return self:openSourceFilterEditor(credentials, source, schema, draft)
+    end, {
+        query = draft and draft.query or "",
+    })
+end
+
+function SuwayomiClient:applySourceFilterDraft(credentials, source, schema, draft)
+    local saved_draft = self:saveSourceFilterDraft(credentials, source, draft)
+    local filters = SourceFilters.buildFilterChanges(schema, saved_draft and saved_draft.filters)
+    return self:showMangaForSource(source, {
+        type = "SEARCH",
+        query = saved_draft and saved_draft.query or "",
+        page = 1,
+        filters = filters,
+        filter_draft = saved_draft,
+        filter_schema = schema,
+        skip_mode_menu = true,
+    })
+end
+
+function SuwayomiClient:openSourceFilterEditor(credentials, source, schema, draft)
+    if not self.ui.showSourceFilterEditor then
+        self.plugin:showMessage(self:translate("Source filters are unavailable."))
+        return
+    end
+    draft = SourceFilters.normalizeDraft(draft)
+    local editor = self.ui.showSourceFilterEditor(source, schema, draft, {
+        title_options = self:getTitleBarMenuOptions({
+            title = self:getSourceDisplayName(source) .. " " .. self:translate("filters"),
+            actions = {
+                { id = "apply_source_filters", text = self:translate("Apply filters") },
+                { id = "reset_source_filters", text = self:translate("Reset filters") },
+                { id = "source_filter_search_text", text = self:translate("Search text") },
+            },
+            onSelect = function(action)
+                local action_id = action and action.id
+                if action_id == "apply_source_filters" then
+                    return self:applySourceFilterDraft(credentials, source, schema, draft)
+                elseif action_id == "reset_source_filters" then
+                    self:clearSourceFilterDraft(credentials, source)
+                    return self:openSourceFilterEditor(credentials, source, schema, { query = "", filters = {} })
+                elseif action_id == "source_filter_search_text" then
+                    return self:showSourceFilterSearchPrompt(source, schema, draft, credentials)
+                end
+            end,
+        }),
+        on_apply = function(next_draft)
+            return self:applySourceFilterDraft(credentials, source, schema, next_draft)
+        end,
+        on_reset = function()
+            self:clearSourceFilterDraft(credentials, source)
+            return self:openSourceFilterEditor(credentials, source, schema, { query = "", filters = {} })
+        end,
+        on_search_text = function(next_draft)
+            return self:showSourceFilterSearchPrompt(source, schema, next_draft or draft, credentials)
+        end,
+    })
+    return self:trackScreen("source-filters", editor)
+end
+
+function SuwayomiClient:showSourceFilters(source)
+    local credentials = self.settings:load()
+    local runtime = self:resolveSourceFilterRuntime()
+    if not runtime then
+        self.plugin:showMessage(self:translate("Could not load source filters."))
+        return
+    end
+
+    self:supersedeSourceFilterLoad()
+
+    local detail_title = self:getSourceDisplayName(source) .. " - " .. self:translate("Source filters")
+    local state = {
+        token = self:nextSourceFilterLoadToken(),
+        credentials = credentials,
+        source = source,
+        title = self:translate("Source filters"),
+        detail_title = detail_title,
+        runtime = runtime,
+    }
+    local menu = self.ui.showMangaMenu({
+        { title = self:translate("Loading source filters...") },
+    }, nil, self:buildSourceFilterLoadingMenuOptions(state))
+    state.menu = menu
+    self._active_source_filter_load = state
+    self:trackScreen("source-filters-loading", menu)
+
+    local function showStatus(message)
+        if menu and self.ui.updateMangaMenu then
+            self.ui.updateMangaMenu(menu, {
+                {
+                    text = message,
+                    raw_menu_row = true,
+                    select_enabled = false,
+                },
+                {
+                    text = self:translate("Retry"),
+                    raw_menu_row = true,
+                    callback = function()
+                        return self:showSourceFilters(source)
+                    end,
+                },
+            }, nil, self:getTitleBarMenuOptions({ title = detail_title }))
+        else
+            self.plugin:showMessage(message)
+        end
+    end
+
+    local ok, active = pcall(runtime.job.start, {
+        active = {
+            source = source,
+            result_path = runtime.job.buildResultPath and runtime.job.buildResultPath("source_filter") or nil,
+        },
+        ffi_util = runtime.ffi_util,
+        ui_manager = runtime.ui_manager,
+        poll_interval_seconds = self:getSourceMangaPollIntervalSeconds(),
+        timeout_seconds = self:getSourceMangaTimeoutSeconds(),
+        run = function(path)
+            runtime.worker:run(credentials, source, path)
+        end,
+        read_result = function(path)
+            return runtime.worker:readResult(path)
+        end,
+        on_finish = function(finished_active, result)
+            if state.canceled or not self:isCurrentSourceFilterLoad(state) then
+                return
+            end
+            state.finished = true
+            state.active = nil
+            self:clearSourceFilterLoad(state)
+            result = result or {
+                ok = false,
+                error = self:translate("Could not load source filters."),
+                filters = {},
+            }
+            local result_source = result.source or finished_active.source or source
+            if not result.ok then
+                showStatus(result.error or self:translate("Could not load source filters."))
+                return
+            end
+            if type(result.filters) ~= "table" or #result.filters == 0 then
+                showStatus(self:translate("This source has no filters."))
+                return
+            end
+            return self:openSourceFilterEditor(
+                credentials,
+                result_source,
+                result.filters,
+                self:loadSourceFilterDraft(credentials, result_source)
+            )
+        end,
+        on_timeout = function()
+            if state.canceled or not self:isCurrentSourceFilterLoad(state) then
+                return
+            end
+            state.finished = true
+            state.active = nil
+            self:clearSourceFilterLoad(state)
+            showStatus(self:translate("Timed out."))
+        end,
+    })
+    if not ok or not active then
+        state.finished = true
+        self:clearSourceFilterLoad(state)
+        showStatus(self:translate("Could not start source filter loading."))
+        return
+    end
+    if not state.finished then
+        state.active = active
+    end
 end
 
 function SuwayomiClient:resolveSourceMangaRuntime()
@@ -261,6 +563,9 @@ function SuwayomiClient:buildSourceMangaFailureRows(source, browse_options, mess
         type = browse_options.type,
         query = browse_options.query,
         page = browse_options.page,
+        filters = browse_options.filters,
+        filter_draft = browse_options.filter_draft,
+        filter_schema = browse_options.filter_schema,
         skip_mode_menu = true,
     }
     local rows = {
@@ -277,15 +582,31 @@ function SuwayomiClient:buildSourceMangaFailureRows(source, browse_options, mess
             end,
         },
     }
-    table.insert(rows, {
-        text = self:translate("Edit search"),
-        raw_menu_row = true,
-        callback = function()
-            return self:showSourceSearchPrompt(source, {
-                query = browse_options.query,
-            })
-        end,
-    })
+    if type(browse_options.filter_schema) == "table" then
+        table.insert(rows, {
+            text = self:translate("Edit filters"),
+            raw_menu_row = true,
+            callback = function()
+                local credentials = self.settings:load()
+                return self:openSourceFilterEditor(
+                    credentials,
+                    source,
+                    browse_options.filter_schema,
+                    browse_options.filter_draft or { query = browse_options.query, filters = {} }
+                )
+            end,
+        })
+    else
+        table.insert(rows, {
+            text = self:translate("Edit search"),
+            raw_menu_row = true,
+            callback = function()
+                return self:showSourceSearchPrompt(source, {
+                    query = browse_options.query,
+                })
+            end,
+        })
+    end
     return rows
 end
 
@@ -429,6 +750,9 @@ function SuwayomiClient:startSourceMangaAppendLoad(session, refresh)
         type = session.browse_options.type,
         query = session.browse_options.query,
         page = (tonumber(session.current_api_page) or 1) + 1,
+        filters = session.browse_options.filters,
+        filter_draft = session.browse_options.filter_draft,
+        filter_schema = session.browse_options.filter_schema,
     }
     session.loading_more = true
     session.next_options = next_options
@@ -683,6 +1007,10 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
             }
             local result_source = result and result.source or finished_active.source or source
             local result_options = result and result.browse_options or finished_active.browse_options or browse_options
+            if result_options and finished_active.browse_options then
+                result_options.filter_draft = result_options.filter_draft or finished_active.browse_options.filter_draft
+                result_options.filter_schema = result_options.filter_schema or finished_active.browse_options.filter_schema
+            end
             self:renderMangaForSourceResult(credentials, result_source, result_options, result, state.menu)
         end,
         on_timeout = function(timed_out_active)
@@ -740,6 +1068,11 @@ function SuwayomiClient:showMangaForSource(source, options)
             query = options.query,
             page = tonumber(options.page) or 1,
         }
+        if browse_options.type == "SEARCH" then
+            browse_options.filters = options.filters
+            browse_options.filter_draft = options.filter_draft
+            browse_options.filter_schema = options.filter_schema
+        end
 
         if self:startSourceMangaLoad(credentials, source, browse_options) then
             return

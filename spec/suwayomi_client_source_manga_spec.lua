@@ -97,6 +97,80 @@ describe("suwayomi/client source manga flows", function()
         assert.are.same({}, state.loading_messages)
     end)
 
+    it("fetches source filters in a worker and applies draft filters as search", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local editor_schema
+        local editor_draft
+        local saved_draft
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showSourceModeMenu = function(_, onSelect)
+                    onSelect("FILTERS")
+                end,
+                showMangaMenu = function()
+                    return { name = "loading-menu" }
+                end,
+                showSourceFilterEditor = function(_, schema, draft, options)
+                    editor_schema = schema
+                    editor_draft = draft
+                    options.on_apply({
+                        query = "",
+                        filters = {
+                            { position = 1, type = "checkBoxState", state = true },
+                        },
+                    })
+                    return { name = "filter-editor" }
+                end,
+            },
+        })
+        client.source_filter_worker = {}
+        client.settings.loadSourceFilterDraft = function()
+            return { query = "", filters = {} }
+        end
+        client.settings.saveSourceFilterDraft = function(_, _, _, draft)
+            saved_draft = draft
+            return draft
+        end
+        client.plugin.current_scanlator_filter = "Team A"
+
+        client:showMangaForSource({ id = "s1", name = "MangaDex", lang = "en" })
+        started[1].on_finish(started[1], {
+            ok = true,
+            source = { id = "s1", name = "MangaDex", lang = "en" },
+            filters = {
+                { type = "CheckBoxFilter", name = "Completed", default = false },
+            },
+        })
+
+        assert.are.equal("s1", started[1].source.id)
+        assert.are.same({
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+        }, editor_schema)
+        assert.are.same({ query = "", filters = {} }, editor_draft)
+        assert.are.same({
+            query = "",
+            filters = {
+                { position = 1, type = "checkBoxState", state = true },
+            },
+        }, saved_draft)
+        assert.are.same({
+            type = "SEARCH",
+            query = "",
+            page = 1,
+            filters = {
+                { position = 0, checkBoxState = true },
+            },
+            filter_draft = saved_draft,
+            filter_schema = editor_schema,
+        }, started[2].browse_options)
+        assert.are.equal("Team A", client.plugin.current_scanlator_filter)
+    end)
+
     it("keeps local sources on the direct manga listing flow", function()
         local mode_menu_shown = false
         local fetched_options
@@ -439,6 +513,102 @@ describe("suwayomi/client source manga flows", function()
 
         updated_rows[3].callback()
         assert.are.equal("frieren", search_prompt_options.query)
+    end)
+
+    it("preserves source filters across paging and failed-search actions", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local shown_menu
+        local updated_options
+        local updated_rows
+        local editor_draft
+        local filters = {
+            { position = 0, checkBoxState = true },
+        }
+        local filter_draft = {
+            query = "",
+            filters = {
+                { position = 1, type = "checkBoxState", state = true },
+            },
+        }
+        local filter_schema = {
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+        }
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    shown_menu = { name = "source-search-menu", page = 1, page_num = 1 }
+                    return shown_menu
+                end,
+                updateMangaMenu = function(_, manga, _, menu_options)
+                    updated_rows = manga
+                    updated_options = menu_options
+                end,
+                showSourceFilterEditor = function(_, _, draft)
+                    editor_draft = draft
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "ComicK", lang = "en" }, {
+            type = "SEARCH",
+            query = "",
+            filters = filters,
+            filter_draft = filter_draft,
+            filter_schema = filter_schema,
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Filtered" },
+            },
+            has_next_page = true,
+            browse_options = {
+                type = "SEARCH",
+                query = "",
+                page = 1,
+                filters = filters,
+            },
+        })
+
+        assert.are.equal("Filter - Page 1", updated_options.title)
+        updated_options.on_page_changed(shown_menu, 1)
+        assert.are.same(filters, started[2].browse_options.filters)
+        assert.are.same(filter_draft, started[2].browse_options.filter_draft)
+        assert.are.same(filter_schema, started[2].browse_options.filter_schema)
+
+        started[2].on_finish(started[2], {
+            ok = true,
+            source = { id = "s1", display_name = "ComicK", lang = "en" },
+            browse_options = { type = "SEARCH", query = "", page = 2, filters = filters },
+            manga = {
+                { id = "m2", title = "Filtered page 2" },
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "ComicK", lang = "en" }, {
+            type = "SEARCH",
+            query = "",
+            filters = filters,
+            filter_draft = filter_draft,
+            filter_schema = filter_schema,
+            skip_mode_menu = true,
+        })
+        started[3].on_finish(started[3], {
+            ok = false,
+            source = { id = "s1", display_name = "ComicK", lang = "en" },
+            browse_options = { type = "SEARCH", query = "", page = 1, filters = filters },
+            error = "HTTP 403 from ComicK.",
+        })
+        updated_rows[2].callback()
+        assert.are.same(filters, started[4].browse_options.filters)
+        updated_rows[3].callback()
+        assert.are.same(filter_draft, editor_draft)
     end)
 
     it("shows source search timeout failures with retry and edit actions", function()
