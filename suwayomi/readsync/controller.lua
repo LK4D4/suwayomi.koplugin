@@ -101,6 +101,11 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
             self.pending_read_sync_active = nil
             self:showMessage(T(_("Could not start read sync: %1"), err or _("unknown error")))
         end,
+        on_cleanup = function(cleaned_active)
+            if self.pending_read_sync_active == cleaned_active then
+                self.pending_read_sync_active = nil
+            end
+        end,
     })
     self.pending_read_sync_active = active and not active.cleaned and active or nil
     if not active then

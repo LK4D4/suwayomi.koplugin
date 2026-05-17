@@ -313,6 +313,65 @@ describe("suwayomi/readsync/controller", function()
         assert.are.equal(5, state.scheduled[2].delay)
     end)
 
+    it("clears only the matching active read-sync job after timeout cleanup", function()
+        local done = false
+        local terminated_pids = {}
+        local controller, state = installController({
+            isSubProcessDone = function()
+                return done
+            end,
+            terminateSubProcess = function(pid)
+                table.insert(terminated_pids, pid)
+            end,
+        })
+        local plugin = buildPlugin(controller, {
+            read_sync_watchdog_timeout_seconds = 1,
+            ledger = {
+                ["m1:c1"] = {
+                    chapter_id = "c1",
+                    read = true,
+                    pending_read_sync = true,
+                    pending_read_state = true,
+                },
+            },
+        })
+
+        assert.is_true(plugin:startPendingReadSyncWorker(nil, 1))
+        local stale_active = plugin.pending_read_sync_active
+        stale_active.started_at = 0
+        stale_active.now = function()
+            return 2
+        end
+
+        state.scheduled[1].callback()
+
+        assert.are.same({ 1234 }, terminated_pids)
+        assert.is_true(plugin.pending_read_sync_active == stale_active)
+
+        local newer_active = { pid = 4321 }
+        plugin.pending_read_sync_active = newer_active
+        done = true
+        state.scheduled[2].callback()
+
+        assert.is_true(plugin.pending_read_sync_active == newer_active)
+
+        plugin.pending_read_sync_active = nil
+        done = false
+        assert.is_true(plugin:startPendingReadSyncWorker(nil, 1))
+        local matching_active = plugin.pending_read_sync_active
+        matching_active.started_at = 0
+        matching_active.now = function()
+            return 2
+        end
+
+        state.scheduled[3].callback()
+        done = true
+        state.scheduled[4].callback()
+
+        assert.is_nil(plugin.pending_read_sync_active)
+        assert.is_true(plugin:startPendingReadSyncWorker(nil, 1))
+    end)
+
     it("batches pending work and backs off failed worker starts", function()
         local attempts = 0
         local controller, state = installController({

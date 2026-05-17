@@ -19,7 +19,7 @@ Fresh review baseline:
   - Direction: mirror the stale credential guard used by source fetch results before applying worker output or setting `current_extension_credentials`.
   - Test: simulate credentials changing while an extension worker is active; assert stale result is ignored and current extension credentials are unchanged.
 
-- [ ] Clear read-sync active state on subprocess timeout and cleanup.
+- [x] Clear read-sync active state on subprocess timeout and cleanup.
   - Files: `suwayomi/readsync/controller.lua`, `spec/suwayomi_readsync_controller_spec.lua`
   - Risk: one read-sync timeout can leave `pending_read_sync_active` stuck forever, blocking manual and automatic sync until restart.
   - Direction: add timeout/cleanup handling that clears only the matching active job token after subprocess termination/reap.
