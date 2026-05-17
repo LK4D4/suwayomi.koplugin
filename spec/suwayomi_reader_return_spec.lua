@@ -207,6 +207,22 @@ describe("suwayomi/reader_return", function()
         }, state.contexts["/downloads/Local/Manga/Chapter 1.cbz"])
     end)
 
+    it("replaces scalar persisted contexts when saving a return context", function()
+        local plugin = build_plugin({
+            contexts = "not-a-table",
+        })
+
+        assert.has_no.errors(function()
+            plugin:saveReaderReturnContext(
+                { id = "m1", title = "Manga", source = { id = "local", name = "Local source" } },
+                { id = "c1", name = "Chapter 1" },
+                "/downloads/Local/Manga/Chapter 1.cbz"
+            )
+        end)
+
+        assert.are.equal("c1", state.contexts["/downloads/Local/Manga/Chapter 1.cbz"].chapter_id)
+    end)
+
     it("saves return contexts for downloaded chapter paths in one settings write", function()
         local plugin = build_plugin()
 

@@ -161,13 +161,20 @@ local function inferSiblingContext(path, contexts, ledger)
     }
 end
 
+local function normalizeContextStore(contexts)
+    if type(contexts) ~= "table" then
+        return {}
+    end
+    return contexts
+end
+
 function Methods:saveReaderReturnContext(manga, chapter, chapter_path)
     local context = buildContext(manga, chapter, chapter_path)
     if not context then
         return nil
     end
 
-    local contexts = SuwayomiSettings:loadReaderReturnContexts() or {}
+    local contexts = normalizeContextStore(SuwayomiSettings:loadReaderReturnContexts())
     contexts[chapter_path] = context
     SuwayomiSettings:saveReaderReturnContexts(contexts)
     return context
@@ -178,7 +185,7 @@ function Methods:saveReaderReturnContextsForChapters(manga, entries)
         return {}
     end
 
-    local contexts = SuwayomiSettings:loadReaderReturnContexts() or {}
+    local contexts = normalizeContextStore(SuwayomiSettings:loadReaderReturnContexts())
     local saved = {}
     local changed = false
     for _, entry in ipairs(entries) do
@@ -210,7 +217,7 @@ function Methods:getReaderReturnContextForPath(path)
         return nil
     end
 
-    local contexts = SuwayomiSettings:loadReaderReturnContexts() or {}
+    local contexts = normalizeContextStore(SuwayomiSettings:loadReaderReturnContexts())
     if type(contexts[path]) == "table" then
         return contexts[path]
     end

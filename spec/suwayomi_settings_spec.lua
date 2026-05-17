@@ -504,4 +504,12 @@ describe("suwayomi/settings", function()
         assert.are.same(contexts, stored_data.reader_return_contexts)
         assert.are.same(contexts, settings:loadReaderReturnContexts())
     end)
+
+    it("normalizes non-table reader return contexts to an empty table", function()
+        stored_data.reader_return_contexts = "not-a-table"
+
+        local settings = require("suwayomi/settings")
+
+        assert.are.same({}, settings:loadReaderReturnContexts())
+    end)
 end)

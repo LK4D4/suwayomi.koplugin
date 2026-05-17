@@ -497,12 +497,19 @@ function SuwayomiSettings:saveChapterLedger(ledger)
 end
 
 function SuwayomiSettings:loadReaderReturnContexts()
-    return self:open():readSetting("reader_return_contexts", {})
+    local contexts = self:open():readSetting("reader_return_contexts", {})
+    if type(contexts) ~= "table" then
+        return {}
+    end
+    return contexts
 end
 
 function SuwayomiSettings:saveReaderReturnContexts(contexts)
-    self:open():saveSetting("reader_return_contexts", contexts or {}):flush()
-    return contexts or {}
+    if type(contexts) ~= "table" then
+        contexts = {}
+    end
+    self:open():saveSetting("reader_return_contexts", contexts):flush()
+    return contexts
 end
 
 return SuwayomiSettings

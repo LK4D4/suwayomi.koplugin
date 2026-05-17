@@ -69,7 +69,7 @@ Fresh review baseline:
   - Direction: avoid unbounded `all_manga` result growth or emit a clearer bounded failure before parent rejects the result file.
   - Test: large paged library data hits controlled behavior instead of opaque oversized-result failure.
 
-- [ ] Normalize persisted reader-return contexts.
+- [x] Normalize persisted reader-return contexts.
   - Files: `suwayomi/settings.lua`, `suwayomi/reader_return.lua`, reader-return/settings specs
   - Risk: scalar `reader_return_contexts` setting can crash context save/open flow.
   - Direction: coerce non-table context stores to an empty table before assignment.
