@@ -14,6 +14,50 @@ local ProgressFile = require("suwayomi/downloads/progress_file")
 local SuwayomiPaths = require("suwayomi/paths")
 
 local Downloader = {}
+local DOWNLOAD_RETRY_DELAYS_SECONDS = { 0.5, 1 }
+
+local function sleep(seconds)
+    local ok, socket = pcall(require, "socket")
+    if ok and socket and socket.sleep then
+        socket.sleep(seconds)
+    end
+end
+
+local function isTransientDownloadError(error_message)
+    error_message = tostring(error_message or ""):lower()
+    return error_message:match("timed out") ~= nil
+        or error_message:match("timeout") ~= nil
+        or error_message:match("could not reach") ~= nil
+        or error_message:match("could not download chapter page") ~= nil
+        or error_message:match("too many requests") ~= nil
+        or error_message:match("rate limit") ~= nil
+        or error_message:match("server error") ~= nil
+        or error_message:match("bad gateway") ~= nil
+        or error_message:match("service unavailable") ~= nil
+        or error_message:match("gateway timeout") ~= nil
+end
+
+local function isRetryableResult(result)
+    if type(result) == "table" and result.retryable ~= nil then
+        return result.retryable == true
+    end
+    return isTransientDownloadError(result and result.error)
+end
+
+local function callWithTransientRetry(callback)
+    local result
+    for attempt = 1, #DOWNLOAD_RETRY_DELAYS_SECONDS + 1 do
+        result = callback() or {}
+        if result.ok == true then
+            return result
+        end
+        if attempt > #DOWNLOAD_RETRY_DELAYS_SECONDS or not isRetryableResult(result) then
+            return result
+        end
+        sleep(DOWNLOAD_RETRY_DELAYS_SECONDS[attempt])
+    end
+    return result
+end
 
 function Downloader:sanitizePathSegment(name)
     return SuwayomiPaths.sanitizePathSegment(name)
@@ -398,7 +442,9 @@ function Downloader:downloadDirectChapterArchive(credentials, download_directory
     local partial_path = self.getDirectPartialPath and self:getDirectPartialPath(chapter_path) or self:getPartialPath(chapter_path)
     self:cleanupPartialFile(partial_path)
 
-    local archive_result = SuwayomiAPI.downloadChapterArchive(credentials, chapter.id, partial_path)
+    local archive_result = callWithTransientRetry(function()
+        return SuwayomiAPI.downloadChapterArchive(credentials, chapter.id, partial_path)
+    end)
     if not archive_result.ok then
         self:cleanupPartialFile(partial_path)
         return nil
@@ -449,7 +495,9 @@ function Downloader:startChapterDownload(credentials, download_directory, manga,
     end
     local partial_path = self:getPartialPath(chapter_path)
 
-    local page_result = SuwayomiAPI.fetchChapterPages(credentials, chapter.id)
+    local page_result = callWithTransientRetry(function()
+        return SuwayomiAPI.fetchChapterPages(credentials, chapter.id)
+    end)
     if not page_result.ok then
         return { ok = false, error = page_result.error }
     end
@@ -567,7 +615,9 @@ function Downloader:downloadNextPage(job)
     end
 
     local next_index = job.current + 1
-    local binary = SuwayomiAPI.downloadBinary(job.credentials, job.pages[next_index])
+    local binary = callWithTransientRetry(function()
+        return SuwayomiAPI.downloadBinary(job.credentials, job.pages[next_index])
+    end)
     if not binary.ok then
         return self:failAndCleanup(binary.error, job.partial_path, job.writer)
     end
