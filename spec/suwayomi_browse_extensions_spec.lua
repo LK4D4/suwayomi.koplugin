@@ -505,8 +505,42 @@ describe("suwayomi/browse/extensions", function()
 
         assert.are.equal("old-source", controller.saved_source_cache.sources[1].id)
         assert.is_nil(refreshed_sources)
+        assert.are.equal(
+            "Extension update succeeded, but source refresh failed: Connection timed out while waiting for Suwayomi.",
+            controller.messages[#controller.messages]
+        )
         assert.are.equal("pkg.mangadex", ui_calls.extensions_menu.extensions[1].pkg_name)
         assert.are.equal("Updating extension...", controller.closed_loading.message)
+    end)
+
+    it("warns when extension action succeeds but extension list refresh fails", function()
+        local extensions = loadExtensions()
+        local controller = buildController(extensions)
+
+        controller:finishExtensionWorker({
+            credentials = { server_url = "https://suwayomi.example" },
+            loading_message = { message = "Installing extension..." },
+        }, {
+            ok = true,
+            action = "install",
+            extension_refresh_ok = false,
+            extension_refresh_error = "Extension catalog timed out.",
+            source_refresh_ok = true,
+            sources = {
+                { id = "source-mangadex", name = "MangaDex" },
+            },
+            extensions = {
+                { pkg_name = "pkg.mangadex", name = "MangaDex", is_installed = true },
+            },
+        })
+
+        assert.are.equal(
+            "Extension install succeeded, but extension list refresh failed: Extension catalog timed out.",
+            controller.messages[#controller.messages]
+        )
+        assert.are.equal("source-mangadex", controller.saved_source_cache.sources[1].id)
+        assert.are.equal("pkg.mangadex", ui_calls.extensions_menu.extensions[1].pkg_name)
+        assert.are.equal("Installing extension...", controller.closed_loading.message)
     end)
 
     it("does not clear source cache from extension list fetch results", function()

@@ -57,7 +57,7 @@ Fresh review baseline:
   - Direction: share the filtered chapter iteration used by next-unread download behavior.
   - Test: with scanlator filter active, first unread comes from visible filtered chapters only.
 
-- [ ] Surface partial extension/source refresh failures after extension actions.
+- [x] Surface partial extension/source refresh failures after extension actions.
   - Files: `suwayomi/browse/extensions.lua`, `suwayomi/browse/extension_worker.lua`, browse extension specs
   - Risk: install/update/uninstall succeeds but follow-up catalog/source refresh fails silently, leaving stale UI with no retry clue.
   - Direction: preserve action success while warning about `extension_refresh_error` or `source_refresh_error`.

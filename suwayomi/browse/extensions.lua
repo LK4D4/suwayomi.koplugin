@@ -115,6 +115,47 @@ local function extensionTimeoutMessage(action)
     return _("Extension list loading timed out.")
 end
 
+local function actionPastTense(action)
+    if action == "install" then
+        return _("install succeeded")
+    end
+    if action == "update" then
+        return _("update succeeded")
+    end
+    if action == "uninstall" then
+        return _("uninstall succeeded")
+    end
+    return nil
+end
+
+local function refreshWarningMessage(action, refresh_kind, error_message)
+    local action_label = actionPastTense(action)
+    if not action_label or not error_message or error_message == "" then
+        return nil
+    end
+    if refresh_kind == "extension" then
+        return T(_("Extension %1, but extension list refresh failed: %2"), action_label, error_message)
+    end
+    if refresh_kind == "source" then
+        return T(_("Extension %1, but source refresh failed: %2"), action_label, error_message)
+    end
+    return nil
+end
+
+local function showRefreshWarnings(self, result)
+    if not result or not result.ok or not self.showMessage then
+        return
+    end
+    local extension_warning = refreshWarningMessage(result.action, "extension", result.extension_refresh_error)
+    if extension_warning then
+        self:showMessage(extension_warning)
+    end
+    local source_warning = refreshWarningMessage(result.action, "source", result.source_refresh_error)
+    if source_warning then
+        self:showMessage(source_warning)
+    end
+end
+
 function Methods:getExtensionWorkerResultPath()
     return SubprocessJob.buildResultPath("extensions")
 end
@@ -201,6 +242,7 @@ function Methods:finishExtensionWorker(active, result)
         self:saveSourceCache(active and active.credentials, result.sources)
         refreshVisibleSourceList(self, active and active.credentials, result.sources)
     end
+    showRefreshWarnings(self, result)
     self:showFetchedExtensions(result, {
         credentials = active and active.credentials,
         action = result and result.action,
