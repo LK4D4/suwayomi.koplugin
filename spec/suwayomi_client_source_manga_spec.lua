@@ -171,6 +171,57 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal("Team A", client.plugin.current_scanlator_filter)
     end)
 
+    it("ignores stale source filter worker results after a newer filter load starts", function()
+        local subprocess_job, started, canceled = buildSourceMangaSubprocessFake()
+        local opened_sources = {}
+        local status_updates = {}
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-filter-loading" }
+                end,
+                updateMangaMenu = function(_, rows)
+                    table.insert(status_updates, rows)
+                end,
+                showSourceFilterEditor = function(source)
+                    table.insert(opened_sources, source.id)
+                    return { name = "filter-editor-" .. tostring(source.id) }
+                end,
+            },
+        })
+        client.source_filter_worker = {}
+        client.settings.loadSourceFilterDraft = function()
+            return { query = "", filters = {} }
+        end
+
+        client:showSourceFilters({ id = "s1", name = "Old Source", lang = "en" })
+        client:showSourceFilters({ id = "s2", name = "New Source", lang = "en" })
+
+        started[1].on_finish(started[1], {
+            ok = true,
+            source = { id = "s1", name = "Old Source", lang = "en" },
+            filters = {
+                { type = "CheckBoxFilter", name = "Old", default = false },
+            },
+        })
+        started[2].on_finish(started[2], {
+            ok = true,
+            source = { id = "s2", name = "New Source", lang = "en" },
+            filters = {
+                { type = "CheckBoxFilter", name = "New", default = false },
+            },
+        })
+
+        assert.are.equal(started[1], canceled[1])
+        assert.are.same({ "s2" }, opened_sources)
+        assert.are.same({}, status_updates)
+    end)
+
     it("keeps local sources on the direct manga listing flow", function()
         local mode_menu_shown = false
         local fetched_options

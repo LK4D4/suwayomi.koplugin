@@ -94,13 +94,15 @@ Before network submit, the source-filter module converts drafts into Suwayomi `F
 
 ```lua
 {
-    position = 7,
+    position = 6,
     groupChange = {
-        position = 2,
+        position = 1,
         triState = "INCLUDE",
     },
 }
 ```
+
+Draft positions are 1-based to match Lua arrays and renderer rows. Submitted `FilterChange.position` values are 0-based for the Suwayomi server GraphQL input.
 
 Unknown or unsupported filter types render as read-only rows and are omitted from submitted filter changes.
 
@@ -149,7 +151,7 @@ source_filter_drafts = {
 }
 ```
 
-Draft persistence is convenience state, not user data required for correctness. If a saved draft no longer matches a source filter schema, invalid positions or incompatible types are dropped on load.
+Draft persistence is convenience state, not user data required for correctness. Saved drafts are normalized on load. If a saved draft no longer matches the latest source filter schema, invalid positions or incompatible types are ignored before submit and do not render as active controls.
 
 Saved searches are a follow-up feature, not part of this first implementation. The design keeps query-plus-filter state shaped so saved searches can later persist `{ query, filters }` per source, WebUI-style.
 
