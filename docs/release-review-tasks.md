@@ -117,7 +117,7 @@ Fresh review baseline:
   - Direction: apply recovered key dedup to failed jobs too.
   - Test: recovery with queued/downloading plus failed duplicate keeps only one canonical job state.
 
-- [ ] Document collision suffixes in download path layout.
+- [x] Document collision suffixes in download path layout.
   - Files: `README.md`, `docs/ARCHITECTURE.md`
   - Risk: docs say `<chapter_name>.cbz`, while source can write `Chapter [id-398].cbz` for duplicate-safe names.
   - Direction: describe base layout plus duplicate-safe suffix behavior.

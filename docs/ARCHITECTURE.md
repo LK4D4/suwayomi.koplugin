@@ -141,6 +141,12 @@ New downloads use the source-scoped layout:
 <download_directory>/<source_label>/<manga_title>/<chapter_name>.cbz
 ```
 
+`suwayomi/paths.lua` appends duplicate-safe suffixes to chapter filenames when
+stable chapter metadata is present, preferring `[id-<chapter_id>]`, then
+`[order-<source_order>]`, then `[chapter-<chapter_number>]`. A chapter named
+`Chapter 1` can therefore become `Chapter 1 [id-398].cbz` instead of plain
+`Chapter 1.cbz` so same-titled chapters do not collide on disk.
+
 Old unscoped path detection is intentionally absent unless a future task explicitly adds migration behavior.
 
 External data is treated as untrusted at module boundaries: API responses are parsed defensively, settings values are normalized before use, persisted jobs keep only serializable metadata, progress files are re-read and normalized by the parent queue, and filesystem paths are built through the paths module or local helper boundaries.

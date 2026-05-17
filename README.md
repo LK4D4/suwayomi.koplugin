@@ -24,7 +24,7 @@ This plugin is experimental and still under active development.
 - Filter sources by language
 - Browse title-menu settings for source languages, NSFW source visibility, and optionally hiding in-library source results
 - Select a custom download directory
-- Source-scoped download layout: `<download directory>/<source>/<manga>/<chapter>.cbz`
+- Source-scoped download layout: `<download directory>/<source>/<manga>/<chapter>.cbz`, with duplicate-safe chapter suffixes when stable chapter metadata is available
 - Download individual chapters as `.cbz`
 - Chapter actions menu with `Open`, `Download`, `Delete from device`, and `Mark as read` / `Mark as unread`
 - Bulk chapter menu actions for selected chapters, one-shot `Download next 5/10/50` commands, per-manga `Keep next 5/10/50 downloaded` auto-refill buffers, and deleting read chapters
@@ -99,7 +99,7 @@ That flow opened duplicate scanlator choices, marked chapters read/unread, and d
 <download directory>/<source label>/<manga title>/<chapter title>.cbz
 ```
 
-and opened the CBZ in KOReader's normal reader. MangaDex search and library add/remove were also verified, but one tested result returned no chapters from Suwayomi. Comick text search timed out on the tested server; Comick Latest still worked.
+When Suwayomi provides stable chapter metadata, the filename adds a duplicate-safe suffix before `.cbz`, such as `<chapter title> [id-398].cbz`, `<chapter title> [order-3].cbz`, or `<chapter title> [chapter-1].cbz`. This keeps same-titled chapters from colliding on disk. The downloaded CBZ opens in KOReader's normal reader. MangaDex search and library add/remove were also verified, but one tested result returned no chapters from Suwayomi. Comick text search timed out on the tested server; Comick Latest still worked.
 
 ## Unsupported / Deferred
 
