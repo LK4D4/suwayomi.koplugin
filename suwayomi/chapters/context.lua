@@ -249,6 +249,14 @@ function Methods:formatChapterListTitle(manga)
     return title
 end
 
+function Methods:formatChapterListScreenTitle()
+    local selected_count = self:getSelectedChapterCount()
+    if self.selection_mode then
+        return T(_("%1 selected"), selected_count)
+    end
+    return _("Chapters")
+end
+
 
 function Methods:clearChapterSelection(skip_refresh)
     self.selected_chapters = {}

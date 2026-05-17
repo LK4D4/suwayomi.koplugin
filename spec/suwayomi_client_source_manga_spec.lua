@@ -12,6 +12,7 @@ describe("suwayomi/client source manga flows", function()
     local buildChapterCountSubprocessFake = helper.buildChapterCountSubprocessFake
 
     it("loads manga for a source and opens the selected manga actions through the plugin", function()
+        local captured_title_options
         local client, state = newClient({
             api = {
                 fetchMangaForSource = function(_, options)
@@ -31,13 +32,16 @@ describe("suwayomi/client source manga flows", function()
             ui = {
                 showMangaMenu = function(manga, onSelect, menu_options)
                     assert.are.equal("Sousou no Frieren", manga[1].title)
-                    assert.are.equal("MangaDex (EN) - Popular - Page 1", menu_options.title)
+                    assert.are.equal("Popular - Page 1", menu_options.title)
                     assert.are.equal("appbar.menu", menu_options.title_bar_left_icon)
                     assert.are.equal("https://suwayomi.example", menu_options.thumbnail_credentials.server_url)
                     onSelect(manga[1])
                     return { name = "browse-results-menu" }
                 end,
             },
+            capture_title_options = function(menu_options)
+                captured_title_options = menu_options
+            end,
             title_menu_options = { title_bar_left_icon = "appbar.menu" },
         })
 
@@ -59,6 +63,7 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal(1, state.log_events[1].manga_count)
         assert.are.equal("browse-results", state.tracked_screens[1].route_id)
         assert.are.equal("source-manga-loading", state.tracked_screens[1].widget.name)
+        assert.are.equal("MangaDex (EN) - Popular - Page 1", captured_title_options.title)
     end)
 
     it("opens a source mode menu for non-local sources and fetches popular manga from it", function()
@@ -193,7 +198,7 @@ describe("suwayomi/client source manga flows", function()
 
         assert.is_false(api_called)
         assert.are.equal("Loading manga...", shown_manga[1].title)
-        assert.are.equal("MangaDex (EN) - Search: frieren - Page 1", shown_options.title)
+        assert.are.equal("Search - Page 1", shown_options.title)
         assert.is_function(shown_options.close_callback)
         assert.is_function(shown_options.on_cancel_source_manga)
         assert.are.equal("s1", started[1].source.id)
@@ -288,7 +293,7 @@ describe("suwayomi/client source manga flows", function()
         assert.is_false(api_called)
         assert.are.same({}, state.shown_messages)
         assert.are.equal("Could not start manga loading.", updated_manga[1].title)
-        assert.are.equal("MangaDex (EN) - Popular - Page 1", updated_options.title)
+        assert.are.equal("Popular - Page 1", updated_options.title)
     end)
 
     it("shows a source manga start error when subprocess startup throws", function()
@@ -338,7 +343,7 @@ describe("suwayomi/client source manga flows", function()
         assert.is_false(api_called)
         assert.are.same({}, state.shown_messages)
         assert.are.equal("Could not start manga loading.", updated_manga[1].title)
-        assert.are.equal("MangaDex (EN) - Popular - Page 1", updated_options.title)
+        assert.are.equal("Popular - Page 1", updated_options.title)
     end)
 
     it("updates the source search menu when the subprocess returns manga", function()
@@ -445,7 +450,7 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal(1, #updates)
         assert.are.equal(menus[2], updates[1].menu)
         assert.are.equal("New Result", updates[1].manga[1].title)
-        assert.are.equal("OtherDex - Search: new - Page 1", updates[1].menu_options.title)
+        assert.are.equal("Search - Page 1", updates[1].menu_options.title)
     end)
 
     it("shows a friendly latest message when unknown support is rejected as unsupported", function()
@@ -590,8 +595,8 @@ describe("suwayomi/client source manga flows", function()
             { source_id = "s1", page = 2, type = "SEARCH", query = "frieren" },
             { source_id = "s1", page = 1, type = "SEARCH", query = "frieren" },
         }, fetched_options)
-        assert.are.equal("MangaDex (EN) - Search: frieren - Page 1", menu_options[1].title)
-        assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", menu_options[2].title)
+        assert.are.equal("Search - Page 1", menu_options[1].title)
+        assert.are.equal("Search - Page 2", menu_options[2].title)
         assert.is_nil(menu_options[1].on_previous_page)
         assert.is_function(menu_options[1].on_next_page)
         assert.is_function(menu_options[2].on_previous_page)
@@ -633,7 +638,7 @@ describe("suwayomi/client source manga flows", function()
         })
 
         assert.are.equal(0, #shown_manga)
-        assert.are.equal("MangaDex (EN) - Popular - Page 1", shown_options.title)
+        assert.are.equal("Popular - Page 1", shown_options.title)
         assert.is_nil(shown_options.on_previous_page)
         assert.is_function(shown_options.on_next_page)
         assert.are.equal(0, #state.shown_messages)
@@ -677,7 +682,7 @@ describe("suwayomi/client source manga flows", function()
         })
 
         assert.are.equal(0, #shown_manga)
-        assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_options.title)
+        assert.are.equal("Search - Page 2", shown_options.title)
         assert.is_function(shown_options.on_previous_page)
         assert.is_nil(shown_options.on_next_page)
         assert.are.equal(0, #state.shown_messages)

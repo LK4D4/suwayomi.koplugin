@@ -82,10 +82,29 @@ function SuwayomiClient:buildBrowseResultTitle(source, options)
         .. tostring(options.page or 1)
 end
 
+function SuwayomiClient:getSourceModeScreenTitle(options)
+    local mode = options.type or "POPULAR"
+    if mode == "SEARCH" then
+        return self:translate("Search")
+    end
+    if mode == "LATEST" then
+        return self:translate("Latest")
+    end
+    return self:translate("Popular")
+end
+
+function SuwayomiClient:buildBrowseResultScreenTitle(_, options)
+    return self:getSourceModeScreenTitle(options)
+        .. " - "
+        .. self:translate("Page")
+        .. " "
+        .. tostring(options.page or 1)
+end
+
 function SuwayomiClient:buildBrowseResultMenuOptions(source, options, has_next_page)
-    local title = self:buildBrowseResultTitle(source, options)
-    local menu_options = copyOptions({}, self:getTitleBarMenuOptions({ title = title }))
-    menu_options.title = title
+    local detail_title = self:buildBrowseResultTitle(source, options)
+    local menu_options = copyOptions({}, self:getTitleBarMenuOptions({ title = detail_title }))
+    menu_options.title = self:buildBrowseResultScreenTitle(source, options)
 
     if (options.page or 1) > 1 then
         menu_options.on_previous_page = function()
@@ -209,7 +228,7 @@ function SuwayomiClient:buildSourceMangaLoadingMenuOptions(state)
         return self:cancelSourceMangaLoad(state)
     end
     local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
-        title = state.title,
+        title = state.detail_title,
         actions = {
             { id = "cancel_source_manga", text = self:translate("Cancel loading") },
         },
@@ -225,10 +244,10 @@ function SuwayomiClient:buildSourceMangaLoadingMenuOptions(state)
     return menu_options
 end
 
-function SuwayomiClient:showSourceMangaStatus(menu, title, message)
+function SuwayomiClient:showSourceMangaStatus(menu, title, message, detail_title)
     if menu and self.ui.updateMangaMenu then
         local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
-            title = title,
+            title = detail_title or title,
         }))
         menu_options.title = title
         self.ui.updateMangaMenu(menu, {
@@ -275,7 +294,7 @@ function SuwayomiClient:cancelSourceMangaLoad(state, options)
     state.active = nil
     self:clearSourceMangaLoad(state)
     if not options.silent then
-        self:showSourceMangaStatus(state.menu, state.title, self:translate("Loading canceled."))
+        self:showSourceMangaStatus(state.menu, state.title, self:translate("Loading canceled."), state.detail_title)
     end
 end
 
@@ -292,16 +311,18 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
             self.plugin:showMessage(self:translate("Latest manga is not supported by this source."))
             self:showSourceMangaStatus(
                 existing_menu,
-                self:buildBrowseResultTitle(source, browse_options),
-                self:translate("Latest manga is not supported by this source.")
+                self:buildBrowseResultScreenTitle(source, browse_options),
+                self:translate("Latest manga is not supported by this source."),
+                self:buildBrowseResultTitle(source, browse_options)
             )
             return
         end
         self.plugin:showMessage(self:translate(result.error))
         self:showSourceMangaStatus(
             existing_menu,
-            self:buildBrowseResultTitle(source, browse_options),
-            self:translate(result.error)
+            self:buildBrowseResultScreenTitle(source, browse_options),
+            self:translate(result.error),
+            self:buildBrowseResultTitle(source, browse_options)
         )
         return
     end
@@ -329,7 +350,8 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
         if not self:showSourceMangaStatus(
             existing_menu,
             menu_options.title,
-            self:translate("This source has no manga.")
+            self:translate("This source has no manga."),
+            self:buildBrowseResultTitle(source, browse_options)
         ) then
             self.plugin:showMessage(self:translate("This source has no manga."))
         end
@@ -406,13 +428,14 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
         return false
     end
 
-    local title = self:buildBrowseResultTitle(source, browse_options)
+    local title = self:buildBrowseResultScreenTitle(source, browse_options)
     local state = {
         token = self:nextSourceMangaLoadToken(),
         credentials = credentials,
         source = source,
         browse_options = browse_options,
         title = title,
+        detail_title = self:buildBrowseResultTitle(source, browse_options),
         runtime = runtime,
     }
 
@@ -464,7 +487,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
             self:clearSourceMangaLoad(state)
             timed_out_active.canceled = true
             self.plugin:showMessage(self:translate("Could not load manga."))
-            self:showSourceMangaStatus(state.menu, title, self:translate("Could not load manga."))
+            self:showSourceMangaStatus(state.menu, title, self:translate("Could not load manga."), state.detail_title)
         end,
     })
     if not start_ok then
@@ -474,7 +497,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
     if not active then
         state.finished = true
         self:clearSourceMangaLoad(state)
-        self:showSourceMangaStatus(state.menu, title, self:translate("Could not start manga loading."))
+        self:showSourceMangaStatus(state.menu, title, self:translate("Could not start manga loading."), state.detail_title)
         return true
     end
 

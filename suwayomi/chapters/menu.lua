@@ -45,12 +45,12 @@ end
 
 local Methods = {}
 
-function Methods:getChapterTitleBarMenuOptions()
+function Methods:getChapterTitleBarMenuOptions(manga)
     if not self.getTitleBarMenuOptions then
         return {}
     end
     return self:getTitleBarMenuOptions({
-        title = _("Manga actions"),
+        title = self:formatChapterListTitle(manga),
         actions = self:getBulkChapterActions(),
         vertical = true,
         destructive_actions_at_bottom = true,
@@ -174,9 +174,9 @@ function Methods:buildChapterMenuOptions(manga, chapters, ledger)
     local visible_chapters = self:getVisibleChapters(chapters)
 
     return copyTitleBarOptions({
-        title = self:formatChapterListTitle(manga),
+        title = self.formatChapterListScreenTitle and self:formatChapterListScreenTitle(manga) or _("Chapters"),
         chapters = self:buildChapterMenuItems(manga, visible_chapters, ledger),
-    }, self:getChapterTitleBarMenuOptions())
+    }, self:getChapterTitleBarMenuOptions(manga))
 end
 
 
@@ -243,9 +243,9 @@ function Methods:buildQuickChapterMenuOptions(manga, chapters)
     local visible_chapters = self:getVisibleChapters(chapters)
 
     return copyTitleBarOptions({
-        title = self:formatChapterListTitle(manga),
+        title = self.formatChapterListScreenTitle and self:formatChapterListScreenTitle(manga) or _("Chapters"),
         chapters = self:buildQuickChapterMenuItems(manga, visible_chapters),
-    }, self:getChapterTitleBarMenuOptions())
+    }, self:getChapterTitleBarMenuOptions(manga))
 end
 
 

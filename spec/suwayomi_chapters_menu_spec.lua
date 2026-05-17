@@ -88,9 +88,9 @@ describe("suwayomi/chapters/menu", function()
 
         local options = plugin:buildChapterMenuOptions(manga, { { name = "Chapter 1" } }, {})
 
-        assert.are.equal("Frieren", options.title)
+        assert.are.equal("Chapters", options.title)
         assert.are.equal("appbar.menu", options.title_bar_left_icon)
-        assert.are.equal("Manga actions", captured_title_options.title)
+        assert.are.equal("Frieren", captured_title_options.title)
         assert.are.equal("select_all", captured_title_options.actions[1].id)
         assert.are.equal("open_first_unread", captured_title_options.actions[2].id)
         assert.are.equal("refresh_chapters", captured_title_options.actions[3].id)
@@ -202,7 +202,8 @@ describe("suwayomi/chapters/menu", function()
         local options = plugin:buildQuickChapterMenuOptions({ title = "Frieren" }, { { name = "Chapter 1" } })
 
         assert.are.equal("appbar.menu", options.title_bar_left_icon)
-        assert.are.equal("Manga actions", captured_title_options.title)
+        assert.are.equal("Chapters", options.title)
+        assert.are.equal("Frieren", captured_title_options.title)
         assert.are.equal("select_all", captured_title_options.actions[1].id)
     end)
 

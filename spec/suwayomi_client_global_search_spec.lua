@@ -145,7 +145,7 @@ describe("suwayomi/client global search flows", function()
         assert.are.equal("https://suwayomi.example", updated_options.thumbnail_credentials.server_url)
 
         selected_callback(updated_summaries[1])
-        assert.are.equal("Local source - Search: frieren - Page 1", opened_options.title)
+        assert.are.equal("Search - Page 1", opened_options.title)
         assert.is_function(opened_options.on_next_page)
     end)
 
