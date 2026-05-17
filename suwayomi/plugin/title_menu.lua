@@ -89,6 +89,10 @@ function Methods:getTitleBarMenuOptions(screen_options)
             self:showTitleBarActionMenu(menu, screen_options)
             return true
         end,
+        on_title_bar_left_hold = function(menu)
+            self:showTitleBarActionMenu(menu, screen_options)
+            return true
+        end,
     }
 end
 

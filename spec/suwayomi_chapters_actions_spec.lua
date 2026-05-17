@@ -649,7 +649,7 @@ describe("suwayomi/chapters/actions", function()
         local deleted = plugin:deleteReadChaptersFromDevice()
 
         assert.are.equal(0, deleted)
-        assert.are.same({ "Deleted 0 chapters from device. Failed to delete 1 download." }, plugin.messages)
+        assert.are.same({ "Deleted 0 chapters from device. Skipped 1 download. Failed to delete 1 download." }, plugin.messages)
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.ledger["m1:c1"].path)
         assert.are.equal(0, #queue.cleared)
     end)
@@ -687,7 +687,7 @@ describe("suwayomi/chapters/actions", function()
 
         assert.are.equal(1, deleted)
         assert.are.same({
-            "Deleted 1 chapter from device. Skipped 1 active download. Missing 1 download. Failed to delete 1 download.",
+            "Deleted 1 chapter from device. Skipped 3 downloads. 1 active download. 1 missing download. Failed to delete 1 download.",
         }, plugin.messages)
     end)
 

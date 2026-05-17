@@ -236,6 +236,10 @@ function SuwayomiClient:startGlobalSearchJob(search, index)
             if search.canceled then
                 return
             end
+            local summary = search.summaries[finished_active.summary_index]
+            if finished_active.canceled or (summary and summary.status ~= "searching") then
+                return
+            end
             self:releaseGlobalSearchJob(search, finished_active)
             self:applyGlobalSearchResult(search, finished_active.summary_index, result)
             self:updateGlobalSearchMenu(search)

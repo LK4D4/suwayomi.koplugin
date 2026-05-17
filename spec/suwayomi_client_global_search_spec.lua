@@ -251,6 +251,47 @@ describe("suwayomi/client global search flows", function()
         assert.are.equal("s2", started[2].source.id)
     end)
 
+    it("ignores late global search finish after a source times out", function()
+        local subprocess_job, started = buildGlobalSearchSubprocessFake()
+        local updated_summaries
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            global_search_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            global_search_max_active_sources = 1,
+            ui = {
+                showGlobalSearchPrompt = function(onSearch)
+                    onSearch(" frieren ")
+                end,
+                showGlobalSearchResultsMenu = function()
+                    return { name = "global-search" }
+                end,
+                updateGlobalSearchResultsMenu = function(_, summaries)
+                    updated_summaries = summaries
+                end,
+            },
+        })
+
+        client:showGlobalSearch({
+            { id = "s1", name = "MangaDex", lang = "en" },
+            { id = "s2", name = "Comick", lang = "en" },
+        })
+        started[1].on_timeout(started[1])
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Frieren" },
+            },
+            query = "frieren",
+        })
+
+        assert.are.equal("timed_out", updated_summaries[1].status)
+        assert.are.equal(0, updated_summaries[1].result_count)
+        assert.are.equal("searching", updated_summaries[2].status)
+        assert.are.equal(1, #started)
+    end)
+
     it("cancels active and pending global search work", function()
         local subprocess_job, started, canceled = buildGlobalSearchSubprocessFake()
         local shown_options
