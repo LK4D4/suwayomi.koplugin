@@ -78,6 +78,18 @@ function Methods:hasOnboardingConnectionTestPassed(credentials)
 end
 
 
+function Methods:clearOnboardingConnectionTest()
+    self.onboarding_connection_test_key = nil
+    local active = self.onboarding_connection_test_active
+    if not active then
+        return
+    end
+    self.onboarding_connection_test_active = nil
+    SubprocessJob.cancel(active)
+    self:closeLoadingMessage(active.loading_message)
+end
+
+
 function Methods:needsOnboardingSetup()
     local credentials = SuwayomiSettings:load()
     if not credentials.server_url or credentials.server_url == "" then
@@ -144,6 +156,9 @@ end
 
 
 function Methods:finishOnboardingConnectionTest(active, result)
+    if active and active.canceled then
+        return
+    end
     self.onboarding_connection_test_active = nil
     self:closeLoadingMessage(active and active.loading_message)
     if result and result.ok == true then
@@ -197,6 +212,7 @@ end
 
 function Methods:showOnboardingConnectionStep(options)
     options = options or {}
+    self:clearOnboardingConnectionTest()
     self.onboarding_connection_dialog = SuwayomiUI.showOnboardingConnectionDialog({
         credentials = self:getOnboardingDialogCredentials(),
         connection_status = "untested",

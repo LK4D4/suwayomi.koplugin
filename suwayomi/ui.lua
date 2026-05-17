@@ -757,10 +757,13 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
                 {
                     text = _("Continue"),
                     id = "continue",
-                    enabled = options.canContinue == nil,
+                    enabled = canContinue(),
                     enabled_func = canContinue,
                     is_enter_default = true,
                     callback = function()
+                        if not canContinue() then
+                            return
+                        end
                         local dialog_credentials = getCredentialsFromDialog(dialog)
                         local should_close = true
                         if options.onContinue then

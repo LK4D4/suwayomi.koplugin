@@ -379,6 +379,7 @@ describe("suwayomi/ui", function()
 
     it("disables onboarding continue until current fields match a passed test", function()
         local ui = require("suwayomi/ui")
+        local continued_credentials
 
         ui.showOnboardingConnectionDialog({
             credentials = {
@@ -388,6 +389,9 @@ describe("suwayomi/ui", function()
                 return credentials.server_url == "https://suwayomi.example"
                     and credentials.username == "alice"
                     and credentials.password == "secret"
+            end,
+            onContinue = function(credentials)
+                continued_credentials = credentials
             end,
         })
 
@@ -403,6 +407,10 @@ describe("suwayomi/ui", function()
         }
 
         assert.is_false(continue_button.enabled_func())
+        continue_button.callback()
+
+        assert.is_nil(continued_credentials)
+        assert.is_nil(closed_dialog)
     end)
 
     it("keeps onboarding connection test status visible", function()
