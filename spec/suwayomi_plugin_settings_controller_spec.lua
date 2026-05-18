@@ -695,7 +695,7 @@ describe("suwayomi/plugin/settings_controller", function()
             hide_in_library_results = true,
         }, state.saved_browse_settings)
         assert.are.equal(2, state.refresh_count)
-        assert.are.equal("Suwayomi Browse setting saved.", state.messages[#state.messages])
+        assert.are.same({}, state.messages)
     end)
 
     it("saves parallel download settings from downloads settings", function()
@@ -710,7 +710,7 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal(3, state.saved_parallel)
         assert.are.equal(3, plugin.download_queue.max_active_chapters)
         assert.are.equal("parallel-downloads-menu", state.parallel_menu_options.menu.name)
-        assert.are.equal("Suwayomi parallel chapter downloads saved: 3", state.messages[#state.messages])
+        assert.are.same({}, state.messages)
         assert.are.equal("Delete after manual mark-read: no", download_items[3].text_func())
     end)
 
@@ -731,7 +731,7 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal(4, state.saved_parallel)
         assert.are.equal(4, plugin.download_queue.max_active_chapters)
         assert.are.equal(1, process_count)
-        assert.are.equal("Suwayomi parallel chapter downloads saved: 4", state.messages[#state.messages])
+        assert.are.same({}, state.messages)
     end)
 
     it("saves category picker behavior and reports unavailable persistence", function()
@@ -745,7 +745,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         assert.are.equal("always", state.saved_category_behavior)
         assert.are.equal("library-category-picker-menu", state.category_menu_options.menu.name)
-        assert.are.equal("Suwayomi library category picker saved: always", state.messages[#state.messages])
+        assert.are.same({}, state.messages)
 
         local unavailable_plugin, unavailable_state = installController({ no_category_persistence = true })
         local unavailable_item = findMenuItem(unavailable_plugin:buildSettingsMenu(), "Library").sub_item_table[1]
@@ -765,7 +765,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         assert.is_true(state.saved_delete_chapters_settings.delete_after_mark_read)
         assert.are.equal(1, state.refresh_count)
-        assert.are.equal("Suwayomi delete chapter setting saved.", state.messages[#state.messages])
+        assert.are.same({}, state.messages)
 
         download_items[4].callback(state.touchmenu)
         assert.are.equal(0, state.delete_finished_menu_options.current)
@@ -773,7 +773,7 @@ describe("suwayomi/plugin/settings_controller", function()
         state.delete_finished_menu_options.onSelect(2)
 
         assert.are.equal(2, state.saved_delete_chapters_settings.delete_finished_while_reading)
-        assert.are.equal("Suwayomi delete-while-reading setting saved: Second to last read chapter", state.messages[#state.messages])
+        assert.are.same({}, state.messages)
         assert.are.equal(2, state.delete_finished_menu_options.current)
         assert.are.equal("delete-finished-menu", state.delete_finished_menu_options.menu.name)
     end)

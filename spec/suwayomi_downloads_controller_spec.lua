@@ -273,7 +273,7 @@ describe("suwayomi/downloads/controller", function()
 
         state.downloads_menu_callbacks.onRetryFailed(queue.snapshot.failed[1], menu)
         assert.are.equal("m1:c1", queue.retried_key)
-        assert.are.equal("Download queued.", state.messages[#state.messages])
+        assert.are.same({}, state.messages)
 
         state.downloads_menu_callbacks.onClearFailed(menu)
         assert.are.equal(1, queue.clear_failed_count)

@@ -323,7 +323,6 @@ function Methods:toggleBrowseSetting(key, touchmenu_instance)
     browse_settings[key] = not browse_settings[key]
     SuwayomiSettings:saveBrowseSettings(browse_settings)
     self:refreshSettingsMenu(touchmenu_instance)
-    self:showMessage(_("Suwayomi Browse setting saved."))
 end
 
 
@@ -345,7 +344,6 @@ function Methods:showParallelDownloadsDialog(touchmenu_instance)
                 self.download_queue:process()
             end
         end
-        self:showMessage(T(_("Suwayomi parallel chapter downloads saved: %1"), saved_value))
         self:refreshSettingsMenu(touchmenu_instance)
         if SuwayomiUI.updateParallelDownloadsMenu then
             SuwayomiUI.updateParallelDownloadsMenu(parallel_menu, {
@@ -405,7 +403,6 @@ function Methods:toggleDeleteAfterMarkRead(touchmenu_instance)
     settings.delete_after_mark_read = not settings.delete_after_mark_read
     SuwayomiSettings:saveDeleteChaptersSettings(settings)
     self:refreshSettingsMenu(touchmenu_instance)
-    self:showMessage(_("Suwayomi delete chapter setting saved."))
 end
 
 function Methods:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
@@ -421,10 +418,6 @@ function Methods:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
         settings.delete_finished_while_reading = value
         local saved_settings = SuwayomiSettings:saveDeleteChaptersSettings(settings)
         self:refreshSettingsMenu(touchmenu_instance)
-        self:showMessage(T(
-            _("Suwayomi delete-while-reading setting saved: %1"),
-            self:getDeleteFinishedWhileReadingLabel(saved_settings.delete_finished_while_reading)
-        ))
         if SuwayomiUI.updateDeleteFinishedWhileReadingMenu then
             SuwayomiUI.updateDeleteFinishedWhileReadingMenu(delete_menu, {
                 current = saved_settings.delete_finished_while_reading,
@@ -463,7 +456,6 @@ function Methods:showLibraryCategoryPickerBehaviorDialog(touchmenu_instance)
     local function onSelect(behavior)
         local saved_behavior = SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
         self:refreshSettingsMenu(touchmenu_instance)
-        self:showMessage(T(_("Suwayomi library category picker saved: %1"), saved_behavior))
         if SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu then
             SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu(picker_menu, {
                 current = saved_behavior,

@@ -396,11 +396,6 @@ function Methods:setMangaLibraryState(manga, in_library, options)
         if options.onMangaUpdated then
             options.onMangaUpdated(manga)
         end
-        if in_library then
-            self:showMessage(_("Added to library."))
-        else
-            self:showMessage(_("Removed from library."))
-        end
         if options.refresh_action_menu_after_library_update then
             self:showMangaActions(manga, options)
         end
@@ -565,7 +560,6 @@ function Methods:performMangaAction(manga, action_id, options)
         local limit = tonumber(keep_unread_count)
         if limit == 0 then
             SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, 0)
-            self:showMessage(_("Download ahead disabled."))
             return true
         end
         return self:keepNextUnreadChaptersForManga(manga, limit)

@@ -187,9 +187,7 @@ function Methods:showDownloads()
         onRetryFailed = function(job, menu)
             local ok = queue:retryFailed(job.key)
             self:closeMenu(menu)
-            if ok then
-                self:showMessage(_("Download queued."), { timeout = 2 })
-            else
+            if not ok then
                 self:showMessage(_("Could not retry download."))
             end
             self:showDownloads()
