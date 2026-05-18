@@ -71,14 +71,14 @@ describe("suwayomi/chapters/context", function()
         end
 
         assert.are.equal(
-            "Chapters - Very Long Manga Title That Would Truncate In... - MangaDex",
+            "Very Long Manga Title That Would Truncate In Header - MangaDex",
             plugin:formatChapterListScreenTitle(manga)
         )
         assert.are.equal("Very Long Manga Title That Would Truncate In Header", plugin:formatChapterListTitle(manga))
 
         plugin.current_scanlator_filter = "Very Long Scanlator Name That Would Truncate In Header"
         assert.are.equal(
-            "Chapters - Very Long Manga Title That Would Truncate In... - MangaDex",
+            "Very Long Manga Title That Would Truncate In Header - MangaDex",
             plugin:formatChapterListScreenTitle(manga)
         )
         assert.are.equal(

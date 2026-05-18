@@ -13,7 +13,7 @@ local SuwayomiSettings = require("suwayomi/settings")
 local ChapterContext = {}
 ChapterContext.__index = ChapterContext
 
-local CHAPTER_SCREEN_MANGA_TITLE_MAX_LENGTH = 47
+local CHAPTER_SCREEN_MANGA_TITLE_MAX_LENGTH = 58
 local CHAPTER_SCREEN_SOURCE_TITLE_MAX_LENGTH = 24
 
 -- Controllers expose new(deps) for a consistent boundary; methods remain plugin-bound mixins so this refactor can move code without changing callback behavior.
@@ -351,7 +351,7 @@ function Methods:formatChapterListScreenTitle(manga)
     end
     local context = formatChapterScreenContext(manga)
     if context then
-        return _("Chapters") .. " - " .. context
+        return context
     end
     return _("Chapters")
 end
