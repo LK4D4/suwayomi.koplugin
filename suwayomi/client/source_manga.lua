@@ -680,6 +680,7 @@ end
 
 function SuwayomiClient:appendUniqueSourceMangaRows(session, page_manga)
     local seen_ids = {}
+    local appended = {}
     for _, manga in ipairs(session.manga_list or {}) do
         if type(manga) == "table" and manga.id ~= nil then
             seen_ids[tostring(manga.id)] = true
@@ -690,14 +691,17 @@ function SuwayomiClient:appendUniqueSourceMangaRows(session, page_manga)
         local manga_id = type(manga) == "table" and manga.id or nil
         if manga_id == nil then
             table.insert(session.manga_list, manga)
+            table.insert(appended, manga)
         else
             local dedupe_id = tostring(manga_id)
             if not seen_ids[dedupe_id] then
                 seen_ids[dedupe_id] = true
                 table.insert(session.manga_list, manga)
+                table.insert(appended, manga)
             end
         end
     end
+    return appended
 end
 
 function SuwayomiClient:appendSourceMangaResult(session, result, refresh)
@@ -728,9 +732,20 @@ function SuwayomiClient:appendSourceMangaResult(session, result, refresh)
         refresh()
         return
     end
-    self:appendUniqueSourceMangaRows(session, page_manga)
+    local appended_manga = self:appendUniqueSourceMangaRows(session, page_manga)
     session.has_next_page = result.has_next_page == true
     refresh()
+    local visible_appended_manga = self:filterBrowseManga(appended_manga)
+    if session.chapter_count_enrichment then
+        self:appendBrowseChapterCountManga(session.chapter_count_enrichment, visible_appended_manga)
+    elseif session.chapter_count_runtime then
+        session.chapter_count_enrichment = self:startBrowseChapterCountEnrichment(
+            session.credentials,
+            visible_appended_manga,
+            refresh,
+            session.chapter_count_runtime
+        )
+    end
     if self:shouldAppendSourceMangaPage(session, session.menu) then
         self:startSourceMangaAppendLoad(session, refresh)
     end
@@ -849,6 +864,7 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
         current_api_page = page,
         manga_list = manga_list,
         has_next_page = result.has_next_page == true,
+        chapter_count_runtime = self:resolveChapterCountRuntime(),
     }
     local visible_manga = self:filterBrowseManga(manga_list)
     self:log({
@@ -910,15 +926,14 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
         end
     end
 
-    local chapter_count_runtime = self:resolveChapterCountRuntime()
     local previous_close_callback = menu_options.close_callback
     menu_options.close_callback = function(...)
         session.closed = true
         if session.active and session.runtime and session.runtime.job and session.runtime.job.cancel then
             session.runtime.job.cancel(session.active)
         end
-        if chapter_count_enrichment then
-            self:cancelBrowseChapterCountEnrichment(chapter_count_enrichment)
+        if session.chapter_count_enrichment then
+            self:cancelBrowseChapterCountEnrichment(session.chapter_count_enrichment)
         end
         if previous_close_callback then
             return previous_close_callback(...)
@@ -936,13 +951,14 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
     if pending_manga_menu_refresh then
         refreshMangaMenu()
     end
-    if chapter_count_runtime then
+    if session.chapter_count_runtime then
         chapter_count_enrichment = self:startBrowseChapterCountEnrichment(
             credentials,
             visible_manga,
             refreshMangaMenu,
-            chapter_count_runtime
+            session.chapter_count_runtime
         )
+        session.chapter_count_enrichment = chapter_count_enrichment
     end
     return manga_menu
 end

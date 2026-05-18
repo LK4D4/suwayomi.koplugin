@@ -195,6 +195,23 @@ function SuwayomiClient:startBrowseChapterCountEnrichment(credentials, manga_lis
     return state
 end
 
+function SuwayomiClient:appendBrowseChapterCountManga(state, manga_list)
+    if not state or state.canceled then
+        return
+    end
+
+    local added = false
+    for _, manga in ipairs(manga_list or {}) do
+        if self:shouldFetchBrowseChapterCount(manga) then
+            table.insert(state.queue, manga)
+            added = true
+        end
+    end
+    if added then
+        self:startNextBrowseChapterCountJobs(state)
+    end
+end
+
 function SuwayomiClient:cancelBrowseChapterCountEnrichment(state)
     if not state or state.canceled then
         return

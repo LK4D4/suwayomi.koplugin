@@ -1496,6 +1496,60 @@ describe("suwayomi/client source manga flows", function()
         assert.is_nil(updated_manga[5].m3.loading)
     end)
 
+    it("fetches chapter counts for manga appended from later source pages", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local shown_menu
+        local menu_options
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            chapter_count_max_active = 1,
+            ui = {
+                showMangaMenu = function()
+                    shown_menu = { name = "browse-menu", page = 2, page_num = 2 }
+                    return shown_menu
+                end,
+                updateMangaMenu = function(_, _, _, options)
+                    menu_options = options
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Page 1", chapter_count = 0 },
+            },
+            has_next_page = true,
+        })
+
+        assert.are.equal("m1", started[2].manga_id)
+        menu_options.on_page_changed(shown_menu, 2)
+        started[3].on_finish(started[3], {
+            ok = true,
+            manga = {
+                { id = "m2", title = "Page 2", chapter_count = 0 },
+            },
+            has_next_page = false,
+        })
+        assert.are.equal(3, #started)
+
+        started[2].on_finish(started[2], {
+            ok = true,
+            manga_id = "m1",
+            chapter_count = 3,
+        })
+
+        assert.is_not_nil(started[4])
+        assert.are.equal("m2", started[4].manga_id)
+    end)
+
     it("keeps timed out browse chapter count slots active until cleanup", function()
         local subprocess_job, started = buildChapterCountSubprocessFake()
         local updated_manga = {}
