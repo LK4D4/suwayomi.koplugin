@@ -553,7 +553,7 @@ describe("suwayomi/client source manga flows", function()
             error = "HTTP 403 from ComicK.",
         })
 
-        assert.are.same({ "Search failed for ComicK: HTTP 403 from ComicK." }, state.shown_messages)
+        assert.are.same({}, state.shown_messages)
         assert.are.equal("Search failed for ComicK: HTTP 403 from ComicK.", updated_rows[1].text)
         assert.are.equal("Retry", updated_rows[2].text)
         assert.are.equal("Edit search", updated_rows[3].text)
@@ -691,7 +691,7 @@ describe("suwayomi/client source manga flows", function()
         })
         started[1].on_timeout(started[1])
 
-        assert.are.same({ "Search failed for ComicK: Timed out." }, state.shown_messages)
+        assert.are.same({}, state.shown_messages)
         assert.are.equal("Search failed for ComicK: Timed out.", updated_rows[1].text)
         assert.are.equal("Retry", updated_rows[2].text)
         assert.are.equal("Edit search", updated_rows[3].text)
@@ -825,7 +825,7 @@ describe("suwayomi/client source manga flows", function()
         messages = state.shown_messages
 
         assert.are.same({ source_id = "s1", page = 1, type = "LATEST" }, latest_options)
-        assert.are.equal("Latest manga is not supported by this source.", messages[#messages])
+        assert.are.same({}, messages)
     end)
 
     it("preserves unrelated latest errors when support is unknown", function()
@@ -852,7 +852,7 @@ describe("suwayomi/client source manga flows", function()
 
             client:showMangaForSource({ id = "s1", name = "MangaDex", lang = "en" }, { type = "LATEST" })
 
-            assert.are.equal(error_message, state.shown_messages[#state.shown_messages])
+            assert.are.same({}, state.shown_messages)
         end
     end)
 

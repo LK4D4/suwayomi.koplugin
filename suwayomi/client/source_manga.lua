@@ -610,12 +610,8 @@ function SuwayomiClient:buildSourceMangaFailureRows(source, browse_options, mess
     return rows
 end
 
-function SuwayomiClient:showSourceMangaFailureStatus(menu, source, browse_options, error_text, options)
-    options = options or {}
+function SuwayomiClient:showSourceMangaFailureStatus(menu, source, browse_options, error_text)
     local failure_message = self:buildSourceMangaFailureMessage(source, browse_options, error_text)
-    if options.show_toast == true then
-        self.plugin:showMessage(failure_message)
-    end
     return self:showSourceMangaStatus(
         menu,
         self:buildBrowseResultScreenTitle(source, browse_options),
@@ -835,7 +831,6 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
             and source.supports_latest == nil
             and self:isLatestUnsupportedError(result.error)
         then
-            self.plugin:showMessage(self:translate("Latest manga is not supported by this source."))
             self:showSourceMangaStatus(
                 existing_menu,
                 self:buildBrowseResultScreenTitle(source, browse_options),
@@ -848,8 +843,7 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
             existing_menu,
             source,
             browse_options,
-            result.error,
-            { show_toast = true }
+            result.error
         )
         return
     end
@@ -1041,8 +1035,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
                 state.menu,
                 state.source,
                 state.browse_options,
-                self:translate("Timed out."),
-                { show_toast = true }
+                self:translate("Timed out.")
             )
         end,
     })

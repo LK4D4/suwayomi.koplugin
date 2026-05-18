@@ -277,7 +277,7 @@ describe("suwayomi/downloads/controller", function()
 
         state.downloads_menu_callbacks.onClearFailed(menu)
         assert.are.equal(1, queue.clear_failed_count)
-        assert.are.equal("Cleared 1 failed downloads.", state.messages[#state.messages])
+        assert.are.same({}, state.messages)
     end)
 
     it("wires queued and active row actions to queue and manga callbacks", function()

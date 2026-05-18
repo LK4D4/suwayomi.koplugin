@@ -193,9 +193,8 @@ function Methods:showDownloads()
             self:showDownloads()
         end,
         onClearFailed = function(menu)
-            local cleared = queue:clearFailed()
+            queue:clearFailed()
             self:closeMenu(menu)
-            self:showMessage(T(_("Cleared %1 failed downloads."), cleared), { timeout = 2 })
             self:showDownloads()
         end,
     }, self:getDownloadsMenuOptions(snapshot))

@@ -51,10 +51,10 @@ function Methods:showLoginDialog(touchmenu_instance)
     SuwayomiUI.showLoginDialog({
         credentials = SuwayomiSettings:load(),
         onSave = function(credentials)
-            local saved_credentials = SuwayomiSettings:save(credentials)
+            SuwayomiSettings:save(credentials)
             self:refreshSettingsMenu(touchmenu_instance)
             UIManager:nextTick(function()
-                self:showMessage(T(_("Suwayomi login settings saved for %1."), saved_credentials.server_url))
+                self:showMessage(_("Suwayomi login settings saved."))
             end)
         end,
     })
@@ -329,7 +329,9 @@ end
 function Methods:showDownloadDirectoryDialog(touchmenu_instance)
     self:chooseDownloadDirectory(function()
         self:refreshSettingsMenu(touchmenu_instance)
-    end)
+    end, {
+        suppress_saved_message = true,
+    })
 end
 
 

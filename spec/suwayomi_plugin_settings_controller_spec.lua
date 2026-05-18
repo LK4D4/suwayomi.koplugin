@@ -293,7 +293,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         assert.are.equal("https://new.example", state.saved_credentials.server_url)
         assert.are.equal(1, state.refresh_count)
-        assert.are.equal("Suwayomi login settings saved for https://new.example.", state.messages[#state.messages])
+        assert.are.equal("Suwayomi login settings saved.", state.messages[#state.messages])
 
         connection_menu.sub_item_table[2].callback(state.touchmenu)
         assert.are.equal("https://new.example", state.started_connection_job.active.credentials.server_url)
@@ -337,6 +337,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         downloads_menu.sub_item_table[1].callback(state.touchmenu)
         assert.truthy(state.choose_download_callback)
+        assert.are.same({ suppress_saved_message = true }, state.choose_download_options)
 
         downloads_menu.sub_item_table[2].callback(state.touchmenu)
         assert.are.same({ 1, 2, 3, 4 }, state.parallel_menu_options.choices)

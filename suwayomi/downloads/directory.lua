@@ -9,8 +9,6 @@ local UIManager = require("ui/uimanager")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local _ = require("gettext")
-local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
 
 local DownloadsDirectory = {}
 DownloadsDirectory.__index = DownloadsDirectory
@@ -131,7 +129,7 @@ function Methods:chooseDownloadDirectory(callback, options)
     SuwayomiUI.showDirectoryChooser(function(path)
         local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
         if not (options and options.suppress_saved_message) then
-            self:showMessage(T(_("Suwayomi download directory saved: %1"), saved_path))
+            self:showMessage(_("Suwayomi download directory saved."))
         end
         runCallback(callback, saved_path, options)
     end, self:getDownloadDirectoryChooserStartDir())
