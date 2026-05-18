@@ -182,7 +182,10 @@ describe("suwayomi/ui", function()
                     options.is_borderless = true
                     options.is_popout = false
                     options.title_bar_fm_style = true
-                    options.items_max_lines = 3
+                    if options.items_max_lines == nil then
+                        options.items_max_lines = 3
+                    end
+                    options.fixed_item_heights = options.fixed_item_heights or false
                     options.multilines_show_more_text = true
                     shown_dialog = options
                     return options
@@ -221,11 +224,12 @@ describe("suwayomi/ui", function()
         package.preload["suwayomi/ui/manga_menu"] = nil
     end)
 
-    local function assertFileManagerListStyle(menu)
+    local function assertFileManagerListStyle(menu, expected_items_max_lines, expected_fixed_item_heights)
         assert.is_true(menu.is_borderless)
         assert.is_false(menu.is_popout)
         assert.is_true(menu.title_bar_fm_style)
-        assert.are.equal(3, menu.items_max_lines)
+        assert.are.equal(expected_items_max_lines or 3, menu.items_max_lines)
+        assert.are.equal(expected_fixed_item_heights or false, menu.fixed_item_heights)
         assert.is_true(menu.multilines_show_more_text)
         assert.is_nil(menu.items_mandatory_font_size)
     end
@@ -467,8 +471,9 @@ describe("suwayomi/ui", function()
         end)
 
         assert.are.equal("Sousou no Frieren", shown_dialog.title)
-        assertFileManagerListStyle(shown_dialog)
+        assertFileManagerListStyle(shown_dialog, 3, true)
         assert.are.equal("Chapter 1", shown_dialog.item_table[1].text)
+        assert.is_true(shown_dialog.item_table[1].title_bold)
         assert.are.equal("Read · Downloaded", shown_dialog.item_table[1].mandatory)
         assert.are.equal("Chapter 2", shown_dialog.item_table[2].text)
         assert.is_nil(shown_dialog.item_table[2].mandatory)
@@ -504,7 +509,7 @@ describe("suwayomi/ui", function()
 
         assert.is_nil(shown_dialog.custom_title_bar)
         assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
-        assertFileManagerListStyle(shown_dialog)
+        assertFileManagerListStyle(shown_dialog, 3, true)
 
         shown_dialog.onLeftButtonTap()
 

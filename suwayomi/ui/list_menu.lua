@@ -48,8 +48,14 @@ local DEFAULT_OPTIONS = {
     is_borderless = true,
     is_popout = false,
     title_bar_fm_style = true,
+    with_bottom_line = true,
+    bottom_line_color = Blitbuffer.COLOR_DARK_GRAY,
+    title_face = Font:getFace("tfont"),
+    title_shrink_font_to_fit = true,
+    subtitle = false,
     items_max_lines = 3,
     multilines_show_more_text = true,
+    line_color = Blitbuffer.COLOR_DARK_GRAY,
 }
 local scale_by_size = Screen and Screen.scaleBySize
     and Screen:scaleBySize(1000000) * (1 / 1000000)
@@ -142,6 +148,42 @@ local function textBoxLineHeight(face)
     local height = widgetHeight(widget)
     freeWidget(widget)
     return math.max(1, height)
+end
+
+local function fittingTextBox(options)
+    local font_size = options.font_size
+    local min_font_size = math.min(font_size, math.max(12, font_size - 8))
+    local widget
+
+    local function build(size, constrain_height)
+        if widget then
+            freeWidget(widget)
+        end
+        widget = TextBoxWidget:new{
+            text = options.text,
+            face = fontFace(options.font or "cfont", size),
+            width = options.width,
+            height = constrain_height and options.height or nil,
+            height_adjust = constrain_height or nil,
+            height_overflow_show_ellipsis = constrain_height or nil,
+            alignment = options.alignment,
+            bold = options.bold,
+            fgcolor = options.fgcolor,
+            bgcolor = options.bgcolor,
+        }
+        return widgetHeight(widget) <= options.height
+    end
+
+    if build(font_size, false) then
+        return widget
+    end
+    for size = font_size - 1, min_font_size, -1 do
+        if build(size, false) then
+            return widget
+        end
+    end
+    build(min_font_size, true)
+    return widget
 end
 
 local function isSectionHeader(item)
@@ -307,13 +349,12 @@ function ListMenuItem:buildRowWidget(width, height)
         )
     end
     local title_height = subtitle and math.max(1, height - subtitle_height) or height
-    local title = TextBoxWidget:new{
+    local title = fittingTextBox{
         text = BD.auto(tostring(self.text or "")),
-        face = fontFace("cfont", fontSizeForRow(20, 24, font_height)),
+        font = "cfont",
+        font_size = fontSizeForRow(20, 24, font_height),
         width = title_width,
         height = title_height,
-        height_adjust = true,
-        height_overflow_show_ellipsis = true,
         alignment = "left",
         bold = self.entry.title_bold == true,
     }
@@ -475,6 +516,56 @@ function ListMenu.estimateItemTitleWidth(menu, item, base_height)
     )
 end
 
+function ListMenu.sectionHeaderHeight(base_height, line_height, row_padding)
+    return math.max(line_height + row_padding, math.floor(base_height * 0.55))
+end
+
+function ListMenu.setupFixedItemHeights(menu)
+    if #menu.item_table == 0 then
+        menu.page_items = {{}}
+        return
+    end
+
+    local has_section_header = false
+    for _, item in ipairs(menu.item_table) do
+        if isSectionHeader(item) then
+            has_section_header = true
+            break
+        end
+    end
+    if not has_section_header then
+        menu.page_items = nil
+        for _, item in ipairs(menu.item_table) do
+            item.height = nil
+        end
+        return
+    end
+
+    local base_height = menu._suwayomi_base_item_height or menu.item_dimen.h
+    local normal_height = menu.item_height or base_height
+    local title_face = fontFace("cfont", fontSizeForRow(20, 24, base_height))
+    local row_padding = 2 * verticalDefaultSpan() + Size.line.thin
+    local header_height = ListMenu.sectionHeaderHeight(base_height, textBoxLineHeight(title_face), row_padding)
+    menu.page_items = {}
+
+    local page_items = {}
+    local page_height = 0
+    for index, item in ipairs(menu.item_table) do
+        item.height = isSectionHeader(item) and header_height or normal_height
+        page_height = page_height + item.height
+        if page_height <= menu.available_height or #page_items == 0 then
+            table.insert(page_items, index)
+        else
+            table.insert(menu.page_items, page_items)
+            page_items = { index }
+            page_height = item.height
+        end
+        if index == #menu.item_table then
+            table.insert(menu.page_items, page_items)
+        end
+    end
+end
+
 function ListMenu.setupItemHeights(menu)
     if #menu.item_table == 0 then
         menu.page_items = {{}}
@@ -491,7 +582,7 @@ function ListMenu.setupItemHeights(menu)
     local page_height = 0
     for index, item in ipairs(menu.item_table) do
         if isSectionHeader(item) then
-            item.height = math.max(line_height + row_padding, math.floor(base_height * 0.55))
+            item.height = ListMenu.sectionHeaderHeight(base_height, line_height, row_padding)
         else
             local title_width = ListMenu.estimateItemTitleWidth(menu, item, base_height)
             local title_width_px = textWidth(getItemText(item), title_face, item.title_bold == true) * 1.08
@@ -555,12 +646,27 @@ function ListMenu.recalculateDimen(menu, no_recalculate_dimen)
         menu.perpage = math.max(1, round(available_height / portrait_item_height))
     end
 
+    local function setItemHeight()
+        menu.item_height = math.floor(available_height / menu.perpage) - Size.line.thin
+    end
+
+    setItemHeight()
+    if menu.fixed_item_heights and menu.items_max_lines then
+        local title_face = fontFace("cfont", fontSizeForRow(20, 24, menu.item_height))
+        local line_height = textBoxLineHeight(title_face)
+        local row_padding = 2 * verticalDefaultSpan() + Size.line.thin
+        local minimum_item_height = menu.items_max_lines * line_height + row_padding
+        if menu.item_height < minimum_item_height then
+            menu.perpage = math.max(1, math.floor(available_height / (minimum_item_height + Size.line.thin)))
+            setItemHeight()
+        end
+    end
+
     menu.page_num = math.ceil(#menu.item_table / menu.perpage)
     if menu.page_num > 0 and menu.page > menu.page_num then
         menu.page = menu.page_num
     end
 
-    menu.item_height = math.floor(available_height / menu.perpage) - Size.line.thin
     menu.item_width = menu.inner_dimen.w
     menu._suwayomi_base_item_height = menu.item_height
     menu.item_dimen = Geom:new{
@@ -569,7 +675,15 @@ function ListMenu.recalculateDimen(menu, no_recalculate_dimen)
         w = menu.item_width,
         h = menu.item_height,
     }
-    if menu.items_max_lines then
+    if menu.fixed_item_heights then
+        ListMenu.setupFixedItemHeights(menu)
+        if menu.page_items then
+            menu.page_num = ListMenu.getPageNumber(menu, #menu.item_table)
+            if menu.page_num > 0 and menu.page > menu.page_num then
+                menu.page = menu.page_num
+            end
+        end
+    elseif menu.items_max_lines then
         ListMenu.setupItemHeights(menu)
         menu.page_num = ListMenu.getPageNumber(menu, #menu.item_table)
         if menu.page_num > 0 and menu.page > menu.page_num then
@@ -720,8 +834,21 @@ function ListMenu.updateItems(menu, select_number, no_recalculate_dimen)
             select_number = idx
         end
         ListMenu.prepareThumbnail(menu, item)
-        if menu.items_max_lines and item.height then
+        if menu.page_items and item.height then
             menu.item_dimen.h = item.height
+        elseif isSectionHeader(item) then
+            local base_height = menu._suwayomi_base_item_height or menu.item_dimen.h
+            local title_face = fontFace("cfont", fontSizeForRow(20, 24, base_height))
+            local row_padding = 2 * verticalDefaultSpan() + Size.line.thin
+            menu.item_dimen.h = ListMenu.sectionHeaderHeight(
+                base_height,
+                textBoxLineHeight(title_face),
+                row_padding
+            )
+            item.height = nil
+        else
+            menu.item_dimen.h = menu.item_height or menu.item_dimen.h
+            item.height = nil
         end
         local item_widget = ListMenuItem:new{
             entry = item,
@@ -838,19 +965,42 @@ end
 
 function ListMenu.show(options)
     options = options or {}
+    local items_max_lines = options.items_max_lines
+    if items_max_lines == nil then
+        items_max_lines = 3
+    end
+    local fixed_item_heights = options.fixed_item_heights ~= false
+    local native_items_max_lines = items_max_lines
+    if fixed_item_heights then
+        native_items_max_lines = false
+    end
+    local subtitle = options.subtitle
+    if subtitle == nil then
+        subtitle = false
+    end
     local menu = Menu:new(menu_utils.applyNativeTitleBarStyle{
         title = options.title,
+        subtitle = subtitle,
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = options.item_table or {},
         items_per_page = options.items_per_page,
         itemnumber = options.itemnumber,
         state_w = options.state_w,
+        fixed_item_heights = fixed_item_heights,
         is_borderless = true,
         is_popout = false,
         title_bar_fm_style = true,
-        items_max_lines = 3,
+        with_bottom_line = options.with_bottom_line ~= false,
+        bottom_line_color = options.bottom_line_color or Blitbuffer.COLOR_DARK_GRAY,
+        title_face = options.title_face or fontFace("tfont"),
+        title_shrink_font_to_fit = options.title_shrink_font_to_fit ~= false,
+        items_max_lines = native_items_max_lines,
         multilines_show_more_text = true,
+        line_color = options.line_color or Blitbuffer.COLOR_DARK_GRAY,
     })
+    if fixed_item_heights then
+        menu.items_max_lines = items_max_lines
+    end
     ListMenu.install(menu, options)
     applyOptions(menu, options)
     menu._suwayomi_pending_itemnumber = options.itemnumber

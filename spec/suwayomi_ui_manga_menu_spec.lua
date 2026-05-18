@@ -381,8 +381,8 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_true(menu.is_borderless)
         assert.is_false(menu.is_popout)
         assert.is_true(menu.title_bar_fm_style)
-        assert.are.equal(10, menu.perpage)
-        assert.are.equal(63, menu.item_dimen.h)
+        assert.is_true(menu.perpage <= 10)
+        assert.is_true(menu.item_dimen.h >= 63)
 
         local textboxes = collectWidgetsByKind(menu.item_group[1], "textbox")
         local saw_title = false
@@ -390,11 +390,12 @@ describe("suwayomi/ui/manga_menu", function()
         local saw_metadata = false
         for _, widget in ipairs(textboxes) do
             if widget.text == "Manga title" then
-                saw_title = widget.bold ~= true and widget.face.name == "cfont" and widget.face.size == 19
+                saw_title = widget.bold ~= true
+                    and widget.face.name == "cfont"
             elseif widget.text == "MangaDex" then
-                saw_subtitle = widget.face.name == "cfont" and widget.face.size == 17
+                saw_subtitle = widget.face.name == "cfont"
             elseif widget.text == "12 chapters" then
-                saw_metadata = widget.face.name == "cfont" and widget.face.size == 13
+                saw_metadata = widget.face.name == "cfont"
             end
         end
         assert.is_true(saw_title)
@@ -402,7 +403,7 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_true(saw_metadata)
     end)
 
-    it("gives long names more row height like File Manager multiline rows", function()
+    it("keeps long names in fixed-height rows like File Manager", function()
         local manga_menu = require("suwayomi/ui/manga_menu")
 
         local menu = manga_menu.show{
@@ -412,6 +413,7 @@ describe("suwayomi/ui/manga_menu", function()
                     text = "A very long manga title that needs wrapping instead of being cut short",
                     mandatory = "12 chapters",
                     thumbnail_placeholder = true,
+                    height = 96,
                     manga = { id = "long" },
                 },
                 {
@@ -424,9 +426,12 @@ describe("suwayomi/ui/manga_menu", function()
         }
 
         assert.is_true(menu.items_max_lines >= 2)
-        assert.is_true(menu.item_table[1].height > menu.item_table[2].height)
-        assert.are.equal(menu.item_table[1].height, menu.item_group[1].dimen.h)
-        assert.are.equal(menu.item_table[2].height, menu.item_group[2].dimen.h)
+        assert.is_true(menu.fixed_item_heights)
+        assert.is_nil(menu.page_items)
+        assert.is_nil(menu.item_table[1].height)
+        assert.is_nil(menu.item_table[2].height)
+        assert.are.equal(menu.item_height, menu.item_group[1].dimen.h)
+        assert.are.equal(menu.item_height, menu.item_group[2].dimen.h)
     end)
 
     it("opens the page containing the requested initial item", function()

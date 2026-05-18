@@ -77,6 +77,8 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
         title = options.title or _("Suwayomi Chapters"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback),
+        fixed_item_heights = true,
+        items_max_lines = 3,
         itemnumber = options.itemnumber,
         close_callback = options.close_callback,
     }

@@ -2,6 +2,7 @@ package.path = "?.lua;" .. package.path
 
 describe("suwayomi/ui/list_menu", function()
     local created_options
+    local created_textboxes
     local stubbed_modules
 
     local function widgetModule()
@@ -16,15 +17,22 @@ describe("suwayomi/ui/list_menu", function()
         return {
             new = function(_, options)
                 options = options or {}
+                table.insert(created_textboxes, options)
                 function options:getSize()
                     local face = self.face or {}
                     local size = face.size or 12
+                    local natural_width = #tostring(self.text or "") * math.max(1, math.floor(size / 2))
+                    local lines = 1
+                    if self.width and self.width > 0 then
+                        lines = math.max(1, math.ceil(natural_width / self.width))
+                    end
                     return {
-                        w = #tostring(self.text or "") * math.max(1, math.floor(size / 2)),
-                        h = size,
+                        w = math.min(natural_width, self.width or natural_width),
+                        h = size * lines,
                     }
                 end
                 function options:free() end
+                function options:init() end
                 return options
             end,
         }
@@ -32,6 +40,7 @@ describe("suwayomi/ui/list_menu", function()
 
     before_each(function()
         created_options = nil
+        created_textboxes = {}
         stubbed_modules = {
             "ui/bidi",
             "ffi/blitbuffer",
@@ -107,7 +116,12 @@ describe("suwayomi/ui/list_menu", function()
             return {
                 extend = function(_, definition)
                     definition.new = definition.new or function(_, options)
-                        return options or {}
+                        options = options or {}
+                        setmetatable(options, { __index = definition })
+                        if options.init then
+                            options:init()
+                        end
+                        return options
                     end
                     return definition
                 end,
@@ -194,6 +208,11 @@ describe("suwayomi/ui/list_menu", function()
         assert.is_true(menu.is_borderless)
         assert.is_false(menu.is_popout)
         assert.is_true(menu.title_bar_fm_style)
+        assert.is_true(menu.with_bottom_line)
+        assert.are.equal("dark_gray", menu.bottom_line_color)
+        assert.are.equal("tfont", menu.title_face.name)
+        assert.is_true(menu.title_shrink_font_to_fit)
+        assert.is_false(menu.subtitle)
         assert.are.equal(3, menu.items_max_lines)
         assert.is_true(menu.multilines_show_more_text)
         assert.is_nil(menu.items_mandatory_font_size)
@@ -207,6 +226,9 @@ describe("suwayomi/ui/list_menu", function()
             is_borderless = false,
             is_popout = true,
             title_bar_fm_style = false,
+            with_bottom_line = false,
+            title_face = { name = "custom-title", size = 30 },
+            title_shrink_font_to_fit = false,
             items_max_lines = 2,
             multilines_show_more_text = false,
             items_mandatory_font_size = 12,
@@ -215,9 +237,71 @@ describe("suwayomi/ui/list_menu", function()
         assert.is_false(menu.is_borderless)
         assert.is_true(menu.is_popout)
         assert.is_false(menu.title_bar_fm_style)
+        assert.is_false(menu.with_bottom_line)
+        assert.are.equal("custom-title", menu.title_face.name)
+        assert.is_false(menu.title_shrink_font_to_fit)
         assert.are.equal(2, menu.items_max_lines)
         assert.is_false(menu.multilines_show_more_text)
         assert.are.equal(12, menu.items_mandatory_font_size)
+    end)
+
+    it("shows menus with caller-provided line limits", function()
+        package.loaded["suwayomi/ui/list_menu"] = nil
+        package.loaded["ui/widget/menu"] = nil
+        package.loaded.device = nil
+        package.preload.device = function()
+            return {
+                screen = {
+                    scaleBySize = function(_, value) return value / 2 end,
+                    getWidth = function() return 480 end,
+                    getHeight = function() return 800 end,
+                },
+            }
+        end
+        package.preload["ui/widget/menu"] = function()
+            return {
+                new = function(_, options)
+                    options.inner_dimen = { w = 320, h = 256 }
+                    options.page = 1
+                    options.itemnumber = 1
+                    if options.items_max_lines then
+                        options.page_items = { { 1 } }
+                        options.item_table[1].height = 96
+                    end
+                    options.item_group = {
+                        clear = function(self)
+                            for index = #self, 1, -1 do
+                                self[index] = nil
+                            end
+                        end,
+                    }
+                    options.page_info = { resetLayout = function() end }
+                    options.return_button = { resetLayout = function() end }
+                    options.content_group = { resetLayout = function() end }
+                    options.updatePageInfo = function() end
+                    options.mergeTitleBarIntoLayout = function() end
+                    return options
+                end,
+            }
+        end
+        local ListMenu = require("suwayomi/ui/list_menu")
+
+        local menu = ListMenu.show({
+            title = "Chapters",
+            item_table = {
+                { text = "Chapter 1", subtitle = "Scanlator" },
+            },
+            items_max_lines = false,
+        })
+
+        assert.is_false(menu.items_max_lines)
+        assert.are.equal("dark_gray", menu.line_color)
+        assert.is_true(menu.with_bottom_line)
+        assert.are.equal("dark_gray", menu.bottom_line_color)
+        assert.are.equal("tfont", menu.title_face.name)
+        assert.is_true(menu.title_shrink_font_to_fit)
+        assert.is_false(menu.subtitle)
+        assert.is_nil(menu.item_table[1].height)
     end)
 
     it("does not fire close callbacks for rows that keep the menu open", function()
@@ -311,7 +395,7 @@ describe("suwayomi/ui/list_menu", function()
                 self.page_num = 3
                 self.item_width = 320
                 self.item_height = 64
-                self.item_dimen = { h = 64, copy = function(value) return value end }
+                self.item_dimen = { w = 320, h = 64, copy = function(value) return value end }
             end,
             updatePageInfo = function() end,
             mergeTitleBarIntoLayout = function() end,
@@ -370,6 +454,217 @@ describe("suwayomi/ui/list_menu", function()
         assert.is_true(menu.item_table[1].height < menu._suwayomi_base_item_height)
         assert.is_true(menu.item_table[2].height >= menu._suwayomi_base_item_height)
         assert.are.same({ { 1, 2 } }, menu.page_items)
+    end)
+
+    it("keeps section headers compact in fixed-height menus", function()
+        local ListMenu = require("suwayomi/ui/list_menu")
+        local function copyDimen(value)
+            local copy = {}
+            for key, child in pairs(value) do
+                copy[key] = child
+            end
+            copy.copy = copyDimen
+            return copy
+        end
+        local menu = {
+            page = 1,
+            itemnumber = 1,
+            item_table = {
+                { text = "Installed (8)", is_section_header = true, select_enabled = false, title_bold = true },
+                { text = "Extension", subtitle = "English", thumbnail_placeholder = true },
+            },
+            layout = {},
+            item_group = {
+                clear = function(self)
+                    for index = #self, 1, -1 do
+                        self[index] = nil
+                    end
+                end,
+            },
+            page_info = { resetLayout = function() end },
+            return_button = { resetLayout = function() end },
+            content_group = { resetLayout = function() end },
+            _recalculateDimen = function(self)
+                self.perpage = 2
+                self.page_num = 1
+                self.item_width = 320
+                self.item_height = 64
+                self._suwayomi_base_item_height = 64
+                self.item_dimen = copyDimen{ w = 320, h = 64 }
+            end,
+            updatePageInfo = function() end,
+            mergeTitleBarIntoLayout = function() end,
+            show_parent = "menu",
+            line_color = "black",
+            fixed_item_heights = true,
+            items_max_lines = 3,
+        }
+
+        ListMenu.install(menu, {})
+        menu:updateItems()
+
+        assert.is_true(menu.item_group[1].dimen.h < menu.item_group[2].dimen.h)
+    end)
+
+    it("packs fixed-height pages by compact section-header height", function()
+        package.loaded["suwayomi/ui/list_menu"] = nil
+        package.loaded["ui/widget/menu"] = nil
+        package.preload["ui/widget/menu"] = function()
+            return {
+                new = function(_, options)
+                    options.inner_dimen = { w = 320, h = 385 }
+                    options.page = 1
+                    options.itemnumber = 1
+                    options.item_group = {
+                        clear = function(self)
+                            for index = #self, 1, -1 do
+                                self[index] = nil
+                            end
+                        end,
+                    }
+                    options.page_info = { resetLayout = function() end }
+                    options.return_button = { resetLayout = function() end }
+                    options.content_group = { resetLayout = function() end }
+                    options.updatePageInfo = function() end
+                    options.mergeTitleBarIntoLayout = function() end
+                    return options
+                end,
+            }
+        end
+        local ListMenu = require("suwayomi/ui/list_menu")
+
+        local menu = ListMenu.show({
+            title = "Extensions",
+            item_table = {
+                { text = "Installed (2)", is_section_header = true },
+                { text = "Installed A", subtitle = "All", thumbnail_placeholder = true },
+                { text = "Installed B", subtitle = "All", thumbnail_placeholder = true },
+                { text = "Available (4)", is_section_header = true },
+                { text = "Available A", subtitle = "All", thumbnail_placeholder = true },
+                { text = "Available B", subtitle = "All", thumbnail_placeholder = true },
+                { text = "Available C", subtitle = "All", thumbnail_placeholder = true },
+                { text = "Available D", subtitle = "All", thumbnail_placeholder = true },
+            },
+            fixed_item_heights = true,
+        })
+
+        assert.are.equal(6, menu.perpage)
+        assert.are.same({ { 1, 2, 3, 4, 5, 6, 7 }, { 8 } }, menu.page_items)
+        assert.are.equal(7, #menu.item_group)
+    end)
+
+    it("keeps empty fixed-height menus on a valid page", function()
+        package.loaded["suwayomi/ui/list_menu"] = nil
+        package.loaded["ui/widget/menu"] = nil
+        package.preload["ui/widget/menu"] = function()
+            return {
+                new = function(_, options)
+                    options.inner_dimen = { w = 320, h = 385 }
+                    options.page = 1
+                    options.itemnumber = 1
+                    options.item_group = {
+                        clear = function(self)
+                            for index = #self, 1, -1 do
+                                self[index] = nil
+                            end
+                        end,
+                    }
+                    options.page_info = { resetLayout = function() end }
+                    options.return_button = { resetLayout = function() end }
+                    options.content_group = { resetLayout = function() end }
+                    options.updatePageInfo = function() end
+                    options.mergeTitleBarIntoLayout = function() end
+                    return options
+                end,
+            }
+        end
+        local ListMenu = require("suwayomi/ui/list_menu")
+
+        local menu = ListMenu.show({
+            title = "Empty",
+            item_table = {},
+            fixed_item_heights = true,
+        })
+
+        assert.are.equal(1, menu.page_num)
+        assert.are.same({ {} }, menu.page_items)
+        assert.are.equal(0, #menu.item_group)
+    end)
+
+    it("shrinks long row titles before clipping fixed-height rows", function()
+        package.loaded["suwayomi/ui/list_menu"] = nil
+        package.loaded["ui/widget/menu"] = nil
+        package.loaded.device = nil
+        package.preload.device = function()
+            return {
+                screen = {
+                    scaleBySize = function(_, value) return value / 2 end,
+                    getWidth = function() return 480 end,
+                    getHeight = function() return 800 end,
+                },
+            }
+        end
+        package.preload["ui/widget/menu"] = function()
+            return {
+                new = function(_, options)
+                    options.inner_dimen = { w = 320, h = 256 }
+                    options.page = 1
+                    options.itemnumber = 1
+                    options.item_group = {
+                        clear = function(self)
+                            for index = #self, 1, -1 do
+                                self[index] = nil
+                            end
+                        end,
+                    }
+                    options.page_info = { resetLayout = function() end }
+                    options.return_button = { resetLayout = function() end }
+                    options.content_group = { resetLayout = function() end }
+                    options.updatePageInfo = function() end
+                    options.mergeTitleBarIntoLayout = function() end
+                    return options
+                end,
+            }
+        end
+        local ListMenu = require("suwayomi/ui/list_menu")
+
+        local title = "A very very very very very very very very very very very long chapter title"
+        local line_height = 20
+        local row_padding = 2 * 2 + 1
+        local menu = ListMenu.show({
+            title = "Chapters",
+            item_table = {
+                { text = title, subtitle = "Scanlator", title_bold = true },
+            },
+            items_max_lines = 3,
+            fixed_item_heights = true,
+        })
+        local title_widget
+        for _, widget in ipairs(created_textboxes) do
+            if widget.text == title then
+                title_widget = widget
+            end
+        end
+
+        assert.are.equal(menu.item_height, menu.item_group[1].dimen.h)
+        assert.is_true(menu.item_height >= 3 * line_height + row_padding)
+        assert.is_nil(menu.page_items)
+        assert.is_not_nil(title_widget)
+        assert.is_true(title_widget.bold)
+        assert.is_true(title_widget.face.size < 20)
+    end)
+
+    it("sets a default row separator color for title-bar menus", function()
+        local ListMenu = require("suwayomi/ui/list_menu")
+
+        local menu = ListMenu.new({
+            title = "Manga",
+            item_table = {
+                { text = "Chapter 1" },
+            },
+        })
+
+        assert.are.equal("dark_gray", menu.line_color)
     end)
 
     it("refreshes visible rows after thumbnail timeouts", function()
