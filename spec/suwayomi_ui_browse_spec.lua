@@ -511,35 +511,27 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("", extension_query)
     end)
 
-    it("keeps source mode title-menu callbacks reachable from the action dialog", function()
+    it("does not render title menu callbacks as action rows in source mode menus", function()
         local browse = require("suwayomi/ui/browse")
-        local tapped_menu
-        local held_menu
 
         browse.showSourceModeMenu({
             id = "s1",
             name = "MangaDex",
         }, function() end, {
             title_bar_left_icon = "appbar.menu",
-            on_title_bar_left_tap = function(menu)
-                tapped_menu = menu
+            on_title_bar_left_tap = function()
                 return true
             end,
-            on_title_bar_left_hold = function(menu)
-                held_menu = menu
+            on_title_bar_left_hold = function()
                 return true
             end,
         })
 
         assert.is_true(shown_dialog.is_button_dialog)
-        assert.are.equal("Menu", shown_dialog.buttons[1][1].text)
-        assert.are.equal("title_bar_left", shown_dialog.buttons[1][1].id)
-
-        shown_dialog.buttons[1][1].callback()
-        shown_dialog.buttons[1][1].hold_callback()
-
-        assert.are.equal(shown_dialog, tapped_menu)
-        assert.are.equal(shown_dialog, held_menu)
+        assert.are.equal("Popular", shown_dialog.buttons[1][1].text)
+        assert.are.equal("POPULAR", shown_dialog.buttons[1][1].id)
+        assert.are.equal("Latest", shown_dialog.buttons[1][2].text)
+        assert.are.equal("LATEST", shown_dialog.buttons[1][2].id)
     end)
 
     it("shows global search summaries and opens only successful or pageable source rows", function()
