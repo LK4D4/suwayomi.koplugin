@@ -1195,7 +1195,8 @@ describe("suwayomi/ui", function()
 
     it("shows a checklist dialog and toggles selected values", function()
         local ui = require("suwayomi/ui")
-        local toggled
+        local selected = { en = true }
+        local toggles = {}
         local done = false
 
         ui.showChecklistDialog({
@@ -1205,10 +1206,11 @@ describe("suwayomi/ui", function()
                 { value = "ja", text = "Japanese" },
             },
             isSelected = function(value)
-                return value == "en"
+                return selected[value] == true
             end,
-            onToggle = function(value, selected)
-                toggled = { value = value, selected = selected }
+            onToggle = function(value, is_selected)
+                selected[value] = is_selected
+                table.insert(toggles, { value = value, selected = is_selected })
             end,
             onDone = function()
                 done = true
@@ -1218,8 +1220,19 @@ describe("suwayomi/ui", function()
         assert.are.equal("* English", shown_dialog.buttons[1][1].text)
         assert.are.equal("Japanese", shown_dialog.buttons[2][1].text)
 
+        local first_dialog = shown_dialog
         shown_dialog.buttons[2][1].callback()
-        assert.are.same({ value = "ja", selected = true }, toggled)
+        assert.are.same({ value = "ja", selected = true }, toggles[1])
+        assert.are.equal(first_dialog, closed_dialog)
+        assert.are_not.equal(first_dialog, shown_dialog)
+        assert.are.equal("* Japanese", shown_dialog.buttons[2][1].text)
+
+        local second_dialog = shown_dialog
+        shown_dialog.buttons[2][1].callback()
+        assert.are.same({ value = "ja", selected = false }, toggles[2])
+        assert.are.equal(second_dialog, closed_dialog)
+        assert.are_not.equal(second_dialog, shown_dialog)
+        assert.are.equal("Japanese", shown_dialog.buttons[2][1].text)
 
         shown_dialog.buttons[3][1].callback()
         assert.is_true(done)

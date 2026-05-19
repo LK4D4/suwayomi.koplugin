@@ -77,6 +77,17 @@ function ChoiceDialogs.showChecklistDialog(options)
     options = options or {}
     local dialog
     local buttons = {}
+    local function reopen()
+        local function showAgain()
+            ChoiceDialogs.showChecklistDialog(options)
+        end
+        UIManager:close(dialog)
+        if UIManager.nextTick then
+            UIManager:nextTick(showAgain)
+        else
+            showAgain()
+        end
+    end
 
     for _, choice in ipairs(options.choices or {}) do
         local value = choiceValue(choice)
@@ -88,6 +99,7 @@ function ChoiceDialogs.showChecklistDialog(options)
                     if options.onToggle then
                         options.onToggle(value, not selected, choice)
                     end
+                    reopen()
                 end,
             },
         })
