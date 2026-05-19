@@ -206,6 +206,10 @@ local function installController(options)
                 manga.source = source
                 return manga
             end,
+            showSourceModeMenu = function(_, source)
+                state.opened_source = source
+                return { name = "source-menu" }
+            end,
         }
     end
     function plugin:isChapterDownloaded()
@@ -279,6 +283,10 @@ local function installController(options)
     end
     function plugin:trackSuwayomiScreen(route_id, widget)
         table.insert(state.tracked_screens, { route_id = route_id, widget = widget })
+    end
+    function plugin:showLibrary()
+        state.opened_library = true
+        return { name = "library-menu" }
     end
     return plugin, state
 end
@@ -630,6 +638,77 @@ describe("suwayomi/manga/controller", function()
         }))
 
         assert.are.equal(2, state.chapter_menu_options.itemnumber)
+    end)
+
+    it("opens Library when closing returned chapters for a library manga", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Fable Orbit", in_library = true, source = { id = "s1" } }
+
+        assert.is_true(plugin:showChapterResultForManga(manga, {
+            ok = true,
+            chapters = { { id = "c1", name = "Ch. 1" } },
+        }, {
+            reader_return_close_target = plugin:buildReaderReturnCloseTarget(nil, manga),
+        }))
+
+        state.chapter_menu_options.close_callback()
+
+        assert.is_nil(plugin.current_chapter_menu)
+        assert.is_true(state.opened_library)
+        assert.is_nil(state.opened_source)
+    end)
+
+    it("opens Source when closing returned chapters for a source-only manga", function()
+        local plugin, state = installController()
+        local source = { id = "s1", name = "Random Source" }
+        local manga = { id = "m1", title = "Cloud Decimal", in_library = false, source = source }
+
+        assert.is_true(plugin:showChapterResultForManga(manga, {
+            ok = true,
+            chapters = { { id = "c1", name = "Ch. 1" } },
+        }, {
+            reader_return_close_target = plugin:buildReaderReturnCloseTarget(nil, manga),
+        }))
+
+        state.chapter_menu_options.close_callback()
+
+        assert.is_nil(plugin.current_chapter_menu)
+        assert.are.equal(source, state.opened_source)
+        assert.is_nil(state.opened_library)
+    end)
+
+    it("keeps normal close behavior when returned chapters have no close target", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Plain Vessel" }
+
+        assert.is_true(plugin:showChapterResultForManga(manga, {
+            ok = true,
+            chapters = { { id = "c1", name = "Ch. 1" } },
+        }, {
+            reader_return_close_target = plugin:buildReaderReturnCloseTarget(nil, manga),
+        }))
+
+        state.chapter_menu_options.close_callback()
+
+        assert.is_nil(plugin.current_chapter_menu)
+        assert.is_nil(state.opened_library)
+        assert.is_nil(state.opened_source)
+    end)
+
+    it("does not route normal chapter menu close", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Quiet Lattice", in_library = true, source = { id = "s1" } }
+
+        assert.is_true(plugin:showChapterResultForManga(manga, {
+            ok = true,
+            chapters = { { id = "c1", name = "Ch. 1" } },
+        }))
+
+        state.chapter_menu_options.close_callback()
+
+        assert.is_nil(plugin.current_chapter_menu)
+        assert.is_nil(state.opened_library)
+        assert.is_nil(state.opened_source)
     end)
 
     it("falls back to returned chapter name when the context has no chapter id", function()

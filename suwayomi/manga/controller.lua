@@ -71,6 +71,10 @@ local function findReturnedChapterItemNumber(chapters, context)
     return nil
 end
 
+local function hasSourceId(source)
+    return type(source) == "table" and source.id ~= nil and tostring(source.id) ~= ""
+end
+
 function Methods:attachSourceToManga(manga, source)
     return self:getClient():attachSourceToManga(manga, source)
 end
@@ -251,6 +255,35 @@ function Methods:startFetchChaptersForManga(manga, options)
     end, _("Could not load chapters."), "chapter_menu")
 end
 
+function Methods:buildReaderReturnCloseTarget(_, manga)
+    if type(manga) ~= "table" then
+        return nil
+    end
+    if manga.in_library == true then
+        return { kind = "library" }
+    end
+    if hasSourceId(manga.source) then
+        return { kind = "source", source = manga.source }
+    end
+    return nil
+end
+
+function Methods:openReaderReturnCloseTarget(target)
+    if type(target) ~= "table" then
+        return nil
+    end
+    if target.kind == "library" and self.showLibrary then
+        return self:showLibrary()
+    end
+    if target.kind == "source" and hasSourceId(target.source) then
+        local client = self.getClient and self:getClient() or nil
+        if client and client.showSourceModeMenu then
+            return client:showSourceModeMenu(target.source)
+        end
+    end
+    return nil
+end
+
 
 function Methods:showChapterResultForManga(manga, result, options)
     options = options or {}
@@ -284,10 +317,16 @@ function Methods:showChapterResultForManga(manga, result, options)
     local chapter_menu
     self.current_chapter_options = self:buildChapterMenuOptions(manga, chapters)
     self.current_chapter_options.itemnumber = findReturnedChapterItemNumber(chapters, options.return_context)
+    local reader_return_close_target = options.reader_return_close_target
     self.current_chapter_options.close_callback = function()
-        if self.current_chapter_menu == chapter_menu then
+        local is_current_menu = self.current_chapter_menu == chapter_menu
+        if is_current_menu then
             self.current_chapter_menu = nil
         end
+        if is_current_menu and reader_return_close_target and self.openReaderReturnCloseTarget then
+            return self:openReaderReturnCloseTarget(reader_return_close_target)
+        end
+        return nil
     end
     chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, function(chapter)
         self:handleChapterTap(manga, chapter)
