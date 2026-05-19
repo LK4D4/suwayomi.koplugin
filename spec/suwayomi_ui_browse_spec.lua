@@ -418,7 +418,7 @@ describe("suwayomi/ui/browse", function()
                 name = "Small group",
                 filters = {
                     { type = "CheckBoxFilter", name = "Awarded", default = false },
-                    { type = "TriStateFilter", name = "Group license", default = "IGNORE" },
+                    { type = "CheckBoxFilter", name = "Licensed", default = false },
                 },
             },
             {
@@ -513,15 +513,17 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("Updated - Descending", editor.item_table[6].mandatory)
         editor.item_table[7].callback()
         assert.are.equal("Small group", shown_dialog.title)
-        assert.are.equal("Awarded: Off", shown_dialog.buttons[1][1].text)
-        assert.are.equal("Group license: IGNORE", shown_dialog.buttons[2][1].text)
+        assert.are.equal("Awarded", shown_dialog.buttons[1][1].text)
+        assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("Licensed", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
         assert.are.equal("Done", shown_dialog.buttons[3][1].text)
         shown_dialog.buttons[1][1].callback()
         assert.are.equal("Modified", editor.item_table[7].mandatory)
-        assert.are.equal("* Awarded: On", shown_dialog.buttons[1][1].text)
-        assert.are.equal("Group license: IGNORE", shown_dialog.buttons[2][1].text)
+        assert.is_true(shown_dialog.buttons[1][1].checked_func())
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
         shown_dialog.buttons[2][1].callback()
-        assert.are.equal("* Group license: INCLUDE", shown_dialog.buttons[2][1].text)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
         shown_dialog.buttons[3][1].callback()
         editor.item_table[11].callback()
         assert.are.same({
@@ -538,7 +540,7 @@ describe("suwayomi/ui/browse", function()
                 },
                 {
                     position = 7,
-                    group_change = { position = 2, type = "triState", state = "INCLUDE" },
+                    group_change = { position = 2, type = "checkBoxState", state = true },
                 },
             },
         }, applied)
@@ -662,7 +664,7 @@ describe("suwayomi/ui/browse", function()
                 name = "Small group",
                 filters = {
                     { type = "CheckBoxFilter", name = "Awarded", default = false },
-                    { type = "TriStateFilter", name = "Group license", default = "IGNORE" },
+                    { type = "CheckBoxFilter", name = "Licensed", default = false },
                 },
             },
             {
@@ -694,6 +696,7 @@ describe("suwayomi/ui/browse", function()
         shown_dialog.buttons[1][1].callback()
 
         assert.are.equal("Modified", editor.item_table[1].mandatory)
+        assert.is_true(shown_dialog.buttons[1][1].checked_func())
         assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
     end)
 

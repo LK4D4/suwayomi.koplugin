@@ -355,7 +355,7 @@ local function canShowGroupAsChecklist(filters)
     end
     for _, child in ipairs(filters) do
         local child_type = type(child) == "table" and child.type or nil
-        if child_type ~= "CheckBoxFilter" and child_type ~= "TriStateFilter" then
+        if child_type ~= "CheckBoxFilter" then
             return false
         end
     end
@@ -549,12 +549,7 @@ local function buildSourceFilterRows(filters, draft, context)
                 row.callback = function(menu)
                     local choices = {}
                     local function childChoiceText(child, child_index)
-                        if child.type == "CheckBoxFilter" then
-                            local value = getDraftState(draft, child_index, "checkBoxState", child.default == true, index)
-                            return (child.name or "") .. ": " .. stateText(value)
-                        end
-                        local value = tostring(getDraftState(draft, child_index, "triState", child.default or "IGNORE", index))
-                        return (child.name or "") .. ": " .. value
+                        return child.name or tostring(child_index)
                     end
                     for child_index, child in ipairs(filter.filters) do
                         table.insert(choices, {
@@ -580,22 +575,6 @@ local function buildSourceFilterRows(filters, draft, context)
                             if value.type == "CheckBoxFilter" then
                                 local entry = findDraftStateEntry(draft, value.child_index, "checkBoxState", index)
                                 entry.state = selected == true
-                            elseif value.type == "TriStateFilter" then
-                                local current = tostring(getDraftState(
-                                    draft,
-                                    value.child_index,
-                                    "triState",
-                                    child.default or "IGNORE",
-                                    index
-                                ))
-                                local next_value = "INCLUDE"
-                                if current == "INCLUDE" then
-                                    next_value = "EXCLUDE"
-                                elseif current == "EXCLUDE" then
-                                    next_value = "IGNORE"
-                                end
-                                local entry = findDraftStateEntry(draft, value.child_index, "triState", index)
-                                entry.state = next_value
                             end
                             choice.text = childChoiceText(child, value.child_index)
                             row.mandatory = _("Modified")

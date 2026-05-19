@@ -77,30 +77,23 @@ function ChoiceDialogs.showChecklistDialog(options)
     options = options or {}
     local dialog
     local buttons = {}
-    local function reopen()
-        local function showAgain()
-            ChoiceDialogs.showChecklistDialog(options)
-        end
-        dialog.suwayomi_refresh_close = true
-        UIManager:close(dialog)
-        if UIManager.nextTick then
-            UIManager:nextTick(showAgain)
-        else
-            showAgain()
-        end
+
+    local function isChoiceSelected(value, choice)
+        return options.isSelected and options.isSelected(value, choice) == true
     end
 
     for _, choice in ipairs(options.choices or {}) do
         local value = choiceValue(choice)
-        local selected = options.isSelected and options.isSelected(value, choice) == true
         table.insert(buttons, {
             {
-                text = selectedText(selected, choiceLabel(choice)),
+                text = choiceLabel(choice),
+                checked_func = function()
+                    return isChoiceSelected(value, choice)
+                end,
                 callback = function()
                     if options.onToggle then
-                        options.onToggle(value, not selected, choice)
+                        options.onToggle(value, not isChoiceSelected(value, choice), choice)
                     end
-                    reopen()
                 end,
             },
         })
@@ -121,14 +114,7 @@ function ChoiceDialogs.showChecklistDialog(options)
         title = options.title or _("Choose"),
         buttons = buttons,
         anchor = options.anchor,
-        close_callback = function()
-            if dialog and dialog.suwayomi_refresh_close then
-                return
-            end
-            if options.close_callback then
-                options.close_callback()
-            end
-        end,
+        close_callback = options.close_callback,
     }
     UIManager:show(dialog)
     return dialog

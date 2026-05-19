@@ -1227,23 +1227,22 @@ describe("suwayomi/ui", function()
             end,
         })
 
-        assert.are.equal("* English", shown_dialog.buttons[1][1].text)
+        assert.are.equal("English", shown_dialog.buttons[1][1].text)
+        assert.is_true(shown_dialog.buttons[1][1].checked_func())
         assert.are.equal("Japanese", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
 
         local first_dialog = shown_dialog
         shown_dialog.buttons[2][1].callback()
         assert.are.same({ value = "ja", selected = true }, toggles[1])
-        assert.are.equal(first_dialog, closed_dialog)
-        assert.are_not.equal(first_dialog, shown_dialog)
-        assert.are.equal("* Japanese", shown_dialog.buttons[2][1].text)
+        assert.is_nil(closed_dialog)
+        assert.are.equal(first_dialog, shown_dialog)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
         assert.are.equal(0, close_count)
 
-        local second_dialog = shown_dialog
         shown_dialog.buttons[2][1].callback()
         assert.are.same({ value = "ja", selected = false }, toggles[2])
-        assert.are.equal(second_dialog, closed_dialog)
-        assert.are_not.equal(second_dialog, shown_dialog)
-        assert.are.equal("Japanese", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
         assert.are.equal(0, close_count)
 
         shown_dialog.buttons[3][1].callback()
@@ -1333,8 +1332,10 @@ describe("suwayomi/ui", function()
 
         assert.are.equal("Source languages", shown_dialog.title)
         assert.is_nil(shown_dialog.renderer)
-        assert.are.equal("* English", shown_dialog.buttons[1][1].text)
+        assert.are.equal("English", shown_dialog.buttons[1][1].text)
+        assert.is_true(shown_dialog.buttons[1][1].checked_func())
         assert.are.equal("Russian", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
 
         shown_dialog.buttons[3][1].callback()
 
@@ -1362,16 +1363,18 @@ describe("suwayomi/ui", function()
             end,
         })
 
-        assert.are.equal("* English", shown_dialog.buttons[1][1].text)
+        assert.are.equal("English", shown_dialog.buttons[1][1].text)
+        assert.is_true(shown_dialog.buttons[1][1].checked_func())
         assert.are.equal("Español", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
 
         local first_dialog = shown_dialog
         shown_dialog.buttons[2][1].callback()
 
         assert.are.same({ code = "es", enabled = true }, toggles[1])
-        assert.are.equal(first_dialog, closed_dialog)
-        assert.are_not.equal(first_dialog, shown_dialog)
-        assert.are.equal("* Español", shown_dialog.buttons[2][1].text)
+        assert.is_nil(closed_dialog)
+        assert.are.equal(first_dialog, shown_dialog)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
         assert.are.equal(0, close_count)
 
         shown_dialog.buttons[3][1].callback()
