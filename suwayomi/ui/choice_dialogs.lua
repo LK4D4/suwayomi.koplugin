@@ -11,14 +11,6 @@ local _ = require("gettext")
 
 local ChoiceDialogs = {}
 
-local function selectedText(selected, text)
-    text = tostring(text or "")
-    if selected then
-        return "* " .. text
-    end
-    return text
-end
-
 local function choiceValue(choice)
     if type(choice) == "table" then
         return choice.value
@@ -31,6 +23,10 @@ local function choiceLabel(choice)
         return choice.text or choice.label or choice.value
     end
     return choice
+end
+
+local function choiceText(choice)
+    return tostring(choiceLabel(choice) or "")
 end
 
 local function closeThen(dialogProvider, callback)
@@ -49,7 +45,10 @@ function ChoiceDialogs.showChoiceDialog(options)
         local value = choiceValue(choice)
         table.insert(buttons, {
             {
-                text = selectedText(value == options.current, choiceLabel(choice)),
+                text = choiceText(choice),
+                checked_func = function()
+                    return value == options.current
+                end,
                 callback = function()
                     closeThen(function()
                         return dialog
@@ -86,7 +85,7 @@ function ChoiceDialogs.showChecklistDialog(options)
         local value = choiceValue(choice)
         table.insert(buttons, {
             {
-                text = choiceLabel(choice),
+                text = choiceText(choice),
                 checked_func = function()
                     return isChoiceSelected(value, choice)
                 end,

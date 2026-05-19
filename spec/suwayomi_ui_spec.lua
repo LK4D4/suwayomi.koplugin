@@ -1190,7 +1190,9 @@ describe("suwayomi/ui", function()
 
         assert.are.equal("Pick count", shown_dialog.title)
         assert.are.equal("1", shown_dialog.buttons[1][1].text)
-        assert.are.equal("* 2", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("2", shown_dialog.buttons[2][1].text)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
 
         shown_dialog.buttons[1][1].callback()
 
@@ -1266,7 +1268,9 @@ describe("suwayomi/ui", function()
         assert.are.equal("Parallel chapter downloads", shown_dialog.title)
         assert.is_nil(shown_dialog.renderer)
         assert.are.equal("1", shown_dialog.buttons[1][1].text)
-        assert.are.equal("* 2", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("2", shown_dialog.buttons[2][1].text)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
 
         shown_dialog.buttons[3][1].callback()
 
@@ -1288,7 +1292,9 @@ describe("suwayomi/ui", function()
 
         assert.are.equal("Library category picker", shown_dialog.title)
         assert.are.equal("Automatic", shown_dialog.buttons[1][1].text)
-        assert.are.equal("* Always ask", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("Always ask", shown_dialog.buttons[2][1].text)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
 
         shown_dialog.buttons[3][1].callback()
 
@@ -1309,7 +1315,9 @@ describe("suwayomi/ui", function()
 
         assert.are.equal("Delete finished chapters", shown_dialog.title)
         assert.are.equal("Disabled", shown_dialog.buttons[1][1].text)
-        assert.are.equal("* Second to last read chapter", shown_dialog.buttons[3][1].text)
+        assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("Second to last read chapter", shown_dialog.buttons[3][1].text)
+        assert.is_true(shown_dialog.buttons[3][1].checked_func())
 
         shown_dialog.buttons[2][1].callback()
 
