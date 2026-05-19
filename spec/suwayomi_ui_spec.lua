@@ -1175,6 +1175,7 @@ describe("suwayomi/ui", function()
     it("shows a choice dialog and marks the current value", function()
         local ui = require("suwayomi/ui")
         local selected
+        record_next_tick = true
 
         ui.showChoiceDialog({
             title = "Pick count",
@@ -1199,6 +1200,7 @@ describe("suwayomi/ui", function()
 
         shown_dialog.buttons[1][1].callback()
 
+        assert.are.same({ "next-tick", "close" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
         assert.are.equal(1, selected)
     end)
@@ -1209,6 +1211,7 @@ describe("suwayomi/ui", function()
         local toggles = {}
         local done = false
         local close_count = 0
+        record_next_tick = true
         run_close_callback_on_close = true
 
         ui.showChecklistDialog({
@@ -1255,6 +1258,7 @@ describe("suwayomi/ui", function()
 
         shown_dialog.buttons[3][1].callback()
         assert.is_true(done)
+        assert.are.same({ "next-tick", "close" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
         assert.are.equal(1, close_count)
     end)

@@ -30,9 +30,17 @@ local function choiceText(choice)
 end
 
 local function closeThen(dialogProvider, callback)
-    UIManager:close(dialogProvider())
-    if callback then
-        callback()
+    local function run()
+        UIManager:close(dialogProvider())
+        if callback then
+            callback()
+        end
+    end
+
+    if UIManager.nextTick then
+        UIManager:nextTick(run)
+    else
+        run()
     end
 end
 
