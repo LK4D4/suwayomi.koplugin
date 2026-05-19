@@ -263,4 +263,48 @@ describe("suwayomi/ui/thumbnail_cache", function()
             inverse = 0,
         }, fromstring_args)
     end)
+
+    it("keeps decoded poster cache paths separate from row thumbnails without leaking data", function()
+        package.preload["ffi/blitbuffer"] = function()
+            return {
+                tostring = function()
+                    return "RAWDATA"
+                end,
+            }
+        end
+
+        local cache = require("suwayomi/ui/thumbnail_cache")
+        local credentials = {
+            server_url = "https://suwayomi.example",
+            username = "alice",
+            auth_method = "basic_auth",
+        }
+        local bitmap = {
+            w = 240,
+            h = 360,
+            stride = 960,
+            getType = function() return 6 end,
+            getRotation = function() return 0 end,
+            getInverse = function() return 0 end,
+        }
+
+        local thumbnail_path = cache.writeDecoded(credentials, "/api/v1/manga/123/thumbnail", bitmap)
+        local poster_path = cache.writeDecoded(credentials, "/api/v1/manga/123/thumbnail", bitmap, {
+            variant = "poster",
+            width = 240,
+            height = 360,
+        })
+
+        assert.are_not.equal(thumbnail_path, poster_path)
+        assert.are.equal(thumbnail_path, cache.find(credentials, "/api/v1/manga/123/thumbnail"))
+        assert.are.equal(poster_path, cache.find(credentials, "/api/v1/manga/123/thumbnail", {
+            variant = "poster",
+            width = 240,
+            height = 360,
+        }))
+        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.bb$", poster_path)
+        assert.is_nil(poster_path:match("suwayomi%.example"))
+        assert.is_nil(poster_path:match("manga/123"))
+        assert.is_nil(poster_path:match("alice"))
+    end)
 end)

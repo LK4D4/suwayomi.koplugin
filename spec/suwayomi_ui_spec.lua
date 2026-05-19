@@ -25,6 +25,9 @@ describe("suwayomi/ui", function()
         package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
         package.loaded["suwayomi/ui/manga_info"] = nil
+        package.loaded["suwayomi/subprocess/job"] = nil
+        package.loaded["suwayomi/ui/thumbnail_worker"] = nil
+        package.loaded["ffi/util"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/buttontable"] = nil
         package.loaded["ui/widget/menu"] = nil
@@ -285,12 +288,20 @@ describe("suwayomi/ui", function()
 
         package.preload["suwayomi/ui/thumbnail_cache"] = function()
             return {
-                find = function(credentials, thumbnail_url)
-                    if thumbnail_url == "thumb://cached" then
-                        events.thumbnail_lookup = { credentials = credentials, thumbnail_url = thumbnail_url }
+                find = function(credentials, thumbnail_url, options)
+                    if thumbnail_url == "thumb://cached" or (thumbnail_url == "thumb://missing" and events.poster_cache_ready) then
+                        events.thumbnail_lookup = {
+                            credentials = credentials,
+                            thumbnail_url = thumbnail_url,
+                            options = options,
+                        }
                         return "/tmp/poster.bb"
                     end
-                    events.thumbnail_lookup = { credentials = credentials, thumbnail_url = thumbnail_url }
+                    events.thumbnail_lookup = {
+                        credentials = credentials,
+                        thumbnail_url = thumbnail_url,
+                        options = options,
+                    }
                     return nil
                 end,
                 isDecodedPath = function(path)
@@ -301,6 +312,58 @@ describe("suwayomi/ui", function()
                         return { decoded = true }
                     end
                     return nil
+                end,
+            }
+        end
+
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                buildResultPath = function(prefix)
+                    return "/tmp/" .. tostring(prefix) .. ".json"
+                end,
+                start = function(options)
+                    events.poster_job = options
+                    if options.run then
+                        options.run(options.active.result_path)
+                    end
+                    return options.active
+                end,
+                cancel = function(active)
+                    events.canceled_poster_job = active
+                end,
+            }
+        end
+
+        package.preload["suwayomi/ui/thumbnail_worker"] = function()
+            return {
+                run = function(_, credentials, thumbnail_url, result_path, options)
+                    events.poster_worker_run = {
+                        credentials = credentials,
+                        thumbnail_url = thumbnail_url,
+                        result_path = result_path,
+                        options = options,
+                    }
+                    return {
+                        ok = true,
+                        path = "/tmp/poster.bb",
+                    }
+                end,
+                readResult = function()
+                    return {
+                        ok = true,
+                        path = "/tmp/poster.bb",
+                    }
+                end,
+            }
+        end
+
+        package.preload["ffi/util"] = function()
+            return {
+                runInSubProcess = function(callback)
+                    if callback then
+                        callback()
+                    end
+                    return 1234
                 end,
             }
         end
@@ -457,6 +520,9 @@ describe("suwayomi/ui", function()
         package.preload["suwayomi/ui/thumbnail_cache"] = nil
         package.preload["suwayomi/ui/list_menu"] = nil
         package.preload["suwayomi/ui/manga_menu"] = nil
+        package.preload["suwayomi/subprocess/job"] = nil
+        package.preload["suwayomi/ui/thumbnail_worker"] = nil
+        package.preload["ffi/util"] = nil
     end)
 
     local function assertFileManagerListStyle(menu, expected_items_max_lines, expected_fixed_item_heights)
@@ -611,6 +677,11 @@ describe("suwayomi/ui", function()
         assert.is_true(dialog.width > 0)
         assert.are.equal("thumb://cached", events.thumbnail_lookup.thumbnail_url)
         assert.are.equal(credentials, events.thumbnail_lookup.credentials)
+        assert.are.same({
+            variant = "poster",
+            width = 240,
+            height = 360,
+        }, events.thumbnail_lookup.options)
 
         local title = findWidget(dialog, "titlebar")
         local title_separator = findWidget(dialog, "linewidget")
@@ -656,15 +727,41 @@ describe("suwayomi/ui", function()
             title = "Manga Title",
             description = "",
             thumbnail_url = "thumb://missing",
+            thumbnail_path = "/tmp/row-thumb.bb",
         }, {
             thumbnail_credentials = { server_url = "https://suwayomi.example" },
         })
 
         local poster_text = findWidget(dialog, "textwidget")
         local description = findWidget(dialog, "scrollhtmlwidget")
+        local title = findWidget(dialog, "titlebar")
         assert.is_not_nil(description)
         assert.are.equal("No poster", poster_text.text)
         assert.are.equal("No description available.", description.html_body)
+        assert.are.equal("thumb://missing", events.poster_worker_run.thumbnail_url)
+        assert.are.equal("/tmp/manga_info_poster.json", events.poster_worker_run.result_path)
+        assert.are.same({
+            variant = "poster",
+            width = 240,
+            height = 360,
+        }, events.poster_worker_run.options)
+        assert.is_nil(findWidget(dialog, "imagewidget"))
+        assert.is_nil(events.canceled_poster_job)
+        events.poster_cache_ready = true
+        events.poster_job.on_finish(events.poster_job.active, {
+            ok = true,
+            path = "/tmp/poster.bb",
+        })
+
+        local refreshed_image = findWidget(dialog, "imagewidget")
+        local refreshed_description = findWidget(dialog, "scrollhtmlwidget")
+        assert.are.same({ decoded = true }, refreshed_image.image)
+        assert.are.equal(dialog, refreshed_description.dialog)
+
+        events.poster_job.active.pid = 1234
+        dialog.poster_job = events.poster_job.active
+        title.close_callback()
+        assert.are.equal(events.poster_job.active, events.canceled_poster_job)
     end)
 
     it("formats manga information description markup and opens links", function()

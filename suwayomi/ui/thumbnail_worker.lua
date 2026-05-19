@@ -14,6 +14,8 @@ local ThumbnailCache = require("suwayomi/ui/thumbnail_cache")
 local ThumbnailWorker = {}
 ThumbnailWorker.MAX_THUMBNAIL_BYTES = ThumbnailCache.MAX_THUMBNAIL_BYTES or 2 * 1024 * 1024
 ThumbnailWorker.DECODED_THUMBNAIL_SIZE = 96
+ThumbnailWorker.POSTER_WIDTH = 240
+ThumbnailWorker.POSTER_HEIGHT = 360
 
 local SUPPORTED_IMAGE_TYPES = {
     ["image/gif"] = true,
@@ -78,15 +80,39 @@ local function freeBitmap(bitmap)
     end
 end
 
-function ThumbnailWorker:writeDecodedThumbnail(credentials, thumbnail_url, body)
+local function normalizeDecodeOptions(options)
+    if type(options) ~= "table" then
+        return {
+            width = ThumbnailWorker.DECODED_THUMBNAIL_SIZE,
+            height = ThumbnailWorker.DECODED_THUMBNAIL_SIZE,
+        }
+    end
+    local default_width = options.variant == "poster" and ThumbnailWorker.POSTER_WIDTH or ThumbnailWorker.DECODED_THUMBNAIL_SIZE
+    local default_height = options.variant == "poster" and ThumbnailWorker.POSTER_HEIGHT or ThumbnailWorker.DECODED_THUMBNAIL_SIZE
+    local width = math.floor(tonumber(options.width) or default_width)
+    local height = math.floor(tonumber(options.height) or default_height)
+    if width < 1 then
+        width = ThumbnailWorker.DECODED_THUMBNAIL_SIZE
+    end
+    if height < 1 then
+        height = ThumbnailWorker.DECODED_THUMBNAIL_SIZE
+    end
+    return {
+        variant = options.variant,
+        width = width,
+        height = height,
+    }
+end
+
+function ThumbnailWorker:writeDecodedThumbnail(credentials, thumbnail_url, body, options)
     local ok, RenderImage = pcall(require, "ui/renderimage")
     if not ok or not RenderImage then
         return nil, "Could not decode thumbnail."
     end
 
-    local size = self.DECODED_THUMBNAIL_SIZE
+    local decode_options = normalizeDecodeOptions(options)
     local rendered_ok, bitmap = pcall(function()
-        return RenderImage:renderImageData(body, #body, false, size, size)
+        return RenderImage:renderImageData(body, #body, false, decode_options.width, decode_options.height)
     end)
     if not rendered_ok or not bitmap then
         freeBitmap(bitmap)
@@ -94,7 +120,7 @@ function ThumbnailWorker:writeDecodedThumbnail(credentials, thumbnail_url, body)
     end
 
     local write_ok, path, write_error = pcall(function()
-        return ThumbnailCache.writeDecoded(credentials, thumbnail_url, bitmap)
+        return ThumbnailCache.writeDecoded(credentials, thumbnail_url, bitmap, options and decode_options or nil)
     end)
     freeBitmap(bitmap)
     if not write_ok then
@@ -103,11 +129,11 @@ function ThumbnailWorker:writeDecodedThumbnail(credentials, thumbnail_url, body)
     return path, write_error
 end
 
-function ThumbnailWorker:writeThumbnail(credentials, thumbnail_url, body, image_type)
-    return self:writeDecodedThumbnail(credentials, thumbnail_url, body, image_type)
+function ThumbnailWorker:writeThumbnail(credentials, thumbnail_url, body, _image_type, options)
+    return self:writeDecodedThumbnail(credentials, thumbnail_url, body, options)
 end
 
-function ThumbnailWorker:run(credentials, thumbnail_url, result_path)
+function ThumbnailWorker:run(credentials, thumbnail_url, result_path, options)
     local result
     local ok, binary = pcall(function()
         return SuwayomiAPI.downloadBinary(credentials, thumbnail_url, {
@@ -148,12 +174,13 @@ function ThumbnailWorker:run(credentials, thumbnail_url, result_path)
                 error = "Thumbnail image is too large.",
             }
         else
-            local path, write_error = self:writeThumbnail(credentials, thumbnail_url, binary.body, image_type)
+            local path, write_error = self:writeThumbnail(credentials, thumbnail_url, binary.body, image_type, options)
             result = {
                 ok = path ~= nil,
                 thumbnail_url = thumbnail_url,
                 path = path,
                 error = write_error,
+                variant = type(options) == "table" and options.variant or nil,
             }
         end
     end

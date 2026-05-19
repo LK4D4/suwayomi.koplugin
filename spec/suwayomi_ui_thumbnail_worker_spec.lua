@@ -162,6 +162,55 @@ describe("suwayomi/ui/thumbnail_worker", function()
         assert.are.same(result, written_results["/tmp/result.json"])
     end)
 
+    it("uses requested poster size and cache variant when decoding poster images", function()
+        local decoded_bitmap = { decoded = true, freed = false }
+        local write_options
+        api.downloadBinary = function()
+            return {
+                ok = true,
+                body = "poster bytes",
+                content_type = "image/jpeg",
+            }
+        end
+        cache.writeDecoded = function(_, thumbnail_url, bitmap, options)
+            assert.are.equal("/poster.jpg", thumbnail_url)
+            assert.are.same(decoded_bitmap, bitmap)
+            write_options = options
+            return "/settings/poster.bb"
+        end
+        package.preload["ui/renderimage"] = function()
+            return {
+                renderImageData = function(_, body, size, want_frames, width, height)
+                    assert.are.equal("poster bytes", body)
+                    assert.are.equal(12, size)
+                    assert.is_false(want_frames)
+                    assert.are.equal(240, width)
+                    assert.are.equal(360, height)
+                    function decoded_bitmap:free()
+                        self.freed = true
+                    end
+                    return decoded_bitmap
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/ui/thumbnail_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, "/poster.jpg", "/tmp/result.json", {
+            variant = "poster",
+            width = 240,
+            height = 360,
+        })
+
+        assert.is_true(result.ok)
+        assert.are.equal("/settings/poster.bb", result.path)
+        assert.are.same({
+            variant = "poster",
+            width = 240,
+            height = 360,
+        }, write_options)
+        assert.is_true(decoded_bitmap.freed)
+    end)
+
     it("rejects oversized thumbnail responses", function()
         api.downloadBinary = function()
             return {

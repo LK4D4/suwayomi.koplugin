@@ -18,6 +18,32 @@ local CACHE_DIR_NAME = "suwayomi_dl_thumbnails"
 local DECODED_EXTENSION = "bb"
 local DECODED_MAGIC = "SWTHUMB1"
 local RAW_IMAGE_EXTENSIONS = { "webp", "jpg", "jpeg", "png", "gif", "svg" }
+local DEFAULT_VARIANT = "thumbnail"
+
+local function normalizeVariant(options)
+    if type(options) ~= "table" then
+        return DEFAULT_VARIANT
+    end
+    local variant = tostring(options.variant or DEFAULT_VARIANT)
+        :lower()
+        :gsub("[^%w_-]", "_")
+        :gsub("_+", "_")
+        :gsub("^_+", "")
+        :gsub("_+$", "")
+    if variant == "" then
+        variant = DEFAULT_VARIANT
+    end
+    if variant == DEFAULT_VARIANT then
+        return DEFAULT_VARIANT
+    end
+
+    local width = math.floor(tonumber(options.width) or 0)
+    local height = math.floor(tonumber(options.height) or 0)
+    if width > 0 and height > 0 then
+        return table.concat({ variant, tostring(width), tostring(height) }, ":")
+    end
+    return variant
+end
 
 local function rollingHash(text, seed, multiplier)
     local hash = seed
@@ -74,7 +100,7 @@ function ThumbnailCache.getExtension(content_type, thumbnail_url)
     return "jpg"
 end
 
-function ThumbnailCache.getKey(credentials, thumbnail_url)
+function ThumbnailCache.getKey(credentials, thumbnail_url, options)
     local server_url = credentials and credentials.server_url or ""
     local auth_identity = ""
     if type(credentials) == "table" then
@@ -83,13 +109,18 @@ function ThumbnailCache.getKey(credentials, thumbnail_url)
             tostring(credentials.username or ""),
         }, "\n"))
     end
-    return hashText(tostring(server_url) .. "\n" .. auth_identity .. "\n" .. tostring(thumbnail_url or ""))
+    local cache_identity = tostring(server_url) .. "\n" .. auth_identity .. "\n" .. tostring(thumbnail_url or "")
+    local variant = normalizeVariant(options)
+    if variant ~= DEFAULT_VARIANT then
+        cache_identity = cache_identity .. "\n" .. variant
+    end
+    return hashText(cache_identity)
 end
 
-function ThumbnailCache.getPath(credentials, thumbnail_url, content_type)
+function ThumbnailCache.getPath(credentials, thumbnail_url, content_type, options)
     return FFIUtil.joinPath(
         getCacheDir(),
-        ThumbnailCache.getKey(credentials, thumbnail_url) .. "." .. ThumbnailCache.getExtension(content_type, thumbnail_url)
+        ThumbnailCache.getKey(credentials, thumbnail_url, options) .. "." .. ThumbnailCache.getExtension(content_type, thumbnail_url)
     )
 end
 
@@ -108,11 +139,11 @@ function ThumbnailCache.ensureCacheDir()
     return false, cache_dir
 end
 
-function ThumbnailCache.find(credentials, thumbnail_url)
+function ThumbnailCache.find(credentials, thumbnail_url, options)
     if not thumbnail_url or thumbnail_url == "" then
         return nil
     end
-    local key = ThumbnailCache.getKey(credentials, thumbnail_url)
+    local key = ThumbnailCache.getKey(credentials, thumbnail_url, options)
     local cache_dir = getCacheDir()
     local decoded_path = FFIUtil.joinPath(cache_dir, key .. "." .. DECODED_EXTENSION)
     if lfs.attributes(decoded_path, "mode") == "file" then
@@ -132,7 +163,7 @@ function ThumbnailCache.find(credentials, thumbnail_url)
     return nil
 end
 
-function ThumbnailCache.write(credentials, thumbnail_url, body, content_type)
+function ThumbnailCache.write(credentials, thumbnail_url, body, content_type, options)
     if not thumbnail_url or thumbnail_url == "" or not body or body == "" then
         return nil, "Missing thumbnail data."
     end
@@ -141,7 +172,7 @@ function ThumbnailCache.write(credentials, thumbnail_url, body, content_type)
         return nil, "Could not create thumbnail cache."
     end
 
-    local path = ThumbnailCache.getPath(credentials, thumbnail_url, content_type)
+    local path = ThumbnailCache.getPath(credentials, thumbnail_url, content_type, options)
     local handle = io.open(path, "wb")
     if not handle then
         return nil, "Could not write thumbnail cache."
@@ -164,7 +195,7 @@ local function getBitmapField(bitmap, field, method)
     end
 end
 
-function ThumbnailCache.writeDecoded(credentials, thumbnail_url, bitmap)
+function ThumbnailCache.writeDecoded(credentials, thumbnail_url, bitmap, options)
     if not thumbnail_url or thumbnail_url == "" or not bitmap then
         return nil, "Missing thumbnail data."
     end
@@ -185,7 +216,7 @@ function ThumbnailCache.writeDecoded(credentials, thumbnail_url, bitmap)
     local rotation = tonumber(bitmap:getRotation()) or 0
     local inverse = tonumber(bitmap:getInverse()) or 0
     local data = Blitbuffer.tostring(bitmap)
-    local path = ThumbnailCache.getPath(credentials, thumbnail_url, "image/webp")
+    local path = ThumbnailCache.getPath(credentials, thumbnail_url, "image/webp", options)
     local handle = io.open(path, "wb")
     if not handle then
         return nil, "Could not write thumbnail cache."

@@ -8,6 +8,11 @@
 local _ = require("gettext")
 
 local MangaInfo = {}
+local POSTER_CACHE_OPTIONS = {
+    variant = "poster",
+    width = 240,
+    height = 360,
+}
 
 local function requireWidgetModules()
     local Device = require("device")
@@ -219,18 +224,7 @@ local function screenHeight(Screen)
     return 800
 end
 
-local function findPosterPath(manga, options)
-    manga = manga or {}
-    if cleanText(manga.thumbnail_path) then
-        return manga.thumbnail_path
-    end
-    if not cleanText(manga.thumbnail_url) then
-        return nil
-    end
-    local ok_cache, ThumbnailCache = pcall(require, "suwayomi/ui/thumbnail_cache")
-    if not ok_cache then
-        return nil
-    end
+local function thumbnailCredentials(options)
     local credentials = options and options.thumbnail_credentials
     if not credentials then
         local ok_settings, Settings = pcall(require, "suwayomi/settings")
@@ -238,7 +232,31 @@ local function findPosterPath(manga, options)
             credentials = Settings:load()
         end
     end
-    return ThumbnailCache.find(credentials, manga.thumbnail_url)
+    return credentials
+end
+
+local function findCachedPosterPath(manga, options)
+    manga = manga or {}
+    if not cleanText(manga.thumbnail_url) then
+        return nil
+    end
+    local ok_cache, ThumbnailCache = pcall(require, "suwayomi/ui/thumbnail_cache")
+    if not ok_cache then
+        return nil
+    end
+    return ThumbnailCache.find(thumbnailCredentials(options), manga.thumbnail_url, POSTER_CACHE_OPTIONS)
+end
+
+local function findPosterPath(manga, options)
+    manga = manga or {}
+    if cleanText(options and options.poster_path) then
+        return options.poster_path
+    end
+    local poster_path = findCachedPosterPath(manga, options)
+    if poster_path then
+        return poster_path
+    end
+    return nil
 end
 
 local function loadPosterImage(path)
@@ -438,8 +456,94 @@ local function buildDialog(modules, manga, options)
     }
 
     function Dialog:onClose()
+        if self.poster_job then
+            local ok_job, SubprocessJob = pcall(require, "suwayomi/subprocess/job")
+            if ok_job and SubprocessJob and SubprocessJob.cancel then
+                SubprocessJob.cancel(self.poster_job)
+            end
+            self.poster_job = nil
+        end
         modules.UIManager:close(self)
         return true
+    end
+
+    function Dialog:refreshContent()
+        if not self.content_frame or not self.content_layout then
+            return
+        end
+        local content = MangaInfo.buildContentWidget(self.manga, self.options, self.content_layout)
+        bindDialog(content, self)
+        if self.content_frame[1] and self.content_frame[1].free then
+            self.content_frame[1]:free()
+        end
+        self.content_frame[1] = content
+        if self.content_frame.resetLayout then
+            self.content_frame:resetLayout()
+        end
+        if self.frame and self.frame.resetLayout then
+            self.frame:resetLayout()
+        end
+        if modules.UIManager.setDirty then
+            modules.UIManager:setDirty(self, function()
+                return "ui", self.frame and self.frame.dimen or self.region
+            end)
+        end
+    end
+
+    function Dialog:startPosterJob()
+        if self.poster_job or findCachedPosterPath(self.manga, self.options) or cleanText(self.options and self.options.poster_path) then
+            return
+        end
+        local thumbnail_url = cleanText(self.manga and self.manga.thumbnail_url)
+        local credentials = thumbnailCredentials(self.options)
+        if not thumbnail_url or not credentials or not cleanText(credentials.server_url) then
+            return
+        end
+
+        local ok_job, SubprocessJob = pcall(require, "suwayomi/subprocess/job")
+        local ok_worker, ThumbnailWorker = pcall(require, "suwayomi/ui/thumbnail_worker")
+        local ok_ffi, FFIUtil = pcall(require, "ffi/util")
+        if not ok_job or not ok_worker or not ok_ffi then
+            return
+        end
+
+        local active = SubprocessJob.start({
+            active = {
+                result_path = SubprocessJob.buildResultPath and SubprocessJob.buildResultPath("manga_info_poster") or nil,
+            },
+            ffi_util = FFIUtil,
+            ui_manager = modules.UIManager,
+            poll_interval_seconds = 0.5,
+            timeout_seconds = 15,
+            run = function(path)
+                ThumbnailWorker:run(credentials, thumbnail_url, path, POSTER_CACHE_OPTIONS)
+            end,
+            read_result = function(path)
+                return ThumbnailWorker:readResult(path)
+            end,
+            on_finish = function(finished_active, result)
+                if self.poster_job ~= finished_active then
+                    return
+                end
+                self.poster_job = nil
+                if result and result.ok and cleanText(result.path) then
+                    self.options = self.options or {}
+                    self.options.poster_path = result.path
+                    self:refreshContent()
+                end
+            end,
+            on_timeout = function(timed_out_active)
+                if self.poster_job == timed_out_active then
+                    self.poster_job = nil
+                end
+            end,
+            on_error = function(_, failed_active)
+                if self.poster_job == failed_active then
+                    self.poster_job = nil
+                end
+            end,
+        })
+        self.poster_job = active
     end
 
     function Dialog:init()
@@ -492,22 +596,24 @@ local function buildDialog(modules, manga, options)
             - lineThickness(modules.Size)
             - widgetHeight(button_table)
             - 2 * content_padding
-        local content = MangaInfo.buildContentWidget(self.manga, self.options, {
+        self.content_layout = {
             width = self.width - 2 * content_padding,
             height = math.max(scale(Screen, 220), content_height),
-        })
+        }
+        local content = MangaInfo.buildContentWidget(self.manga, self.options, self.content_layout)
+        self.content_frame = modules.FrameContainer:new{
+            padding = content_padding,
+            margin = 0,
+            bordersize = 0,
+            content,
+        }
 
         local body = modules.CenterContainer:new{
             dimen = modules.Geom:new{
                 w = self.width,
                 h = content_height + 2 * content_padding,
             },
-            modules.FrameContainer:new{
-                padding = content_padding,
-                margin = 0,
-                bordersize = 0,
-                content,
-            },
+            self.content_frame,
         }
 
         self.frame = modules.FrameContainer:new{
@@ -538,6 +644,7 @@ local function buildDialog(modules, manga, options)
         }
 
         bindDialog(self, self)
+        self:startPosterJob()
     end
 
     return Dialog:new{}
