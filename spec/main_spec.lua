@@ -266,6 +266,32 @@ describe("suwayomi plugin", function()
         assert.is_false(plugin:isSuwayomiScreenActive(second))
     end)
 
+    it("marks plugin closing and cancels active work before closing screens", function()
+        local close_callback_saw_closing
+        local plugin = build_plugin({
+            cancelReaderReturnRequest = function(self)
+                self.reader_return_cancel_saw_closing = self.suwayomi_plugin_closing == true
+            end,
+            cancelMangaNetworkRequests = function(self)
+                self.manga_cancel_saw_closing = self.suwayomi_plugin_closing == true
+            end,
+        })
+        local chapter_menu = {
+            name = "chapters",
+            close_callback = function()
+                close_callback_saw_closing = plugin.suwayomi_plugin_closing == true
+            end,
+        }
+
+        plugin:trackSuwayomiScreen("chapters", chapter_menu)
+        plugin:closeSuwayomiPlugin()
+
+        assert.is_true(plugin.reader_return_cancel_saw_closing)
+        assert.is_true(plugin.manga_cancel_saw_closing)
+        assert.is_true(close_callback_saw_closing)
+        assert.is_nil(plugin.suwayomi_plugin_closing)
+    end)
+
     it("configures API debug logging and plugin read-sync defaults on init", function()
         local plugin = build_plugin({
             ui = {

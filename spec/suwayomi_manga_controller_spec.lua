@@ -309,6 +309,7 @@ describe("suwayomi/manga/controller", function()
             "setMangaLibraryState",
             "refreshMangaChapters",
             "performMangaAction",
+            "cancelMangaNetworkRequests",
         })
     end)
 
@@ -677,6 +678,25 @@ describe("suwayomi/manga/controller", function()
         assert.is_nil(state.opened_library)
     end)
 
+    it("does not route returned chapter close while plugin is closing", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Fable Orbit", in_library = true, source = { id = "s1" } }
+
+        assert.is_true(plugin:showChapterResultForManga(manga, {
+            ok = true,
+            chapters = { { id = "c1", name = "Ch. 1" } },
+        }, {
+            reader_return_close_target = plugin:buildReaderReturnCloseTarget(nil, manga),
+        }))
+
+        plugin.suwayomi_plugin_closing = true
+        state.chapter_menu_options.close_callback()
+
+        assert.is_nil(plugin.current_chapter_menu)
+        assert.is_nil(state.opened_library)
+        assert.is_nil(state.opened_source)
+    end)
+
     it("keeps normal close behavior when returned chapters have no close target", function()
         local plugin, state = installController()
         local manga = { id = "m1", title = "Plain Vessel" }
@@ -713,6 +733,24 @@ describe("suwayomi/manga/controller", function()
         assert.is_nil(plugin.current_chapter_menu)
         assert.is_nil(state.opened_library)
         assert.is_nil(state.opened_source)
+    end)
+
+    it("cancels active manga network requests and ignores stale completions", function()
+        local plugin, state = installController({
+            defer_network_finish = true,
+        })
+        local manga = { id = "m1", title = "Fable Orbit" }
+
+        assert.is_true(plugin:showChaptersForManga(manga))
+        assert.is_true(plugin:cancelMangaNetworkRequests())
+        state.network_requests[1].on_finish({
+            ok = true,
+            chapters = { { id = "c1", name = "Ch. 1", is_read = false } },
+        })
+
+        assert.are.equal(1, #state.canceled_requests)
+        assert.is_nil(plugin.active_manga_network_requests.chapter_menu)
+        assert.is_nil(plugin.current_chapter_context)
     end)
 
     it("does not route normal chapter menu close", function()

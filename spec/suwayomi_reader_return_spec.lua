@@ -194,6 +194,7 @@ describe("suwayomi/reader_return", function()
             "saveReaderReturnContextsForChapters",
             "getCurrentReaderReturnContext",
             "returnToSuwayomiChapters",
+            "cancelReaderReturnRequest",
         })
     end)
 
@@ -572,6 +573,36 @@ describe("suwayomi/reader_return", function()
         state.next_tick_callback()
 
         assert.are.same({ "network-request" }, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("cancels active reader-return request and ignores its eventual result", function()
+        local plugin = build_plugin({
+            defer_network_finish = true,
+            document_path = "/tmp/books/ember-lane/part-one.cbz",
+            contexts = {
+                ["/tmp/books/ember-lane/part-one.cbz"] = {
+                    path = "/tmp/books/ember-lane/part-one.cbz",
+                    manga_id = "ember-1",
+                    manga_title = "Ember Lane",
+                    chapter_id = "part-1",
+                    chapter_name = "Part One",
+                },
+            },
+        })
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+        assert.is_true(plugin:cancelReaderReturnRequest())
+        state.network_requests[1].on_finish({
+            ok = true,
+            chapters = {
+                { id = "part-1", name = "Part One" },
+            },
+        })
+
+        assert.are.equal(1, #state.canceled_requests)
+        assert.are.same({ "network-request" }, state.events)
+        assert.is_nil(plugin.active_reader_return_request)
         assert.is_nil(state.shown_manga)
     end)
 end)

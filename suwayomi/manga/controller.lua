@@ -156,6 +156,23 @@ function Methods:startMangaNetworkRequest(manga, request, loading_message, on_fi
     return true
 end
 
+function Methods:cancelMangaNetworkRequests()
+    local active_requests = self.active_manga_network_requests
+    if type(active_requests) ~= "table" then
+        return false
+    end
+
+    local canceled = false
+    for slot_key, request_token in pairs(active_requests) do
+        active_requests[slot_key] = nil
+        if request_token and request_token.active then
+            NetworkRequestJob.cancel(request_token.active)
+            canceled = true
+        end
+    end
+    return canceled
+end
+
 function Methods:handleRefreshMangaResult(manga, result, options)
     options = options or {}
     if not result then
@@ -323,7 +340,11 @@ function Methods:showChapterResultForManga(manga, result, options)
         if is_current_menu then
             self.current_chapter_menu = nil
         end
-        if is_current_menu and reader_return_close_target and self.openReaderReturnCloseTarget then
+        if is_current_menu
+            and not self.suwayomi_plugin_closing
+            and reader_return_close_target
+            and self.openReaderReturnCloseTarget
+        then
             return self:openReaderReturnCloseTarget(reader_return_close_target)
         end
         return nil

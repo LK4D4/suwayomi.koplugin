@@ -143,11 +143,24 @@ function SuwayomiPlugin:isSuwayomiScreenActive(widget)
 end
 
 function SuwayomiPlugin:closeSuwayomiPlugin()
-    if self.suwayomi_navigation then
-        self.suwayomi_navigation:closeAll()
+    self.suwayomi_plugin_closing = true
+    local ok, err = pcall(function()
+        if self.cancelReaderReturnRequest then
+            self:cancelReaderReturnRequest()
+        end
+        if self.cancelMangaNetworkRequests then
+            self:cancelMangaNetworkRequests()
+        end
+        if self.suwayomi_navigation then
+            self.suwayomi_navigation:closeAll()
+        end
+        self.current_sources_menu = nil
+        self.current_chapter_menu = nil
+    end)
+    self.suwayomi_plugin_closing = nil
+    if not ok then
+        error(err)
     end
-    self.current_sources_menu = nil
-    self.current_chapter_menu = nil
 end
 
 function SuwayomiPlugin:withChapterMenuRefreshSuppressed(callback)

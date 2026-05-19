@@ -365,6 +365,19 @@ function Methods:startReaderReturnChapterRequest(context)
     return true
 end
 
+function Methods:cancelReaderReturnRequest()
+    local request = self.active_reader_return_request
+    if not request then
+        return false
+    end
+
+    self.active_reader_return_request = nil
+    if request.active and NetworkRequestJob.cancel then
+        NetworkRequestJob.cancel(request.active)
+    end
+    return true
+end
+
 function Methods:closeReaderToFileManager(callback, should_continue)
     UIManager:nextTick(function()
         if should_continue and not should_continue() then
