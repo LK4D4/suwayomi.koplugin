@@ -238,6 +238,7 @@ describe("suwayomi/ui", function()
         local ui = require("suwayomi/ui")
         local selected
 
+        assert.is_function(ui.showSourceFilterEditor)
         ui.showMangaMenu({
             { id = "m1", title = "One Piece" },
         }, function(manga)

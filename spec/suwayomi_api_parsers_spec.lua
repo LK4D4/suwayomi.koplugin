@@ -94,6 +94,27 @@ describe("suwayomi/api/parsers", function()
         assert.is_true(parsed.filters[8].unsupported)
     end)
 
+    it("parses aliased source filter defaults", function()
+        local parsed = assert(parsers.parseSourceFiltersResponse([[
+            { "data": { "source": {
+                "id": "s1",
+                "filters": [
+                    { "__typename": "CheckBoxFilter", "name": "Completed", "checkBoxDefault": true },
+                    { "__typename": "TriStateFilter", "name": "Official", "triStateDefault": "EXCLUDE" },
+                    { "__typename": "SelectFilter", "name": "Demographic", "values": ["Any", "Shounen"], "selectDefault": 1 },
+                    { "__typename": "TextFilter", "name": "Author", "textDefault": "Ada" },
+                    { "__typename": "SortFilter", "name": "Sort", "values": ["Relevance"], "sortDefault": { "index": 0, "ascending": true } }
+                ]
+            } } }
+        ]]))
+
+        assert.are.equal(true, parsed.filters[1].default)
+        assert.are.equal("EXCLUDE", parsed.filters[2].default)
+        assert.are.equal(1, parsed.filters[3].default)
+        assert.are.equal("Ada", parsed.filters[4].default)
+        assert.are.same({ index = 0, ascending = true }, parsed.filters[5].default)
+    end)
+
     it("reports source filter parser and schema errors", function()
         local invalid, invalid_error = parsers.parseSourceFiltersResponse("{")
         assert.is_nil(invalid)

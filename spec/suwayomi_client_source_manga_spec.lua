@@ -222,6 +222,82 @@ describe("suwayomi/client source manga flows", function()
         assert.are.same({}, status_updates)
     end)
 
+    it("shows source filter failures with retry on the error row", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updated_rows
+        local captured_title_options
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-filter-loading" }
+                end,
+                updateMangaMenu = function(_, rows)
+                    updated_rows = rows
+                end,
+            },
+            capture_title_options = function(menu_options)
+                captured_title_options = menu_options
+            end,
+        })
+        client.source_filter_worker = {}
+
+        client:showSourceFilters({ id = "s1", name = "Example Source", lang = "en" })
+        started[1].on_finish(started[1], {
+            ok = false,
+            source = { id = "s1", name = "Example Source", lang = "en" },
+            error = "Validation error (UnknownType): Unknown type 'Long'",
+        })
+
+        assert.are.equal("Validation error (UnknownType): Unknown type 'Long'", updated_rows[1].text)
+        assert.are.equal("Tap to retry", updated_rows[1].subtitle)
+        assert.are.equal("Retry", updated_rows[1].mandatory)
+        assert.are.equal("Example Source - Source filters", captured_title_options.title)
+        assert.is_nil(updated_rows[2])
+
+        updated_rows[1].callback()
+        assert.are.equal(2, #started)
+    end)
+
+    it("shows source filter empty results without retry guidance", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updated_rows
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-filter-loading" }
+                end,
+                updateMangaMenu = function(_, rows)
+                    updated_rows = rows
+                end,
+            },
+        })
+        client.source_filter_worker = {}
+
+        client:showSourceFilters({ id = "s1", name = "Example Source", lang = "en" })
+        started[1].on_finish(started[1], {
+            ok = true,
+            source = { id = "s1", name = "Example Source", lang = "en" },
+            filters = {},
+        })
+
+        assert.are.equal("This source has no filters.", updated_rows[1].text)
+        assert.is_nil(updated_rows[1].subtitle)
+        assert.is_nil(updated_rows[1].mandatory)
+        assert.is_false(updated_rows[1].select_enabled)
+        assert.is_nil(updated_rows[1].callback)
+        assert.is_nil(updated_rows[2])
+    end)
+
     it("keeps local sources on the direct manga listing flow", function()
         local mode_menu_shown = false
         local fetched_options
@@ -515,7 +591,7 @@ describe("suwayomi/client source manga flows", function()
         assert.is_nil(updated_options.on_cancel_source_manga)
     end)
 
-    it("shows source search failures with retry and edit actions", function()
+    it("shows source search failures with retry on the error row and edit actions", function()
         local subprocess_job, started = buildSourceMangaSubprocessFake()
         local updated_rows
         local search_prompt_options
@@ -555,14 +631,15 @@ describe("suwayomi/client source manga flows", function()
 
         assert.are.same({}, state.shown_messages)
         assert.are.equal("Search failed for ComicK: HTTP 403 from ComicK.", updated_rows[1].text)
-        assert.are.equal("Retry", updated_rows[2].text)
-        assert.are.equal("Edit search", updated_rows[3].text)
+        assert.are.equal("Tap to retry", updated_rows[1].subtitle)
+        assert.are.equal("Retry", updated_rows[1].mandatory)
+        assert.are.equal("Edit search", updated_rows[2].text)
 
-        updated_rows[2].callback()
+        updated_rows[1].callback()
         assert.are.equal(2, #started)
         assert.are.equal("frieren", started[2].browse_options.query)
 
-        updated_rows[3].callback()
+        updated_rows[2].callback()
         assert.are.equal("frieren", search_prompt_options.query)
     end)
 
@@ -656,9 +733,9 @@ describe("suwayomi/client source manga flows", function()
             browse_options = { type = "SEARCH", query = "", page = 1, filters = filters },
             error = "HTTP 403 from ComicK.",
         })
-        updated_rows[2].callback()
+        updated_rows[1].callback()
         assert.are.same(filters, started[4].browse_options.filters)
-        updated_rows[3].callback()
+        updated_rows[2].callback()
         assert.are.same(filter_draft, editor_draft)
     end)
 
@@ -693,8 +770,9 @@ describe("suwayomi/client source manga flows", function()
 
         assert.are.same({}, state.shown_messages)
         assert.are.equal("Search failed for ComicK: Timed out.", updated_rows[1].text)
-        assert.are.equal("Retry", updated_rows[2].text)
-        assert.are.equal("Edit search", updated_rows[3].text)
+        assert.are.equal("Tap to retry", updated_rows[1].subtitle)
+        assert.are.equal("Retry", updated_rows[1].mandatory)
+        assert.are.equal("Edit search", updated_rows[2].text)
     end)
 
     it("shows source search start failures with retry and edit actions", function()
@@ -734,8 +812,9 @@ describe("suwayomi/client source manga flows", function()
         })
 
         assert.are.equal("Search failed for ComicK: Could not start manga loading.", updated_rows[1].text)
-        assert.are.equal("Retry", updated_rows[2].text)
-        assert.are.equal("Edit search", updated_rows[3].text)
+        assert.are.equal("Tap to retry", updated_rows[1].subtitle)
+        assert.are.equal("Retry", updated_rows[1].mandatory)
+        assert.are.equal("Edit search", updated_rows[2].text)
     end)
 
     it("ignores stale source manga results after a newer source load starts", function()

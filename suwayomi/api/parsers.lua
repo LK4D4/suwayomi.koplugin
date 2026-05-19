@@ -71,29 +71,49 @@ local function parseFilterNode(filter)
     if filter_type == "HeaderFilter" or filter_type == "SeparatorFilter" then
         return parsed
     elseif filter_type == "CheckBoxFilter" then
-        parsed.default = filter.default == true
+        local default = filter.checkBoxDefault
+        if default == nil then
+            default = filter.default
+        end
+        parsed.default = default == true
         return parsed
     elseif filter_type == "TriStateFilter" then
-        parsed.default = filter.default or "IGNORE"
+        local default = filter.triStateDefault
+        if default == nil then
+            default = filter.default
+        end
+        parsed.default = default or "IGNORE"
         return parsed
     elseif filter_type == "SelectFilter" then
         if type(filter.values) ~= "table" then
             return nil
         end
         parsed.values = filter.values
-        parsed.default = tonumber(filter.default) or 0
+        local default = filter.selectDefault
+        if default == nil then
+            default = filter.default
+        end
+        parsed.default = tonumber(default) or 0
         return parsed
     elseif filter_type == "TextFilter" then
-        parsed.default = filter.default ~= nil and tostring(filter.default) or ""
+        local default = filter.textDefault
+        if default == nil then
+            default = filter.default
+        end
+        parsed.default = default ~= nil and tostring(default) or ""
         return parsed
     elseif filter_type == "SortFilter" then
-        if type(filter.values) ~= "table" or type(filter.default) ~= "table" then
+        local default = filter.sortDefault
+        if default == nil then
+            default = filter.default
+        end
+        if type(filter.values) ~= "table" or type(default) ~= "table" then
             return nil
         end
         parsed.values = filter.values
         parsed.default = {
-            index = tonumber(filter.default.index) or 0,
-            ascending = filter.default.ascending == true,
+            index = tonumber(default.index) or 0,
+            ascending = default.ascending == true,
         }
         return parsed
     elseif filter_type == "GroupFilter" then

@@ -5,7 +5,7 @@
 -- Owned state: none.
 -- Dependencies: dkjson only.
 -- External data: caller-provided IDs, pagination, and filter values are coerced
--- into query variables before leaving the plugin.
+-- into GraphQL-safe request bodies before leaving the plugin.
 
 local Queries = {}
 local json = require("dkjson")
@@ -24,11 +24,11 @@ local SOURCE_FILTER_FIELDS = table.concat({
     "__typename",
     "... on HeaderFilter { name }",
     "... on SeparatorFilter { name }",
-    "... on SelectFilter { name values default }",
-    "... on TextFilter { name default }",
-    "... on CheckBoxFilter { name default }",
-    "... on TriStateFilter { name default }",
-    "... on SortFilter { name values default { index ascending } }",
+    "... on SelectFilter { name values selectDefault: default }",
+    "... on TextFilter { name textDefault: default }",
+    "... on CheckBoxFilter { name checkBoxDefault: default }",
+    "... on TriStateFilter { name triStateDefault: default }",
+    "... on SortFilter { name values sortDefault: default { index ascending } }",
 }, " ")
 local GROUP_FILTER_FIELDS_DEPTH_1 = SOURCE_FILTER_FIELDS
     .. " ... on GroupFilter { name filters { "
@@ -58,13 +58,13 @@ function Queries._buildLegacySourcesQuery()
 end
 
 function Queries._buildSourceFiltersQuery(source_id)
+    local encoded_source_id = json.encode(tostring(source_id or ""))
     return json.encode({
-        query = "query GET_SOURCE_FILTERS($id: Long!) { source(id: $id) { id displayName name filters { "
+        query = "query GET_SOURCE_FILTERS { source(id: "
+            .. encoded_source_id
+            .. ") { id displayName name filters { "
             .. GROUP_FILTER_FIELDS
             .. " } } }",
-        variables = {
-            id = tostring(source_id or ""),
-        },
     })
 end
 

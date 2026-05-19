@@ -34,6 +34,7 @@ SuwayomiUI.showDirectoryChooser = DirectoryUI.showDirectoryChooser
 SuwayomiUI.showSourcesMenu = BrowseUI.showSourcesMenu
 SuwayomiUI.showSourceModeMenu = BrowseUI.showSourceModeMenu
 SuwayomiUI.showSourceSearchPrompt = BrowseUI.showSourceSearchPrompt
+SuwayomiUI.showSourceFilterEditor = BrowseUI.showSourceFilterEditor
 SuwayomiUI.showGlobalSearchPrompt = BrowseUI.showGlobalSearchPrompt
 SuwayomiUI.showExtensionSearchPrompt = BrowseUI.showExtensionSearchPrompt
 SuwayomiUI.updateSourcesMenu = BrowseUI.updateSourcesMenu

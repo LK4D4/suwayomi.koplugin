@@ -388,22 +388,23 @@ function SuwayomiClient:showSourceFilters(source)
     self._active_source_filter_load = state
     self:trackScreen("source-filters-loading", menu)
 
-    local function showStatus(message)
+    local function showStatus(message, options)
+        options = options or {}
+        local row = {
+            text = message,
+            raw_menu_row = true,
+        }
+        if options.retry == true then
+            row.subtitle = self:translate("Tap to retry")
+            row.mandatory = self:translate("Retry")
+            row.callback = function()
+                return self:showSourceFilters(source)
+            end
+        else
+            row.select_enabled = false
+        end
         if menu and self.ui.updateMangaMenu then
-            self.ui.updateMangaMenu(menu, {
-                {
-                    text = message,
-                    raw_menu_row = true,
-                    select_enabled = false,
-                },
-                {
-                    text = self:translate("Retry"),
-                    raw_menu_row = true,
-                    callback = function()
-                        return self:showSourceFilters(source)
-                    end,
-                },
-            }, nil, self:getTitleBarMenuOptions({ title = detail_title }))
+            self.ui.updateMangaMenu(menu, { row }, nil, self:getTitleBarMenuOptions({ title = detail_title }))
         else
             self.plugin:showMessage(message)
         end
@@ -438,7 +439,7 @@ function SuwayomiClient:showSourceFilters(source)
             }
             local result_source = result.source or finished_active.source or source
             if not result.ok then
-                showStatus(result.error or self:translate("Could not load source filters."))
+                showStatus(result.error or self:translate("Could not load source filters."), { retry = true })
                 return
             end
             if type(result.filters) ~= "table" or #result.filters == 0 then
@@ -459,13 +460,13 @@ function SuwayomiClient:showSourceFilters(source)
             state.finished = true
             state.active = nil
             self:clearSourceFilterLoad(state)
-            showStatus(self:translate("Timed out."))
+            showStatus(self:translate("Timed out."), { retry = true })
         end,
     })
     if not ok or not active then
         state.finished = true
         self:clearSourceFilterLoad(state)
-        showStatus(self:translate("Could not start source filter loading."))
+        showStatus(self:translate("Could not start source filter loading."), { retry = true })
         return
     end
     if not state.finished then
@@ -571,11 +572,8 @@ function SuwayomiClient:buildSourceMangaFailureRows(source, browse_options, mess
     local rows = {
         {
             text = message,
-            raw_menu_row = true,
-            select_enabled = false,
-        },
-        {
-            text = self:translate("Retry"),
+            subtitle = self:translate("Tap to retry"),
+            mandatory = self:translate("Retry"),
             raw_menu_row = true,
             callback = function()
                 return self:showMangaForSource(source, retry_options)
