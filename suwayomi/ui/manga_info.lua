@@ -2,7 +2,7 @@
 --
 -- Responsibility: format already-loaded manga metadata and show read-only KOReader dialog content.
 -- Owned state: none; KOReader dialog/widgets own runtime state.
--- Dependencies: KOReader dialog/container/image/text widgets, thumbnail cache, UIManager, gettext.
+-- Dependencies: KOReader container/image/text widgets, thumbnail cache, UIManager, gettext.
 -- External data: manga fields come from server responses and are displayed only after nil/empty checks.
 
 local _ = require("gettext")
@@ -13,7 +13,7 @@ local function requireWidgetModules()
     local Device = require("device")
     return {
         Blitbuffer = require("ffi/blitbuffer"),
-        ButtonDialog = require("ui/widget/buttondialog"),
+        ButtonTable = require("ui/widget/buttontable"),
         CenterContainer = require("ui/widget/container/centercontainer"),
         Device = Device,
         Font = require("ui/font"),
@@ -22,13 +22,18 @@ local function requireWidgetModules()
         HorizontalGroup = require("ui/widget/horizontalgroup"),
         HorizontalSpan = require("ui/widget/horizontalspan"),
         ImageWidget = require("ui/widget/imagewidget"),
-        ScrollTextWidget = require("ui/widget/scrolltextwidget"),
+        InputContainer = require("ui/widget/container/inputcontainer"),
+        LineWidget = require("ui/widget/linewidget"),
+        MovableContainer = require("ui/widget/container/movablecontainer"),
+        ScrollHtmlWidget = require("ui/widget/scrollhtmlwidget"),
         Size = require("ui/size"),
         TextBoxWidget = require("ui/widget/textboxwidget"),
         TextWidget = require("ui/widget/textwidget"),
+        TitleBar = require("ui/widget/titlebar"),
         UIManager = require("ui/uimanager"),
         VerticalGroup = require("ui/widget/verticalgroup"),
         VerticalSpan = require("ui/widget/verticalspan"),
+        WidgetContainer = require("ui/widget/container/widgetcontainer"),
         Screen = Device.screen,
     }
 end
@@ -107,6 +112,83 @@ function MangaInfo.buildDescriptionText(manga)
     return cleanText(manga and manga.description) or _("No description available.")
 end
 
+local function escapeHtml(text)
+    return tostring(text or "")
+        :gsub("&", "&amp;")
+        :gsub("<", "&lt;")
+        :gsub(">", "&gt;")
+end
+
+local function escapeAttribute(text)
+    return escapeHtml(text):gsub('"', "&quot;")
+end
+
+local function isOpenableUrl(url)
+    return type(url) == "string"
+        and url:match("^https?://") ~= nil
+        and url:match("[%z\001-\031%s]") == nil
+end
+
+local function stripUnsafeBlocks(text)
+    return text
+        :gsub("<[Ss][Cc][Rr][Ii][Pp][Tt][^>]*>.-</[Ss][Cc][Rr][Ii][Pp][Tt]%s*>", "")
+        :gsub("<[Ss][Tt][Yy][Ll][Ee][^>]*>.-</[Ss][Tt][Yy][Ll][Ee]%s*>", "")
+end
+
+function MangaInfo.buildDescriptionHtml(manga)
+    local text = stripUnsafeBlocks(MangaInfo.buildDescriptionText(manga)):gsub("\r\n", "\n"):gsub("\r", "\n")
+    local tokens = {}
+    local function protect(html)
+        table.insert(tokens, html)
+        return "\001" .. tostring(#tokens) .. "\002"
+    end
+    local function protectLink(url, label)
+        if not isOpenableUrl(url) then
+            return label or url or ""
+        end
+        return protect(('<a href="%s">%s</a>'):format(escapeAttribute(url), escapeHtml(label or url)))
+    end
+
+    text = text:gsub("%[([^%]]+)%]%((https?://[^%s%)]+)%)", function(label, url)
+        return protectLink(url, label)
+    end)
+    text = text:gsub("<[Aa]%s+[^>]*[Hh][Rr][Ee][Ff]%s*=%s*\"([^\"]+)\"[^>]*>(.-)</[Aa]%s*>", protectLink)
+    text = text:gsub("<[Aa]%s+[^>]*[Hh][Rr][Ee][Ff]%s*=%s*'([^']+)'[^>]*>(.-)</[Aa]%s*>", protectLink)
+    text = text:gsub("<[Bb][Rr]%s*/?%s*>", function()
+        return protect("<br/>")
+    end)
+    text = text:gsub("<%s*[Ii]%s*>", function()
+        return protect("<i>")
+    end):gsub("<%s*/%s*[Ii]%s*>", function()
+        return protect("</i>")
+    end)
+    text = text:gsub("<%s*[Ee][Mm]%s*>", function()
+        return protect("<em>")
+    end):gsub("<%s*/%s*[Ee][Mm]%s*>", function()
+        return protect("</em>")
+    end)
+    text = text:gsub("<%s*[Bb]%s*>", function()
+        return protect("<b>")
+    end):gsub("<%s*/%s*[Bb]%s*>", function()
+        return protect("</b>")
+    end)
+    text = text:gsub("<%s*[Ss][Tt][Rr][Oo][Nn][Gg]%s*>", function()
+        return protect("<strong>")
+    end):gsub("<%s*/%s*[Ss][Tt][Rr][Oo][Nn][Gg]%s*>", function()
+        return protect("</strong>")
+    end)
+    text = text:gsub("<%s*[Pp]%s*>", function()
+        return protect("<p>")
+    end):gsub("<%s*/%s*[Pp]%s*>", function()
+        return protect("</p>")
+    end)
+
+    text = escapeHtml(text:gsub("<[^>]*>", "")):gsub("\n", "<br/>")
+    return (text:gsub("\001(%d+)\002", function(index)
+        return tokens[tonumber(index)] or ""
+    end))
+end
+
 function MangaInfo.buildText(manga)
     local metadata = MangaInfo.buildMetadataText(manga)
     local description = MangaInfo.buildDescriptionText(manga)
@@ -183,14 +265,52 @@ local function safeNew(factory, options)
     return nil
 end
 
+local function openLink(Device, link)
+    if type(link) == "table" then
+        link = link.uri
+    end
+    if not isOpenableUrl(link) then
+        return false
+    end
+    if Device and Device.canOpenLink and not Device:canOpenLink() then
+        return false
+    end
+    if Device and Device.openLink then
+        Device:openLink(link)
+        return true
+    end
+    return false
+end
+
+local DESCRIPTION_CSS = [[
+@page {
+  margin: 0;
+  font-family: 'Noto Sans';
+}
+html, body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: 'Noto Sans';
+  line-height: 1.2;
+}
+p {
+  margin: 0 0 0.6em 0;
+}
+a {
+  text-decoration: underline;
+}
+]]
+
 local function bindDialog(widget, dialog)
     if widget == nil then
         return
     end
-    if widget.manga_info_scroll_text then
+    if widget.manga_info_scroll_html then
         widget.dialog = dialog
-        if widget.text_widget then
-            widget.text_widget.dialog = dialog
+        if widget.htmlbox_widget then
+            widget.htmlbox_widget.dialog = dialog
         end
     end
     for _, child in ipairs(widget) do
@@ -232,15 +352,27 @@ local function buildPosterWidget(modules, manga, options, width, height)
     }
 end
 
-function MangaInfo.buildContentWidget(manga, options)
+local function mangaTitle(manga)
+    return manga and (manga.title or tostring(manga.id)) or _("Manga information")
+end
+
+local function lineThickness(Size)
+    return (Size.line and (Size.line.thick or Size.line.medium)) or 3
+end
+
+function MangaInfo.buildContentWidget(manga, options, layout)
     local modules = requireWidgetModules()
     local Screen = modules.Screen
-    local dialog_width = math.floor(math.min(screenWidth(Screen), screenHeight(Screen)) * 0.84)
+    layout = layout or {}
+    local dialog_width = layout.width or math.floor(math.min(screenWidth(Screen), screenHeight(Screen)) * 0.84)
     local gap = scale(Screen, 12)
     local poster_width = math.floor(dialog_width * 0.34)
     local poster_height = math.floor(poster_width * 1.45)
     local text_width = dialog_width - poster_width - gap
-    local description_height = math.max(scale(Screen, 140), math.floor(screenHeight(Screen) * 0.24))
+    local description_height = math.max(
+        scale(Screen, 180),
+        (layout.height or math.floor(screenHeight(Screen) * 0.75)) - poster_height - modules.Size.padding.default
+    )
 
     local poster = buildPosterWidget(modules, manga, options, poster_width, poster_height)
     local metadata = modules.TextBoxWidget:new{
@@ -257,15 +389,17 @@ function MangaInfo.buildContentWidget(manga, options)
         modules.HorizontalSpan:new{ width = gap },
         metadata,
     }
-    local description = modules.ScrollTextWidget:new{
-        text = MangaInfo.buildDescriptionText(manga),
+    local description = modules.ScrollHtmlWidget:new{
+        html_body = MangaInfo.buildDescriptionHtml(manga),
+        css = DESCRIPTION_CSS,
         width = dialog_width,
         height = description_height,
-        face = modules.Font:getFace("infofont"),
-        alignment = "left",
-        auto_para_direction = true,
+        default_font_size = scale(Screen, 28),
+        html_link_tapped_callback = function(link)
+            openLink(modules.Device, link)
+        end,
     }
-    description.manga_info_scroll_text = true
+    description.manga_info_scroll_html = true
     return modules.VerticalGroup:new{
         top,
         modules.VerticalSpan:new{ width = modules.Size.padding.default },
@@ -273,29 +407,145 @@ function MangaInfo.buildContentWidget(manga, options)
     }
 end
 
-function MangaInfo.show(manga, options)
-    local modules = requireWidgetModules()
-    local dialog
-    dialog = modules.ButtonDialog:new{
-        title = manga and (manga.title or tostring(manga.id)) or _("Manga information"),
-        width_factor = 0.92,
-        _added_widgets = {
-            MangaInfo.buildContentWidget(manga, options),
-        },
-        buttons = {
-            {
+local function widgetHeight(widget)
+    if not widget then
+        return 0
+    end
+    if widget.getHeight then
+        return widget:getHeight()
+    end
+    if widget.getSize then
+        local size = widget:getSize()
+        return size and size.h or 0
+    end
+    return widget.height or 0
+end
+
+local function buildDialog(modules, manga, options)
+    local Screen = modules.Screen
+    local screen_width = screenWidth(Screen)
+    local screen_height = screenHeight(Screen)
+    local dialog_width = math.floor(math.min(screen_width, screen_height) * 0.92)
+    local dialog_height = math.floor(screen_height * 0.82)
+    local content_padding = modules.Size.padding.default
+    local button_padding = modules.Size.padding.default
+
+    local Dialog = modules.InputContainer:extend{
+        manga = manga,
+        options = options,
+        width = dialog_width,
+        height = dialog_height,
+    }
+
+    function Dialog:onClose()
+        modules.UIManager:close(self)
+        return true
+    end
+
+    function Dialog:init()
+        self.region = modules.Geom:new{
+            x = 0,
+            y = 0,
+            w = screen_width,
+            h = screen_height,
+        }
+
+        local titlebar = modules.TitleBar:new{
+            width = self.width,
+            align = "left",
+            with_bottom_line = false,
+            title = mangaTitle(self.manga),
+            title_face = modules.Font:getFace("tfont"),
+            title_shrink_font_to_fit = true,
+            close_callback = function()
+                self:onClose()
+            end,
+            show_parent = self,
+        }
+
+        local title_separator = modules.LineWidget:new{
+            background = modules.Blitbuffer.COLOR_GRAY or modules.Blitbuffer.COLOR_BLACK,
+            dimen = modules.Geom:new{
+                w = self.width,
+                h = lineThickness(modules.Size),
+            },
+        }
+
+        local button_table = modules.ButtonTable:new{
+            width = self.width - 2 * button_padding,
+            buttons = {
                 {
-                    text = _("Close"),
-                    callback = function()
-                        modules.UIManager:close(dialog)
-                    end,
+                    {
+                        text = _("Close"),
+                        callback = function()
+                            self:onClose()
+                        end,
+                    },
                 },
             },
-        },
-    }
-    for _, widget in ipairs(dialog._added_widgets or {}) do
-        bindDialog(widget, dialog)
+            zero_sep = true,
+            show_parent = self,
+        }
+
+        local content_height = self.height
+            - widgetHeight(titlebar)
+            - lineThickness(modules.Size)
+            - widgetHeight(button_table)
+            - 2 * content_padding
+        local content = MangaInfo.buildContentWidget(self.manga, self.options, {
+            width = self.width - 2 * content_padding,
+            height = math.max(scale(Screen, 220), content_height),
+        })
+
+        local body = modules.CenterContainer:new{
+            dimen = modules.Geom:new{
+                w = self.width,
+                h = content_height + 2 * content_padding,
+            },
+            modules.FrameContainer:new{
+                padding = content_padding,
+                margin = 0,
+                bordersize = 0,
+                content,
+            },
+        }
+
+        self.frame = modules.FrameContainer:new{
+            radius = modules.Size.radius and modules.Size.radius.window or nil,
+            padding = 0,
+            margin = 0,
+            background = modules.Blitbuffer.COLOR_WHITE,
+            modules.VerticalGroup:new{
+                titlebar,
+                title_separator,
+                body,
+                modules.CenterContainer:new{
+                    dimen = modules.Geom:new{
+                        w = self.width,
+                        h = widgetHeight(button_table),
+                    },
+                    button_table,
+                },
+            },
+        }
+        self.movable = modules.MovableContainer:new{
+            self.frame,
+        }
+        self[1] = modules.WidgetContainer:new{
+            align = "center",
+            dimen = self.region,
+            self.movable,
+        }
+
+        bindDialog(self, self)
     end
+
+    return Dialog:new{}
+end
+
+function MangaInfo.show(manga, options)
+    local modules = requireWidgetModules()
+    local dialog = buildDialog(modules, manga, options)
     modules.UIManager:show(dialog)
     return dialog
 end
