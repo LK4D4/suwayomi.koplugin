@@ -233,13 +233,7 @@ function Methods:getReaderReturnContextForPath(path)
     local ledger = SuwayomiSettings:loadChapterLedger() or {}
     for _, entry in pairs(ledger) do
         if type(entry) == "table" and entry.path == path then
-            return {
-                path = entry.path,
-                manga_id = present(entry.manga_id),
-                manga_title = entry.manga_title,
-                chapter_id = present(entry.chapter_id),
-                chapter_name = entry.chapter_name,
-            }
+            return candidateFromLedgerEntry(entry)
         end
     end
     return inferSiblingContext(path, contexts, ledger)

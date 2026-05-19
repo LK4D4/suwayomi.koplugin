@@ -347,6 +347,27 @@ describe("suwayomi/reader_return", function()
         assert.are.equal("/downloads/Local/Manga/Chapter 1.cbz", context.path)
     end)
 
+    it("preserves library state from exact chapter ledger path entries", function()
+        local plugin = build_plugin({
+            contexts = {},
+            ledger = {
+                ["m1:c1"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Manga",
+                    in_library = true,
+                    chapter_id = "c1",
+                    chapter_name = "Chapter 1",
+                },
+            },
+        })
+
+        local context = plugin:getCurrentReaderReturnContext()
+
+        assert.are.equal("m1", context.manga_id)
+        assert.is_true(context.in_library)
+    end)
+
     it("infers the current reader context from linked sibling chapter files", function()
         local plugin = build_plugin({
             document_path = "/downloads/Local/Manga/Chapter 2.cbz",

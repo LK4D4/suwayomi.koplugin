@@ -695,6 +695,26 @@ describe("suwayomi/manga/controller", function()
         assert.is_nil(state.opened_source)
     end)
 
+    it("does not open Source when returned manga has only a whitespace source id", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Plain Vessel", in_library = false, source = { id = "   " } }
+
+        assert.is_true(plugin:showChapterResultForManga(manga, {
+            ok = true,
+            chapters = { { id = "c1", name = "Ch. 1" } },
+        }, {
+            reader_return_close_target = plugin:buildReaderReturnCloseTarget(nil, manga),
+        }))
+
+        assert.is_nil(plugin:buildReaderReturnCloseTarget(nil, manga))
+
+        state.chapter_menu_options.close_callback()
+
+        assert.is_nil(plugin.current_chapter_menu)
+        assert.is_nil(state.opened_library)
+        assert.is_nil(state.opened_source)
+    end)
+
     it("does not route normal chapter menu close", function()
         local plugin, state = installController()
         local manga = { id = "m1", title = "Quiet Lattice", in_library = true, source = { id = "s1" } }

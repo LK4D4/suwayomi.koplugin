@@ -25,7 +25,7 @@
 - Modify: `spec/suwayomi_reader_return_spec.lua`
 - Modify: `suwayomi/reader_return.lua`
 
-- [ ] **Step 1: Write failing reader-return metadata tests**
+- [x] **Step 1: Write failing reader-return metadata tests**
 
 Add these assertions to existing reader-return specs.
 
@@ -71,7 +71,7 @@ buildReaderReturnCloseTarget = function(_, _, manga)
 end,
 ```
 
-- [ ] **Step 2: Run reader-return spec and verify RED**
+- [x] **Step 2: Run reader-return spec and verify RED**
 
 Run:
 
@@ -81,7 +81,7 @@ rtk busted spec/suwayomi_reader_return_spec.lua
 
 Expected: FAIL because saved context lacks `in_library` and returned manga lacks `in_library`, so the close target stub receives no library state.
 
-- [ ] **Step 3: Implement reader-return metadata propagation**
+- [x] **Step 3: Implement reader-return metadata propagation**
 
 In `suwayomi/reader_return.lua`, change `buildContext()` result to include `in_library`:
 
@@ -160,7 +160,7 @@ self:closeReaderToFileManager(function()
 end, function()
 ```
 
-- [ ] **Step 4: Run reader-return spec and verify GREEN**
+- [x] **Step 4: Run reader-return spec and verify GREEN**
 
 Run:
 
@@ -170,7 +170,7 @@ rtk busted spec/suwayomi_reader_return_spec.lua
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 Run:
 
@@ -187,7 +187,7 @@ rtk git commit -m "feat: preserve reader return route metadata"
 - Modify: `spec/suwayomi_manga_controller_spec.lua`
 - Modify: `suwayomi/manga/controller.lua`
 
-- [ ] **Step 1: Write failing manga controller close routing tests**
+- [x] **Step 1: Write failing manga controller close routing tests**
 
 In `spec/suwayomi_manga_controller_spec.lua`, replace the existing `plugin:getClient()` helper with this version:
 
@@ -290,7 +290,7 @@ it("does not route normal chapter menu close", function()
 end)
 ```
 
-- [ ] **Step 2: Run manga controller spec and verify RED**
+- [x] **Step 2: Run manga controller spec and verify RED**
 
 Run:
 
@@ -300,7 +300,7 @@ rtk busted spec/suwayomi_manga_controller_spec.lua
 
 Expected: FAIL because `buildReaderReturnCloseTarget()` is missing and close callbacks do not route.
 
-- [ ] **Step 3: Implement manga close target helpers**
+- [x] **Step 3: Implement manga close target helpers**
 
 In `suwayomi/manga/controller.lua`, add helpers near `findReturnedChapterItemNumber()`:
 
@@ -359,7 +359,7 @@ self.current_chapter_options.close_callback = function()
 end
 ```
 
-- [ ] **Step 4: Run manga controller spec and verify GREEN**
+- [x] **Step 4: Run manga controller spec and verify GREEN**
 
 Run:
 
@@ -369,7 +369,7 @@ rtk busted spec/suwayomi_manga_controller_spec.lua
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 Run:
 
@@ -385,7 +385,7 @@ rtk git commit -m "feat: route reader return close target"
 **Files:**
 - Verify all files changed by Tasks 1-2.
 
-- [ ] **Step 1: Run focused specs**
+- [x] **Step 1: Run focused specs**
 
 Run:
 
@@ -406,7 +406,7 @@ rtk luacheck --codes spec suwayomi main.lua _meta.lua
 
 Expected: both PASS.
 
-- [ ] **Step 3: Review diff for privacy and scope**
+- [x] **Step 3: Review diff for privacy and scope**
 
 Run:
 

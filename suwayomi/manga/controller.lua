@@ -72,7 +72,7 @@ local function findReturnedChapterItemNumber(chapters, context)
 end
 
 local function hasSourceId(source)
-    return type(source) == "table" and source.id ~= nil and tostring(source.id) ~= ""
+    return type(source) == "table" and source.id ~= nil and tostring(source.id):match("%S") ~= nil
 end
 
 function Methods:attachSourceToManga(manga, source)
