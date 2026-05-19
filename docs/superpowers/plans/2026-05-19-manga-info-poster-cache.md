@@ -50,3 +50,13 @@
 - [x] Run `rtk busted spec`.
 - [x] Review `rtk git diff`.
 - [x] Commit with Conventional Commit subject.
+
+### Task 5: Loading Placeholder Follow-Up
+
+**Files:**
+- Modify: `suwayomi/ui/manga_info.lua`
+- Test: `spec/suwayomi_ui_spec.lua`
+
+- [x] Add failing spec proving manga info shows `Loading...` while the poster worker is active.
+- [x] Keep `No poster` for rows with no thumbnail URL.
+- [x] Clear loading state and refresh content when poster worker finishes, times out, or errors.

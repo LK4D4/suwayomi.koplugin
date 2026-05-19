@@ -355,7 +355,7 @@ local function buildPosterWidget(modules, manga, options, width, height)
                 h = height,
             },
             modules.TextWidget:new{
-                text = _("No poster"),
+                text = (options and options.poster_loading) and _("Loading...") or _("No poster"),
                 face = modules.Font:getFace("infofont"),
             },
         }
@@ -526,24 +526,36 @@ local function buildDialog(modules, manga, options)
                     return
                 end
                 self.poster_job = nil
+                self.options = self.options or {}
+                self.options.poster_loading = false
                 if result and result.ok and cleanText(result.path) then
-                    self.options = self.options or {}
                     self.options.poster_path = result.path
-                    self:refreshContent()
                 end
+                self:refreshContent()
             end,
             on_timeout = function(timed_out_active)
                 if self.poster_job == timed_out_active then
                     self.poster_job = nil
+                    self.options = self.options or {}
+                    self.options.poster_loading = false
+                    self:refreshContent()
                 end
             end,
             on_error = function(_, failed_active)
                 if self.poster_job == failed_active then
                     self.poster_job = nil
+                    self.options = self.options or {}
+                    self.options.poster_loading = false
+                    self:refreshContent()
                 end
             end,
         })
         self.poster_job = active
+        if active then
+            self.options = self.options or {}
+            self.options.poster_loading = true
+            self:refreshContent()
+        end
     end
 
     function Dialog:init()

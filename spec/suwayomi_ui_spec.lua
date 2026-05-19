@@ -719,7 +719,7 @@ describe("suwayomi/ui", function()
         assert.are.equal(dialog, closed_dialog)
     end)
 
-    it("shows manga information without a cached poster", function()
+    it("shows manga information with a loading poster while the poster worker runs", function()
         local ui = require("suwayomi/ui")
 
         local dialog = ui.showMangaInformation({
@@ -736,7 +736,7 @@ describe("suwayomi/ui", function()
         local description = findWidget(dialog, "scrollhtmlwidget")
         local title = findWidget(dialog, "titlebar")
         assert.is_not_nil(description)
-        assert.are.equal("No poster", poster_text.text)
+        assert.are.equal("Loading...", poster_text.text)
         assert.are.equal("No description available.", description.html_body)
         assert.are.equal("thumb://missing", events.poster_worker_run.thumbnail_url)
         assert.are.equal("/tmp/manga_info_poster.json", events.poster_worker_run.result_path)
@@ -762,6 +762,22 @@ describe("suwayomi/ui", function()
         dialog.poster_job = events.poster_job.active
         title.close_callback()
         assert.are.equal(events.poster_job.active, events.canceled_poster_job)
+    end)
+
+    it("shows manga information without a poster when there is no thumbnail URL", function()
+        local ui = require("suwayomi/ui")
+
+        local dialog = ui.showMangaInformation({
+            id = 42,
+            title = "Manga Title",
+            description = "",
+        }, {
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+        })
+
+        local poster_text = findWidget(dialog, "textwidget")
+        assert.are.equal("No poster", poster_text.text)
+        assert.is_nil(events.poster_worker_run)
     end)
 
     it("formats manga information description markup and opens links", function()
