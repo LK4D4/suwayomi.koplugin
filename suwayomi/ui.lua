@@ -14,6 +14,7 @@ local MultiInputDialog = require("ui/widget/multiinputdialog")
 local _ = require("gettext")
 
 local BrowseUI = require("suwayomi/ui/browse")
+local ChoiceDialogs = require("suwayomi/ui/choice_dialogs")
 local DirectoryUI = require("suwayomi/ui/directory")
 local DownloadsUI = require("suwayomi/ui/downloads")
 local ListRows = require("suwayomi/ui/list_rows")
@@ -54,6 +55,8 @@ SuwayomiUI.buildDownloadsMenuTable = DownloadsUI.buildDownloadsMenuTable
 SuwayomiUI.showDownloadsMenu = DownloadsUI.showDownloadsMenu
 SuwayomiUI.buildMangaInformationText = MangaInfoUI.buildText
 SuwayomiUI.showMangaInformation = MangaInfoUI.show
+SuwayomiUI.showChoiceDialog = ChoiceDialogs.showChoiceDialog
+SuwayomiUI.showChecklistDialog = ChoiceDialogs.showChecklistDialog
 
 function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
     return ListRows.buildChapterMenuTable(chapter_list, {
@@ -415,75 +418,25 @@ function SuwayomiUI.showLanguageMenu(options)
     return menu
 end
 
-function SuwayomiUI.showParallelDownloadsMenu(options)
-    options = options or {}
-    local menu = getListMenu().show({
-        title = _("Parallel chapter downloads"),
-        item_table = SuwayomiUI.buildParallelDownloadsMenuTable(options),
-        state_w = getStateMarkWidth(),
-    })
-    return menu
-end
-
-function SuwayomiUI.showLibraryCategoryPickerBehaviorMenu(options)
-    options = options or {}
-    local menu = getListMenu().show({
-        title = _("Library category picker"),
-        item_table = SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options),
-        state_w = getStateMarkWidth(),
-    })
-    return menu
-end
-
-function SuwayomiUI.showDeleteFinishedWhileReadingMenu(options)
-    options = options or {}
-    local menu = getListMenu().show({
-        title = _("Delete finished chapters"),
-        item_table = SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options),
-        state_w = getStateMarkWidth(),
-    })
-    return menu
-end
-
-local function formatSelectedChoiceText(selected, label)
-    if selected then
-        return "* " .. tostring(label)
-    end
-    return tostring(label)
-end
-
-function SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options)
-    options = options or {}
+local function buildLibraryCategoryPickerBehaviorChoices(choices)
     local labels = {
         automatic = _("Automatic"),
         always = _("Always ask"),
         never = _("Never ask"),
     }
-    local menu_table = {}
-    local current = options.current or "automatic"
-    for _, behavior in ipairs(options.choices or { "automatic", "always", "never" }) do
-        local selected = behavior == current
-        table.insert(menu_table, {
-            text = formatSelectedChoiceText(selected, labels[behavior] or behavior),
-            radio = true,
-            state = newStateMark("radio", selected),
-            checked_func = function()
-                return behavior == current
-            end,
-            callback = function()
-                if options.onSelect then
-                    options.onSelect(behavior)
-                end
-            end,
-            keep_menu_open = true,
+
+    local dialog_choices = {}
+    for _, behavior in ipairs(choices or { "automatic", "always", "never" }) do
+        table.insert(dialog_choices, {
+            value = behavior,
+            text = labels[behavior] or behavior,
         })
     end
 
-    return menu_table
+    return dialog_choices
 end
 
-function SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options)
-    options = options or {}
+local function buildDeleteFinishedWhileReadingChoices(choices)
     local labels = {
         [0] = _("Disabled"),
         [1] = _("Last read chapter"),
@@ -492,85 +445,64 @@ function SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options)
         [4] = _("Fourth to last read chapter"),
         [5] = _("Fifth to last read chapter"),
     }
-    local menu_table = {}
-    local current = tonumber(options.current) or 0
-    for _, value in ipairs(options.choices or { 0, 1, 2, 3, 4, 5 }) do
-        local selected = value == current
-        table.insert(menu_table, {
-            text = formatSelectedChoiceText(selected, labels[value] or tostring(value)),
-            radio = true,
-            state = newStateMark("radio", selected),
-            checked_func = function()
-                return value == current
-            end,
-            callback = function()
-                if options.onSelect then
-                    options.onSelect(value)
-                end
-            end,
-            keep_menu_open = true,
+
+    local dialog_choices = {}
+    for _, value in ipairs(choices or { 0, 1, 2, 3, 4, 5 }) do
+        table.insert(dialog_choices, {
+            value = value,
+            text = labels[value] or tostring(value),
         })
     end
 
-    return menu_table
+    return dialog_choices
 end
 
-function SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu(menu, options)
-    if not menu then
-        return
+local function buildParallelDownloadChoices(choices)
+    local dialog_choices = {}
+    for _, value in ipairs(choices or { 1, 2, 3, 4 }) do
+        table.insert(dialog_choices, {
+            value = value,
+            text = tostring(value),
+        })
     end
 
-    menu.item_table = SuwayomiUI.buildLibraryCategoryPickerBehaviorMenuTable(options)
-    if menu.updateItems then
-        menu:updateItems()
-    end
+    return dialog_choices
 end
 
-function SuwayomiUI.updateDeleteFinishedWhileReadingMenu(menu, options)
-    if not menu then
-        return
-    end
-
-    menu.item_table = SuwayomiUI.buildDeleteFinishedWhileReadingMenuTable(options)
-    if menu.updateItems then
-        menu:updateItems(nil, true)
-    end
-end
-
-function SuwayomiUI.buildParallelDownloadsMenuTable(options)
+function SuwayomiUI.showParallelDownloadsMenu(options)
     options = options or {}
-    local menu_table = {}
-    local current = tonumber(options.current) or 2
-    for _, value in ipairs(options.choices or { 1, 2, 3, 4 }) do
-        local selected = value == current
-        table.insert(menu_table, {
-            text = formatSelectedChoiceText(selected, value),
-            radio = true,
-            state = newStateMark("radio", selected),
-            checked_func = function()
-                return value == current
-            end,
-            callback = function()
-                if options.onSelect then
-                    options.onSelect(value)
-                end
-            end,
-            keep_menu_open = true,
-        })
-    end
-
-    return menu_table
+    return ChoiceDialogs.showChoiceDialog({
+        title = _("Parallel chapter downloads"),
+        current = tonumber(options.current) or 2,
+        choices = buildParallelDownloadChoices(options.choices),
+        onSelect = options.onSelect,
+        anchor = options.anchor,
+        close_callback = options.close_callback,
+    })
 end
 
-function SuwayomiUI.updateParallelDownloadsMenu(menu, options)
-    if not menu then
-        return
-    end
+function SuwayomiUI.showLibraryCategoryPickerBehaviorMenu(options)
+    options = options or {}
+    return ChoiceDialogs.showChoiceDialog({
+        title = _("Library category picker"),
+        current = options.current or "automatic",
+        choices = buildLibraryCategoryPickerBehaviorChoices(options.choices),
+        onSelect = options.onSelect,
+        anchor = options.anchor,
+        close_callback = options.close_callback,
+    })
+end
 
-    menu.item_table = SuwayomiUI.buildParallelDownloadsMenuTable(options)
-    if menu.updateItems then
-        menu:updateItems(nil, true)
-    end
+function SuwayomiUI.showDeleteFinishedWhileReadingMenu(options)
+    options = options or {}
+    return ChoiceDialogs.showChoiceDialog({
+        title = _("Delete finished chapters"),
+        current = tonumber(options.current) or 0,
+        choices = buildDeleteFinishedWhileReadingChoices(options.choices),
+        onSelect = options.onSelect,
+        anchor = options.anchor,
+        close_callback = options.close_callback,
+    })
 end
 
 function SuwayomiUI.updateLanguageMenu(menu, options, onToggleCallback)

@@ -336,7 +336,6 @@ end
 
 
 function Methods:showParallelDownloadsDialog(touchmenu_instance)
-    local parallel_menu
     local choices = { 1, 2, 3, 4 }
     local function onSelect(value)
         local saved_value = SuwayomiSettings:saveMaxParallelChapterDownloads(value)
@@ -347,16 +346,9 @@ function Methods:showParallelDownloadsDialog(touchmenu_instance)
             end
         end
         self:refreshSettingsMenu(touchmenu_instance)
-        if SuwayomiUI.updateParallelDownloadsMenu then
-            SuwayomiUI.updateParallelDownloadsMenu(parallel_menu, {
-                current = saved_value,
-                choices = choices,
-                onSelect = onSelect,
-            })
-        end
     end
 
-    parallel_menu = SuwayomiUI.showParallelDownloadsMenu({
+    SuwayomiUI.showParallelDownloadsMenu({
         current = SuwayomiSettings:loadMaxParallelChapterDownloads(),
         choices = choices,
         onSelect = onSelect,
@@ -413,23 +405,15 @@ function Methods:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
         return
     end
 
-    local delete_menu
     local choices = { 0, 1, 2, 3, 4, 5 }
     local function onSelect(value)
         local settings = self:loadDeleteChaptersSettings()
         settings.delete_finished_while_reading = value
-        local saved_settings = SuwayomiSettings:saveDeleteChaptersSettings(settings)
+        SuwayomiSettings:saveDeleteChaptersSettings(settings)
         self:refreshSettingsMenu(touchmenu_instance)
-        if SuwayomiUI.updateDeleteFinishedWhileReadingMenu then
-            SuwayomiUI.updateDeleteFinishedWhileReadingMenu(delete_menu, {
-                current = saved_settings.delete_finished_while_reading,
-                choices = choices,
-                onSelect = onSelect,
-            })
-        end
     end
 
-    delete_menu = SuwayomiUI.showDeleteFinishedWhileReadingMenu({
+    SuwayomiUI.showDeleteFinishedWhileReadingMenu({
         current = self:loadDeleteChaptersSettings().delete_finished_while_reading,
         choices = choices,
         onSelect = onSelect,
@@ -453,21 +437,13 @@ function Methods:showLibraryCategoryPickerBehaviorDialog(touchmenu_instance)
         return
     end
 
-    local picker_menu
     local choices = { "automatic", "always", "never" }
     local function onSelect(behavior)
-        local saved_behavior = SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
+        SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
         self:refreshSettingsMenu(touchmenu_instance)
-        if SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu then
-            SuwayomiUI.updateLibraryCategoryPickerBehaviorMenu(picker_menu, {
-                current = saved_behavior,
-                choices = choices,
-                onSelect = onSelect,
-            })
-        end
     end
 
-    picker_menu = SuwayomiUI.showLibraryCategoryPickerBehaviorMenu({
+    SuwayomiUI.showLibraryCategoryPickerBehaviorMenu({
         current = SuwayomiSettings:loadLibraryCategoryPickerBehavior(),
         choices = choices,
         onSelect = onSelect,
