@@ -19,11 +19,15 @@ Use a KOReader-native modal similar in shape to the referenced assistant dialog:
 - scrollable body
 - bottom button row with `Close`
 
-The body is read-only. It starts with compact metadata, then shows the description or a fallback message.
+The body is read-only. It uses a poster-forward layout: cached poster on the
+left, compact metadata on the right, then a scrollable description or a fallback
+message.
 
 ## Data
 
 Use only manga data already available in memory. Do not add a network fetch in this pass.
+GraphQL manga payloads should include the WebUI detail fields when available:
+`author`, `artist`, `description`, `genre`, `status`, and `thumbnailUrl`.
 
 Show available fields in this order:
 
@@ -35,6 +39,9 @@ Show available fields in this order:
 6. Library state
 7. Genres
 8. Description
+
+Use a cached decoded thumbnail as the poster when it is already available.
+If no poster is cached, show a neutral placeholder and keep all metadata visible.
 
 Skip empty metadata fields. If description is absent, show `No description available.`
 

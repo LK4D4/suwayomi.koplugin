@@ -92,10 +92,13 @@ describe("suwayomi/api facade", function()
             "_buildSourcesQuery",
             "_buildLegacySourcesQuery",
             "_buildMangaQuery",
+            "_buildLegacyMangaQuery",
             "_buildLibraryMangaQuery",
+            "_buildLegacyLibraryMangaQuery",
             "_buildCategoryQuery",
             "_buildUpdateMangaLibraryMutation",
             "_buildRefreshMangaMutation",
+            "_buildLegacyRefreshMangaMutation",
             "_buildChapterQuery",
             "_buildChapterPagesQuery",
             "_buildStoredChapterQuery",
@@ -113,6 +116,7 @@ describe("suwayomi/api facade", function()
             "parseUpdateExtensionResponse",
             "parseSourceFiltersResponse",
             "isSourceFiltersFieldError",
+            "isOptionalMangaMetadataFieldError",
             "parseMangaResponse",
             "parseLibraryMangaResponse",
             "parseCategoryResponse",
@@ -162,6 +166,60 @@ describe("suwayomi/api facade", function()
         assert.is_nil(request.bodies[2]:match("iconUrl"))
         assert.is_nil(request.bodies[2]:match("isNsfw"))
         assert.are.equal("legacy_source_query_retry", events[2].event)
+    end)
+
+    it("retries manga operations with legacy fields for old schemas", function()
+        local browse_request = install_graphql_sequence_stub({
+            {
+                body = [[{"errors":[{"message":"Cannot query field \"artist\" on type \"Manga\""}]}]],
+            },
+            {
+                body = [[{"data":{"fetchSourceManga":{"hasNextPage":false,"mangas":[{"id":1,"title":"Cloud Lantern","thumbnailUrl":"/thumb/1"}]}}}]],
+            },
+        })
+
+        local manga = api.fetchMangaForSource(valid_credentials(), { source_id = "local", page = 1 })
+
+        assert.are.equal(true, manga.ok)
+        assert.are.equal("Cloud Lantern", manga.manga[1].title)
+        assert.are.equal(2, browse_request.count)
+        assert.truthy(browse_request.bodies[1]:match("artist"))
+        assert.is_nil(browse_request.bodies[2]:match("artist"))
+        assert.truthy(browse_request.bodies[2]:match("thumbnailUrl"))
+
+        local library_request = install_graphql_sequence_stub({
+            {
+                body = [[{"errors":[{"message":"FieldUndefined: description"}]}]],
+            },
+            {
+                body = [[{"data":{"mangas":{"totalCount":1,"nodes":[{"id":17,"title":"Harbor Notes","inLibrary":true}]}}}]],
+            },
+        })
+
+        local library = api.fetchLibraryManga(valid_credentials(), { first = 20, offset = 40 })
+
+        assert.are.equal(true, library.ok)
+        assert.are.equal(1, library.total_count)
+        assert.are.equal(2, library_request.count)
+        assert.truthy(library_request.bodies[1]:match("description"))
+        assert.is_nil(library_request.bodies[2]:match("description"))
+
+        local refresh_request = install_graphql_sequence_stub({
+            {
+                body = [[{"errors":[{"message":"Cannot query field \"genre\" on type \"Manga\""}]}]],
+            },
+            {
+                body = [[{"data":{"fetchManga":{"manga":{"id":17,"title":"Harbor Notes","initialized":true}},"fetchChapters":{"chapters":[{"id":398,"name":"Ch. 1","isRead":false}]}}}]],
+            },
+        })
+
+        local refreshed = api.refreshManga(valid_credentials(), "17")
+
+        assert.are.equal(true, refreshed.ok)
+        assert.are.equal("Harbor Notes", refreshed.manga.title)
+        assert.are.equal(2, refresh_request.count)
+        assert.truthy(refresh_request.bodies[1]:match("genre"))
+        assert.is_nil(refresh_request.bodies[2]:match("genre"))
     end)
 
     it("tests connection with a lightweight GraphQL request", function()

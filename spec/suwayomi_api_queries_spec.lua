@@ -53,34 +53,69 @@ describe("suwayomi/api/queries", function()
             source_id = "2499283573021220255",
             page = "2",
             type = "SEARCH",
-            query = "frieren",
-            filters = { genre = "fantasy" },
+            query = "lantern",
+            filters = { genre = "ink" },
         }))
 
         assert.truthy(payload.query:match("fetchSourceManga"))
         assert.truthy(payload.query:match("chapters%s*{%s*totalCount%s*}"))
+        assert.truthy(payload.query:match("author"))
+        assert.truthy(payload.query:match("artist"))
+        assert.truthy(payload.query:match("description"))
+        assert.truthy(payload.query:match("genre"))
+        assert.truthy(payload.query:match("status"))
+        assert.truthy(payload.query:match("thumbnailUrl"))
         assert.are.equal("2499283573021220255", payload.variables.input.source)
         assert.are.equal(2, payload.variables.input.page)
         assert.are.equal("SEARCH", payload.variables.input.type)
-        assert.are.equal("frieren", payload.variables.input.query)
-        assert.are.equal("fantasy", payload.variables.input.filters.genre)
+        assert.are.equal("lantern", payload.variables.input.query)
+        assert.are.equal("ink", payload.variables.input.filters.genre)
 
         local popular = decode_request(queries._buildMangaQuery({
             source_id = "2499283573021220255",
             page = "1",
             type = "POPULAR",
-            filters = { genre = "fantasy" },
+            filters = { genre = "ink" },
         }))
         assert.is_nil(popular.variables.input.filters)
+
+        local legacy = decode_request(queries._buildLegacyMangaQuery({
+            source_id = "2499283573021220255",
+            page = "2",
+            type = "SEARCH",
+            query = "lantern",
+        }))
+        assert.truthy(legacy.query:match("fetchSourceManga"))
+        assert.truthy(legacy.query:match("thumbnailUrl"))
+        assert.is_nil(legacy.query:match("author"))
+        assert.is_nil(legacy.query:match("artist"))
+        assert.is_nil(legacy.query:match("description"))
+        assert.is_nil(legacy.query:match("genre"))
+        assert.is_nil(legacy.query:match("status"))
     end)
 
     it("builds library and category queries", function()
         local library = decode_request(queries._buildLibraryMangaQuery({ first = "50", offset = "10", order = { { by = "TITLE" } } }))
         assert.truthy(library.query:match("GET_LIBRARY_MANGAS"))
+        assert.truthy(library.query:match("author"))
+        assert.truthy(library.query:match("artist"))
+        assert.truthy(library.query:match("description"))
+        assert.truthy(library.query:match("genre"))
+        assert.truthy(library.query:match("status"))
+        assert.truthy(library.query:match("thumbnailUrl"))
         assert.are.equal(true, library.variables.filter.inLibrary.equalTo)
         assert.are.equal(50, library.variables.first)
         assert.are.equal(10, library.variables.offset)
         assert.are.equal("TITLE", library.variables.order[1].by)
+
+        local legacy_library = decode_request(queries._buildLegacyLibraryMangaQuery({ first = "50", offset = "10" }))
+        assert.truthy(legacy_library.query:match("GET_LIBRARY_MANGAS"))
+        assert.truthy(legacy_library.query:match("thumbnailUrl"))
+        assert.is_nil(legacy_library.query:match("author"))
+        assert.is_nil(legacy_library.query:match("artist"))
+        assert.is_nil(legacy_library.query:match("description"))
+        assert.is_nil(legacy_library.query:match("genre"))
+        assert.is_nil(legacy_library.query:match("status"))
 
         local categories = queries._buildCategoryQuery()
         assert.truthy(categories:match("GET_LIBRARY_CATEGORIES"))
@@ -132,8 +167,24 @@ describe("suwayomi/api/queries", function()
         assert.truthy(refresh.query:match("REFRESH_MANGA"))
         assert.truthy(refresh.query:match("fetchManga"))
         assert.truthy(refresh.query:match("fetchChapters"))
+        assert.truthy(refresh.query:match("author"))
+        assert.truthy(refresh.query:match("artist"))
+        assert.truthy(refresh.query:match("description"))
+        assert.truthy(refresh.query:match("genre"))
+        assert.truthy(refresh.query:match("status"))
+        assert.truthy(refresh.query:match("thumbnailUrl"))
         assert.are.equal(17, refresh.variables.manga.id)
         assert.are.equal(17, refresh.variables.chapters.mangaId)
+
+        local legacy_refresh = decode_request(queries._buildLegacyRefreshMangaMutation("17"))
+        assert.truthy(legacy_refresh.query:match("REFRESH_MANGA"))
+        assert.truthy(legacy_refresh.query:match("thumbnailUrl"))
+        assert.is_nil(legacy_refresh.query:match("author"))
+        assert.is_nil(legacy_refresh.query:match("artist"))
+        assert.is_nil(legacy_refresh.query:match("description"))
+        assert.is_nil(legacy_refresh.query:match("genre"))
+        assert.is_nil(legacy_refresh.query:match("status"))
+        assert.is_nil(legacy_refresh.query:match("inLibrary"))
     end)
 
     it("builds chapter queries and read-state mutations", function()
