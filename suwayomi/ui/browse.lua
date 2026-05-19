@@ -636,6 +636,20 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
     for key, value in pairs(title_options) do
         show_options[key] = value
     end
+    local function withCurrentDraft(callback)
+        return function(menu, ...)
+            if type(menu) == "table" then
+                menu.suwayomi_source_filter_draft = copyDraft(draft)
+            end
+            return callback(menu, ...)
+        end
+    end
+    if type(show_options.on_title_bar_left_tap) == "function" then
+        show_options.on_title_bar_left_tap = withCurrentDraft(show_options.on_title_bar_left_tap)
+    end
+    if type(show_options.on_title_bar_left_hold) == "function" then
+        show_options.on_title_bar_left_hold = withCurrentDraft(show_options.on_title_bar_left_hold)
+    end
     show_options.title = title_options.title or title
     show_options.item_table = buildSourceFilterRows(filters, draft)
     if not hasSourceFilterTitleActions(title_options) then

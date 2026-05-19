@@ -569,6 +569,40 @@ describe("suwayomi/ui/browse", function()
         assert.is_nil(shown_dialog.item_table[2])
     end)
 
+    it("passes edited draft to title action callbacks", function()
+        local browse = require("suwayomi/ui/browse")
+        local applied
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "Random Source",
+        }, {
+            { type = "SelectFilter", name = "Length", values = { "Any", "Long" }, default = 0 },
+        }, {
+            filters = {},
+        }, {
+            title_options = {
+                title_bar_left_icon = "appbar.menu",
+                on_title_bar_left_tap = function(menu)
+                    applied = menu.suwayomi_source_filter_draft
+                    return true
+                end,
+            },
+        })
+
+        local editor = shown_dialog
+        editor.item_table[1].callback()
+        shown_dialog.buttons[2][1].callback()
+        editor.on_title_bar_left_tap(editor)
+
+        assert.are.same({
+            query = "",
+            filters = {
+                { position = 1, type = "selectState", state = 1 },
+            },
+        }, applied)
+    end)
+
     it("shows latest for unknown source support and collects search queries", function()
         local browse = require("suwayomi/ui/browse")
         local selected_mode
