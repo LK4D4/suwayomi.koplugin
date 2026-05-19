@@ -270,6 +270,38 @@ describe("suwayomi/chapters/menu", function()
         assert.is_nil(action_ids.mark_through_read)
     end)
 
+    it("offers cancel download for queued and active chapter rows", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local plugin = {}
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+        function plugin:isChapterDownloaded()
+            return false
+        end
+        function plugin:getChapterDownloadStatus(_, chapter)
+            return { state = chapter.id == "active" and "downloading" or "queued" }
+        end
+
+        local queued_actions = plugin:getChapterActions({ id = "m1" }, {
+            id = "queued",
+            name = "Queued chapter",
+        })
+        local active_actions = plugin:getChapterActions({ id = "m1" }, {
+            id = "active",
+            name = "Active chapter",
+        })
+
+        assert.are.equal("cancel_download", queued_actions[1].id)
+        assert.are.equal("Cancel download", queued_actions[1].text)
+        assert.is_true(queued_actions[1].destructive)
+        assert.are.equal("cancel_download", active_actions[1].id)
+        assert.are.equal("Cancel download", active_actions[1].text)
+        assert.is_true(active_actions[1].destructive)
+    end)
+
     it("marks bulk chapter actions that open submenus", function()
         helper.stubControllerDependencies()
         package.loaded["suwayomi/chapters/menu"] = nil

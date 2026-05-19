@@ -149,16 +149,15 @@ function Methods:showActiveDownloadActions(job, menu)
     if not SuwayomiUI.showChapterActionsMenu then
         return
     end
-    if not self:canOpenDownloadJobChapterList(job) then
-        self:showMessage(_("This download cannot be opened right now."), { timeout = 2 })
-        return
+    local actions = {}
+    if self:canOpenDownloadJobChapterList(job) then
+        table.insert(actions, { id = "open_chapter_list", text = _("Open chapter list") })
     end
+    table.insert(actions, { id = "cancel_download", text = _("Cancel download"), destructive = true })
 
     SuwayomiUI.showChapterActionsMenu({
         title = self:getDownloadJobTitle(job),
-        actions = {
-            { id = "open_chapter_list", text = _("Open chapter list") },
-        },
+        actions = actions,
     }, function(action)
         if action and action.id == "open_chapter_list" then
             self:showMangaActions(job.manga, {
@@ -168,6 +167,13 @@ function Methods:showActiveDownloadActions(job, menu)
                     end
                 end,
             })
+        elseif action and action.id == "cancel_download" then
+            local cancelled = self:getDownloadQueue():cancelPending(job.manga, job.chapter)
+            self:closeMenu(menu)
+            if not cancelled then
+                self:showMessage(_("Download is no longer active."), { timeout = 2 })
+            end
+            self:showDownloads()
         end
     end)
 end

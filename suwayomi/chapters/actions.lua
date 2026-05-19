@@ -85,6 +85,9 @@ function Methods:performChapterAction(manga, chapter, action_id)
         self:enqueueChapterDownload(manga, chapter)
         return true
     end
+    if action_id == "cancel_download" then
+        return self:cancelChapterDownload(manga, chapter)
+    end
     if action_id == "delete" then
         return self:confirmDeleteChapterFromDevice(manga, chapter)
     end
@@ -96,6 +99,21 @@ function Methods:performChapterAction(manga, chapter, action_id)
     end
     if action_id == "mark_unread" then
         return self:markChapterUnread(manga, chapter)
+    end
+    return false
+end
+
+
+function Methods:cancelChapterDownload(manga, chapter)
+    local cancelled, state = self:getDownloadQueue():cancelPending(manga, chapter)
+    if cancelled then
+        self:refreshChapterMenu({ quick = true })
+        return true
+    end
+    if state == "downloading" then
+        self:showMessage(_("Download is no longer active."))
+    else
+        self:showMessage(_("Download is no longer queued."))
     end
     return false
 end

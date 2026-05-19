@@ -302,6 +302,12 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(job.manga, state.manga_actions[1].manga)
         state.manga_actions[1].options.onMangaUpdated()
         assert.are.equal(2, state.downloads_count)
+
+        assert.are.equal("Cancel download", state.actions_menu_options.actions[2].text)
+        assert.is_true(state.actions_menu_options.actions[2].destructive)
+        state.actions_menu_callback(state.actions_menu_options.actions[2])
+        assert.are.equal(job.chapter, plugin.queue.cancelled.chapter)
+        assert.are.equal(menu, state.closed_menus[#state.closed_menus])
     end)
 
     it("does not reopen downloads after manga actions if the downloads route is gone", function()

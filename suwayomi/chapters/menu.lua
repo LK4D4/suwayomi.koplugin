@@ -250,10 +250,13 @@ end
 
 
 function Methods:getChapterActions(manga, chapter)
+    local status = self.getChapterDownloadStatus and self:getChapterDownloadStatus(manga, chapter) or nil
     local downloaded = self:isChapterDownloaded(manga, chapter)
     local actions = {}
 
-    if downloaded then
+    if status and (status.state == "queued" or status.state == "downloading") then
+        table.insert(actions, { id = "cancel_download", text = _("Cancel download"), destructive = true })
+    elseif downloaded then
         table.insert(actions, { id = "open", text = _("Open") })
     else
         table.insert(actions, { id = "download", text = _("Download") })

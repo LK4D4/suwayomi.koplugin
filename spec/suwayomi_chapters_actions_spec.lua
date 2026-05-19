@@ -444,6 +444,28 @@ describe("suwayomi/chapters/actions", function()
         assert.is_false(called)
     end)
 
+    it("cancels chapter downloads from the chapter action menu", function()
+        local cancelled
+        local plugin = build_plugin({
+            queue = {
+                status = {
+                    ["m1:c1"] = { state = "downloading" },
+                },
+                cancelPending = function(_, target_manga, target_chapter)
+                    cancelled = { manga = target_manga, chapter = target_chapter }
+                    return true, "downloading"
+                end,
+            },
+        })
+
+        assert.is_true(plugin:performChapterAction(manga, chapter, "cancel_download"))
+
+        assert.are.equal(manga, cancelled.manga)
+        assert.are.equal(chapter, cancelled.chapter)
+        assert.are.same({ { quick = true } }, plugin.refreshes)
+        assert.are.same({}, plugin.messages)
+    end)
+
     it("confirms selected download deletion before removing local files", function()
         local chapter2 = { id = "c2", name = "Chapter 2" }
         local plugin = build_plugin({
