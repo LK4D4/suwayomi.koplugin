@@ -395,7 +395,7 @@ rtk busted spec/suwayomi_reader_return_spec.lua spec/suwayomi_manga_controller_s
 
 Expected: PASS.
 
-- [ ] **Step 2: Run full local checks**
+- [x] **Step 2: Run full local checks**
 
 Run:
 
@@ -417,7 +417,7 @@ rtk git diff master...HEAD -- suwayomi/reader_return.lua suwayomi/manga/controll
 
 Expected: runtime changes stay in reader-return and manga controller boundaries; no debug output adds path, source display name, title, or chapter name logging.
 
-- [ ] **Step 4: Confirm branch state**
+- [x] **Step 4: Confirm branch state**
 
 Run:
 
