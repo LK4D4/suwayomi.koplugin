@@ -99,7 +99,7 @@ function SuwayomiClient:getChapterCountMaxActive()
     if configured and configured > 0 then
         return configured
     end
-    return 2
+    return 4
 end
 
 function SuwayomiClient:getChapterCountPollIntervalSeconds()

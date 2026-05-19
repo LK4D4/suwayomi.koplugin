@@ -690,6 +690,58 @@ function SuwayomiClient:appendUniqueSourceMangaRows(session, page_manga)
     return appended
 end
 
+function SuwayomiClient:getVisibleBrowseChapterCountManga(session, fallback_manga)
+    local menu = session and session.menu or nil
+    local item_table = type(menu) == "table" and menu.item_table or nil
+    if type(item_table) == "table" then
+        local visible = {}
+        local function appendMenuManga(item_index)
+            local item = item_table[item_index]
+            local manga = type(item) == "table" and item.manga or nil
+            if type(manga) == "table" then
+                table.insert(visible, manga)
+            end
+        end
+        local page = tonumber(menu.page) or 1
+        local page_items = type(menu.page_items) == "table" and menu.page_items[page] or nil
+        if type(page_items) == "table" then
+            for _, item_index in ipairs(page_items) do
+                appendMenuManga(item_index)
+            end
+        else
+            local perpage = tonumber(menu.perpage)
+            if perpage and perpage > 0 then
+                local first_index = (math.max(1, page) - 1) * perpage + 1
+                local last_index = math.min(#item_table, first_index + perpage - 1)
+                for item_index = first_index, last_index do
+                    appendMenuManga(item_index)
+                end
+            end
+        end
+        if #visible > 0 then
+            return visible
+        end
+    end
+    return fallback_manga or {}
+end
+
+function SuwayomiClient:queueVisibleBrowseChapterCounts(session, refresh, fallback_manga)
+    if not session then
+        return
+    end
+    local visible_manga = self:getVisibleBrowseChapterCountManga(session, fallback_manga)
+    if session.chapter_count_enrichment then
+        self:appendBrowseChapterCountManga(session.chapter_count_enrichment, visible_manga)
+    elseif session.chapter_count_runtime then
+        session.chapter_count_enrichment = self:startBrowseChapterCountEnrichment(
+            session.credentials,
+            visible_manga,
+            refresh,
+            session.chapter_count_runtime
+        )
+    end
+end
+
 function SuwayomiClient:appendSourceMangaResult(session, result, refresh)
     session.loading_more = false
     session.active = nil
@@ -722,16 +774,7 @@ function SuwayomiClient:appendSourceMangaResult(session, result, refresh)
     session.has_next_page = result.has_next_page == true
     refresh()
     local visible_appended_manga = self:filterBrowseManga(appended_manga)
-    if session.chapter_count_enrichment then
-        self:appendBrowseChapterCountManga(session.chapter_count_enrichment, visible_appended_manga)
-    elseif session.chapter_count_runtime then
-        session.chapter_count_enrichment = self:startBrowseChapterCountEnrichment(
-            session.credentials,
-            visible_appended_manga,
-            refresh,
-            session.chapter_count_runtime
-        )
-    end
+    self:queueVisibleBrowseChapterCounts(session, refresh, visible_appended_manga)
     if self:shouldAppendSourceMangaPage(session, session.menu) then
         self:startSourceMangaAppendLoad(session, refresh)
     end
@@ -880,7 +923,6 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
     end
 
     local manga_menu = existing_menu
-    local chapter_count_enrichment
     local pending_manga_menu_refresh = false
     local refreshMangaMenu
     local function selectManga(manga)
@@ -905,6 +947,8 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
         end
     end
     menu_options.on_page_changed = function(menu, changed_page)
+        session.menu = menu
+        self:queueVisibleBrowseChapterCounts(session, refreshMangaMenu)
         if self:shouldAppendSourceMangaPage(session, menu, changed_page) then
             self:startSourceMangaAppendLoad(session, refreshMangaMenu)
         end
@@ -936,13 +980,7 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
         refreshMangaMenu()
     end
     if session.chapter_count_runtime then
-        chapter_count_enrichment = self:startBrowseChapterCountEnrichment(
-            credentials,
-            visible_manga,
-            refreshMangaMenu,
-            session.chapter_count_runtime
-        )
-        session.chapter_count_enrichment = chapter_count_enrichment
+        self:queueVisibleBrowseChapterCounts(session, refreshMangaMenu, visible_manga)
     end
     return manga_menu
 end

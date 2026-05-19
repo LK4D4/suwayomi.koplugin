@@ -1575,6 +1575,134 @@ describe("suwayomi/client source manga flows", function()
         assert.is_nil(updated_manga[5].m3.loading)
     end)
 
+    it("starts four browse chapter count workers by default", function()
+        local subprocess_job, started = buildChapterCountSubprocessFake()
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            chapter_count_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            api = {
+                fetchMangaForSource = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Riverside Dust", chapter_count = 0 },
+                            { id = "m2", title = "Glass Signal", chapter_count = 0 },
+                            { id = "m3", title = "Paper Lantern", chapter_count = 0 },
+                            { id = "m4", title = "Blue Orchard", chapter_count = 0 },
+                            { id = "m5", title = "Cinder Map", chapter_count = 0 },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function()
+                    return { name = "browse-menu" }
+                end,
+                updateMangaMenu = function() end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "Random Source" }, {
+            skip_mode_menu = true,
+        })
+
+        assert.are.equal(4, #started)
+        assert.are.equal("m1", started[1].manga_id)
+        assert.are.equal("m4", started[4].manga_id)
+    end)
+
+    it("queues browse chapter counts only for the current visible menu page", function()
+        local subprocess_job, started = buildChapterCountSubprocessFake()
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            chapter_count_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            chapter_count_max_active = 10,
+            api = {
+                fetchMangaForSource = function()
+                    return {
+                        ok = true,
+                        manga = {
+                            { id = "m1", title = "Riverside Dust", chapter_count = 0 },
+                            { id = "m2", title = "Glass Signal", chapter_count = 0 },
+                            { id = "m3", title = "Paper Lantern", chapter_count = 0 },
+                            { id = "m4", title = "Blue Orchard", chapter_count = 0 },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showMangaMenu = function(manga)
+                    return {
+                        name = "browse-menu",
+                        page = 1,
+                        perpage = 2,
+                        item_table = {
+                            { manga = manga[1] },
+                            { manga = manga[2] },
+                            { manga = manga[3] },
+                            { manga = manga[4] },
+                        },
+                    }
+                end,
+                updateMangaMenu = function(menu, manga)
+                    menu.page = 1
+                    menu.perpage = 2
+                    menu.item_table = {
+                        { manga = manga[1] },
+                        { manga = manga[2] },
+                        { manga = manga[3] },
+                        { manga = manga[4] },
+                    }
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "Random Source" }, {
+            skip_mode_menu = true,
+        })
+
+        assert.are.equal(2, #started)
+        assert.are.equal("m1", started[1].manga_id)
+        assert.are.equal("m2", started[2].manga_id)
+    end)
+
+    it("reuses cached browse chapter counts for repeated manga ids", function()
+        local subprocess_job, started = buildChapterCountSubprocessFake()
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            chapter_count_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            chapter_count_max_active = 1,
+            ui = {
+                updateMangaMenu = function() end,
+            },
+        })
+        local first = { id = "m1", title = "Riverside Dust", chapter_count = 0 }
+        local state = client:startBrowseChapterCountEnrichment(
+            { server_url = "https://random.example" },
+            { first },
+            function() end
+        )
+
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga_id = "m1",
+            chapter_count = 5,
+        })
+        local repeated = { id = "m1", title = "Riverside Dust", chapter_count = 0 }
+        client:appendBrowseChapterCountManga(state, { repeated })
+
+        assert.are.equal(1, #started)
+        assert.are.equal(5, repeated.chapter_count)
+        assert.is_true(repeated.chapter_count_verified)
+        assert.is_nil(repeated.chapter_count_loading)
+    end)
+
     it("fetches chapter counts for manga appended from later source pages", function()
         local subprocess_job, started = buildSourceMangaSubprocessFake()
         local shown_menu

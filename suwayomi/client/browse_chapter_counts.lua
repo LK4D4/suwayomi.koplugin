@@ -7,6 +7,18 @@
 
 local M = {}
 
+local function getChapterCountCacheKey(manga)
+    if type(manga) ~= "table" or manga.id == nil then
+        return nil
+    end
+    local source = type(manga.source) == "table" and manga.source or nil
+    local source_id = source and source.id
+    if source_id ~= nil then
+        return tostring(source_id) .. ":" .. tostring(manga.id)
+    end
+    return tostring(manga.id)
+end
+
 function M.install(SuwayomiClient)
 function SuwayomiClient:shouldFetchBrowseChapterCount(manga)
     if type(manga) ~= "table" or manga.id == nil then
@@ -17,6 +29,32 @@ function SuwayomiClient:shouldFetchBrowseChapterCount(manga)
     end
     local count = tonumber(manga.chapter_count)
     return count == nil or count == 0
+end
+
+function SuwayomiClient:applyBrowseChapterCountCache(manga, cache)
+    local key = getChapterCountCacheKey(manga)
+    local cached = key and cache and cache[key] or nil
+    if not cached then
+        return false
+    end
+    manga.chapter_count_loading = nil
+    manga.chapter_count = cached.chapter_count
+    manga.chapter_count_verified = true
+    manga.chapter_count_error = nil
+    return true
+end
+
+function SuwayomiClient:rememberBrowseChapterCount(manga, result, cache)
+    if not cache or not result or result.ok ~= true then
+        return
+    end
+    local key = getChapterCountCacheKey(manga)
+    if not key then
+        return
+    end
+    cache[key] = {
+        chapter_count = tonumber(result.chapter_count) or 0,
+    }
 end
 
 function SuwayomiClient:resolveChapterCountRuntime()
@@ -69,7 +107,9 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
     while (state.active_count or 0) < state.max_active and state.next_index <= #state.queue do
         local manga = state.queue[state.next_index]
         state.next_index = state.next_index + 1
-        if self:shouldFetchBrowseChapterCount(manga) then
+        if not self:applyBrowseChapterCountCache(manga, state.cache)
+            and self:shouldFetchBrowseChapterCount(manga)
+        then
             manga.chapter_count_loading = true
             if state.refresh then
                 state.refresh()
@@ -101,6 +141,7 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
                         end
                         self:releaseBrowseChapterCountJob(state, finished_active)
                         self:applyBrowseChapterCountResult(finished_active.manga, result)
+                        self:rememberBrowseChapterCount(finished_active.manga, result, state.cache)
                         if state.refresh then
                             state.refresh()
                         end
@@ -190,6 +231,7 @@ function SuwayomiClient:startBrowseChapterCountEnrichment(credentials, manga_lis
         max_active = self:getChapterCountMaxActive(),
         runtime = runtime,
         refresh = refresh,
+        cache = {},
     }
     self:startNextBrowseChapterCountJobs(state)
     return state
@@ -201,11 +243,17 @@ function SuwayomiClient:appendBrowseChapterCountManga(state, manga_list)
     end
 
     local added = false
+    local applied_cache = false
     for _, manga in ipairs(manga_list or {}) do
-        if self:shouldFetchBrowseChapterCount(manga) then
+        if self:applyBrowseChapterCountCache(manga, state.cache) then
+            applied_cache = true
+        elseif self:shouldFetchBrowseChapterCount(manga) then
             table.insert(state.queue, manga)
             added = true
         end
+    end
+    if applied_cache and state.refresh then
+        state.refresh()
     end
     if added then
         self:startNextBrowseChapterCountJobs(state)
