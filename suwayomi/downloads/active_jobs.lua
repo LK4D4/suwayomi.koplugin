@@ -237,6 +237,18 @@ function ActiveJobs:finishWithFailure(active, message)
     queue.onMessage(failure_message)
 end
 
+function ActiveJobs:finishWithCancel(active)
+    local queue = self.queue
+    self:terminateJob(active)
+    self:removeJob(active)
+    if queue.cleanupInterruptedDownload then
+        queue:cleanupInterruptedDownload(active)
+    end
+    os.remove(active.progress_path)
+    queue:clearStatus(active.manga, active.chapter)
+    self:process()
+end
+
 function ActiveJobs:recordProgress(active, progress)
     local queue = self.queue
     if not progress or not progress.state then

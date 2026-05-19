@@ -636,12 +636,39 @@ describe("suwayomi/downloads/active_jobs", function()
 
         context.queue:enqueue(manga, chapter, "/books")
         table.remove(context.scheduled, 1).callback()
+        local progress_path = context.queue:buildProgressPath(manga, chapter, "/books")
 
         local cancelled = context.queue:cancelPending(manga, chapter)
 
         assert.is_true(cancelled)
         assert.is_true(path_was_removed(chapter_path .. ".part"))
         assert.is_true(path_was_removed(chapter_path .. ".direct.part"))
+        assert.is_true(path_was_removed(progress_path))
+    end)
+
+    it("backfills an active slot after canceling an active download", function()
+        local context = build_queue({
+            max_active_chapters = 1,
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapters = {
+            { id = "398", name = "Official_Vol. 1 Ch. 1" },
+            { id = "399", name = "Official_Vol. 1 Ch. 2" },
+        }
+
+        context.queue:enqueueBatch(manga, chapters, "/books")
+        table.remove(context.scheduled, 1).callback()
+
+        local cancelled = context.queue:cancelPending(manga, chapters[1])
+
+        assert.is_true(cancelled)
+        assert.is_nil(context.queue:getStatus(manga, chapters[1]))
+        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[2]).state)
+        assert.is_nil(context.active_job(manga, chapters[1]))
+        assert.is_not_nil(context.active_job(manga, chapters[2]))
+        assert.are.same({ 1234 }, context.terminated_pids)
     end)
 
     it("marks the active job failed when the watchdog expires", function()

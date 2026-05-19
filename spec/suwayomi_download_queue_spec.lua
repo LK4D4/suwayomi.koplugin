@@ -439,7 +439,7 @@ describe("suwayomi/downloads/queue", function()
         assert.are.same({}, context.saved_queue())
     end)
 
-    it("cancels an active download by terminating its subprocess", function()
+    it("cancels an active download without leaving a failed job", function()
         local context = build_queue({ subprocess_done = false, skip_subprocess_callback = true })
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
@@ -451,10 +451,10 @@ describe("suwayomi/downloads/queue", function()
 
         assert.is_true(cancelled)
         assert.are.equal("downloading", state)
-        assert.are.equal("failed", context.queue:getStatus(manga, chapter).state)
-        assert.are.equal(1, #context.saved_queue())
-        assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.is_nil(context.queue:getStatus(manga, chapter))
+        assert.are.same({}, context.saved_queue())
         assert.are.same({ 1234 }, context.terminated_pids)
+        assert.are.same({}, context.messages)
     end)
 
     it("clamps the active chapter limit to the supported range", function()

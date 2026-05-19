@@ -283,7 +283,7 @@ function DownloadQueue:cancelPending(manga, chapter)
     local key = self:getKey(manga, chapter)
     local active = self:getActiveJob(key)
     if active then
-        self.active_job_lifecycle:finishWithFailure(active, _("Chapter download canceled."))
+        self.active_job_lifecycle:finishWithCancel(active)
         return true, "downloading"
     end
     local status = self.statuses[key]
