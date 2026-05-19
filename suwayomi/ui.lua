@@ -17,6 +17,7 @@ local BrowseUI = require("suwayomi/ui/browse")
 local DirectoryUI = require("suwayomi/ui/directory")
 local DownloadsUI = require("suwayomi/ui/downloads")
 local ListRows = require("suwayomi/ui/list_rows")
+local MangaInfoUI = require("suwayomi/ui/manga_info")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local SuwayomiUI = {}
@@ -51,6 +52,8 @@ SuwayomiUI.updateLibraryMangaMenu = BrowseUI.updateLibraryMangaMenu
 
 SuwayomiUI.buildDownloadsMenuTable = DownloadsUI.buildDownloadsMenuTable
 SuwayomiUI.showDownloadsMenu = DownloadsUI.showDownloadsMenu
+SuwayomiUI.buildMangaInformationText = MangaInfoUI.buildText
+SuwayomiUI.showMangaInformation = MangaInfoUI.show
 
 function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
     return ListRows.buildChapterMenuTable(chapter_list, {

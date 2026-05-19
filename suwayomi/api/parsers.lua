@@ -153,6 +153,19 @@ local function parseChapterNode(chapter)
     }
 end
 
+local function normalizeGenres(genre)
+    if type(genre) == "table" then
+        local genres = {}
+        for _, value in ipairs(genre) do
+            table.insert(genres, tostring(value))
+        end
+        return genres
+    elseif genre ~= nil then
+        return { tostring(genre) }
+    end
+    return nil
+end
+
 local function parseMangaNode(entry)
     if type(entry) ~= "table" or entry.id == nil then
         return nil
@@ -176,6 +189,21 @@ local function parseMangaNode(entry)
     end
     if entry.thumbnailUrl ~= nil then
         manga.thumbnail_url = entry.thumbnailUrl
+    end
+    if entry.author ~= nil then
+        manga.author = entry.author
+    end
+    if entry.artist ~= nil then
+        manga.artist = entry.artist
+    end
+    if entry.description ~= nil then
+        manga.description = entry.description
+    end
+    if entry.genre ~= nil then
+        manga.genres = normalizeGenres(entry.genre)
+    end
+    if entry.status ~= nil then
+        manga.status = entry.status
     end
     if type(entry.chapters) == "table" and entry.chapters.totalCount ~= nil then
         manga.chapter_count = tonumber(entry.chapters.totalCount) or 0
@@ -278,6 +306,29 @@ function Parsers.isOptionalExtensionMetadataFieldError(response_body)
         local mentions_optional_field = message:match("iconUrl")
             or message:match("apkName")
             or message:match("repo")
+        local looks_like_schema_error = message:match("Cannot query field")
+            or message:match("Unknown field")
+            or message:match("FieldUndefined")
+        if mentions_optional_field and looks_like_schema_error then
+            return true
+        end
+    end
+    return false
+end
+
+function Parsers.isOptionalMangaMetadataFieldError(response_body)
+    local payload = json.decode(response_body, 1, nil)
+    if type(payload) ~= "table" or type(payload.errors) ~= "table" then
+        return false
+    end
+
+    for _, graph_error in ipairs(payload.errors) do
+        local message = tostring(graph_error and graph_error.message or "")
+        local mentions_optional_field = message:match("author")
+            or message:match("artist")
+            or message:match("description")
+            or message:match("genre")
+            or message:match("status")
         local looks_like_schema_error = message:match("Cannot query field")
             or message:match("Unknown field")
             or message:match("FieldUndefined")

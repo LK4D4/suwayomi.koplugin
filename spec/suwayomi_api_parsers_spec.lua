@@ -45,6 +45,16 @@ describe("suwayomi/api/parsers", function()
         assert.is_false(parsers.isOptionalExtensionMetadataFieldError([[
             { "errors": [ { "message": "Authentication failed" } ] }
         ]]))
+
+        assert.is_true(parsers.isOptionalMangaMetadataFieldError([[
+            { "errors": [ { "message": "Cannot query field \"artist\" on type \"Manga\"" } ] }
+        ]]))
+        assert.is_true(parsers.isOptionalMangaMetadataFieldError([[
+            { "errors": [ { "message": "FieldUndefined: description" } ] }
+        ]]))
+        assert.is_false(parsers.isOptionalMangaMetadataFieldError([[
+            { "errors": [ { "message": "Cannot query field \"chapters\" on type \"Manga\"" } ] }
+        ]]))
     end)
 
     it("parses source filter schema responses", function()
@@ -142,27 +152,43 @@ describe("suwayomi/api/parsers", function()
     it("parses manga, library manga, categories, and refresh responses", function()
         local manga, has_next_page = parsers.parseMangaResponse([[
             { "data": { "fetchSourceManga": { "hasNextPage": true, "mangas": [
-                { "id": 17, "title": "Frieren", "inLibrary": true, "initialized": true,
+                { "id": 17, "title": "Cloud Lantern", "inLibrary": true, "initialized": true,
+                  "author": "Rina Vale", "artist": "Mako Reed",
+                  "description": "Archive notes cross the harbor.", "genre": ["Quest", "Ink"], "status": "ONGOING",
+                  "thumbnailUrl": "/api/v1/manga/17/thumbnail",
                   "chapters": { "totalCount": 42 },
-                  "source": { "id": "local", "displayName": "Local Source", "name": "Local Source", "lang": "localsourcelang" } }
+                  "source": { "id": "source-z", "displayName": "Source Z", "name": "Source Z", "lang": "zz" } }
             ] } } }
         ]])
         assert.are.equal(true, has_next_page)
         assert.are.equal("17", manga[1].id)
-        assert.are.equal("Frieren", manga[1].title)
+        assert.are.equal("Cloud Lantern", manga[1].title)
         assert.are.equal(true, manga[1].in_library)
+        assert.are.equal("Rina Vale", manga[1].author)
+        assert.are.equal("Mako Reed", manga[1].artist)
+        assert.are.equal("Archive notes cross the harbor.", manga[1].description)
+        assert.are.same({ "Quest", "Ink" }, manga[1].genres)
+        assert.are.equal("ONGOING", manga[1].status)
+        assert.are.equal("/api/v1/manga/17/thumbnail", manga[1].thumbnail_url)
         assert.are.equal(42, manga[1].chapter_count)
-        assert.are.equal("local", manga[1].source.id)
+        assert.are.equal("source-z", manga[1].source.id)
 
         local library = assert(parsers.parseLibraryMangaResponse([[
             { "data": { "mangas": { "totalCount": 1, "nodes": [
-                { "id": 17, "title": "Frieren", "unreadCount": 4, "downloadCount": 3,
+                { "id": 17, "title": "Cloud Lantern", "unreadCount": 4, "downloadCount": 3,
+                  "author": "Rina Vale", "artist": "Mako Reed",
+                  "description": "Archive notes cross the harbor.", "genre": ["Quest", "Ink"], "status": "ONGOING",
                   "categories": { "nodes": [ { "id": 2, "name": "Reading", "order": 1 } ] },
-                  "firstUnreadChapter": { "id": 398, "name": "Ch. 1", "chapterNumber": 1, "sourceOrder": 1, "scanlator": "Sense Scans", "isRead": false },
-                  "latestFetchedChapter": { "id": 399, "name": "Ch. 2", "chapterNumber": 2, "sourceOrder": 2, "scanlator": "Flame Scans", "isRead": true } }
+                  "firstUnreadChapter": { "id": 398, "name": "Ch. 1", "chapterNumber": 1, "sourceOrder": 1, "scanlator": "Crew One", "isRead": false },
+                  "latestFetchedChapter": { "id": 399, "name": "Ch. 2", "chapterNumber": 2, "sourceOrder": 2, "scanlator": "Crew Two", "isRead": true } }
             ] } } }
         ]]))
         assert.are.equal(1, library.total_count)
+        assert.are.equal("Rina Vale", library.manga[1].author)
+        assert.are.equal("Mako Reed", library.manga[1].artist)
+        assert.are.equal("Archive notes cross the harbor.", library.manga[1].description)
+        assert.are.same({ "Quest", "Ink" }, library.manga[1].genres)
+        assert.are.equal("ONGOING", library.manga[1].status)
         assert.are.equal(4, library.manga[1].unread_count)
         assert.are.equal(3, library.manga[1].download_count)
         assert.are.equal("Reading", library.manga[1].categories[1].name)
@@ -179,11 +205,20 @@ describe("suwayomi/api/parsers", function()
 
         local refreshed = assert(parsers.parseRefreshMangaResponse([[
             { "data": {
-                "fetchManga": { "manga": { "id": 17, "title": "Frieren", "initialized": true } },
-                "fetchChapters": { "chapters": [ { "id": 398, "name": "Ch. 1", "scanlator": "Sense Scans", "isRead": false } ] }
+                "fetchManga": { "manga": { "id": 17, "title": "Cloud Lantern", "initialized": true,
+                    "author": "Rina Vale", "artist": "Mako Reed",
+                    "description": "Archive notes cross the harbor.", "genre": ["Quest", "Ink"], "status": "ONGOING",
+                    "thumbnailUrl": "/api/v1/manga/17/thumbnail" } },
+                "fetchChapters": { "chapters": [ { "id": 398, "name": "Ch. 1", "scanlator": "Crew One", "isRead": false } ] }
             } }
         ]]))
         assert.are.equal("17", refreshed.manga.id)
+        assert.are.equal("Rina Vale", refreshed.manga.author)
+        assert.are.equal("Mako Reed", refreshed.manga.artist)
+        assert.are.equal("Archive notes cross the harbor.", refreshed.manga.description)
+        assert.are.same({ "Quest", "Ink" }, refreshed.manga.genres)
+        assert.are.equal("ONGOING", refreshed.manga.status)
+        assert.are.equal("/api/v1/manga/17/thumbnail", refreshed.manga.thumbnail_url)
         assert.are.equal("398", refreshed.chapters[1].id)
         assert.are.equal(false, refreshed.chapters[1].is_read)
     end)

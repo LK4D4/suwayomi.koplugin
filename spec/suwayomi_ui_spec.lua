@@ -24,16 +24,34 @@ describe("suwayomi/ui", function()
         package.loaded["suwayomi/ui/downloads"] = nil
         package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
+        package.loaded["suwayomi/ui/manga_info"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
         package.loaded["ui/widget/buttondialog"] = nil
         package.loaded["ui/widget/confirmbox"] = nil
         package.loaded["ui/widget/multiinputdialog"] = nil
+        package.loaded["ui/widget/textviewer"] = nil
         package.loaded["ui/widget/titlebar"] = nil
+        package.loaded["ui/widget/container/centercontainer"] = nil
+        package.loaded["ui/widget/container/framecontainer"] = nil
+        package.loaded["ui/widget/horizontalgroup"] = nil
+        package.loaded["ui/widget/horizontalspan"] = nil
+        package.loaded["ui/widget/imagewidget"] = nil
+        package.loaded["ui/widget/scrolltextwidget"] = nil
+        package.loaded["ui/widget/textboxwidget"] = nil
+        package.loaded["ui/widget/textwidget"] = nil
+        package.loaded["ui/widget/verticalgroup"] = nil
+        package.loaded["ui/widget/verticalspan"] = nil
+        package.loaded["device"] = nil
+        package.loaded["ffi/blitbuffer"] = nil
+        package.loaded["ui/font"] = nil
+        package.loaded["ui/geometry"] = nil
+        package.loaded["ui/size"] = nil
         package.loaded["ui/widget/checkmark"] = nil
         package.loaded["ui/widget/radiomark"] = nil
         package.loaded["ui/widget/pathchooser"] = nil
         package.loaded["ui/uimanager"] = nil
+        package.loaded["suwayomi/ui/thumbnail_cache"] = nil
         package.loaded["suwayomi/ui/manga_menu"] = nil
 
         package.preload.gettext = function()
@@ -78,10 +96,144 @@ describe("suwayomi/ui", function()
             }
         end
 
+        package.preload["ui/widget/textviewer"] = function()
+            return {
+                new = function(_, options)
+                    return options
+                end,
+            }
+        end
+
         package.preload["ui/widget/titlebar"] = function()
             return {
                 new = function(_, options)
                     return options
+                end,
+            }
+        end
+
+        package.preload.device = function()
+            return {
+                screen = {
+                    getWidth = function()
+                        return 600
+                    end,
+                    getHeight = function()
+                        return 900
+                    end,
+                    scaleBySize = function(_, value)
+                        return value
+                    end,
+                },
+            }
+        end
+
+        package.preload["ffi/blitbuffer"] = function()
+            return {
+                COLOR_BLACK = 0,
+                COLOR_WHITE = 1,
+                COLOR_LIGHT_GRAY = 2,
+            }
+        end
+
+        package.preload["ui/font"] = function()
+            return {
+                getFace = function(_, name, size)
+                    return { name = name, size = size }
+                end,
+            }
+        end
+
+        package.preload["ui/geometry"] = function()
+            return {
+                new = function(_, dimen)
+                    return dimen
+                end,
+            }
+        end
+
+        package.preload["ui/size"] = function()
+            return {
+                border = { thin = 1 },
+                padding = { small = 4, default = 8, large = 12 },
+                margin = { default = 8 },
+            }
+        end
+
+        local function widgetFactory(kind)
+            return {
+                new = function(_, options)
+                    options = options or {}
+                    options.kind = kind
+                    options.getSize = function(self)
+                        return {
+                            w = self.width or (self.dimen and self.dimen.w) or 0,
+                            h = self.height or (self.dimen and self.dimen.h) or 0,
+                        }
+                    end
+                    return options
+                end,
+            }
+        end
+
+        package.preload["ui/widget/container/centercontainer"] = function()
+            return widgetFactory("centercontainer")
+        end
+
+        package.preload["ui/widget/container/framecontainer"] = function()
+            return widgetFactory("framecontainer")
+        end
+
+        package.preload["ui/widget/horizontalgroup"] = function()
+            return widgetFactory("horizontalgroup")
+        end
+
+        package.preload["ui/widget/horizontalspan"] = function()
+            return widgetFactory("horizontalspan")
+        end
+
+        package.preload["ui/widget/imagewidget"] = function()
+            return widgetFactory("imagewidget")
+        end
+
+        package.preload["ui/widget/scrolltextwidget"] = function()
+            return widgetFactory("scrolltextwidget")
+        end
+
+        package.preload["ui/widget/textboxwidget"] = function()
+            return widgetFactory("textboxwidget")
+        end
+
+        package.preload["ui/widget/textwidget"] = function()
+            return widgetFactory("textwidget")
+        end
+
+        package.preload["ui/widget/verticalgroup"] = function()
+            return widgetFactory("verticalgroup")
+        end
+
+        package.preload["ui/widget/verticalspan"] = function()
+            return widgetFactory("verticalspan")
+        end
+
+        package.preload["suwayomi/ui/thumbnail_cache"] = function()
+            return {
+                find = function(credentials, thumbnail_url)
+                    if thumbnail_url == "thumb://cached" then
+                        events.thumbnail_lookup = { credentials = credentials, thumbnail_url = thumbnail_url }
+                        return "/tmp/poster.bb"
+                    end
+                    events.thumbnail_lookup = { credentials = credentials, thumbnail_url = thumbnail_url }
+                    return nil
+                end,
+                isDecodedPath = function(path)
+                    return path == "/tmp/poster.bb"
+                end,
+                loadDecoded = function(path)
+                    if path == "/tmp/poster.bb" then
+                        return { decoded = true }
+                    end
+                    return nil
                 end,
             }
         end
@@ -215,11 +367,27 @@ describe("suwayomi/ui", function()
         package.preload["ui/widget/buttondialog"] = nil
         package.preload["ui/widget/confirmbox"] = nil
         package.preload["ui/widget/multiinputdialog"] = nil
+        package.preload["ui/widget/container/centercontainer"] = nil
+        package.preload["ui/widget/container/framecontainer"] = nil
+        package.preload["ui/widget/horizontalgroup"] = nil
+        package.preload["ui/widget/horizontalspan"] = nil
+        package.preload["ui/widget/imagewidget"] = nil
+        package.preload["ui/widget/scrolltextwidget"] = nil
+        package.preload["ui/widget/textboxwidget"] = nil
+        package.preload["ui/widget/textwidget"] = nil
+        package.preload["ui/widget/verticalgroup"] = nil
+        package.preload["ui/widget/verticalspan"] = nil
         package.preload["ui/widget/titlebar"] = nil
+        package.preload.device = nil
+        package.preload["ffi/blitbuffer"] = nil
+        package.preload["ui/font"] = nil
+        package.preload["ui/geometry"] = nil
+        package.preload["ui/size"] = nil
         package.preload["ui/widget/checkmark"] = nil
         package.preload["ui/widget/radiomark"] = nil
         package.preload["ui/widget/pathchooser"] = nil
         package.preload["ui/uimanager"] = nil
+        package.preload["suwayomi/ui/thumbnail_cache"] = nil
         package.preload["suwayomi/ui/list_menu"] = nil
         package.preload["suwayomi/ui/manga_menu"] = nil
     end)
@@ -289,6 +457,126 @@ describe("suwayomi/ui", function()
         shown_dialog.item_table[1].callback()
 
         assert.are.equal("m-failed:205", retried_key)
+    end)
+
+    it("builds manga information text from available metadata", function()
+        local ui = require("suwayomi/ui")
+
+        local text = ui.buildMangaInformationText({
+            source = { displayName = "  Source A  " },
+            status = "ONGOING",
+            authors = {
+                { name = "Author One" },
+                " Author Two ",
+                "",
+            },
+            artists = {
+                { title = "Artist One" },
+            },
+            chapter_count = 12,
+            unread_count = 4,
+            download_count = 2,
+            in_library = false,
+            categories = {
+                { name = "Reading" },
+                { id = "2" },
+            },
+            genres = {
+                "Action",
+                { name = "Mystery" },
+            },
+            first_unread_chapter = { name = "Chapter 5" },
+            latest_fetched_chapter = { name = "Chapter 8" },
+            description = "  Plot text.  ",
+        })
+
+        assert.are.equal(table.concat({
+            "Source: Source A",
+            "Status: ONGOING",
+            "Author: Author One, Author Two",
+            "Artist: Artist One",
+            "Chapters: 12",
+            "Unread: 4",
+            "Downloaded: 2",
+            "Library: Not in library",
+            "Categories: Reading, 2",
+            "Genres: Action, Mystery",
+            "First unread: Chapter 5",
+            "Latest fetched: Chapter 8",
+            "",
+            "Plot text.",
+        }, "\n"), text)
+    end)
+
+    local function findWidget(widget, kind)
+        if widget == nil then
+            return nil
+        end
+        if widget.kind == kind then
+            return widget
+        end
+        for _, child in ipairs(widget) do
+            local found = findWidget(child, kind)
+            if found then
+                return found
+            end
+        end
+        return nil
+    end
+
+    it("shows manga information in a close-only poster dialog", function()
+        local ui = require("suwayomi/ui")
+        local credentials = { server_url = "https://suwayomi.example" }
+
+        local dialog = ui.showMangaInformation({
+            id = 42,
+            title = "Manga Title",
+            author = "Writer",
+            status = "ONGOING",
+            description = "Synopsis",
+            thumbnail_url = "thumb://cached",
+        }, {
+            thumbnail_credentials = credentials,
+        })
+
+        assert.are.equal(dialog, shown_dialog)
+        assert.are.equal("Manga Title", dialog.title)
+        assert.are.equal("Close", dialog.buttons[1][1].text)
+        assert.are.equal("thumb://cached", events.thumbnail_lookup.thumbnail_url)
+        assert.are.equal(credentials, events.thumbnail_lookup.credentials)
+
+        local content = dialog._added_widgets[1]
+        local image = findWidget(content, "imagewidget")
+        local description = findWidget(content, "scrolltextwidget")
+        assert.are.same({ decoded = true }, image.image)
+        assert.are.equal(0, image.scale_factor)
+        assert.is_true(image.width > 0)
+        assert.is_true(image.height > image.width)
+        assert.are.equal("Synopsis", description.text)
+        assert.are.equal(dialog, description.dialog)
+
+        dialog.buttons[1][1].callback()
+
+        assert.are.equal(dialog, closed_dialog)
+    end)
+
+    it("shows manga information without a cached poster", function()
+        local ui = require("suwayomi/ui")
+
+        local dialog = ui.showMangaInformation({
+            id = 42,
+            title = "Manga Title",
+            description = "",
+            thumbnail_url = "thumb://missing",
+        }, {
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+        })
+
+        local content = dialog._added_widgets[1]
+        local poster_text = findWidget(content, "textwidget")
+        local description = findWidget(content, "scrolltextwidget")
+        assert.are.equal("No poster", poster_text.text)
+        assert.are.equal("No description available.", description.text)
     end)
 
     it("preserves facade access to the directory chooser", function()

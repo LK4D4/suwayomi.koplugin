@@ -110,6 +110,9 @@ local function installController(options)
             showConfirm = function(confirm_options)
                 state.confirm_options = confirm_options
             end,
+            showMangaInformation = function(manga)
+                state.shown_manga_information = manga
+            end,
             showChapterMenu = function(chapter_options)
                 state.chapter_menu_options = chapter_options
                 return { name = "chapter-menu", close_callback = chapter_options.close_callback }
@@ -315,12 +318,13 @@ describe("suwayomi/manga/controller", function()
 
         plugin:showMangaActions(manga)
         assert.are.equal("Open chapters", state.manga_actions_options.actions[1].text)
-        assert.are.equal("Open first unread", state.manga_actions_options.actions[2].text)
-        assert.are.equal("Refresh chapters", state.manga_actions_options.actions[3].text)
-        assert.are.equal("Bulk downloads", state.manga_actions_options.actions[4].text)
-        assert.is_true(state.manga_actions_options.actions[4].submenu)
-        assert.are.equal("Download ahead", state.manga_actions_options.actions[5].text)
+        assert.are.equal("Manga information", state.manga_actions_options.actions[2].text)
+        assert.are.equal("Open first unread", state.manga_actions_options.actions[3].text)
+        assert.are.equal("Refresh chapters", state.manga_actions_options.actions[4].text)
+        assert.are.equal("Bulk downloads", state.manga_actions_options.actions[5].text)
         assert.is_true(state.manga_actions_options.actions[5].submenu)
+        assert.are.equal("Download ahead", state.manga_actions_options.actions[6].text)
+        assert.is_true(state.manga_actions_options.actions[6].submenu)
         assert.are.equal("Remove from library", state.manga_actions_options.actions[#state.manga_actions_options.actions].text)
         assert.is_true(state.manga_actions_options.actions[#state.manga_actions_options.actions].destructive)
         assert.are.equal("manga-actions", state.tracked_screens[1].route_id)
@@ -335,7 +339,7 @@ describe("suwayomi/manga/controller", function()
 
         state.manga_actions_options.on_back()
         assert.are.equal("Frieren", state.manga_actions_options.title)
-        assert.are.equal("bulk_downloads", state.manga_actions_options.actions[4].id)
+        assert.are.equal("bulk_downloads", state.manga_actions_options.actions[5].id)
 
         state.manga_actions_callback({ id = "keep_downloaded" })
         assert.are.equal("Download ahead", state.manga_actions_options.title)
@@ -345,7 +349,16 @@ describe("suwayomi/manga/controller", function()
 
         state.manga_actions_options.on_back()
         assert.are.equal("Frieren", state.manga_actions_options.title)
-        assert.are.equal("Download ahead", state.manga_actions_options.actions[5].text)
+        assert.are.equal("Download ahead", state.manga_actions_options.actions[6].text)
+    end)
+
+    it("opens manga information from shared manga actions", function()
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Frieren" }
+
+        assert.is_true(plugin:performMangaAction(manga, "manga_information"))
+
+        assert.are.same(manga, state.shown_manga_information)
     end)
 
     it("builds manga actions without loading missing chapter context", function()
@@ -363,7 +376,7 @@ describe("suwayomi/manga/controller", function()
 
         plugin:showMangaActions(manga)
 
-        assert.are.equal("Open first unread", state.manga_actions_options.actions[2].text)
+        assert.are.equal("Open first unread", state.manga_actions_options.actions[3].text)
     end)
 
     it("builds first-unread action from visible scanlator-filtered chapters only", function()

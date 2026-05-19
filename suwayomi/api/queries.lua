@@ -20,6 +20,9 @@ end
 
 local EXTENSION_FIELDS = "pkgName name lang versionName versionCode isNsfw isInstalled hasUpdate isObsolete iconUrl apkName repo"
 local LEGACY_EXTENSION_FIELDS = "pkgName name lang versionName versionCode isNsfw isInstalled hasUpdate isObsolete"
+local LEGACY_MANGA_FIELDS = "id title inLibrary initialized thumbnailUrl"
+local LEGACY_REFRESH_MANGA_FIELDS = "id title initialized thumbnailUrl"
+local MANGA_FIELDS = "id title author artist description genre status inLibrary initialized thumbnailUrl"
 local SOURCE_FILTER_FIELDS = table.concat({
     "__typename",
     "... on HeaderFilter { name }",
@@ -109,7 +112,7 @@ function Queries._buildLegacyUpdateExtensionMutation(pkg_name, action)
     return buildUpdateExtensionMutation(pkg_name, action, LEGACY_EXTENSION_FIELDS)
 end
 
-function Queries._buildMangaQuery(options)
+local function buildMangaQuery(options, fields)
     options = options or {}
     local input = {
         source = tostring(options.source_id),
@@ -124,14 +127,24 @@ function Queries._buildMangaQuery(options)
     end
 
     return json.encode({
-        query = "mutation GET_SOURCE_MANGAS_FETCH($input: FetchSourceMangaInput!) { fetchSourceManga(input: $input) { hasNextPage mangas { id title inLibrary initialized thumbnailUrl chapters { totalCount } source { id displayName name lang } } } }",
+        query = "mutation GET_SOURCE_MANGAS_FETCH($input: FetchSourceMangaInput!) { fetchSourceManga(input: $input) { hasNextPage mangas { "
+            .. fields
+            .. " chapters { totalCount } source { id displayName name lang } } } }",
         variables = {
             input = input,
         },
     })
 end
 
-function Queries._buildLibraryMangaQuery(options)
+function Queries._buildMangaQuery(options)
+    return buildMangaQuery(options, MANGA_FIELDS)
+end
+
+function Queries._buildLegacyMangaQuery(options)
+    return buildMangaQuery(options, LEGACY_MANGA_FIELDS)
+end
+
+local function buildLibraryMangaQuery(options, fields)
     options = options or {}
     local variables = {
         filter = {
@@ -147,9 +160,19 @@ function Queries._buildLibraryMangaQuery(options)
     end
 
     return json.encode({
-        query = "query GET_LIBRARY_MANGAS($filter: MangaFilterInput, $first: Int, $offset: Int, $order: [MangaOrderInput!]) { mangas(filter: $filter, first: $first, offset: $offset, order: $order) { totalCount nodes { id title inLibrary unreadCount downloadCount initialized thumbnailUrl source { id displayName name lang } categories { nodes { id name order } } firstUnreadChapter { id name chapterNumber sourceOrder scanlator isRead } latestFetchedChapter { id name chapterNumber sourceOrder scanlator isRead } } } }",
+        query = "query GET_LIBRARY_MANGAS($filter: MangaFilterInput, $first: Int, $offset: Int, $order: [MangaOrderInput!]) { mangas(filter: $filter, first: $first, offset: $offset, order: $order) { totalCount nodes { "
+            .. fields
+            .. " unreadCount downloadCount source { id displayName name lang } categories { nodes { id name order } } firstUnreadChapter { id name chapterNumber sourceOrder scanlator isRead } latestFetchedChapter { id name chapterNumber sourceOrder scanlator isRead } } } }",
         variables = variables,
     })
+end
+
+function Queries._buildLibraryMangaQuery(options)
+    return buildLibraryMangaQuery(options, MANGA_FIELDS)
+end
+
+function Queries._buildLegacyLibraryMangaQuery(options)
+    return buildLibraryMangaQuery(options, LEGACY_MANGA_FIELDS)
 end
 
 function Queries._buildCategoryQuery()
@@ -172,9 +195,11 @@ function Queries._buildUpdateMangaLibraryMutation(manga_id, in_library)
     })
 end
 
-function Queries._buildRefreshMangaMutation(manga_id)
+local function buildRefreshMangaMutation(manga_id, fields)
     return json.encode({
-        query = "mutation REFRESH_MANGA($manga: FetchMangaInput!, $chapters: FetchChaptersInput!) { fetchManga(input: $manga) { manga { id title initialized thumbnailUrl source { id displayName name lang } } } fetchChapters(input: $chapters) { chapters { id name chapterNumber sourceOrder scanlator isRead } } }",
+        query = "mutation REFRESH_MANGA($manga: FetchMangaInput!, $chapters: FetchChaptersInput!) { fetchManga(input: $manga) { manga { "
+            .. fields
+            .. " source { id displayName name lang } } } fetchChapters(input: $chapters) { chapters { id name chapterNumber sourceOrder scanlator isRead } } }",
         variables = {
             manga = {
                 id = tonumber(manga_id) or manga_id,
@@ -184,6 +209,14 @@ function Queries._buildRefreshMangaMutation(manga_id)
             },
         },
     })
+end
+
+function Queries._buildRefreshMangaMutation(manga_id)
+    return buildRefreshMangaMutation(manga_id, MANGA_FIELDS)
+end
+
+function Queries._buildLegacyRefreshMangaMutation(manga_id)
+    return buildRefreshMangaMutation(manga_id, LEGACY_REFRESH_MANGA_FIELDS)
 end
 
 function Queries._buildChapterQuery(manga_id)
