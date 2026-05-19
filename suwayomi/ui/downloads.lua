@@ -138,6 +138,8 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
             callback = function(menu)
                 if callbacks.onSelectFailed then
                     callbacks.onSelectFailed(job, menu)
+                elseif callbacks.onRetryFailed then
+                    callbacks.onRetryFailed(job, menu)
                 end
             end,
         })

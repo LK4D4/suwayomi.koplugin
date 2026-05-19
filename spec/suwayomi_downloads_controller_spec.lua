@@ -297,6 +297,16 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(2, state.downloads_count)
         assert.are.same({}, state.messages)
 
+        queue.retried_key = nil
+        state.downloads_count = 0
+        state.closed_menus = {}
+        state.actions_menu_callback(state.actions_menu_options.actions[2])
+        assert.is_nil(queue.retried_key)
+        assert.is_nil(queue.clear_failed_count)
+        assert.are.equal(0, state.downloads_count)
+        assert.are.same({}, state.closed_menus)
+        assert.are.same({}, state.messages)
+
         state.downloads_menu_callbacks.onClearFailed(menu)
         assert.are.equal(1, queue.clear_failed_count)
         assert.are.same({}, state.messages)
