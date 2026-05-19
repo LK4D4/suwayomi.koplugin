@@ -536,59 +536,60 @@ local function buildSourceFilterRows(filters, draft, context)
             }
             if canShowGroupAsChecklist(filter.filters) then
                 row.callback = function()
-                    local actions = {}
-                    for child_index, child in ipairs(filter.filters) do
+                    local choices = {}
+                    local function childChoiceText(child, child_index)
                         if child.type == "CheckBoxFilter" then
                             local value = getDraftState(draft, child_index, "checkBoxState", child.default == true, index)
-                            table.insert(actions, {
-                                id = "checkbox",
-                                text = (child.name or "") .. ": " .. stateText(value),
-                                child_index = child_index,
-                                default = child.default == true,
-                            })
-                        elseif child.type == "TriStateFilter" then
-                            local value = tostring(getDraftState(draft, child_index, "triState", child.default or "IGNORE", index))
-                            table.insert(actions, {
-                                id = "tristate",
-                                text = (child.name or "") .. ": " .. value,
-                                child_index = child_index,
-                                default = child.default or "IGNORE",
-                            })
+                            return (child.name or "") .. ": " .. stateText(value)
                         end
+                        local value = tostring(getDraftState(draft, child_index, "triState", child.default or "IGNORE", index))
+                        return (child.name or "") .. ": " .. value
                     end
-                    return getUI().showActionMenu({
+                    for child_index, child in ipairs(filter.filters) do
+                        table.insert(choices, {
+                            value = {
+                                type = child.type,
+                                child_index = child_index,
+                            },
+                            text = childChoiceText(child, child_index),
+                        })
+                    end
+                    return getUI().showChecklistDialog({
                         title = filter.name or "",
-                        actions = actions,
-                        vertical = true,
-                    }, function(action)
-                        if action.id == "checkbox" then
-                            local entry = findDraftStateEntry(draft, action.child_index, "checkBoxState", index)
-                            entry.state = getDraftState(
-                                draft,
-                                action.child_index,
-                                "checkBoxState",
-                                action.default,
-                                index
-                            ) ~= true
-                        elseif action.id == "tristate" then
-                            local current = tostring(getDraftState(
-                                draft,
-                                action.child_index,
-                                "triState",
-                                action.default,
-                                index
-                            ))
-                            local next_value = "INCLUDE"
-                            if current == "INCLUDE" then
-                                next_value = "EXCLUDE"
-                            elseif current == "EXCLUDE" then
-                                next_value = "IGNORE"
+                        choices = choices,
+                        isSelected = function(value)
+                            local child = filter.filters[value.child_index]
+                            if value.type == "CheckBoxFilter" then
+                                return getDraftState(draft, value.child_index, "checkBoxState", child.default == true, index) == true
                             end
-                            local entry = findDraftStateEntry(draft, action.child_index, "triState", index)
-                            entry.state = next_value
-                        end
-                        row.mandatory = _("Modified")
-                    end)
+                            return getDraftState(draft, value.child_index, "triState", child.default or "IGNORE", index) ~= "IGNORE"
+                        end,
+                        onToggle = function(value, selected, choice)
+                            local child = filter.filters[value.child_index]
+                            if value.type == "CheckBoxFilter" then
+                                local entry = findDraftStateEntry(draft, value.child_index, "checkBoxState", index)
+                                entry.state = selected == true
+                            elseif value.type == "TriStateFilter" then
+                                local current = tostring(getDraftState(
+                                    draft,
+                                    value.child_index,
+                                    "triState",
+                                    child.default or "IGNORE",
+                                    index
+                                ))
+                                local next_value = "INCLUDE"
+                                if current == "INCLUDE" then
+                                    next_value = "EXCLUDE"
+                                elseif current == "EXCLUDE" then
+                                    next_value = "IGNORE"
+                                end
+                                local entry = findDraftStateEntry(draft, value.child_index, "triState", index)
+                                entry.state = next_value
+                            end
+                            choice.text = childChoiceText(child, value.child_index)
+                            row.mandatory = _("Modified")
+                        end,
+                    })
                 end
             else
                 local sub_rows = buildSourceFilterRows(filter.filters, draft, { group_position = index })

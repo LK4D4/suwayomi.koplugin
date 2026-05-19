@@ -513,9 +513,16 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("Updated - Descending", editor.item_table[6].mandatory)
         editor.item_table[7].callback()
         assert.are.equal("Small group", shown_dialog.title)
-        assert.truthy(shown_dialog.buttons[1][1].text:match("Awarded"))
+        assert.are.equal("Awarded: Off", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Group license: IGNORE", shown_dialog.buttons[2][1].text)
+        assert.are.equal("Done", shown_dialog.buttons[3][1].text)
         shown_dialog.buttons[1][1].callback()
         assert.are.equal("Modified", editor.item_table[7].mandatory)
+        assert.are.equal("* Awarded: On", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Group license: IGNORE", shown_dialog.buttons[2][1].text)
+        shown_dialog.buttons[2][1].callback()
+        assert.are.equal("* Group license: INCLUDE", shown_dialog.buttons[2][1].text)
+        shown_dialog.buttons[3][1].callback()
         editor.item_table[11].callback()
         assert.are.same({
             query = "",
@@ -528,6 +535,10 @@ describe("suwayomi/ui/browse", function()
                 {
                     position = 7,
                     group_change = { position = 1, type = "checkBoxState", state = true },
+                },
+                {
+                    position = 7,
+                    group_change = { position = 2, type = "triState", state = "INCLUDE" },
                 },
             },
         }, applied)
