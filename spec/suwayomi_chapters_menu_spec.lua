@@ -338,6 +338,48 @@ describe("suwayomi/chapters/menu", function()
         assert.is_true(bulk_actions[6].submenu)
     end)
 
+    it("offers cancel all downloads from the chapter title menu", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local plugin = {
+            current_chapter_context = {
+                chapters = {
+                    { id = "c1", name = "Chapter 1" },
+                },
+            },
+        }
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+        function plugin:getSelectedChapterCount()
+            return 0
+        end
+        function plugin:getVisibleChapters(chapters)
+            return chapters
+        end
+        function plugin:getChapterScanlatorChoices()
+            return {}
+        end
+        function plugin:getDownloadQueue()
+            return {
+                getSnapshot = function()
+                    return {
+                        active = { { key = "active" } },
+                        queued = { { key = "queued" } },
+                        failed = {},
+                    }
+                end,
+            }
+        end
+
+        local actions = plugin:getBulkChapterActions()
+
+        assert.are.equal("cancel_all_downloads", actions[#actions].id)
+        assert.are.equal("Cancel all downloads", actions[#actions].text)
+        assert.is_true(actions[#actions].destructive)
+    end)
+
     it("quick refresh reflects updated read state instead of stale cached row status", function()
         helper.stubControllerDependencies()
         package.loaded["suwayomi/chapters/menu"] = nil

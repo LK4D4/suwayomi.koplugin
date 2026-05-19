@@ -352,6 +352,15 @@ function DownloadQueue:cancelQueued()
     return canceled
 end
 
+function DownloadQueue:cancelAll()
+    local queued = self:cancelQueued()
+    local active = 0
+    if self.active_job_lifecycle.cancelAll then
+        active = self.active_job_lifecycle:cancelAll()
+    end
+    return queued + active
+end
+
 function DownloadQueue:splitUtf8Chars(text)
     return StatusFormatter.splitUtf8Chars(text)
 end

@@ -35,6 +35,18 @@ local function copyTitleBarOptions(target, title_options)
     return target
 end
 
+local function hasCancelableDownloads(self)
+    if not self.getDownloadQueue then
+        return false
+    end
+    local queue = self:getDownloadQueue()
+    if not queue or not queue.getSnapshot then
+        return false
+    end
+    local snapshot = queue:getSnapshot() or {}
+    return #(snapshot.active or {}) > 0 or #(snapshot.queued or {}) > 0
+end
+
 -- Controllers expose new(deps) for a consistent boundary; methods remain plugin-bound mixins so this refactor can move code without changing callback behavior.
 function ChapterMenu:new(deps)
     deps = deps or {}
@@ -286,6 +298,9 @@ function Methods:getBulkChapterActions()
         if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
             table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter"), submenu = true })
         end
+        if hasCancelableDownloads(self) then
+            table.insert(actions, { id = "cancel_all_downloads", text = _("Cancel all downloads"), destructive = true })
+        end
         table.insert(actions, { id = "delete_selected", text = _("Delete downloads"), destructive = true })
         return actions
     end
@@ -300,6 +315,9 @@ function Methods:getBulkChapterActions()
     end
     if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
         table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter"), submenu = true })
+    end
+    if hasCancelableDownloads(self) then
+        table.insert(actions, { id = "cancel_all_downloads", text = _("Cancel all downloads"), destructive = true })
     end
 
     return actions

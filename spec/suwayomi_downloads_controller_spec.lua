@@ -80,6 +80,9 @@ local function installController(options)
     function queue:cancelQueued()
         self.cancel_queued_count = (self.cancel_queued_count or 0) + 1
     end
+    function queue:cancelAll()
+        self.cancel_all_count = (self.cancel_all_count or 0) + 1
+    end
     function queue:clearFailed()
         self.clear_failed_count = (self.clear_failed_count or 0) + 1
         return options.cleared_failed or 2
@@ -246,14 +249,16 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal("downloads", state.tracked_screens[1].route_id)
         assert.are.equal("downloads-menu", state.tracked_screens[1].widget.name)
         assert.are.equal("Downloads", state.title_menu_options.title)
-        assert.are.equal("cancel_queued", state.title_menu_options.actions[1].id)
+        assert.are.equal("cancel_all", state.title_menu_options.actions[1].id)
+        assert.are.equal("Cancel all downloads", state.title_menu_options.actions[1].text)
+        assert.is_true(state.title_menu_options.actions[1].destructive)
         assert.is_nil(state.title_menu_options.actions[2])
 
         state.downloads_menu_options.on_title_bar_left_tap(menu)
         assert.are.equal(menu, state.title_menu_tapped)
 
         state.title_menu_options.onSelect(state.title_menu_options.actions[1], menu)
-        assert.are.equal(1, queue.cancel_queued_count)
+        assert.are.equal(1, queue.cancel_all_count)
         assert.are.equal(menu, state.closed_menus[1])
         assert.are.equal(2, state.downloads_count)
     end)

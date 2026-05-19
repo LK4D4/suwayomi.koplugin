@@ -237,7 +237,8 @@ function ActiveJobs:finishWithFailure(active, message)
     queue.onMessage(failure_message)
 end
 
-function ActiveJobs:finishWithCancel(active)
+function ActiveJobs:finishWithCancel(active, options)
+    options = options or {}
     local queue = self.queue
     self:terminateJob(active)
     self:removeJob(active)
@@ -246,7 +247,22 @@ function ActiveJobs:finishWithCancel(active)
     end
     os.remove(active.progress_path)
     queue:clearStatus(active.manga, active.chapter)
+    if options.process ~= false then
+        self:process()
+    end
+end
+
+function ActiveJobs:cancelAll()
+    local active_jobs = {}
+    for _, active in pairs(self.jobs or {}) do
+        table.insert(active_jobs, active)
+    end
+
+    for _, active in ipairs(active_jobs) do
+        self:finishWithCancel(active, { process = false })
+    end
     self:process()
+    return #active_jobs
 end
 
 function ActiveJobs:recordProgress(active, progress)

@@ -50,8 +50,8 @@ end
 function Methods:getDownloadsTitleActions(snapshot)
     snapshot = snapshot or {}
     local actions = {}
-    if #(snapshot.queued or {}) > 0 then
-        table.insert(actions, { id = "cancel_queued", text = _("Cancel queued downloads") })
+    if #(snapshot.active or {}) > 0 or #(snapshot.queued or {}) > 0 then
+        table.insert(actions, { id = "cancel_all", text = _("Cancel all downloads"), destructive = true })
     end
     if #(snapshot.failed or {}) > 0 then
         table.insert(actions, { id = "clear_failed", text = _("Clear failed") })
@@ -67,7 +67,12 @@ function Methods:performDownloadsTitleAction(action, menu)
     end
 
     local queue = self:getDownloadQueue()
-    if action.id == "cancel_queued" then
+    if action.id == "cancel_all" then
+        queue:cancelAll()
+        self:closeMenu(menu)
+        self:showDownloads()
+        return true
+    elseif action.id == "cancel_queued" then
         queue:cancelQueued()
         self:closeMenu(menu)
         self:showDownloads()

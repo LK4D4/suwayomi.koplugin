@@ -975,6 +975,21 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(anchor, scanlator_options and scanlator_options.anchor)
     end)
 
+    it("cancels all downloads from the chapter bulk menu", function()
+        local queue = {
+            cancelAll = function(self)
+                self.cancel_all_count = (self.cancel_all_count or 0) + 1
+                return 2
+            end,
+        }
+        local plugin = build_plugin({ queue = queue })
+
+        assert.is_true(plugin:performBulkChapterAction("cancel_all_downloads"))
+
+        assert.are.equal(1, queue.cancel_all_count)
+        assert.are.same({ { quick = true } }, plugin.refreshes)
+    end)
+
     it("marks a chapter unread and schedules sync by default", function()
         local plugin = build_plugin({
             existing = {

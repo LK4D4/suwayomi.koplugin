@@ -790,6 +790,43 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal("m-failed:205", context.saved_queue()[2].key)
     end)
 
+    it("cancels all active and queued downloads without clearing failed jobs", function()
+        local failed_manga = { id = "m-failed", title = "Chainsaw Man" }
+        local failed_chapter = { id = "205", name = "Ch. 205" }
+        local manga = { id = "m1", title = "Frieren" }
+        local active_chapter = { id = "144", name = "Ch. 144" }
+        local queued_chapter = { id = "145", name = "Ch. 145" }
+        local context = build_queue({
+            max_active_chapters = 1,
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+            saved_queue = {
+                {
+                    key = "m-failed:205",
+                    state = "failed",
+                    download_directory = "/books",
+                    manga = failed_manga,
+                    chapter = failed_chapter,
+                },
+            },
+        })
+        context.queue:recover()
+        context.queue:enqueueBatch(manga, { active_chapter, queued_chapter }, "/books")
+        table.remove(context.scheduled, 1).callback()
+
+        local canceled = context.queue:cancelAll()
+
+        assert.are.equal(2, canceled)
+        assert.are.equal(0, context.active_count())
+        assert.are.equal(0, #context.queue.items)
+        assert.is_nil(context.queue:getStatus(manga, active_chapter))
+        assert.is_nil(context.queue:getStatus(manga, queued_chapter))
+        assert.are.equal("failed", context.queue:getStatus(failed_manga, failed_chapter).state)
+        assert.are.same({ 1234 }, context.terminated_pids)
+        assert.are.equal(1, #context.saved_queue())
+        assert.are.equal("m-failed:205", context.saved_queue()[1].key)
+    end)
+
     it("requeues interrupted persistent downloads on recovery", function()
         local context = build_queue({
             mark_archive_exists_after_download = true,

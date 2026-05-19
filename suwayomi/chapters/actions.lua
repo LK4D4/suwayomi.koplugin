@@ -614,6 +614,11 @@ function Methods:performBulkChapterAction(action_id, menu_context)
         self:confirmDeleteSelectedChapters()
         return true
     end
+    if action_id == "cancel_all_downloads" then
+        self:getDownloadQueue():cancelAll()
+        self:refreshChapterMenu({ quick = true })
+        return true
+    end
     if action_id == "mark_read_selected" then
         self:markSelectedChaptersRead()
         return true
