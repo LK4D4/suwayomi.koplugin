@@ -538,7 +538,7 @@ describe("suwayomi/ui/browse", function()
         assert.is_true(search_text)
     end)
 
-    it("omits source filter fallback action rows when title actions are present", function()
+    it("omits source filter fallback action rows when title callbacks are present", function()
         local browse = require("suwayomi/ui/browse")
 
         browse.showSourceFilterEditor({
@@ -548,9 +548,9 @@ describe("suwayomi/ui/browse", function()
             { type = "CheckBoxFilter", name = "Completed", default = false },
         }, nil, {
             title_options = {
-                actions = {
-                    { id = "custom", text = "Custom" },
-                },
+                title_bar_left_icon = "appbar.menu",
+                on_title_bar_left_tap = function() end,
+                on_title_bar_left_hold = function() end,
             },
         })
 

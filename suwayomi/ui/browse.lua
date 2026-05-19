@@ -362,6 +362,12 @@ local function canShowGroupAsChecklist(filters)
     return true
 end
 
+local function hasSourceFilterTitleActions(title_options)
+    return type(title_options.actions) == "table"
+        or type(title_options.on_title_bar_left_tap) == "function"
+        or type(title_options.on_title_bar_left_hold) == "function"
+end
+
 local function buildSourceFilterRows(filters, draft, context)
     context = context or {}
     local rows = {}
@@ -631,7 +637,7 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
     end
     show_options.title = title_options.title or title
     show_options.item_table = buildSourceFilterRows(filters, draft)
-    if type(title_options.actions) ~= "table" then
+    if not hasSourceFilterTitleActions(title_options) then
         table.insert(show_options.item_table, {
             text = _("Apply filters"),
             callback = function()
