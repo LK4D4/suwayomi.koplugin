@@ -1317,7 +1317,7 @@ describe("suwayomi/ui", function()
         assert.are.equal(1, selected)
     end)
 
-    it("closes the language menu from Done before running the close callback", function()
+    it("shows the language menu as a checklist dialog", function()
         local ui = require("suwayomi/ui")
 
         ui.showLanguageMenu({
@@ -1332,62 +1332,64 @@ describe("suwayomi/ui", function()
         })
 
         assert.are.equal("Source languages", shown_dialog.title)
-        assert.are.equal(32, shown_dialog.state_w)
-        assert.are.equal("check", shown_dialog.item_table[1].state.mark_type)
-        assert.is_true(shown_dialog.item_table[1].state.checked)
-        assert.is_false(shown_dialog.item_table[2].state.checked)
+        assert.is_nil(shown_dialog.renderer)
+        assert.are.equal("* English", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Russian", shown_dialog.buttons[2][1].text)
 
-        shown_dialog.item_table[3].callback()
+        shown_dialog.buttons[3][1].callback()
 
         assert.are.same({ "close", "summary" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
     end)
 
-    it("can show a language menu without a Done row", function()
+    it("refreshes checked language state without running close cleanup", function()
         local ui = require("suwayomi/ui")
+        local toggles = {}
+        local close_count = 0
+        run_close_callback_on_close = true
 
         ui.showLanguageMenu({
             title = "Source languages",
-            show_done = false,
             languages = {
                 { code = "en", label = "English", enabled = true },
                 { code = "es", label = "Español", enabled = false },
             },
+            onToggle = function(code, enabled)
+                table.insert(toggles, { code = code, enabled = enabled })
+            end,
+            onClose = function()
+                close_count = close_count + 1
+            end,
         })
 
-        assert.are.equal(2, #shown_dialog.item_table)
-        assert.are.equal("English", shown_dialog.item_table[1].text)
-        assert.are.equal("Español", shown_dialog.item_table[2].text)
+        assert.are.equal("* English", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Español", shown_dialog.buttons[2][1].text)
+
+        local first_dialog = shown_dialog
+        shown_dialog.buttons[2][1].callback()
+
+        assert.are.same({ code = "es", enabled = true }, toggles[1])
+        assert.are.equal(first_dialog, closed_dialog)
+        assert.are_not.equal(first_dialog, shown_dialog)
+        assert.are.equal("* Español", shown_dialog.buttons[2][1].text)
+        assert.are.equal(0, close_count)
+
+        shown_dialog.buttons[3][1].callback()
+
+        assert.are.equal(1, close_count)
     end)
 
-    it("does not run the language close callback during an in-place menu refresh", function()
+    it("keeps updateLanguageMenu compatible as a no-op for checklist dialogs", function()
         local ui = require("suwayomi/ui")
-        local summary_count = 0
-        local menu = {
-            close_callback = function()
-                summary_count = summary_count + 10
-            end,
-            updateItems = function(self)
-                if self.close_callback then
-                    self.close_callback()
-                end
-            end,
-        }
+        local menu = { kind = "language-dialog" }
 
         ui.updateLanguageMenu(menu, {
             languages = {
                 { code = "en", label = "EN", enabled = true },
                 { code = "ru", label = "RU", enabled = true },
             },
-            onClose = function()
-                summary_count = summary_count + 1
-            end,
         }, function() end)
 
-        assert.are.equal(0, summary_count)
-
-        menu.close_callback()
-
-        assert.are.equal(1, summary_count)
+        assert.are.same({ kind = "language-dialog" }, menu)
     end)
 end)

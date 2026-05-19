@@ -7,7 +7,6 @@
 -- External data: menu rows and callbacks come from controllers and are bound to
 -- KOReader widgets without changing business behavior.
 
-local Menu = require("ui/widget/menu")
 local ButtonDialog = require("ui/widget/buttondialog")
 local ConfirmBox = require("ui/widget/confirmbox")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
@@ -25,7 +24,6 @@ local SuwayomiUI = {}
 
 local bindMenuCallbacks = menu_utils.bindMenuCallbacks
 local newStateMark = menu_utils.newStateMark
-local getStateMarkWidth = menu_utils.getStateMarkWidth
 
 local function getListMenu()
     return require("suwayomi/ui/list_menu")
@@ -374,48 +372,45 @@ end
 
 function SuwayomiUI.showLanguageMenu(options)
     options = options or {}
-    local UIManager = require("ui/uimanager")
-    local menu
     local close_ran = false
-    local menu_options = {}
-    for key, value in pairs(options) do
-        menu_options[key] = value
+    local choices = {}
+
+    for _, language in ipairs(options.languages or {}) do
+        table.insert(choices, {
+            value = language.code,
+            text = language.label,
+            language = language,
+        })
     end
-    local function runClose(close_menu)
+
+    local function runClose()
         if close_ran then
             return
         end
         close_ran = true
-        if close_menu and menu then
-            UIManager:close(menu)
-        end
         if options.onClose then
             options.onClose()
         end
     end
-    menu_options.onClose = function()
-        runClose(true)
-    end
-    menu_options.skipNextCloseCallback = function()
-        if menu then
-            menu.suwayomi_skip_next_close_callback = true
-        end
-    end
 
-    menu = Menu:new{
+    return SuwayomiUI.showChecklistDialog({
         title = options.title or _("Suwayomi source languages"),
-        item_table = SuwayomiUI.buildLanguageMenuTable(menu_options, options.onToggle),
-        state_w = getStateMarkWidth(),
-        close_callback = function()
-            if menu and menu.suwayomi_skip_next_close_callback then
-                menu.suwayomi_skip_next_close_callback = nil
-                return
-            end
-            runClose(false)
+        choices = choices,
+        anchor = options.anchor,
+        isSelected = function(_, choice)
+            return choice.language and choice.language.enabled == true
         end,
-    }
-    UIManager:show(menu)
-    return menu
+        onToggle = function(code, selected, choice)
+            if choice and choice.language then
+                choice.language.enabled = selected == true
+            end
+            if options.onToggle then
+                options.onToggle(code, selected)
+            end
+        end,
+        onDone = runClose,
+        close_callback = runClose,
+    })
 end
 
 local function buildLibraryCategoryPickerBehaviorChoices(choices)
@@ -505,49 +500,8 @@ function SuwayomiUI.showDeleteFinishedWhileReadingMenu(options)
     })
 end
 
-function SuwayomiUI.updateLanguageMenu(menu, options, onToggleCallback)
-    if not menu then
-        return
-    end
-
-    options = options or {}
-    local UIManager = require("ui/uimanager")
-    local menu_options = {}
-    for key, value in pairs(options) do
-        menu_options[key] = value
-    end
-    local close_ran = false
-    local function runClose(close_menu)
-        if close_ran then
-            return
-        end
-        close_ran = true
-        if close_menu then
-            UIManager:close(menu)
-        end
-        if options.onClose then
-            options.onClose()
-        end
-    end
-    menu_options.onClose = function()
-        runClose(true)
-    end
-    menu_options.skipNextCloseCallback = function()
-        menu.suwayomi_skip_next_close_callback = true
-    end
-
-    menu.item_table = SuwayomiUI.buildLanguageMenuTable(menu_options, onToggleCallback or options.onToggle)
-    menu.close_callback = nil
-    if menu.updateItems then
-        menu:updateItems(nil, true)
-    end
-    menu.close_callback = function()
-        if menu.suwayomi_skip_next_close_callback then
-            menu.suwayomi_skip_next_close_callback = nil
-            return
-        end
-        runClose(false)
-    end
+function SuwayomiUI.updateLanguageMenu(menu, _options, _onToggleCallback)
+    return menu
 end
 
 function SuwayomiUI.showLoginDialog(options)
