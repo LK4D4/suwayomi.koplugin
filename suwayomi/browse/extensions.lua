@@ -246,6 +246,10 @@ function Methods:finishExtensionWorker(active, result)
     self:showFetchedExtensions(result, {
         credentials = active and active.credentials,
         action = result and result.action,
+        updated_pkg_name = result
+            and type(result.updated_extension) == "table"
+            and result.updated_extension.pkg_name
+            or nil,
         force_new = active and active.options and active.options.force_new,
     })
     return true
@@ -393,8 +397,10 @@ function Methods:showFetchedExtensions(result, options)
             end
         end
         menu_options.thumbnail_credentials = options.credentials
+        menu_options.focus_extension_pkg_name = options.updated_pkg_name
         if query then
             menu_options.empty_text = _("No matching extensions")
+            menu_options.show_empty_extension_sections = true
             menu_options.on_close = function()
                 applySearch("")
                 return true

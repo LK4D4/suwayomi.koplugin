@@ -229,6 +229,57 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("pkg.mangadex", selected[1].pkg_name)
     end)
 
+    it("focuses a refreshed extension row by package name", function()
+        local browse = require("suwayomi/ui/browse")
+        local menu = { title = "Suwayomi Extensions" }
+
+        browse.updateExtensionsMenu(menu, {
+            {
+                pkg_name = "pkg.orchid",
+                name = "Orchid Gate",
+                is_installed = true,
+            },
+            {
+                pkg_name = "pkg.quartz",
+                name = "Quartz Node",
+                is_installed = true,
+            },
+            {
+                pkg_name = "pkg.fallback",
+                name = "Fallback",
+                is_installed = false,
+            },
+        }, function() end, {
+            focus_extension_pkg_name = "pkg.quartz",
+            show_empty_extension_sections = true,
+        })
+
+        assert.are.equal(3, menu.updated_options.itemnumber)
+        assert.are.equal("Installed (2)", menu.item_table[1].text)
+        assert.are.equal("Orchid Gate", menu.item_table[2].text)
+        assert.are.equal("Quartz Node", menu.item_table[3].text)
+        assert.are.equal("Available (1)", menu.item_table[4].text)
+    end)
+
+    it("keeps installed and available section headers visible during extension search updates", function()
+        local browse = require("suwayomi/ui/browse")
+        local menu = { title = "Suwayomi Extensions" }
+
+        browse.updateExtensionsMenu(menu, {
+            {
+                pkg_name = "pkg.quartz",
+                name = "Quartz Node",
+                is_installed = true,
+            },
+        }, function() end, {
+            show_empty_extension_sections = true,
+        })
+
+        assert.are.equal("Installed (1)", menu.item_table[1].text)
+        assert.are.equal("Quartz Node", menu.item_table[2].text)
+        assert.are.equal("Available (0)", menu.item_table[3].text)
+    end)
+
     it("shows extension actions through the shared action dialog", function()
         local browse = require("suwayomi/ui/browse")
         local selected = {}

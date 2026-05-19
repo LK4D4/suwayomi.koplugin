@@ -349,6 +349,23 @@ describe("suwayomi/ui/list_rows", function()
         assert.are.same({ "pkg.update", "pkg.installed", "pkg.available" }, selected)
     end)
 
+    it("keeps empty installed and available extension sections when requested", function()
+        local rows = require("suwayomi/ui/list_rows")
+        local menu_table = rows.buildExtensionMenuTable({
+            {
+                pkg_name = "pkg.installed",
+                name = "Installed Source",
+                is_installed = true,
+            },
+        }, {
+            show_empty_sections = true,
+        })
+
+        assert.are.equal("Installed (1)", menu_table[1].text)
+        assert.are.equal("Installed Source", menu_table[2].text)
+        assert.are.equal("Available (0)", menu_table[3].text)
+    end)
+
     it("keeps extension status on the first right-column line and markers on the second", function()
         local rows = require("suwayomi/ui/list_rows")
 

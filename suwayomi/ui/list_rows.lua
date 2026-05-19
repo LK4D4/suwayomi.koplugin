@@ -241,6 +241,7 @@ function ListRows.buildExtensionMenuTable(extensions, options)
     local updates = {}
     local installed = {}
     local available = {}
+    local show_empty_sections = options.show_empty_sections == true and #(extensions or {}) > 0
 
     for _, extension in ipairs(extensions or {}) do
         if type(extension) == "table" and extension.has_update == true then
@@ -252,8 +253,8 @@ function ListRows.buildExtensionMenuTable(extensions, options)
         end
     end
 
-    local function appendSection(label, group)
-        if #group == 0 then
+    local function appendSection(label, group, show_empty)
+        if #group == 0 and not show_empty then
             return
         end
         table.insert(menu_table, ListRows.buildSectionHeaderRow(sectionTitle(label, #group)))
@@ -263,8 +264,8 @@ function ListRows.buildExtensionMenuTable(extensions, options)
     end
 
     appendSection(_("Updates"), updates)
-    appendSection(_("Installed"), installed)
-    appendSection(_("Available"), available)
+    appendSection(_("Installed"), installed, show_empty_sections)
+    appendSection(_("Available"), available, show_empty_sections)
 
     if #menu_table == 0 and options.empty_text then
         table.insert(menu_table, {

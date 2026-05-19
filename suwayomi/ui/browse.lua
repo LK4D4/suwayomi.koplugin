@@ -17,6 +17,18 @@ local function getListMenu()
     return require("suwayomi/ui/list_menu")
 end
 
+local function findExtensionItemNumber(menu_table, pkg_name)
+    if pkg_name == nil or pkg_name == "" then
+        return nil
+    end
+    for index, row in ipairs(menu_table or {}) do
+        if type(row.extension) == "table" and row.extension.pkg_name == pkg_name then
+            return index
+        end
+    end
+    return nil
+end
+
 function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
     options = options or {}
     if type(onSelectCallback) == "table" then
@@ -41,14 +53,17 @@ end
 
 function BrowseUI.showExtensionsMenu(extensions, onSelectCallback, options)
     options = options or {}
+    local item_table = ListRows.buildExtensionMenuTable(extensions, {
+        on_select = onSelectCallback,
+        empty_text = options.empty_text,
+        show_empty_sections = options.show_empty_extension_sections,
+    })
     return getListMenu().show{
         title = options.title or _("Suwayomi Extensions"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         fixed_item_heights = options.fixed_item_heights ~= false,
-        item_table = ListRows.buildExtensionMenuTable(extensions, {
-            on_select = onSelectCallback,
-            empty_text = options.empty_text,
-        }),
+        item_table = item_table,
+        itemnumber = findExtensionItemNumber(item_table, options.focus_extension_pkg_name),
         close_callback = options.close_callback,
         on_close = options.on_close,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
@@ -59,13 +74,16 @@ end
 
 function BrowseUI.updateExtensionsMenu(menu, extensions, onSelectCallback, options)
     options = options or {}
+    local item_table = ListRows.buildExtensionMenuTable(extensions, {
+        on_select = onSelectCallback,
+        empty_text = options.empty_text,
+        show_empty_sections = options.show_empty_extension_sections,
+    })
     return getListMenu().update(menu, {
         title = options.title or _("Suwayomi Extensions"),
         title_bar_left_icon = options.title_bar_left_icon,
-        item_table = ListRows.buildExtensionMenuTable(extensions, {
-            on_select = onSelectCallback,
-            empty_text = options.empty_text,
-        }),
+        item_table = item_table,
+        itemnumber = findExtensionItemNumber(item_table, options.focus_extension_pkg_name),
         close_callback = options.close_callback,
         on_close = options.on_close,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
