@@ -169,6 +169,27 @@ local function inferSiblingContext(path, contexts, ledger)
     }
 end
 
+local function buildReturnedManga(context, refreshed_manga)
+    local manga = {
+        id = context.manga_id,
+        title = context.manga_title or context.manga_id,
+        in_library = context.in_library,
+        source = copyTable(context.source),
+    }
+    if type(refreshed_manga) == "table" then
+        for key, value in pairs(refreshed_manga) do
+            manga[key] = value
+        end
+        if manga.in_library == nil then
+            manga.in_library = context.in_library
+        end
+        if not manga.source then
+            manga.source = copyTable(context.source)
+        end
+    end
+    return manga
+end
+
 local function normalizeContextStore(contexts)
     if type(contexts) ~= "table" then
         return {}
@@ -274,7 +295,7 @@ function Methods:startReaderReturnChapterRequest(context)
         owner = self,
         credentials = credentials,
         request = {
-            action = "fetch_chapters_for_manga",
+            action = "fetch_reader_return_chapters_for_manga",
             manga_id = context.manga_id,
         },
         loading_message = _("Loading chapters..."),
@@ -309,12 +330,7 @@ function Methods:startReaderReturnChapterRequest(context)
                 return
             end
 
-            local manga = {
-                id = context.manga_id,
-                title = context.manga_title or context.manga_id,
-                in_library = context.in_library,
-                source = copyTable(context.source),
-            }
+            local manga = buildReturnedManga(context, result.manga)
             self:closeReaderToFileManager(function()
                 if self.active_reader_return_request == request_token then
                     self.active_reader_return_request = nil

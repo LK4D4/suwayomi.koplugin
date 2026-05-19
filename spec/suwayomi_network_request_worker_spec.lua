@@ -141,6 +141,38 @@ describe("suwayomi/network/request_worker", function()
         }, written["/settings/update.json"])
     end)
 
+    it("fetches reader return chapters with fresh manga metadata", function()
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchChaptersForManga = function()
+                    return {
+                        ok = true,
+                        chapters = { { id = "c1", name = "Chapter 1" } },
+                    }
+                end,
+                fetchMangaById = function(_, manga_id)
+                    return {
+                        ok = true,
+                        manga = { id = manga_id, title = "Paper Comet", in_library = true },
+                    }
+                end,
+            }
+        end
+        package.loaded["suwayomi/api"] = nil
+        local Worker = require("suwayomi/network/request_worker")
+
+        Worker:run({ server_url = "https://suwayomi.example" }, {
+            action = "fetch_reader_return_chapters_for_manga",
+            manga_id = "m1",
+        }, "/settings/reader-return.json")
+
+        assert.are.same({
+            ok = true,
+            chapters = { { id = "c1", name = "Chapter 1" } },
+            manga = { id = "m1", title = "Paper Comet", in_library = true },
+        }, written["/settings/reader-return.json"])
+    end)
+
     it("normalizes missing and malformed result files to network request errors", function()
         local Worker = require("suwayomi/network/request_worker")
 

@@ -175,6 +175,30 @@ function Queries._buildLegacyLibraryMangaQuery(options)
     return buildLibraryMangaQuery(options, LEGACY_MANGA_FIELDS)
 end
 
+local function buildMangaByIdQuery(manga_id, fields)
+    return json.encode({
+        query = "query GET_MANGA_BY_ID($filter: MangaFilterInput, $first: Int) { mangas(filter: $filter, first: $first) { totalCount nodes { "
+            .. fields
+            .. " source { id displayName name lang } } } }",
+        variables = {
+            filter = {
+                id = {
+                    equalTo = tonumber(manga_id) or manga_id,
+                },
+            },
+            first = 1,
+        },
+    })
+end
+
+function Queries._buildMangaByIdQuery(manga_id)
+    return buildMangaByIdQuery(manga_id, MANGA_FIELDS)
+end
+
+function Queries._buildLegacyMangaByIdQuery(manga_id)
+    return buildMangaByIdQuery(manga_id, LEGACY_MANGA_FIELDS)
+end
+
 function Queries._buildCategoryQuery()
     return json.encode({
         query = "query GET_LIBRARY_CATEGORIES { categories { nodes { id name order mangas { totalCount } } } }",

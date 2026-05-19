@@ -435,7 +435,7 @@ describe("suwayomi/reader_return", function()
             "reinit-filemanager",
             "show-chapters",
         }, state.events)
-        assert.are.equal("fetch_chapters_for_manga", state.network_requests[1].request.action)
+        assert.are.equal("fetch_reader_return_chapters_for_manga", state.network_requests[1].request.action)
         assert.are.equal("m1", state.network_requests[1].request.manga_id)
         assert.are.same({}, state.fetched_manga_ids)
         assert.are.equal("m1", state.shown_manga.id)
@@ -445,6 +445,40 @@ describe("suwayomi/reader_return", function()
         assert.are.equal("c1", state.shown_options.return_context.chapter_id)
         assert.are.equal("Chapter 1", state.shown_options.return_context.chapter_name)
         assert.is_table(state.shown_options.reader_return_close_target)
+        assert.are.equal("library", state.shown_options.reader_return_close_target.kind)
+    end)
+
+    it("uses fresh manga library state when returning to the chapter list", function()
+        local plugin = build_plugin({
+            contexts = {
+                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Paper Comet",
+                    in_library = false,
+                    chapter_id = "c1",
+                    chapter_name = "Chapter 1",
+                    source = { id = "local", name = "Local source" },
+                },
+            },
+            fetch_result = {
+                ok = true,
+                manga = {
+                    id = "m1",
+                    title = "Paper Comet",
+                    in_library = true,
+                    source = { id = "local", name = "Local source" },
+                },
+                chapters = {
+                    { id = "c1", name = "Chapter 1" },
+                },
+            },
+        })
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+
+        assert.are.equal("fetch_reader_return_chapters_for_manga", state.network_requests[1].request.action)
+        assert.is_true(state.shown_manga.in_library)
         assert.are.equal("library", state.shown_options.reader_return_close_target.kind)
     end)
 
@@ -466,7 +500,7 @@ describe("suwayomi/reader_return", function()
         assert.is_true(plugin:returnToSuwayomiChapters())
 
         assert.are.same({ "network-request" }, state.events)
-        assert.are.equal("fetch_chapters_for_manga", state.network_requests[1].request.action)
+        assert.are.equal("fetch_reader_return_chapters_for_manga", state.network_requests[1].request.action)
         assert.are.same({}, state.fetched_manga_ids)
         assert.are.same({ "Network unavailable." }, plugin.messages)
     end)

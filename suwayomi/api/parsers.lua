@@ -491,6 +491,17 @@ function Parsers.parseLibraryMangaResponse(response_body)
     }
 end
 
+function Parsers.parseMangaByIdResponse(response_body)
+    local parsed, parse_error = Parsers.parseLibraryMangaResponse(response_body)
+    if not parsed then
+        return nil, parse_error
+    end
+    if type(parsed.manga) ~= "table" or #parsed.manga == 0 then
+        return nil, "Suwayomi server did not return manga data."
+    end
+    return parsed.manga[1]
+end
+
 function Parsers.parseCategoryResponse(response_body)
     local payload, _, err = json.decode(response_body, 1, nil)
     if err then

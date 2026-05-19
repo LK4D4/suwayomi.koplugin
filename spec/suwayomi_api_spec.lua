@@ -204,6 +204,23 @@ describe("suwayomi/api facade", function()
         assert.truthy(library_request.bodies[1]:match("description"))
         assert.is_nil(library_request.bodies[2]:match("description"))
 
+        local single_request = install_graphql_sequence_stub({
+            {
+                body = [[{"errors":[{"message":"Cannot query field \"artist\" on type \"Manga\""}]}]],
+            },
+            {
+                body = [[{"data":{"mangas":{"totalCount":1,"nodes":[{"id":17,"title":"Paper Comet","inLibrary":true}]}}}]],
+            },
+        })
+
+        local single_manga = api.fetchMangaById(valid_credentials(), "17")
+
+        assert.are.equal(true, single_manga.ok)
+        assert.are.equal("Paper Comet", single_manga.manga.title)
+        assert.are.equal(2, single_request.count)
+        assert.truthy(single_request.bodies[1]:match("artist"))
+        assert.is_nil(single_request.bodies[2]:match("artist"))
+
         local refresh_request = install_graphql_sequence_stub({
             {
                 body = [[{"errors":[{"message":"Cannot query field \"genre\" on type \"Manga\""}]}]],
@@ -339,6 +356,12 @@ describe("suwayomi/api facade", function()
         assert.are.equal(true, library.ok)
         assert.are.equal(1, library.total_count)
         assert.are.equal("17", library.manga[1].id)
+
+        install_graphql_stub([[{"data":{"mangas":{"totalCount":1,"nodes":[{"id":17,"title":"Paper Comet","inLibrary":true}]}}}]])
+        local single_manga = api.fetchMangaById(valid_credentials(), "17")
+        assert.are.equal(true, single_manga.ok)
+        assert.are.equal("Paper Comet", single_manga.manga.title)
+        assert.are.equal(true, single_manga.manga.in_library)
 
         install_graphql_stub([[{"data":{"categories":{"nodes":[{"id":2,"name":"Reading","order":1,"mangas":{"totalCount":7}}]}}}]])
         local categories = api.fetchCategories(valid_credentials())

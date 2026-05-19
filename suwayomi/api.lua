@@ -28,6 +28,8 @@ local query_exports = {
     "_buildLegacyMangaQuery",
     "_buildLibraryMangaQuery",
     "_buildLegacyLibraryMangaQuery",
+    "_buildMangaByIdQuery",
+    "_buildLegacyMangaByIdQuery",
     "_buildCategoryQuery",
     "_buildUpdateMangaLibraryMutation",
     "_buildRefreshMangaMutation",
@@ -54,6 +56,7 @@ local parser_exports = {
     "parseUpdateExtensionResponse",
     "parseMangaResponse",
     "parseLibraryMangaResponse",
+    "parseMangaByIdResponse",
     "parseCategoryResponse",
     "parseUpdateMangaLibraryResponse",
     "parseRefreshMangaResponse",
@@ -281,6 +284,34 @@ function SuwayomiAPI.fetchLibraryManga(credentials, options)
         ok = true,
         manga = parsed.manga,
         total_count = parsed.total_count,
+    }
+end
+
+function SuwayomiAPI.fetchMangaById(credentials, manga_id)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildMangaByIdQuery(manga_id), "fetchMangaById")
+    if not result.ok then
+        return result
+    end
+    if parsers.isOptionalMangaMetadataFieldError(result.response_body) then
+        logDebugEvent({ operation = "fetchMangaById", event = "legacy_manga_query_retry" })
+        result = performGraphQLRequest(credentials, SuwayomiAPI._buildLegacyMangaByIdQuery(manga_id), "fetchMangaById")
+        if not result.ok then
+            return result
+        end
+    end
+
+    local manga, parse_error = SuwayomiAPI.parseMangaByIdResponse(result.response_body)
+    if not manga then
+        logDebugEvent({ operation = "fetchMangaById", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        manga = manga,
     }
 end
 

@@ -195,6 +195,21 @@ describe("suwayomi/api/parsers", function()
         assert.are.equal("398", library.manga[1].first_unread_chapter.id)
         assert.are.equal(true, library.manga[1].latest_fetched_chapter.is_read)
 
+        local single_manga = assert(parsers.parseMangaByIdResponse([[
+            { "data": { "mangas": { "nodes": [
+                {
+                    "id": 17,
+                    "title": "Paper Comet",
+                    "inLibrary": true,
+                    "source": { "id": "local", "displayName": "Local source", "name": "Local", "lang": "en" }
+                }
+            ] } } }
+        ]]))
+        assert.are.equal("17", single_manga.id)
+        assert.are.equal("Paper Comet", single_manga.title)
+        assert.are.equal(true, single_manga.in_library)
+        assert.are.equal("local", single_manga.source.id)
+
         local categories = assert(parsers.parseCategoryResponse([[
             { "data": { "categories": { "nodes": [
                 { "id": 2, "name": "Reading", "order": 1, "mangas": { "totalCount": 7 } }

@@ -67,6 +67,21 @@ local function fetchLibraryMangaPages(credentials)
     }
 end
 
+local function fetchReaderReturnChapters(credentials, manga_id)
+    local result = SuwayomiAPI.fetchChaptersForManga(credentials, manga_id)
+    if not result.ok then
+        return result
+    end
+
+    if SuwayomiAPI.fetchMangaById then
+        local manga_result = SuwayomiAPI.fetchMangaById(credentials, manga_id)
+        if manga_result and manga_result.ok and type(manga_result.manga) == "table" then
+            result.manga = manga_result.manga
+        end
+    end
+    return result
+end
+
 local function normalizeResult(result)
     if type(result) ~= "table" then
         return {
@@ -94,6 +109,9 @@ function RequestWorker:run(credentials, request, result_path)
     local ok, result = pcall(function()
         if request.action == "fetch_chapters_for_manga" then
             return SuwayomiAPI.fetchChaptersForManga(credentials, request.manga_id)
+        end
+        if request.action == "fetch_reader_return_chapters_for_manga" then
+            return fetchReaderReturnChapters(credentials, request.manga_id)
         end
         if request.action == "refresh_manga" then
             return SuwayomiAPI.refreshManga(credentials, request.manga_id)
