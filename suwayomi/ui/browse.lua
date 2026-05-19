@@ -368,6 +368,15 @@ local function hasSourceFilterTitleActions(title_options)
         or type(title_options.on_title_bar_left_hold) == "function"
 end
 
+local function refreshSourceFilterMenu(context, menu)
+    if type(menu) ~= "table" and context and type(context.get_menu) == "function" then
+        menu = context.get_menu()
+    end
+    if type(menu) == "table" and type(menu.updateItems) == "function" then
+        menu:updateItems(nil, true)
+    end
+end
+
 local function buildSourceFilterRows(filters, draft, context)
     context = context or {}
     local rows = {}
@@ -427,7 +436,7 @@ local function buildSourceFilterRows(filters, draft, context)
             if #values == 0 then
                 row.select_enabled = false
             else
-                row.callback = function()
+                row.callback = function(menu)
                     local choices = {}
                     local current = tonumber(getDraftState(
                         draft,
@@ -450,6 +459,7 @@ local function buildSourceFilterRows(filters, draft, context)
                             local entry = findDraftStateEntry(draft, index, "selectState", context.group_position)
                             entry.state = state
                             row.mandatory = choice and choice.text or values[state + 1] or tostring(state)
+                            refreshSourceFilterMenu(context, menu)
                         end,
                     })
                 end
@@ -479,7 +489,7 @@ local function buildSourceFilterRows(filters, draft, context)
                 mandatory = sortStateText(filter, state),
             }
             local values = type(filter.values) == "table" and filter.values or {}
-            row.callback = function()
+            row.callback = function(menu)
                 local actions = {}
                 local current = getDraftState(draft, index, "sortState", default, context.group_position)
                 if type(current) ~= "table" then
@@ -526,6 +536,7 @@ local function buildSourceFilterRows(filters, draft, context)
                         }
                     end
                     row.mandatory = sortStateText(filter, entry.state)
+                    refreshSourceFilterMenu(context, menu)
                 end)
             end
             table.insert(rows, row)
@@ -535,7 +546,7 @@ local function buildSourceFilterRows(filters, draft, context)
                 mandatory = _("Group"),
             }
             if canShowGroupAsChecklist(filter.filters) then
-                row.callback = function()
+                row.callback = function(menu)
                     local choices = {}
                     local function childChoiceText(child, child_index)
                         if child.type == "CheckBoxFilter" then
@@ -588,11 +599,15 @@ local function buildSourceFilterRows(filters, draft, context)
                             end
                             choice.text = childChoiceText(child, value.child_index)
                             row.mandatory = _("Modified")
+                            refreshSourceFilterMenu(context, menu)
                         end,
                     })
                 end
             else
-                local sub_rows = buildSourceFilterRows(filter.filters, draft, { group_position = index })
+                local sub_rows = buildSourceFilterRows(filter.filters, draft, {
+                    group_position = index,
+                    get_menu = context.get_menu,
+                })
                 row.sub_item_table = sub_rows
                 if #sub_rows == 0 then
                     row.select_enabled = false
@@ -651,7 +666,12 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
         show_options.on_title_bar_left_hold = withCurrentDraft(show_options.on_title_bar_left_hold)
     end
     show_options.title = title_options.title or title
-    show_options.item_table = buildSourceFilterRows(filters, draft)
+    local menu
+    show_options.item_table = buildSourceFilterRows(filters, draft, {
+        get_menu = function()
+            return menu
+        end,
+    })
     if not hasSourceFilterTitleActions(title_options) then
         table.insert(show_options.item_table, {
             text = _("Apply filters"),
@@ -684,7 +704,8 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
             return menu_options.onSelect({ id = "apply_source_filters" })
         end
     end
-    return getListMenu().show(show_options)
+    menu = getListMenu().show(show_options)
+    return menu
 end
 
 function BrowseUI.showExtensionSearchPrompt(currentQuery, onSearchCallback)

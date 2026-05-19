@@ -603,6 +603,100 @@ describe("suwayomi/ui/browse", function()
         }, applied)
     end)
 
+    it("refreshes source filter select rows after modal edits", function()
+        local browse = require("suwayomi/ui/browse")
+        local refreshes = {}
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "Random Source",
+        }, {
+            { type = "SelectFilter", name = "Length", values = { "Any", "Long" }, default = 0 },
+        })
+
+        local editor = shown_dialog
+        editor.updateItems = function(_, select_number, no_recalculate_dimen)
+            table.insert(refreshes, { select_number = select_number, no_recalculate_dimen = no_recalculate_dimen })
+        end
+
+        editor.item_table[1].callback(editor)
+        shown_dialog.buttons[2][1].callback()
+
+        assert.are.equal("Long", editor.item_table[1].mandatory)
+        assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
+    end)
+
+    it("refreshes source filter sort rows after modal edits", function()
+        local browse = require("suwayomi/ui/browse")
+        local refreshes = {}
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "Random Source",
+        }, {
+            { type = "SortFilter", name = "Sort by", values = { "Name", "Updated" }, default = { index = 0, ascending = true } },
+        })
+
+        local editor = shown_dialog
+        editor.updateItems = function(_, select_number, no_recalculate_dimen)
+            table.insert(refreshes, { select_number = select_number, no_recalculate_dimen = no_recalculate_dimen })
+        end
+
+        editor.item_table[1].callback(editor)
+        shown_dialog.buttons[2][1].callback()
+
+        assert.are.equal("Updated - Ascending", editor.item_table[1].mandatory)
+        assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
+    end)
+
+    it("refreshes small source filter group rows after modal edits", function()
+        local browse = require("suwayomi/ui/browse")
+        local refreshes = {}
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "Random Source",
+        }, {
+            {
+                type = "GroupFilter",
+                name = "Small group",
+                filters = {
+                    { type = "CheckBoxFilter", name = "Awarded", default = false },
+                    { type = "TriStateFilter", name = "Group license", default = "IGNORE" },
+                },
+            },
+            {
+                type = "GroupFilter",
+                name = "Large group",
+                filters = {
+                    { type = "CheckBoxFilter", name = "One", default = false },
+                    { type = "CheckBoxFilter", name = "Two", default = false },
+                    { type = "CheckBoxFilter", name = "Three", default = false },
+                    { type = "CheckBoxFilter", name = "Four", default = false },
+                    { type = "CheckBoxFilter", name = "Five", default = false },
+                    { type = "CheckBoxFilter", name = "Six", default = false },
+                    { type = "CheckBoxFilter", name = "Seven", default = false },
+                    { type = "CheckBoxFilter", name = "Eight", default = false },
+                    { type = "CheckBoxFilter", name = "Nine", default = false },
+                },
+            },
+        })
+
+        local editor = shown_dialog
+        editor.updateItems = function(_, select_number, no_recalculate_dimen)
+            table.insert(refreshes, { select_number = select_number, no_recalculate_dimen = no_recalculate_dimen })
+        end
+
+        assert.is_nil(editor.item_table[1].sub_item_table)
+        assert.are.equal("One", editor.item_table[2].sub_item_table[1].text)
+
+        editor.item_table[1].callback(editor)
+        shown_dialog.buttons[1][1].callback()
+
+        assert.are.equal("Modified", editor.item_table[1].mandatory)
+        assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
+    end)
+
     it("shows latest for unknown source support and collects search queries", function()
         local browse = require("suwayomi/ui/browse")
         local selected_mode

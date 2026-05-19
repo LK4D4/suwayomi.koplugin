@@ -513,3 +513,11 @@ Only if Step 1-3 require edits:
 rtk git add suwayomi spec docs/superpowers/plans/2026-05-19-modal-choice-dialogs.md
 rtk git commit -m "test: cover modal choice dialogs"
 ```
+
+## Final Status
+
+- Source filter modal refresh regression fixed.
+- SelectFilter, SortFilter, and small GroupFilter modal callbacks now refresh the parent source-filter menu after draft row mutations.
+- Large and complex GroupFilter rows remain nested.
+- Title actions continue to receive the edited draft.
+- Focused specs and lint passed before final commit.
