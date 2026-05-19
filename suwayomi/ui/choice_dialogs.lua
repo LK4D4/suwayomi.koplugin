@@ -46,9 +46,11 @@ function ChoiceDialogs.showChoiceDialog(options)
         table.insert(buttons, {
             {
                 text = choiceText(choice),
+                align = "left",
                 checked_func = function()
                     return value == options.current
                 end,
+                no_refresh_checkmark = true,
                 callback = function()
                     closeThen(function()
                         return dialog
@@ -86,6 +88,7 @@ function ChoiceDialogs.showChecklistDialog(options)
         table.insert(buttons, {
             {
                 text = choiceText(choice),
+                align = "left",
                 checked_func = function()
                     return isChoiceSelected(value, choice)
                 end,

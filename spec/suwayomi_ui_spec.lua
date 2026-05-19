@@ -1190,9 +1190,12 @@ describe("suwayomi/ui", function()
 
         assert.are.equal("Pick count", shown_dialog.title)
         assert.are.equal("1", shown_dialog.buttons[1][1].text)
+        assert.are.equal("left", shown_dialog.buttons[1][1].align)
         assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.is_true(shown_dialog.buttons[1][1].no_refresh_checkmark)
         assert.are.equal("2", shown_dialog.buttons[2][1].text)
         assert.is_true(shown_dialog.buttons[2][1].checked_func())
+        assert.is_true(shown_dialog.buttons[2][1].no_refresh_checkmark)
 
         shown_dialog.buttons[1][1].callback()
 
@@ -1230,9 +1233,12 @@ describe("suwayomi/ui", function()
         })
 
         assert.are.equal("English", shown_dialog.buttons[1][1].text)
+        assert.are.equal("left", shown_dialog.buttons[1][1].align)
         assert.is_true(shown_dialog.buttons[1][1].checked_func())
+        assert.is_nil(shown_dialog.buttons[1][1].no_refresh_checkmark)
         assert.are.equal("Japanese", shown_dialog.buttons[2][1].text)
         assert.is_false(shown_dialog.buttons[2][1].checked_func())
+        assert.is_nil(shown_dialog.buttons[2][1].no_refresh_checkmark)
 
         local first_dialog = shown_dialog
         shown_dialog.buttons[2][1].callback()
