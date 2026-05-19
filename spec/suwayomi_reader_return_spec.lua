@@ -168,6 +168,15 @@ describe("suwayomi/reader_return", function()
                 state.shown_options = show_options
                 return true
             end,
+            buildReaderReturnCloseTarget = function(_, _, manga)
+                if manga and manga.in_library == true then
+                    return { kind = "library" }
+                end
+                if manga and manga.source and manga.source.id then
+                    return { kind = "source", source = manga.source }
+                end
+                return nil
+            end,
         }
         for name, method in pairs(ReaderReturn.methods) do
             plugin[name] = method
@@ -192,19 +201,20 @@ describe("suwayomi/reader_return", function()
         local plugin = build_plugin()
 
         plugin:saveReaderReturnContext(
-            { id = "m1", title = "Manga", source = { id = "local", name = "Local source" } },
+            { id = "m1", title = "Fable Orbit", in_library = true, source = { id = "local", name = "Local source" } },
             { id = "c1", name = "Chapter 1" },
-            "/downloads/Local/Manga/Chapter 1.cbz"
+            "/downloads/Local/Fable Orbit/Chapter 1.cbz"
         )
 
         assert.are.same({
-            path = "/downloads/Local/Manga/Chapter 1.cbz",
+            path = "/downloads/Local/Fable Orbit/Chapter 1.cbz",
             manga_id = "m1",
-            manga_title = "Manga",
+            manga_title = "Fable Orbit",
+            in_library = true,
             chapter_id = "c1",
             chapter_name = "Chapter 1",
             source = { id = "local", name = "Local source" },
-        }, state.contexts["/downloads/Local/Manga/Chapter 1.cbz"])
+        }, state.contexts["/downloads/Local/Fable Orbit/Chapter 1.cbz"])
     end)
 
     it("replaces scalar persisted contexts when saving a return context", function()
@@ -248,6 +258,36 @@ describe("suwayomi/reader_return", function()
             { id = "local", name = "Local source" },
             state.contexts["/downloads/Local/Manga/Chapter 2.cbz"].source
         )
+    end)
+
+    it("updates saved return contexts when library membership changes", function()
+        local plugin = build_plugin({
+            contexts = {
+                ["/downloads/Local/Paper Comet/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Paper Comet/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Paper Comet",
+                    chapter_id = "c1",
+                    chapter_name = "Chapter 1",
+                    source = { id = "local", name = "Local source" },
+                },
+            },
+        })
+
+        plugin:saveReaderReturnContextsForChapters({
+            id = "m1",
+            title = "Paper Comet",
+            in_library = true,
+            source = { id = "local", name = "Local source" },
+        }, {
+            {
+                chapter = { id = "c1", name = "Chapter 1" },
+                path = "/downloads/Local/Paper Comet/Chapter 1.cbz",
+            },
+        })
+
+        assert.are.same({ "save-contexts" }, state.events)
+        assert.is_true(state.contexts["/downloads/Local/Paper Comet/Chapter 1.cbz"].in_library)
     end)
 
     it("finds current reader context from persisted contexts", function()
@@ -356,6 +396,7 @@ describe("suwayomi/reader_return", function()
                     path = "/downloads/Local/Manga/Chapter 1.cbz",
                     manga_id = "m1",
                     manga_title = "Manga",
+                    in_library = true,
                     chapter_id = "c1",
                     chapter_name = "Chapter 1",
                     source = { id = "local", name = "Local source" },
@@ -376,9 +417,12 @@ describe("suwayomi/reader_return", function()
         assert.are.same({}, state.fetched_manga_ids)
         assert.are.equal("m1", state.shown_manga.id)
         assert.are.equal("Manga", state.shown_manga.title)
+        assert.is_true(state.shown_manga.in_library)
         assert.are.same({ id = "local", name = "Local source" }, state.shown_manga.source)
         assert.are.equal("c1", state.shown_options.return_context.chapter_id)
         assert.are.equal("Chapter 1", state.shown_options.return_context.chapter_name)
+        assert.is_table(state.shown_options.reader_return_close_target)
+        assert.are.equal("library", state.shown_options.reader_return_close_target.kind)
     end)
 
     it("keeps reader open when chapter lookup fails", function()

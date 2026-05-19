@@ -58,6 +58,7 @@ local function buildContext(manga, chapter, chapter_path)
         path = chapter_path,
         manga_id = present(manga.id),
         manga_title = manga.title,
+        in_library = manga.in_library,
         chapter_id = present(chapter.id),
         chapter_name = chapter.name,
         source = copyTable(manga.source),
@@ -91,6 +92,7 @@ local function contextMatches(left, right)
     return left.path == right.path
         and left.manga_id == right.manga_id
         and left.manga_title == right.manga_title
+        and left.in_library == right.in_library
         and left.chapter_id == right.chapter_id
         and left.chapter_name == right.chapter_name
         and sourceMatches(left.source, right.source)
@@ -104,6 +106,7 @@ local function candidateFromLedgerEntry(entry)
         path = entry.path,
         manga_id = present(entry.manga_id),
         manga_title = entry.manga_title,
+        in_library = entry.in_library,
         chapter_id = present(entry.chapter_id),
         chapter_name = entry.chapter_name,
     }
@@ -117,6 +120,7 @@ local function inferSiblingContext(path, contexts, ledger)
 
     local inferred_manga_id
     local inferred_manga_title
+    local inferred_in_library
     local inferred_source
     local function consider(candidate)
         if type(candidate) ~= "table" or parentDirectory(candidate.path) ~= current_dir then
@@ -132,6 +136,9 @@ local function inferSiblingContext(path, contexts, ledger)
         inferred_manga_id = manga_id
         if not inferred_source and candidate.source then
             inferred_source = candidate.source
+        end
+        if inferred_in_library == nil and candidate.in_library ~= nil then
+            inferred_in_library = candidate.in_library
         end
         if not inferred_manga_title and candidate.manga_title then
             inferred_manga_title = candidate.manga_title
@@ -157,6 +164,7 @@ local function inferSiblingContext(path, contexts, ledger)
         path = path,
         manga_id = inferred_manga_id,
         manga_title = inferred_manga_title,
+        in_library = inferred_in_library,
         source = copyTable(inferred_source),
     }
 end
@@ -310,6 +318,7 @@ function Methods:startReaderReturnChapterRequest(context)
             local manga = {
                 id = context.manga_id,
                 title = context.manga_title or context.manga_id,
+                in_library = context.in_library,
                 source = copyTable(context.source),
             }
             self:closeReaderToFileManager(function()
@@ -318,6 +327,9 @@ function Methods:startReaderReturnChapterRequest(context)
                 end
                 self:showChapterResultForManga(manga, result, {
                     return_context = context,
+                    reader_return_close_target = self.buildReaderReturnCloseTarget
+                        and self:buildReaderReturnCloseTarget(context, manga)
+                        or nil,
                 })
             end, function()
                 if self.active_reader_return_request ~= request_token then
