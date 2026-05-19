@@ -355,6 +355,7 @@ describe("suwayomi/reader_return", function()
                     path = "/downloads/Local/Manga/Chapter 1.cbz",
                     manga_id = "m1",
                     manga_title = "Manga",
+                    in_library = true,
                     source = { id = "local", name = "Local source" },
                 },
             },
@@ -365,6 +366,7 @@ describe("suwayomi/reader_return", function()
         assert.are.equal("m1", context.manga_id)
         assert.are.equal("Manga", context.manga_title)
         assert.are.equal("/downloads/Local/Manga/Chapter 2.cbz", context.path)
+        assert.is_true(context.in_library)
         assert.is_nil(context.chapter_id)
         assert.are.same({ id = "local", name = "Local source" }, context.source)
     end)
