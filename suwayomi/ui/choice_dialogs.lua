@@ -81,6 +81,7 @@ function ChoiceDialogs.showChecklistDialog(options)
         local function showAgain()
             ChoiceDialogs.showChecklistDialog(options)
         end
+        dialog.suwayomi_refresh_close = true
         UIManager:close(dialog)
         if UIManager.nextTick then
             UIManager:nextTick(showAgain)
@@ -120,7 +121,14 @@ function ChoiceDialogs.showChecklistDialog(options)
         title = options.title or _("Choose"),
         buttons = buttons,
         anchor = options.anchor,
-        close_callback = options.close_callback,
+        close_callback = function()
+            if dialog and dialog.suwayomi_refresh_close then
+                return
+            end
+            if options.close_callback then
+                options.close_callback()
+            end
+        end,
     }
     UIManager:show(dialog)
     return dialog

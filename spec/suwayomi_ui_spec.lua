@@ -5,6 +5,7 @@ describe("suwayomi/ui", function()
     local closed_dialog
     local events
     local record_next_tick
+    local run_close_callback_on_close
     local dialog_fields
 
     before_each(function()
@@ -12,6 +13,7 @@ describe("suwayomi/ui", function()
         closed_dialog = nil
         events = {}
         record_next_tick = false
+        run_close_callback_on_close = false
         dialog_fields = {
             "https://suwayomi.example",
             "alice",
@@ -315,6 +317,9 @@ describe("suwayomi/ui", function()
                 close = function(_, widget)
                     closed_dialog = widget
                     table.insert(events, "close")
+                    if run_close_callback_on_close and widget and widget.close_callback then
+                        widget.close_callback()
+                    end
                 end,
                 nextTick = function(_, callback)
                     if record_next_tick then
@@ -1198,6 +1203,8 @@ describe("suwayomi/ui", function()
         local selected = { en = true }
         local toggles = {}
         local done = false
+        local close_count = 0
+        run_close_callback_on_close = true
 
         ui.showChecklistDialog({
             title = "Languages",
@@ -1215,6 +1222,9 @@ describe("suwayomi/ui", function()
             onDone = function()
                 done = true
             end,
+            close_callback = function()
+                close_count = close_count + 1
+            end,
         })
 
         assert.are.equal("* English", shown_dialog.buttons[1][1].text)
@@ -1226,6 +1236,7 @@ describe("suwayomi/ui", function()
         assert.are.equal(first_dialog, closed_dialog)
         assert.are_not.equal(first_dialog, shown_dialog)
         assert.are.equal("* Japanese", shown_dialog.buttons[2][1].text)
+        assert.are.equal(0, close_count)
 
         local second_dialog = shown_dialog
         shown_dialog.buttons[2][1].callback()
@@ -1233,10 +1244,12 @@ describe("suwayomi/ui", function()
         assert.are.equal(second_dialog, closed_dialog)
         assert.are_not.equal(second_dialog, shown_dialog)
         assert.are.equal("Japanese", shown_dialog.buttons[2][1].text)
+        assert.are.equal(0, close_count)
 
         shown_dialog.buttons[3][1].callback()
         assert.is_true(done)
         assert.are.equal(shown_dialog, closed_dialog)
+        assert.are.equal(1, close_count)
     end)
 
     it("shows a parallel chapter downloads choice dialog", function()
