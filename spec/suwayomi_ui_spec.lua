@@ -24,11 +24,13 @@ describe("suwayomi/ui", function()
         package.loaded["suwayomi/ui/downloads"] = nil
         package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
+        package.loaded["suwayomi/ui/manga_info"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/menu"] = nil
         package.loaded["ui/widget/buttondialog"] = nil
         package.loaded["ui/widget/confirmbox"] = nil
         package.loaded["ui/widget/multiinputdialog"] = nil
+        package.loaded["ui/widget/textviewer"] = nil
         package.loaded["ui/widget/titlebar"] = nil
         package.loaded["ui/widget/checkmark"] = nil
         package.loaded["ui/widget/radiomark"] = nil
@@ -73,6 +75,14 @@ describe("suwayomi/ui", function()
                         return dialog_fields
                     end
                     options.onShowKeyboard = function() end
+                    return options
+                end,
+            }
+        end
+
+        package.preload["ui/widget/textviewer"] = function()
+            return {
+                new = function(_, options)
                     return options
                 end,
             }
@@ -288,6 +298,76 @@ describe("suwayomi/ui", function()
         shown_dialog.item_table[1].callback()
 
         assert.are.equal("m-failed:205", retried_key)
+    end)
+
+    it("builds manga information text from available metadata", function()
+        local ui = require("suwayomi/ui")
+
+        local text = ui.buildMangaInformationText({
+            source = { displayName = "  Source A  " },
+            status = "ONGOING",
+            authors = {
+                { name = "Author One" },
+                " Author Two ",
+                "",
+            },
+            artists = {
+                { title = "Artist One" },
+            },
+            chapter_count = 12,
+            unread_count = 4,
+            download_count = 2,
+            in_library = false,
+            categories = {
+                { name = "Reading" },
+                { id = "2" },
+            },
+            genres = {
+                "Action",
+                { name = "Mystery" },
+            },
+            first_unread_chapter = { name = "Chapter 5" },
+            latest_fetched_chapter = { name = "Chapter 8" },
+            description = "  Plot text.  ",
+        })
+
+        assert.are.equal(table.concat({
+            "Source: Source A",
+            "Status: ONGOING",
+            "Author: Author One, Author Two",
+            "Artist: Artist One",
+            "Chapters: 12",
+            "Unread: 4",
+            "Downloaded: 2",
+            "Library: Not in library",
+            "Categories: Reading, 2",
+            "Genres: Action, Mystery",
+            "First unread: Chapter 5",
+            "Latest fetched: Chapter 8",
+            "",
+            "Plot text.",
+        }, "\n"), text)
+    end)
+
+    it("shows manga information in a close-only text viewer", function()
+        local ui = require("suwayomi/ui")
+
+        local dialog = ui.showMangaInformation({
+            id = 42,
+            title = "Manga Title",
+            description = "Synopsis",
+        })
+
+        assert.are.equal(dialog, shown_dialog)
+        assert.are.equal("Manga Title", dialog.title)
+        assert.are.equal("Synopsis", dialog.text)
+        assert.are.equal("book_info", dialog.text_type)
+        assert.is_false(dialog.show_menu)
+        assert.are.equal("Close", dialog.buttons_table[1][1].text)
+
+        dialog.buttons_table[1][1].callback()
+
+        assert.are.equal(dialog, closed_dialog)
     end)
 
     it("preserves facade access to the directory chooser", function()

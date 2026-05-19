@@ -503,6 +503,13 @@ function Methods:performMangaAction(manga, action_id, options)
         self:showChaptersForManga(manga)
         return true
     end
+    if action_id == "manga_information" then
+        if SuwayomiUI.showMangaInformation then
+            SuwayomiUI.showMangaInformation(manga)
+            return true
+        end
+        return false
+    end
     if action_id == "open_first_unread" then
         if getLoadedMangaChapterContext(self, manga) then
             local chapter = self:getFirstUnreadChapterForManga(manga)

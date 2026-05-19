@@ -71,6 +71,7 @@ function MangaActionMenu.buildMainActions(owner, manga, options)
     if options.include_select_all and hasVisibleChapters(owner) then
         table.insert(actions, { id = "select_all", text = _("Select all") })
     end
+    table.insert(actions, { id = "manga_information", text = _("Manga information") })
     if canOpenFirstUnread(owner, manga) then
         table.insert(actions, { id = "open_first_unread", text = _("Open first unread") })
     end
@@ -114,7 +115,8 @@ function MangaActionMenu.buildKeepDownloadedActions()
 end
 
 function MangaActionMenu.isSharedAction(action_id)
-    if action_id == "open_first_unread"
+    if action_id == "manga_information"
+        or action_id == "open_first_unread"
         or action_id == "refresh_chapters"
         or action_id == "add_to_library"
         or action_id == "remove_from_library"
