@@ -68,8 +68,8 @@ local function installController(options)
                 state.actions_menu_callback = onSelect
                 return { name = "actions-menu" }
             end,
-            showConfirm = function(options)
-                state.confirm_options = options
+            showConfirm = function(confirm_options)
+                state.confirm_options = confirm_options
                 return { name = "confirm-dialog" }
             end,
         }
