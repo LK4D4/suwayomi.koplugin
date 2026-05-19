@@ -80,10 +80,6 @@ function SuwayomiClient:buildBrowseResultTitle(source, options)
     return self:getSourceDisplayName(source)
         .. " - "
         .. self:getSourceModeTitle(options)
-        .. " - "
-        .. self:translate("Page")
-        .. " "
-        .. tostring(options.page or 1)
 end
 
 function SuwayomiClient:getSourceModeScreenTitle(options)
@@ -102,10 +98,6 @@ end
 
 function SuwayomiClient:buildBrowseResultScreenTitle(_, options)
     return self:getSourceModeScreenTitle(options)
-        .. " - "
-        .. self:translate("Page")
-        .. " "
-        .. tostring(options.page or 1)
 end
 
 function SuwayomiClient:buildBrowseResultMenuOptions(source, options)

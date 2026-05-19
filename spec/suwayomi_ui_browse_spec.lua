@@ -733,7 +733,7 @@ describe("suwayomi/ui/browse", function()
         }, function(manga)
             table.insert(selected, manga.id)
         end, {
-            title = "MangaDex (EN) - Search: frieren - Page 2",
+            title = "MangaDex (EN) - Search: frieren",
             on_previous_page = function()
                 table.insert(paging, "previous")
             end,
@@ -743,7 +743,7 @@ describe("suwayomi/ui/browse", function()
             on_page_changed = on_page_changed,
         })
 
-        assert.are.equal("MangaDex (EN) - Search: frieren - Page 2", shown_dialog.title)
+        assert.are.equal("MangaDex (EN) - Search: frieren", shown_dialog.title)
         assert.are.equal("list_menu", shown_dialog.renderer)
         assert.is_true(shown_dialog.fixed_item_heights)
         assert.are.equal(on_page_changed, shown_dialog.on_page_changed)
@@ -771,7 +771,7 @@ describe("suwayomi/ui/browse", function()
         local closed = false
         local on_page_changed = function() end
         local menu = {
-            title = "MangaDex - Popular - Page 1",
+            title = "MangaDex - Popular",
             title_bar = {
                 setTitle = function(_, title, refresh)
                     title_bar_title = { title = title, refresh = refresh }
@@ -788,7 +788,7 @@ describe("suwayomi/ui/browse", function()
         browse.updateMangaMenu(menu, {
             { id = "m2", title = "Page 2" },
         }, function() end, {
-            title = "MangaDex - Popular - Page 2",
+            title = "MangaDex - Latest",
             title_bar_left_icon = "appbar.menu",
             close_callback = function()
                 closed = true
@@ -796,9 +796,9 @@ describe("suwayomi/ui/browse", function()
             on_page_changed = on_page_changed,
         })
 
-        assert.are.equal("MangaDex - Popular - Page 2", menu.title)
+        assert.are.equal("MangaDex - Latest", menu.title)
         assert.are.equal("list_menu", menu.renderer)
-        assert.are.same({ title = "MangaDex - Popular - Page 2", refresh = true }, title_bar_title)
+        assert.are.same({ title = "MangaDex - Latest", refresh = true }, title_bar_title)
         assert.are.equal("appbar.menu", left_icon)
         assert.are.equal(on_page_changed, menu.updated_options.on_page_changed)
         assert.is_true(menu.updated)
