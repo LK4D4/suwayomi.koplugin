@@ -120,6 +120,34 @@ function MangaInfo.buildMetadataText(manga)
     return table.concat(lines, "\n")
 end
 
+function MangaInfo.buildPrimaryMetadataText(manga)
+    manga = manga or {}
+    local lines = {}
+
+    appendField(lines, _("Source"), sourceName(manga.source))
+    appendField(lines, _("Status"), manga.status)
+    appendField(lines, _("Author"), joinList(manga.authors or manga.author))
+    appendField(lines, _("Artist"), joinList(manga.artists or manga.artist))
+    appendField(lines, _("Chapters"), manga.chapter_count)
+    appendField(lines, _("Unread"), manga.unread_count)
+    appendField(lines, _("Downloaded"), manga.download_count)
+    if manga.in_library ~= nil then
+        appendField(lines, _("Library"), manga.in_library and _("In library") or _("Not in library"))
+    end
+    return table.concat(lines, "\n")
+end
+
+function MangaInfo.buildDetailsText(manga)
+    manga = manga or {}
+    local lines = {}
+
+    appendField(lines, _("Categories"), joinList(manga.categories))
+    appendField(lines, _("Genres"), joinList(manga.genres or manga.genre))
+    appendField(lines, _("First unread"), chapterName(manga.first_unread_chapter))
+    appendField(lines, _("Latest fetched"), chapterName(manga.latest_fetched_chapter))
+    return table.concat(lines, "\n")
+end
+
 function MangaInfo.buildDescriptionText(manga)
     return cleanText(manga and manga.description) or _("No description available.")
 end
@@ -270,6 +298,15 @@ function MangaInfo.buildDescriptionHtml(manga)
         end
     end
     closeList()
+    local details = MangaInfo.buildDetailsText(manga)
+    if details ~= "" then
+        table.insert(html, "<h3>" .. escapeHtml(_("Details")) .. "</h3>")
+        local detail_lines = {}
+        for line in (details .. "\n"):gmatch("([^\n]*)\n") do
+            table.insert(detail_lines, (escapeHtml(line)))
+        end
+        table.insert(html, "<p>" .. table.concat(detail_lines, "<br/>") .. "</p>")
+    end
     return table.concat(html)
 end
 
@@ -366,7 +403,7 @@ local function computeContentLayout(modules, manga, bounds, chrome)
         - chrome.separator_height
         - chrome.button_height
         - 2 * padding)
-    local metadata_text = MangaInfo.buildMetadataText(manga)
+    local metadata_text = MangaInfo.buildPrimaryMetadataText(manga)
     local metadata_lines = countLines(metadata_text)
     local split_poster_width = math.floor(math.min(scale(Screen, 320), math.max(scale(Screen, 180), body_width * 0.34)))
     local split_poster_height = math.floor(split_poster_width * 1.5)
@@ -374,11 +411,11 @@ local function computeContentLayout(modules, manga, bounds, chrome)
     local split_description_height = body_height - split_poster_height - gap
     local split_metadata_lines = estimateWrappedLineCount(metadata_text, split_metadata_width, scale(Screen, 12))
     local split_metadata_content_height = math.max(scale(Screen, 120), split_metadata_lines * scale(Screen, 24))
-
     local split_fits = body_width >= scale(Screen, 520)
         and body_height >= scale(Screen, 420)
         and split_metadata_width >= scale(Screen, 220)
         and split_poster_height >= scale(Screen, 240)
+        and split_metadata_content_height <= split_poster_height
         and split_description_height >= scale(Screen, 120)
 
     if split_fits then
@@ -603,22 +640,13 @@ function MangaInfo.buildContentWidget(manga, options, layout)
     local poster = buildPosterWidget(modules, manga, options, layout.poster_width, layout.poster_height)
     local metadata_height = layout.metadata_content_height or layout.metadata_height
     local metadata = modules.TextBoxWidget:new{
-        text = MangaInfo.buildMetadataText(manga),
+        text = MangaInfo.buildPrimaryMetadataText(manga),
         width = layout.metadata_width,
         height = metadata_height,
         face = modules.Font:getFace("infofont"),
         alignment = "left",
         auto_para_direction = true,
     }
-    if layout.mode == "split" and metadata_height > layout.metadata_height then
-        metadata = modules.ScrollableContainer:new{
-            dimen = modules.Geom:new{
-                w = layout.metadata_width,
-                h = layout.metadata_height,
-            },
-            metadata,
-        }
-    end
     local description_html = MangaInfo.buildDescriptionHtml(manga)
     local description
     if layout.scroll_mode == "body" then

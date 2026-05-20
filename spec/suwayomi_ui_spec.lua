@@ -785,9 +785,12 @@ describe("suwayomi/ui", function()
         assert.is_nil(buttons.buttons[2])
 
         local image = findWidget(dialog, "imagewidget")
+        local metadata = findWidget(dialog, "textboxwidget")
         local description = findWidget(dialog, "scrollhtmlwidget")
         assert.is_not_nil(description)
         assert.is_true(description.width < dialog.width)
+        assert.is_not_nil(metadata)
+        assert.is_nil(metadata.text:match("Genres:"))
         assert.are.same({ decoded = true }, image.image)
         assert.are.equal(0, image.scale_factor)
         assert.is_true(image.width > 0)
@@ -938,6 +941,9 @@ describe("suwayomi/ui", function()
         manga.genres = {
             "Action Mystery Drama Historical Supernatural Psychological Adventure Slice of Life",
             "Another Very Long Genre Label That Wraps Across Several Lines On Ereader Screens",
+            "**Bold**",
+            "[Label](https://example.invalid)",
+            "https://example.invalid/raw",
         }
 
         local dialog = ui.showMangaInformation(manga, {
@@ -947,8 +953,41 @@ describe("suwayomi/ui", function()
         assert.are.equal("split", dialog.content_layout.mode)
         assert.are.equal("description", dialog.content_layout.scroll_mode)
         assert.is_not_nil(findWidget(dialog, "horizontalgroup"))
-        assert.is_not_nil(findWidget(dialog, "scrollablecontainer"))
-        assert.is_true(dialog.content_layout.metadata_content_height > dialog.content_layout.metadata_height)
+        assert.is_nil(findWidget(dialog, "scrollablecontainer"))
+
+        local metadata = findWidget(dialog, "textboxwidget")
+        local description = findWidget(dialog, "scrollhtmlwidget")
+        assert.is_not_nil(metadata)
+        assert.is_not_nil(description)
+        assert.is_nil(metadata.text:match("Genres:"))
+        assert.matches("<h3>Details</h3>", description.html_body)
+        assert.matches("Genres: Action Mystery Drama Historical", description.html_body)
+        assert.is_not_nil(description.html_body:match("%*%*Bold%*%*"))
+        assert.is_not_nil(description.html_body:match("%[Label%]%(https://example%.invalid%)"))
+        assert.is_not_nil(description.html_body:match("https://example%.invalid/raw"))
+        assert.is_nil(description.html_body:match("<strong>Bold</strong>"))
+        assert.is_nil(description.html_body:match("<a href=\"https://example%.invalid/raw\""))
+    end)
+
+    it("uses stacked manga information layout when primary metadata would clip", function()
+        setScreenDimensions(758, 1024)
+        local ui = require("suwayomi/ui")
+        local manga = sampleManga()
+        manga.author = table.concat({
+            "Very Long Author Name With Many Words",
+            "Another Very Long Author Name With Many Words",
+            "Third Very Long Author Name With Many Words",
+            "Fourth Very Long Author Name With Many Words",
+            "Fifth Very Long Author Name With Many Words",
+            "Sixth Very Long Author Name With Many Words",
+        }, ", ")
+
+        local dialog = ui.showMangaInformation(manga, {
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+        })
+
+        assert.are.equal("stacked", dialog.content_layout.mode)
+        assert.are.equal("body", dialog.content_layout.scroll_mode)
     end)
 
     it("gives stacked manga information descriptions useful space", function()
