@@ -11,6 +11,8 @@ local _ = require("gettext")
 local SourceLanguages = require("suwayomi/source_languages")
 
 local ListRows = {}
+local MANGA_COVER_THUMBNAIL_WIDTH = 64
+local MANGA_COVER_THUMBNAIL_HEIGHT = 96
 
 local function formatChapterCount(count)
     count = tonumber(count)
@@ -83,6 +85,9 @@ function ListRows.buildMangaRow(manga, options)
         mandatory = ListRows.getMangaMandatory(manga, options),
         thumbnail_url = type(manga) == "table" and manga.thumbnail_url or nil,
         thumbnail_placeholder = true,
+        thumbnail_variant = "manga_cover",
+        thumbnail_width = MANGA_COVER_THUMBNAIL_WIDTH,
+        thumbnail_height = MANGA_COVER_THUMBNAIL_HEIGHT,
         manga = manga,
         callback = function()
             if options.on_select then

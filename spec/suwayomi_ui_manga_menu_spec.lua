@@ -563,6 +563,86 @@ describe("suwayomi/ui/manga_menu", function()
         assert.are.equal("/icons/mangadex.png", started_jobs[1].thumbnail_url)
     end)
 
+    it("renders poster-shaped manga thumbnail slots and cache jobs", function()
+        local decoded_image = { kind = "decoded_bitmap" }
+        cache_paths["/cover.webp"] = "/settings/cover.bb"
+        decoded_images["/settings/cover.bb"] = decoded_image
+        local manga_menu = require("suwayomi/ui/manga_menu")
+
+        local menu = manga_menu.show{
+            title = "Results",
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            item_table = {
+                {
+                    text = "Frieren",
+                    manga = { id = "m1" },
+                    thumbnail_placeholder = true,
+                    thumbnail_url = "/cover.webp",
+                    thumbnail_variant = "manga_cover",
+                    thumbnail_width = 64,
+                    thumbnail_height = 96,
+                },
+            },
+        }
+
+        local image = findWidgetByKind(menu.item_group[1], "image")
+        local frame = findWidgetByKind(menu.item_group[1], "frame")
+        assert.are.same(decoded_image, image.image)
+        assert.are.equal(62, image.width)
+        assert.are.equal(93, image.height)
+        assert.are.equal(64, frame.width)
+        assert.are.equal(95, frame.height)
+        assert.are.equal(96, menu.item_group[1].dimen.h)
+        assert.are.equal(0, #started_jobs)
+    end)
+
+    it("requests distinct poster-shaped cache variants for uncached manga thumbnails", function()
+        local seen_options
+        package.loaded["suwayomi/ui/thumbnail_cache"] = nil
+        package.preload["suwayomi/ui/thumbnail_cache"] = function()
+            return {
+                getKey = function(_, thumbnail_url, options)
+                    seen_options = options
+                    return "key:" .. tostring(thumbnail_url) .. ":" .. tostring(options and options.variant)
+                end,
+                find = function(_, _, options)
+                    seen_options = options
+                    return nil
+                end,
+                isDecodedPath = function()
+                    return false
+                end,
+            }
+        end
+        local manga_menu = require("suwayomi/ui/manga_menu")
+
+        manga_menu.show{
+            title = "Results",
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            item_table = {
+                {
+                    text = "Frieren",
+                    manga = { id = "m1" },
+                    thumbnail_url = "/cover.jpg",
+                    thumbnail_variant = "manga_cover",
+                    thumbnail_width = 64,
+                    thumbnail_height = 96,
+                },
+            },
+        }
+
+        assert.are.same({
+            variant = "manga_cover",
+            width = 64,
+            height = 96,
+        }, seen_options)
+        assert.are.same({
+            variant = "manga_cover",
+            width = 64,
+            height = 96,
+        }, started_jobs[1].thumbnail_options)
+    end)
+
     it("renders decoded cached thumbnails as in-memory images", function()
         local decoded_image = { kind = "decoded_bitmap" }
         cache_paths["/cached.webp"] = "/settings/cached.bb"

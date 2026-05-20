@@ -190,6 +190,58 @@ local function isSectionHeader(item)
     return type(item) == "table" and item.is_section_header == true
 end
 
+local function thumbnailOptionsForItem(item)
+    if type(item) ~= "table" then
+        return nil
+    end
+    local width = math.floor(tonumber(item.thumbnail_width) or 0)
+    local height = math.floor(tonumber(item.thumbnail_height) or 0)
+    local variant = item.thumbnail_variant
+    if variant == nil and width < 1 and height < 1 then
+        return nil
+    end
+    local options = {}
+    if variant ~= nil then
+        options.variant = tostring(variant)
+    end
+    if width > 0 then
+        options.width = width
+    end
+    if height > 0 then
+        options.height = height
+    end
+    return options
+end
+
+local function thumbnailSlotDimensions(item, row_height, fallback_height)
+    local options = thumbnailOptionsForItem(item)
+    if not options then
+        local size = math.max(1, math.min(row_height, fallback_height))
+        return size, size
+    end
+
+    local height = options.height and scaled(options.height) or row_height
+    local width = options.width and scaled(options.width) or height
+    return math.max(1, math.min(width, row_height)), math.max(1, math.min(height, row_height))
+end
+
+local function preferredItemHeight(item, base_height, normal_height)
+    local height = normal_height or base_height
+    local options = thumbnailOptionsForItem(item)
+    if options and options.height then
+        height = math.max(height, scaled(options.height))
+    end
+    return height
+end
+
+local function hasVariableItemHeight(item)
+    if isSectionHeader(item) then
+        return true
+    end
+    local options = thumbnailOptionsForItem(item)
+    return options and options.height ~= nil
+end
+
 local function placeholderText(text)
     text = tostring(text or ""):gsub("^%s+", "")
     if text == "" then
@@ -239,13 +291,14 @@ function ListMenuItem:init()
     self[1] = self._underline_container
 end
 
-function ListMenuItem:buildThumbnail(slot_size)
+function ListMenuItem:buildThumbnail(slot_width, slot_height)
     if not self.entry.thumbnail_placeholder and not self.entry.thumbnail_url and not self.entry.thumbnail_path then
         return HorizontalSpan:new{ width = 0 }
     end
 
     local border = Size.border.thin
-    local image_size = math.max(1, slot_size - 2 * border)
+    local image_width = math.max(1, slot_width - 2 * border)
+    local image_height = math.max(1, slot_height - 2 * border)
     local image
     if self.entry.thumbnail_path then
         local is_decoded_path = ThumbnailCache.isDecodedPath and ThumbnailCache.isDecodedPath(self.entry.thumbnail_path)
@@ -258,28 +311,28 @@ function ListMenuItem:buildThumbnail(slot_size)
         if decoded_image then
             image = newImageWidget{
                 image = decoded_image,
-                width = image_size,
-                height = image_size,
+                width = image_width,
+                height = image_height,
                 scale_factor = 0,
             }
         end
     end
     if not image then
         image = CenterContainer:new{
-            dimen = Geom:new{ w = image_size, h = image_size },
+            dimen = Geom:new{ w = image_width, h = image_height },
             TextWidget:new{
                 text = placeholderText(self.text),
-                face = fontFace("cfont", math.max(10, math.floor(image_size / 2))),
+                face = fontFace("cfont", math.max(10, math.floor(math.min(image_width, image_height) / 2))),
                 fgcolor = Blitbuffer.COLOR_DARK_GRAY,
             },
         }
     end
 
     return CenterContainer:new{
-        dimen = Geom:new{ w = slot_size, h = slot_size },
+        dimen = Geom:new{ w = slot_width, h = slot_height },
         FrameContainer:new{
-            width = image_size + 2 * border,
-            height = image_size + 2 * border,
+            width = image_width + 2 * border,
+            height = image_height + 2 * border,
             margin = 0,
             padding = 0,
             bordersize = border,
@@ -315,7 +368,10 @@ function ListMenuItem:buildRowWidget(width, height)
     local font_height = self.menu and self.menu._suwayomi_base_item_height or height
     local left_padding = has_thumbnail and 0 or scaled(10)
     local right_padding = scaled(10)
-    local thumbnail_slot = has_thumbnail and math.max(1, math.min(height, font_height)) or 0
+    local thumbnail_width, thumbnail_height = 0, 0
+    if has_thumbnail then
+        thumbnail_width, thumbnail_height = thumbnailSlotDimensions(self.entry, height, font_height)
+    end
     local gap = has_thumbnail and scaled(5) or 0
     local inner_width = width - left_padding - right_padding
     local mandatory_widget
@@ -337,7 +393,7 @@ function ListMenuItem:buildRowWidget(width, height)
 
     local title_width = math.max(
         1,
-        inner_width - thumbnail_slot - gap - mandatory_width - (mandatory_widget and Size.span.horizontal_default or 0)
+        inner_width - thumbnail_width - gap - mandatory_width - (mandatory_widget and Size.span.horizontal_default or 0)
     )
     local subtitle = self.entry.subtitle
     local subtitle_height = 0
@@ -376,7 +432,7 @@ function ListMenuItem:buildRowWidget(width, height)
     end
 
     local title_items = {
-        self:buildThumbnail(thumbnail_slot),
+        self:buildThumbnail(thumbnail_width, thumbnail_height),
     }
     if has_thumbnail then
         table.insert(title_items, HorizontalSpan:new{ width = gap })
@@ -495,7 +551,10 @@ function ListMenu.estimateItemTitleWidth(menu, item, base_height)
     local has_thumbnail = item.thumbnail_placeholder or item.thumbnail_url or item.thumbnail_path
     local left_padding = has_thumbnail and 0 or scaled(10)
     local right_padding = scaled(10)
-    local thumbnail_slot = has_thumbnail and math.max(1, base_height) or 0
+    local thumbnail_width = 0
+    if has_thumbnail then
+        thumbnail_width = thumbnailSlotDimensions(item, preferredItemHeight(item, base_height, base_height), base_height)
+    end
     local gap = has_thumbnail and scaled(5) or 0
     local inner_width = math.max(1, menu.item_width - left_padding - right_padding)
     local mandatory_width = 0
@@ -509,7 +568,7 @@ function ListMenu.estimateItemTitleWidth(menu, item, base_height)
     return math.max(
         1,
         inner_width
-            - thumbnail_slot
+            - thumbnail_width
             - gap
             - mandatory_width
             - (item.mandatory and Size.span.horizontal_default or 0)
@@ -526,14 +585,14 @@ function ListMenu.setupFixedItemHeights(menu)
         return
     end
 
-    local has_section_header = false
+    local has_variable_height = false
     for _, item in ipairs(menu.item_table) do
-        if isSectionHeader(item) then
-            has_section_header = true
+        if hasVariableItemHeight(item) then
+            has_variable_height = true
             break
         end
     end
-    if not has_section_header then
+    if not has_variable_height then
         menu.page_items = nil
         for _, item in ipairs(menu.item_table) do
             item.height = nil
@@ -551,7 +610,7 @@ function ListMenu.setupFixedItemHeights(menu)
     local page_items = {}
     local page_height = 0
     for index, item in ipairs(menu.item_table) do
-        item.height = isSectionHeader(item) and header_height or normal_height
+        item.height = isSectionHeader(item) and header_height or preferredItemHeight(item, base_height, normal_height)
         page_height = page_height + item.height
         if page_height <= menu.available_height or #page_items == 0 then
             table.insert(page_items, index)
@@ -590,7 +649,7 @@ function ListMenu.setupItemHeights(menu)
             local max_title_lines = math.max(1, (menu.items_max_lines or 1) - subtitle_lines)
             local title_lines = math.min(math.max(1, math.ceil(title_width_px / title_width)), max_title_lines)
             local lines = title_lines + subtitle_lines
-            item.height = math.max(base_height, lines * line_height + row_padding)
+            item.height = math.max(preferredItemHeight(item, base_height, base_height), lines * line_height + row_padding)
         end
 
         page_height = page_height + item.height
@@ -696,21 +755,26 @@ function ListMenu.prepareThumbnail(menu, item)
     if not item or not item.thumbnail_url or item.thumbnail_url == "" then
         return
     end
+    local thumbnail_options = thumbnailOptionsForItem(item)
     item.thumbnail_path = item.thumbnail_path
-        or ThumbnailCache.find(menu._suwayomi_thumbnail_credentials, item.thumbnail_url)
+        or ThumbnailCache.find(menu._suwayomi_thumbnail_credentials, item.thumbnail_url, thumbnail_options)
     if item.thumbnail_path then
         item.thumbnail_failed = nil
     end
 end
 
-local function getThumbnailKey(credentials, thumbnail_url)
-    return ThumbnailCache.getKey(credentials, thumbnail_url)
+local function getThumbnailKey(credentials, thumbnail_url, thumbnail_options)
+    return ThumbnailCache.getKey(credentials, thumbnail_url, thumbnail_options)
 end
 
 local function markThumbnailResult(menu, thumbnail_key, path)
     for _, item in ipairs(menu.item_table or {}) do
         if item.thumbnail_url
-            and getThumbnailKey(menu._suwayomi_thumbnail_credentials, item.thumbnail_url) == thumbnail_key
+            and getThumbnailKey(
+                menu._suwayomi_thumbnail_credentials,
+                item.thumbnail_url,
+                thumbnailOptionsForItem(item)
+            ) == thumbnail_key
         then
             item.thumbnail_loading = nil
             if path then
@@ -726,7 +790,8 @@ end
 function ListMenu.startThumbnailJob(menu, item)
     local credentials = menu._suwayomi_thumbnail_credentials
     local thumbnail_url = item.thumbnail_url
-    local thumbnail_key = thumbnail_url and getThumbnailKey(credentials, thumbnail_url)
+    local thumbnail_options = thumbnailOptionsForItem(item)
+    local thumbnail_key = thumbnail_url and getThumbnailKey(credentials, thumbnail_url, thumbnail_options)
     if not item.thumbnail_url
         or item.thumbnail_path
         or item.thumbnail_loading
@@ -748,6 +813,7 @@ function ListMenu.startThumbnailJob(menu, item)
         active = {
             thumbnail_url = thumbnail_url,
             thumbnail_key = thumbnail_key,
+            thumbnail_options = thumbnail_options,
             generation = menu._suwayomi_thumbnail_generation or 0,
             result_path = SubprocessJob.buildResultPath and SubprocessJob.buildResultPath("thumbnail") or nil,
         },
@@ -756,7 +822,7 @@ function ListMenu.startThumbnailJob(menu, item)
         poll_interval_seconds = 0.5,
         timeout_seconds = 15,
         run = function(path)
-            ThumbnailWorker:run(credentials, thumbnail_url, path)
+            ThumbnailWorker:run(credentials, thumbnail_url, path, thumbnail_options)
         end,
         read_result = function(path)
             return ThumbnailWorker:readResult(path)
