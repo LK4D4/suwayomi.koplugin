@@ -685,7 +685,6 @@ describe("suwayomi/ui", function()
             "Categories: Reading, 2",
             "Genres: Action, Mystery",
             "First unread: Chapter 5",
-            "Latest fetched: Chapter 8",
             "",
             "Plot text.",
         }, "\n"), text)

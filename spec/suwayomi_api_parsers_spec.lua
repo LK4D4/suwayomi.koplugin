@@ -193,7 +193,7 @@ describe("suwayomi/api/parsers", function()
         assert.are.equal(3, library.manga[1].download_count)
         assert.are.equal("Reading", library.manga[1].categories[1].name)
         assert.are.equal("398", library.manga[1].first_unread_chapter.id)
-        assert.are.equal(true, library.manga[1].latest_fetched_chapter.is_read)
+        assert.is_nil(library.manga[1].latest_fetched_chapter)
 
         local single_manga = assert(parsers.parseMangaByIdResponse([[
             { "data": { "mangas": { "nodes": [

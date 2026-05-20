@@ -125,7 +125,6 @@ function MangaInfo.buildMetadataText(manga)
     appendField(lines, _("Categories"), joinList(manga.categories))
     appendField(lines, _("Genres"), joinList(manga.genres or manga.genre))
     appendField(lines, _("First unread"), chapterName(manga.first_unread_chapter))
-    appendField(lines, _("Latest fetched"), chapterName(manga.latest_fetched_chapter))
     return table.concat(lines, "\n")
 end
 
@@ -153,7 +152,6 @@ function MangaInfo.buildDetailsText(manga)
     appendField(lines, _("Categories"), joinList(manga.categories))
     appendField(lines, _("Genres"), joinList(manga.genres or manga.genre))
     appendField(lines, _("First unread"), chapterName(manga.first_unread_chapter))
-    appendField(lines, _("Latest fetched"), chapterName(manga.latest_fetched_chapter))
     return table.concat(lines, "\n")
 end
 

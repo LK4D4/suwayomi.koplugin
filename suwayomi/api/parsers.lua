@@ -232,10 +232,6 @@ local function parseMangaNode(entry)
     if entry.firstUnreadChapter ~= nil and not manga.first_unread_chapter then
         return nil
     end
-    manga.latest_fetched_chapter = parseChapterNode(entry.latestFetchedChapter)
-    if entry.latestFetchedChapter ~= nil and not manga.latest_fetched_chapter then
-        return nil
-    end
     return manga
 end
 
