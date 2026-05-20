@@ -50,6 +50,7 @@ describe("suwayomi/ui", function()
         package.loaded["ui/widget/container/widgetcontainer"] = nil
         package.loaded["ui/widget/horizontalgroup"] = nil
         package.loaded["ui/widget/horizontalspan"] = nil
+        package.loaded["ui/widget/htmlboxwidget"] = nil
         package.loaded["ui/widget/imagewidget"] = nil
         package.loaded["ui/widget/linewidget"] = nil
         package.loaded["ui/widget/scrollhtmlwidget"] = nil
@@ -263,6 +264,26 @@ describe("suwayomi/ui", function()
 
         package.preload["ui/widget/horizontalspan"] = function()
             return widgetFactory("horizontalspan")
+        end
+
+        package.preload["ui/widget/htmlboxwidget"] = function()
+            local HtmlBoxWidget = widgetFactory("htmlboxwidget")
+            local new = HtmlBoxWidget.new
+            function HtmlBoxWidget.new(_, options)
+                options = new(HtmlBoxWidget, options)
+                options.setContent = function(self, html_body, css, default_font_size)
+                    self.html_body = html_body
+                    self.css = css
+                    self.default_font_size = default_font_size
+                    self.single_page_height = (select(2, tostring(html_body):gsub("<p>", "<p>"))
+                        + select(2, tostring(html_body):gsub("<li>", "<li>"))) * 32
+                end
+                options.getSinglePageHeight = function(self)
+                    return self.single_page_height or self.height or (self.dimen and self.dimen.h) or 0
+                end
+                return options
+            end
+            return HtmlBoxWidget
         end
 
         package.preload["ui/widget/imagewidget"] = function()
@@ -686,6 +707,17 @@ describe("suwayomi/ui", function()
         return nil
     end
 
+    local function countWidgets(widget, kind)
+        if widget == nil then
+            return 0
+        end
+        local count = widget.kind == kind and 1 or 0
+        for _, child in ipairs(widget) do
+            count = count + countWidgets(child, kind)
+        end
+        return count
+    end
+
     local function sampleManga()
         return {
             id = 42,
@@ -760,7 +792,7 @@ describe("suwayomi/ui", function()
         assert.are.equal(0, image.scale_factor)
         assert.is_true(image.width > 0)
         assert.is_true(image.height > image.width)
-        assert.are.equal("Synopsis", description.html_body)
+        assert.are.equal("<p>Synopsis</p>", description.html_body)
         assert.is_not_nil(description.css)
         assert.matches("@page%s*{[^}]*margin:%s*0", description.css)
         assert.matches("margin:%s*0", description.css)
@@ -797,7 +829,7 @@ describe("suwayomi/ui", function()
         local title = findWidget(dialog, "titlebar")
         assert.is_not_nil(description)
         assert.are.equal("Loading...", poster_text.text)
-        assert.are.equal("No description available.", description.html_body)
+        assert.are.equal("<p>No description available.</p>", description.html_body)
         assert.are.equal("thumb://missing", events.poster_worker_run.thumbnail_url)
         assert.are.equal("/tmp/manga_info_poster.json", events.poster_worker_run.result_path)
         assert.are.same({
@@ -860,7 +892,8 @@ describe("suwayomi/ui", function()
                 thumbnail_credentials = { server_url = "https://suwayomi.example" },
             })
             local layout = dialog.content_layout
-            local description = findWidget(dialog, "scrollhtmlwidget")
+            local description_kind = case.mode == "stacked" and "htmlboxwidget" or "scrollhtmlwidget"
+            local description = findWidget(dialog, description_kind)
             local poster = findWidget(dialog, "imagewidget")
 
             assert.are.equal(case.mode, layout.mode, case.name)
@@ -888,6 +921,8 @@ describe("suwayomi/ui", function()
             if case.mode == "stacked" then
                 assert.are.equal("body", layout.scroll_mode, case.name)
                 assert.is_not_nil(findWidget(dialog, "scrollablecontainer"), case.name)
+                assert.is_nil(findWidget(dialog, "scrollhtmlwidget"), case.name)
+                assert.are.equal(1, countWidgets(dialog, "scrollablecontainer"), case.name)
                 assert.is_not_nil(findWidget(dialog, "textboxwidget"), case.name)
             else
                 assert.are.equal("description", layout.scroll_mode, case.name)
@@ -896,7 +931,7 @@ describe("suwayomi/ui", function()
         end
     end)
 
-    it("uses body scrolling when wrapped metadata cannot safely fit beside the poster", function()
+    it("keeps e-reader manga information poster placement stable with long metadata", function()
         setScreenDimensions(758, 1024)
         local ui = require("suwayomi/ui")
         local manga = sampleManga()
@@ -909,9 +944,37 @@ describe("suwayomi/ui", function()
             thumbnail_credentials = { server_url = "https://suwayomi.example" },
         })
 
-        assert.are.equal("stacked", dialog.content_layout.mode)
-        assert.are.equal("body", dialog.content_layout.scroll_mode)
+        assert.are.equal("split", dialog.content_layout.mode)
+        assert.are.equal("description", dialog.content_layout.scroll_mode)
+        assert.is_not_nil(findWidget(dialog, "horizontalgroup"))
         assert.is_not_nil(findWidget(dialog, "scrollablecontainer"))
+        assert.is_true(dialog.content_layout.metadata_content_height > dialog.content_layout.metadata_height)
+    end)
+
+    it("gives stacked manga information descriptions useful space", function()
+        setScreenDimensions(360, 640)
+        local ui = require("suwayomi/ui")
+
+        local manga = sampleManga()
+        manga.description = table.concat({
+            "First paragraph.",
+            "Second paragraph.",
+            "Third paragraph.",
+            "Fourth paragraph.",
+            "Fifth paragraph.",
+            "Sixth paragraph.",
+        }, "\n")
+
+        local dialog = ui.showMangaInformation(manga, {
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+        })
+        local description = findWidget(dialog, "htmlboxwidget")
+
+        assert.are.equal("stacked", dialog.content_layout.mode)
+        assert.is_true(dialog.content_layout.description_height >= 120)
+        assert.is_not_nil(description)
+        assert.is_true(description.height > dialog.content_layout.description_height)
+        assert.is_nil(findWidget(dialog, "scrollhtmlwidget"))
     end)
 
     it("recomputes manga information layout after screen dimensions change", function()
@@ -947,8 +1010,16 @@ describe("suwayomi/ui", function()
         local dialog = ui.showMangaInformation({
             title = "Manga Title",
             description = table.concat({
+                "# Heading",
                 "Line one<br><br><i>Italic</i> and <b>bold</b>",
+                "**Strong** and _emphasis_",
+                "- First item",
+                "- Second [Site](https://example.invalid/path?one=1&two=2)",
+                "Bare https://example.invalid/bare?x=1&y=2",
+                "2 < 3 and <unknown>tag</unknown>",
                 "[Site](https://example.invalid/path?one=1&two=2)",
+                "<a href=\"javascript:alert(1)\">Bad JS</a>",
+                "<a href='data:text/html,boom'>Bad data</a>",
                 "<script>alert('x')</script><img src='x'>",
             }, "\n"),
         })
@@ -956,9 +1027,16 @@ describe("suwayomi/ui", function()
         local description = findWidget(dialog, "scrollhtmlwidget")
         assert.is_not_nil(description)
         assert.are.equal(table.concat({
-            "Line one<br/><br/><i>Italic</i> and <b>bold</b><br/>",
-            "<a href=\"https://example.invalid/path?one=1&amp;two=2\">Site</a><br/>",
-            "",
+            "<h3>Heading</h3>",
+            "<p>Line one<br/><br/><i>Italic</i> and <b>bold</b></p>",
+            "<p><strong>Strong</strong> and <em>emphasis</em></p>",
+            "<ul><li>First item</li><li>Second <a href=\"https://example.invalid/path?one=1&amp;two=2\">Site</a></li></ul>",
+            "<p>Bare <a href=\"https://example.invalid/bare?x=1&amp;y=2\">https://example.invalid/bare?x=1&amp;y=2</a></p>",
+            "<p>2 &lt; 3 and &lt;unknown&gt;tag&lt;/unknown&gt;</p>",
+            "<p><a href=\"https://example.invalid/path?one=1&amp;two=2\">Site</a></p>",
+            "<p>Bad JS</p>",
+            "<p>Bad data</p>",
+            "<p>&lt;img src='x'&gt;</p>",
         }), description.html_body)
 
         description.html_link_tapped_callback({ uri = "https://example.invalid/path" })

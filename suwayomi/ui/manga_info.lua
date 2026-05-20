@@ -31,6 +31,7 @@ local function requireWidgetModules()
         Geom = require("ui/geometry"),
         HorizontalGroup = require("ui/widget/horizontalgroup"),
         HorizontalSpan = require("ui/widget/horizontalspan"),
+        HtmlBoxWidget = require("ui/widget/htmlboxwidget"),
         ImageWidget = require("ui/widget/imagewidget"),
         InputContainer = require("ui/widget/container/inputcontainer"),
         LineWidget = require("ui/widget/linewidget"),
@@ -160,6 +161,41 @@ function MangaInfo.buildDescriptionHtml(manga)
         return protect(('<a href="%s">%s</a>'):format(escapeAttribute(url), escapeHtml(label or url)))
     end
 
+    local function protectInlineMarkup(line)
+        line = line:gsub("%[([^%]]+)%]%((https?://[^%s%)]+)%)", function(label, url)
+            return protectLink(url, label)
+        end)
+        line = line:gsub("^(https?://[^%s<]+)", function(url)
+            local trailing = ""
+            while url:match("[,%.%;:%)%]]$") do
+                trailing = url:sub(-1) .. trailing
+                url = url:sub(1, -2)
+            end
+            return protectLink(url, url) .. trailing
+        end)
+        line = line:gsub("([%s%(])(https?://[^%s<]+)", function(prefix, url)
+            local trailing = ""
+            while url:match("[,%.%;:%)%]]$") do
+                trailing = url:sub(-1) .. trailing
+                url = url:sub(1, -2)
+            end
+            return prefix .. protectLink(url, url) .. trailing
+        end)
+        line = line:gsub("%*%*([^%*]-)%*%*", function(value)
+            return protect("<strong>" .. escapeHtml(value) .. "</strong>")
+        end)
+        line = line:gsub("__([^_]-)__", function(value)
+            return protect("<strong>" .. escapeHtml(value) .. "</strong>")
+        end)
+        line = line:gsub("%*([^%*]-)%*", function(value)
+            return protect("<em>" .. escapeHtml(value) .. "</em>")
+        end)
+        line = line:gsub("_([^_]-)_", function(value)
+            return protect("<em>" .. escapeHtml(value) .. "</em>")
+        end)
+        return line
+    end
+
     text = text:gsub("%[([^%]]+)%]%((https?://[^%s%)]+)%)", function(label, url)
         return protectLink(url, label)
     end)
@@ -189,15 +225,52 @@ function MangaInfo.buildDescriptionHtml(manga)
         return protect("</strong>")
     end)
     text = text:gsub("<%s*[Pp]%s*>", function()
-        return protect("<p>")
+        return "\n\n"
     end):gsub("<%s*/%s*[Pp]%s*>", function()
-        return protect("</p>")
+        return "\n\n"
     end)
 
-    text = escapeHtml(text:gsub("<[^>]*>", "")):gsub("\n", "<br/>")
-    return (text:gsub("\001(%d+)\002", function(index)
-        return tokens[tonumber(index)] or ""
-    end))
+    local html = {}
+    local in_list = false
+    local function restore(value)
+        return (value:gsub("\001(%d+)\002", function(index)
+            return tokens[tonumber(index)] or ""
+        end))
+    end
+    local function inline(value)
+        return restore(escapeHtml(protectInlineMarkup(value)))
+    end
+    local function closeList()
+        if in_list then
+            table.insert(html, "</ul>")
+            in_list = false
+        end
+    end
+
+    for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+        local trimmed = line:gsub("^%s+", ""):gsub("%s+$", "")
+        if trimmed == "" then
+            closeList()
+        else
+            local heading = trimmed:match("^#+%s+(.+)$")
+            local bullet = trimmed:match("^[-%*+]%s+(.+)$")
+            if heading then
+                closeList()
+                table.insert(html, "<h3>" .. inline(heading) .. "</h3>")
+            elseif bullet then
+                if not in_list then
+                    table.insert(html, "<ul>")
+                    in_list = true
+                end
+                table.insert(html, "<li>" .. inline(bullet) .. "</li>")
+            else
+                closeList()
+                table.insert(html, "<p>" .. inline(trimmed) .. "</p>")
+            end
+        end
+    end
+    closeList()
+    return table.concat(html)
 end
 
 function MangaInfo.buildText(manga)
@@ -272,7 +345,8 @@ local function computeDialogBounds(modules)
     local height = screenHeight(Screen)
     local margin = scale(Screen, 12)
     local max_width = scale(Screen, 920)
-    local dialog_width = math.floor(math.min(math.max(1, width - 2 * margin), math.min(width, height) * 0.92, max_width))
+    local shape_width_cap = width > height and width * 0.96 or math.min(width, height) * 0.92
+    local dialog_width = math.floor(math.min(math.max(1, width - 2 * margin), shape_width_cap, max_width))
     local dialog_height = math.floor(math.min(math.max(1, height - 2 * margin), height * 0.86))
     return {
         screen_width = width,
@@ -299,13 +373,12 @@ local function computeContentLayout(modules, manga, bounds, chrome)
     local split_metadata_width = body_width - split_poster_width - gap
     local split_description_height = body_height - split_poster_height - gap
     local split_metadata_lines = estimateWrappedLineCount(metadata_text, split_metadata_width, scale(Screen, 12))
-    local metadata_min_height = math.max(scale(Screen, 120), split_metadata_lines * scale(Screen, 24))
+    local split_metadata_content_height = math.max(scale(Screen, 120), split_metadata_lines * scale(Screen, 24))
 
     local split_fits = body_width >= scale(Screen, 520)
         and body_height >= scale(Screen, 420)
         and split_metadata_width >= scale(Screen, 220)
         and split_poster_height >= scale(Screen, 240)
-        and split_poster_height >= metadata_min_height
         and split_description_height >= scale(Screen, 120)
 
     if split_fits then
@@ -321,16 +394,18 @@ local function computeContentLayout(modules, manga, bounds, chrome)
             poster_height = split_poster_height,
             metadata_width = split_metadata_width,
             metadata_height = split_poster_height,
+            metadata_content_height = split_metadata_content_height,
             description_width = body_width,
             description_height = split_description_height,
             poster_cache_options = posterCacheOptionsForSlot(split_poster_width, split_poster_height),
         }
     end
 
-    local stacked_poster_width = math.floor(math.min(scale(Screen, 240), math.max(scale(Screen, 96), body_width * 0.45)))
+    local stacked_poster_width = math.floor(math.min(scale(Screen, 180), math.max(scale(Screen, 96), body_width * 0.36)))
     local stacked_poster_height = math.floor(stacked_poster_width * 1.5)
-    local stacked_metadata_height = math.max(scale(Screen, 72), metadata_lines * scale(Screen, 20))
-    local stacked_description_height = math.max(scale(Screen, 64), math.min(scale(Screen, 180), body_height - stacked_poster_height - stacked_metadata_height - 2 * gap))
+    local stacked_metadata_height = math.max(scale(Screen, 72), math.min(scale(Screen, 140), metadata_lines * scale(Screen, 20)))
+    local remaining_height = body_height - stacked_poster_height - stacked_metadata_height - 2 * gap
+    local stacked_description_height = math.max(scale(Screen, 120), remaining_height)
     return {
         mode = "stacked",
         scroll_mode = "body",
@@ -343,6 +418,7 @@ local function computeContentLayout(modules, manga, bounds, chrome)
         poster_height = stacked_poster_height,
         metadata_width = body_width,
         metadata_height = stacked_metadata_height,
+        metadata_content_height = stacked_metadata_height,
         description_width = body_width,
         description_height = stacked_description_height,
         poster_cache_options = posterCacheOptionsForSlot(stacked_poster_width, stacked_poster_height),
@@ -456,6 +532,9 @@ local function bindDialog(widget, dialog)
             widget.htmlbox_widget.dialog = dialog
         end
     end
+    if widget.manga_info_html_box then
+        widget.dialog = dialog
+    end
     for _, child in ipairs(widget) do
         bindDialog(child, dialog)
     end
@@ -522,25 +601,62 @@ function MangaInfo.buildContentWidget(manga, options, layout)
     options.poster_cache_options = layout.poster_cache_options or POSTER_CACHE_OPTIONS
 
     local poster = buildPosterWidget(modules, manga, options, layout.poster_width, layout.poster_height)
+    local metadata_height = layout.metadata_content_height or layout.metadata_height
     local metadata = modules.TextBoxWidget:new{
         text = MangaInfo.buildMetadataText(manga),
         width = layout.metadata_width,
-        height = layout.metadata_height,
+        height = metadata_height,
         face = modules.Font:getFace("infofont"),
         alignment = "left",
         auto_para_direction = true,
     }
-    local description = modules.ScrollHtmlWidget:new{
-        html_body = MangaInfo.buildDescriptionHtml(manga),
-        css = DESCRIPTION_CSS,
-        width = layout.description_width,
-        height = layout.description_height,
-        default_font_size = scale(Screen, 28),
-        html_link_tapped_callback = function(link)
-            openLink(modules.Device, link)
-        end,
-    }
-    description.manga_info_scroll_html = true
+    if layout.mode == "split" and metadata_height > layout.metadata_height then
+        metadata = modules.ScrollableContainer:new{
+            dimen = modules.Geom:new{
+                w = layout.metadata_width,
+                h = layout.metadata_height,
+            },
+            metadata,
+        }
+    end
+    local description_html = MangaInfo.buildDescriptionHtml(manga)
+    local description
+    if layout.scroll_mode == "body" then
+        description = modules.HtmlBoxWidget:new{
+            dimen = modules.Geom:new{
+                w = layout.description_width,
+                h = layout.description_height,
+            },
+            dialog = options.dialog,
+            html_link_tapped_callback = function(link)
+                openLink(modules.Device, link)
+            end,
+        }
+        if description.setContent then
+            description:setContent(description_html, DESCRIPTION_CSS, scale(Screen, 28))
+        end
+        if description.getSinglePageHeight then
+            local single_page_height = description:getSinglePageHeight()
+            if single_page_height and single_page_height > layout.description_height then
+                description.dimen.h = math.ceil(single_page_height)
+            end
+        end
+        description.width = layout.description_width
+        description.height = description.dimen.h
+        description.manga_info_html_box = true
+    else
+        description = modules.ScrollHtmlWidget:new{
+            html_body = description_html,
+            css = DESCRIPTION_CSS,
+            width = layout.description_width,
+            height = layout.description_height,
+            default_font_size = scale(Screen, 28),
+            html_link_tapped_callback = function(link)
+                openLink(modules.Device, link)
+            end,
+        }
+        description.manga_info_scroll_html = true
+    end
     local content
     if layout.mode == "stacked" then
         content = modules.ScrollableContainer:new{
