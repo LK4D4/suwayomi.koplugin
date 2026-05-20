@@ -798,6 +798,17 @@ function SuwayomiClient:queueVisibleBrowseChapterCounts(session, refresh, fallba
     end
 end
 
+function SuwayomiClient:restartVisibleBrowseChapterCounts(session, refresh)
+    if not session then
+        return
+    end
+    if session.chapter_count_enrichment then
+        self:cancelBrowseChapterCountEnrichment(session.chapter_count_enrichment)
+        session.chapter_count_enrichment = nil
+    end
+    self:queueVisibleBrowseChapterCounts(session, refresh)
+end
+
 function SuwayomiClient:appendSourceMangaResult(session, result, refresh)
     session.loading_more = false
     session.active = nil
@@ -1006,7 +1017,7 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
     end
     menu_options.on_page_changed = function(menu, changed_page)
         session.menu = menu
-        self:queueVisibleBrowseChapterCounts(session, refreshMangaMenu)
+        self:restartVisibleBrowseChapterCounts(session, refreshMangaMenu)
         if self:shouldAppendSourceMangaPage(session, menu, changed_page) then
             self:startSourceMangaAppendLoad(session, refreshMangaMenu)
         end

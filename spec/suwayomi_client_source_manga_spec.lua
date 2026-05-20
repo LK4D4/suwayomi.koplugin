@@ -1829,7 +1829,7 @@ describe("suwayomi/client source manga flows", function()
     end)
 
     it("fetches chapter counts for manga appended from later source pages", function()
-        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local subprocess_job, started, canceled = buildSourceMangaSubprocessFake()
         local shown_menu
         local menu_options
         local client = newClient({
@@ -1863,6 +1863,7 @@ describe("suwayomi/client source manga flows", function()
 
         assert.are.equal("m1", started[2].manga_id)
         menu_options.on_page_changed(shown_menu, 2)
+        assert.are.same(started[2], canceled[1])
         started[3].on_finish(started[3], {
             ok = true,
             manga = {
@@ -1870,7 +1871,8 @@ describe("suwayomi/client source manga flows", function()
             },
             has_next_page = false,
         })
-        assert.are.equal(3, #started)
+        assert.is_not_nil(started[4])
+        assert.are.equal("m2", started[4].manga_id)
 
         started[2].on_finish(started[2], {
             ok = true,
@@ -1878,11 +1880,10 @@ describe("suwayomi/client source manga flows", function()
             chapter_count = 3,
         })
 
-        assert.is_not_nil(started[4])
-        assert.are.equal("m2", started[4].manga_id)
+        assert.are.equal(4, #started)
     end)
 
-    it("keeps timed out browse chapter count slots active until cleanup", function()
+    it("starts the next browse chapter count when a worker times out", function()
         local subprocess_job, started = buildChapterCountSubprocessFake()
         local updated_manga = {}
         local client = newClient({
@@ -1923,13 +1924,73 @@ describe("suwayomi/client source manga flows", function()
         started[1].on_timeout(started[1])
 
         assert.is_true(updated_manga[#updated_manga].first_error)
-        assert.is_nil(updated_manga[#updated_manga].second_loading)
-        assert.are.equal(1, #started)
+        assert.is_not_nil(started[2])
+        assert.are.equal("m2", started[2].manga_id)
+        assert.is_true(updated_manga[#updated_manga].second_loading)
 
         started[1].on_cleanup(started[1])
 
-        assert.are.equal("m2", started[2].manga_id)
-        assert.is_true(updated_manga[#updated_manga].second_loading)
+        assert.are.equal(2, #started)
+    end)
+
+    it("cancels stale browse chapter counts when changing result pages", function()
+        local subprocess_job, started, canceled = buildSourceMangaSubprocessFake()
+        local shown_menu
+        local menu_options
+        local refreshed_manga
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            chapter_count_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            chapter_count_max_active = 1,
+            source_manga_worker = {},
+            ui = {
+                showMangaMenu = function(_, _, options)
+                    menu_options = options
+                    shown_menu = {
+                        name = "browse-menu",
+                        page = 1,
+                        perpage = 2,
+                    }
+                    return shown_menu
+                end,
+                updateMangaMenu = function(menu, manga, _, options)
+                    menu_options = options
+                    menu.item_table = {
+                        { manga = manga[1] },
+                        { manga = manga[2] },
+                        { manga = manga[3] },
+                        { manga = manga[4] },
+                    }
+                    refreshed_manga = manga
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "MangaDex (EN)" }, {
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            manga = {
+                { id = "m1", title = "Page 1 A", chapter_count = 0 },
+                { id = "m2", title = "Page 1 B", chapter_count = 0 },
+                { id = "m3", title = "Page 2 A", chapter_count = 0 },
+                { id = "m4", title = "Page 2 B", chapter_count = 0 },
+            },
+        })
+
+        assert.are.equal("m1", started[2].manga_id)
+        assert.is_true(refreshed_manga[1].chapter_count_loading)
+
+        shown_menu.page = 2
+        menu_options.on_page_changed(shown_menu, 2)
+
+        assert.are.equal(1, #canceled)
+        assert.is_nil(refreshed_manga[1].chapter_count_loading)
+        assert.are.equal("m3", started[3].manga_id)
+        assert.is_true(refreshed_manga[3].chapter_count_loading)
     end)
 
     it("routes browse result row taps without leaking browse title actions", function()

@@ -19,6 +19,14 @@ local function getChapterCountCacheKey(manga)
     return tostring(manga.id)
 end
 
+local function clearBrowseChapterCountLoading(manga)
+    if type(manga) ~= "table" or manga.chapter_count_loading ~= true then
+        return false
+    end
+    manga.chapter_count_loading = nil
+    return true
+end
+
 function M.install(SuwayomiClient)
 function SuwayomiClient:shouldFetchBrowseChapterCount(manga)
     if type(manga) ~= "table" or manga.id == nil then
@@ -152,6 +160,7 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
                             return
                         end
                         timed_out_active.canceled = true
+                        self:releaseBrowseChapterCountJob(state, timed_out_active)
                         self:applyBrowseChapterCountResult(timed_out_active.manga, {
                             ok = false,
                             error = self:translate("Could not load chapters."),
@@ -159,6 +168,7 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
                         if state.refresh then
                             state.refresh()
                         end
+                        self:startNextBrowseChapterCountJobs(state)
                     end,
                     on_cleanup = function(cleaned_active)
                         if state.canceled then
@@ -266,13 +276,21 @@ function SuwayomiClient:cancelBrowseChapterCountEnrichment(state)
     end
     state.canceled = true
     local job = state.runtime and state.runtime.job
+    local cleared_loading = false
     if job and job.cancel then
         for _, active in pairs(state.active_jobs or {}) do
             job.cancel(active)
+            cleared_loading = clearBrowseChapterCountLoading(active and active.manga) or cleared_loading
         end
+    end
+    for _, manga in ipairs(state.queue or {}) do
+        cleared_loading = clearBrowseChapterCountLoading(manga) or cleared_loading
     end
     state.active_jobs = {}
     state.active_count = 0
+    if cleared_loading and state.refresh then
+        state.refresh()
+    end
 end
 end
 
