@@ -593,6 +593,26 @@ local function widgetHeight(widget)
     return widget.height or 0
 end
 
+local function buildActionButtons(dialog)
+    local buttons = {}
+    local options = dialog.options or {}
+    local gettext = _
+    for _, action in ipairs(options.actions or {}) do
+        if action and action.id and action.text then
+            table.insert(buttons, {
+                text = gettext(action.text),
+                callback = function()
+                    dialog:onClose()
+                    if options.onAction then
+                        options.onAction(action)
+                    end
+                end,
+            })
+        end
+    end
+    return buttons
+end
+
 local function buildDialog(modules, manga, options)
     local content_padding = modules.Size.padding.default
     local button_padding = modules.Size.padding.default
@@ -742,21 +762,18 @@ local function buildDialog(modules, manga, options)
             },
         }
 
-        local button_table = modules.ButtonTable:new{
-            width = self.width - 2 * button_padding,
-            buttons = {
-                {
-                    {
-                        text = _("Close"),
-                        callback = function()
-                            self:onClose()
-                        end,
-                    },
+        local action_buttons = buildActionButtons(self)
+        local button_table
+        if #action_buttons > 0 then
+            button_table = modules.ButtonTable:new{
+                width = self.width - 2 * button_padding,
+                buttons = {
+                    action_buttons,
                 },
-            },
-            zero_sep = true,
-            show_parent = self,
-        }
+                zero_sep = true,
+                show_parent = self,
+            }
+        end
         self.button_table = button_table
 
         self.content_layout = computeContentLayout(modules, self.manga, {
@@ -783,23 +800,27 @@ local function buildDialog(modules, manga, options)
             self.content_frame,
         }
 
+        local frame_children = {
+            titlebar,
+            title_separator,
+            body,
+        }
+        if button_table then
+            table.insert(frame_children, modules.CenterContainer:new{
+                dimen = modules.Geom:new{
+                    w = self.width,
+                    h = widgetHeight(button_table),
+                },
+                button_table,
+            })
+        end
+
         self.frame = modules.FrameContainer:new{
             radius = modules.Size.radius and modules.Size.radius.window or nil,
             padding = 0,
             margin = 0,
             background = modules.Blitbuffer.COLOR_WHITE,
-            modules.VerticalGroup:new{
-                titlebar,
-                title_separator,
-                body,
-                modules.CenterContainer:new{
-                    dimen = modules.Geom:new{
-                        w = self.width,
-                        h = widgetHeight(button_table),
-                    },
-                    button_table,
-                },
-            },
+            modules.VerticalGroup:new(frame_children),
         }
         self.movable = modules.MovableContainer:new{
             self.frame,

@@ -720,6 +720,13 @@ describe("suwayomi/ui", function()
             thumbnail_url = "thumb://cached",
         }, {
             thumbnail_credentials = credentials,
+            actions = {
+                { id = "open_chapters", text = "Open chapters" },
+                { id = "open_first_unread", text = "Open next unread" },
+            },
+            onAction = function(action)
+                events.selected_manga_info_action = action
+            end,
         })
 
         assert.are.equal(dialog, shown_dialog)
@@ -741,7 +748,9 @@ describe("suwayomi/ui", function()
         assert.is_false(title.with_bottom_line)
         assert.are.equal(3, title_separator.dimen.h)
         assert.are.equal(dialog.width, title_separator.dimen.w)
-        assert.are.equal("Close", buttons.buttons[1][1].text)
+        assert.are.equal("Open chapters", buttons.buttons[1][1].text)
+        assert.are.equal("Open next unread", buttons.buttons[1][2].text)
+        assert.is_nil(buttons.buttons[2])
 
         local image = findWidget(dialog, "imagewidget")
         local description = findWidget(dialog, "scrollhtmlwidget")
@@ -767,6 +776,7 @@ describe("suwayomi/ui", function()
         buttons.buttons[1][1].callback()
 
         assert.are.equal(dialog, closed_dialog)
+        assert.are.equal("open_chapters", events.selected_manga_info_action.id)
     end)
 
     it("shows manga information with a loading poster while the poster worker runs", function()

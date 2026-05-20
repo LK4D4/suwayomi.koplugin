@@ -565,7 +565,20 @@ function Methods:performMangaAction(manga, action_id, options)
     end
     if action_id == "manga_information" then
         if SuwayomiUI.showMangaInformation then
-            SuwayomiUI.showMangaInformation(manga)
+            local info_actions = {
+                { id = "open_chapters", text = _("Open chapters") },
+            }
+            if MangaActionMenu.canOpenFirstUnread(self, manga) then
+                table.insert(info_actions, { id = "open_first_unread", text = _("Open next unread") })
+            end
+            SuwayomiUI.showMangaInformation(manga, {
+                actions = info_actions,
+                onAction = function(action)
+                    if action and action.id then
+                        self:performMangaAction(manga, action.id, options)
+                    end
+                end,
+            })
             return true
         end
         return false

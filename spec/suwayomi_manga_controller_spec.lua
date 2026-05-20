@@ -110,8 +110,9 @@ local function installController(options)
             showConfirm = function(confirm_options)
                 state.confirm_options = confirm_options
             end,
-            showMangaInformation = function(manga)
+            showMangaInformation = function(manga, info_options)
                 state.shown_manga_information = manga
+                state.manga_information_options = info_options
             end,
             showChapterMenu = function(chapter_options)
                 state.chapter_menu_options = chapter_options
@@ -361,13 +362,42 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("Download ahead", state.manga_actions_options.actions[6].text)
     end)
 
-    it("opens manga information from shared manga actions", function()
-        local plugin, state = installController()
-        local manga = { id = "m1", title = "Frieren" }
+    it("opens manga information with navigation actions", function()
+        local plugin, state = installController({
+            first_unread_downloaded = true,
+        })
+        local manga = {
+            id = "m1",
+            title = "Frieren",
+            first_unread_chapter = { id = "c1", name = "Ch. 1" },
+        }
 
         assert.is_true(plugin:performMangaAction(manga, "manga_information"))
 
         assert.are.same(manga, state.shown_manga_information)
+        assert.are.equal("open_chapters", state.manga_information_options.actions[1].id)
+        assert.are.equal("Open chapters", state.manga_information_options.actions[1].text)
+        assert.are.equal("open_first_unread", state.manga_information_options.actions[2].id)
+        assert.are.equal("Open next unread", state.manga_information_options.actions[2].text)
+        assert.is_function(state.manga_information_options.onAction)
+
+        state.manga_information_options.onAction({ id = "open_chapters" })
+
+        assert.are.equal("fetch_chapters_for_manga", state.network_requests[1].request.action)
+    end)
+
+    it("hides manga information next-unread action when it cannot open a chapter", function()
+        local plugin, state = installController()
+        local manga = {
+            id = "m1",
+            title = "Frieren",
+            first_unread_chapter = { id = "c1", name = "Ch. 1" },
+        }
+
+        assert.is_true(plugin:performMangaAction(manga, "manga_information"))
+
+        assert.are.equal("open_chapters", state.manga_information_options.actions[1].id)
+        assert.is_nil(state.manga_information_options.actions[2])
     end)
 
     it("builds manga actions without loading missing chapter context", function()
