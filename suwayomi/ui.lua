@@ -62,11 +62,25 @@ function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
     })
 end
 
-function SuwayomiUI.showSettingsMenu(items)
+function SuwayomiUI.showSettingsMenu(items, options)
+    options = options or {}
     local menu = getListMenu().show({
         title = _("Suwayomi Settings"),
+        title_bar_left_icon = options.title_bar_left_icon,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
         item_table = items or {},
     })
+    if options.on_title_bar_left_tap then
+        menu.onLeftButtonTap = function(...)
+            return options.on_title_bar_left_tap(menu, ...)
+        end
+    end
+    if options.on_title_bar_left_hold then
+        menu.onLeftButtonHold = function(...)
+            return options.on_title_bar_left_hold(menu, ...)
+        end
+    end
     bindMenuCallbacks(menu.item_table, menu)
     return menu
 end

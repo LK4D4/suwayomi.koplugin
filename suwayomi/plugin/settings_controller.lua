@@ -34,7 +34,15 @@ end
 
 function Methods:showSettings()
     if SuwayomiUI.showSettingsMenu then
-        return SuwayomiUI.showSettingsMenu(self:buildSettingsMenu())
+        return SuwayomiUI.showSettingsMenu(self:buildSettingsMenu(), {
+            title_bar_left_icon = "appbar.menu",
+            on_title_bar_left_tap = function()
+                if self.showHome then
+                    self:showHome()
+                end
+                return true
+            end,
+        })
     end
     self:showMessage(_("Settings are unavailable."))
 end

@@ -122,8 +122,9 @@ local function installController(options)
     end
     package.preload["suwayomi/ui"] = function()
         return {
-            showSettingsMenu = function(items)
+            showSettingsMenu = function(items, menu_options)
                 state.settings_menu = items
+                state.settings_menu_options = menu_options
                 return items
             end,
             showLoginDialog = function(dialog_options)
@@ -271,6 +272,8 @@ describe("suwayomi/plugin/settings_controller", function()
         local menu = plugin:showSettings()
         local connection_menu = findMenuItem(menu, "Connection")
 
+        assert.are.equal("appbar.menu", state.settings_menu_options.title_bar_left_icon)
+        assert.is_function(state.settings_menu_options.on_title_bar_left_tap)
         assert.are.equal("Setup wizard", menu[1].text)
         assert.are.equal("Connection", menu[2].text)
         assert.are.equal("Library", menu[3].text)
@@ -299,6 +302,16 @@ describe("suwayomi/plugin/settings_controller", function()
             message = "Connection test passed.",
         })
         assert.are.equal("Connection test passed.", state.messages[#state.messages])
+    end)
+
+    it("opens Suwayomi home from the settings title burger without closing the stack", function()
+        local plugin, state = installController()
+
+        plugin:showSettings()
+        state.settings_menu_options.on_title_bar_left_tap({ name = "settings-menu" })
+
+        assert.are.equal(1, state.home_count)
+        assert.is_nil(state.closed_plugin)
     end)
 
     it("keeps settings root groups and callback routes stable", function()

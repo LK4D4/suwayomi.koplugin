@@ -1648,6 +1648,7 @@ describe("suwayomi/ui", function()
 
     it("renders settings root with the shared list menu style", function()
         local ui = require("suwayomi/ui")
+        local tapped = false
 
         ui.showSettingsMenu({
             {
@@ -1659,10 +1660,18 @@ describe("suwayomi/ui", function()
                     },
                 },
             },
+        }, {
+            title_bar_left_icon = "appbar.menu",
+            on_title_bar_left_tap = function(menu)
+                tapped = menu
+            end,
         })
 
         assert.are.equal("Suwayomi Settings", shown_dialog.title)
         assert.are.equal("list_menu", shown_dialog.renderer)
+        assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
+        shown_dialog.onLeftButtonTap()
+        assert.are.equal(shown_dialog, tapped)
         assertFileManagerListStyle(shown_dialog)
         assert.are.equal("Connection", shown_dialog.item_table[1].text)
         assert.truthy(shown_dialog.item_table[1].sub_item_table)
