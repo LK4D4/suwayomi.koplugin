@@ -79,7 +79,7 @@ local function runCallback(callback, saved_path, options)
 end
 
 function Methods:getDownloadDirectoryChooserStartDir()
-    local ok, lfs = pcall(require, "lfs")
+    local ok, lfs = pcall(require, "suwayomi/fs")
     if not ok or not lfs or not lfs.attributes then
         return nil
     end

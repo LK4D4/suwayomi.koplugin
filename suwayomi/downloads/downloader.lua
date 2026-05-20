@@ -3,11 +3,11 @@
 -- Responsibility: download pages or direct archives, validate page data, write
 -- ordered CBZ files, clean partial files, and report progress.
 -- Owned state: none.
--- Dependencies: lfs, KOReader archiver, API facade, and path helpers.
+-- Dependencies: filesystem loader, KOReader archiver, API facade, and path helpers.
 -- External data: page URLs, archive bytes, filesystem paths, and API responses
 -- are validated before final CBZ rename.
 
-local lfs = require("lfs")
+local lfs = require("suwayomi/fs")
 local Archiver = require("ffi/archiver")
 local SuwayomiAPI = require("suwayomi/api")
 local ProgressFile = require("suwayomi/downloads/progress_file")

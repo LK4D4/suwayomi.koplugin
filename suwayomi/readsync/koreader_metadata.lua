@@ -54,7 +54,7 @@ function Methods:ensureDirectory(path)
         return false
     end
 
-    local ok, lfs = pcall(require, "lfs")
+    local ok, lfs = pcall(require, "suwayomi/fs")
     if not ok or not lfs then
         return false
     end

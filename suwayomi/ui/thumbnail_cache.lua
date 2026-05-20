@@ -3,13 +3,13 @@
 -- Responsibility: map remote thumbnail URLs to private cache file paths and
 -- write validated image bytes or decoded bitmap thumbnails for the manga row UI.
 -- Owned state: cache directory on disk.
--- Dependencies: datastorage, lfs, ffi/util, and Lua file IO.
+-- Dependencies: datastorage, filesystem loader, ffi/util, and Lua file IO.
 -- External data: server URLs and thumbnail URLs are hashed before becoming
 -- filenames so library metadata does not leak through cache paths.
 
 local DataStorage = require("datastorage")
 local FFIUtil = require("ffi/util")
-local lfs = require("lfs")
+local lfs = require("suwayomi/fs")
 
 local ThumbnailCache = {}
 ThumbnailCache.MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024

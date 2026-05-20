@@ -59,6 +59,7 @@ describe("suwayomi/downloads/downloader progress writing", function()
         package.loaded["suwayomi/downloads/progress_file"] = nil
         package.loaded["suwayomi/paths"] = nil
         package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/fs"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
@@ -95,10 +96,12 @@ describe("suwayomi/downloads/downloader progress writing", function()
         package.loaded["suwayomi/downloads/progress_file"] = nil
         package.loaded["suwayomi/paths"] = nil
         package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/fs"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
         package.preload["suwayomi/api"] = nil
+        package.preload["suwayomi/fs"] = nil
         package.preload.lfs = nil
         package.preload["ffi/archiver"] = nil
         package.preload["ffi/util"] = nil

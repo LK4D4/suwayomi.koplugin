@@ -15,6 +15,7 @@ describe("suwayomi/downloads/directory", function()
             "suwayomi/downloads/directory",
             "suwayomi/settings",
             "suwayomi/ui",
+            "suwayomi/fs",
             "lfs",
             "device",
         }) do

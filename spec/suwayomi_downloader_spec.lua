@@ -291,6 +291,7 @@ describe("suwayomi/downloads/downloader", function()
         package.loaded["suwayomi/downloads/downloader"] = nil
         package.loaded["suwayomi/paths"] = nil
         package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/fs"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
@@ -298,6 +299,7 @@ describe("suwayomi/downloads/downloader", function()
 
         package.preload["suwayomi/paths"] = nil
         package.preload["suwayomi/api"] = nil
+        package.preload["suwayomi/fs"] = nil
         package.preload.lfs = nil
         package.preload["ffi/archiver"] = nil
         package.preload["ffi/util"] = nil
@@ -422,6 +424,7 @@ describe("suwayomi/downloads/downloader", function()
     it("skips downloading when the target cbz already exists", function()
         package.loaded["suwayomi/downloads/downloader"] = nil
         package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/fs"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
@@ -471,6 +474,7 @@ describe("suwayomi/downloads/downloader", function()
 
         package.loaded["suwayomi/downloads/downloader"] = nil
         package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/fs"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil
@@ -2753,6 +2757,7 @@ describe("suwayomi/downloads/downloader", function()
         package.loaded["suwayomi/downloads/downloader"] = nil
         package.loaded["suwayomi/paths"] = nil
         package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/fs"] = nil
         package.loaded.lfs = nil
         package.loaded["ffi/archiver"] = nil
         package.loaded["ffi/util"] = nil

@@ -18,6 +18,7 @@ local MODULES_TO_CLEAR = {
     "suwayomi/api",
     "suwayomi/subprocess/job",
     "suwayomi/client",
+    "suwayomi/fs",
     "suwayomi/downloads/queue",
     "suwayomi/downloads/downloader",
     "suwayomi/downloads/active_jobs",

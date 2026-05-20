@@ -7,6 +7,7 @@ describe("suwayomi/ui/thumbnail_cache", function()
 
     before_each(function()
         package.loaded["suwayomi/ui/thumbnail_cache"] = nil
+        package.loaded["suwayomi/fs"] = nil
         package.loaded.datastorage = nil
         package.loaded.lfs = nil
         package.loaded["ffi/util"] = nil
@@ -118,11 +119,13 @@ describe("suwayomi/ui/thumbnail_cache", function()
         io.open = original_io_open
         os.remove = original_os_remove
         package.preload.datastorage = nil
+        package.preload["suwayomi/fs"] = nil
         package.preload.lfs = nil
         package.preload["ffi/util"] = nil
         package.preload["ffi/blitbuffer"] = nil
         package.preload.bit = nil
         package.loaded["suwayomi/ui/thumbnail_cache"] = nil
+        package.loaded["suwayomi/fs"] = nil
     end)
 
     it("builds thumbnail cache paths without leaking server or manga data", function()
