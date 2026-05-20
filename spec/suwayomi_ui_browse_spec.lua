@@ -555,6 +555,23 @@ describe("suwayomi/ui/browse", function()
         assert.is_true(search_text)
     end)
 
+    it("omits blank source filter header and separator rows", function()
+        local browse = require("suwayomi/ui/browse")
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "Random Source",
+        }, {
+            { type = "HeaderFilter", name = "" },
+            { type = "SeparatorFilter" },
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+        })
+
+        assert.are.equal("Completed", shown_dialog.item_table[1].text)
+        assert.are.equal("Off", shown_dialog.item_table[1].mandatory)
+        assert.are.equal("Apply filters", shown_dialog.item_table[2].text)
+    end)
+
     it("omits source filter fallback action rows when title callbacks are present", function()
         local browse = require("suwayomi/ui/browse")
 

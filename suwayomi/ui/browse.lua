@@ -439,6 +439,10 @@ local function refreshSourceFilterMenu(context, menu)
     end
 end
 
+local function hasFilterLabel(filter)
+    return tostring(filter and filter.name or ""):match("%S") ~= nil
+end
+
 local function buildSourceFilterRows(filters, draft, context)
     context = context or {}
     local rows = {}
@@ -446,10 +450,12 @@ local function buildSourceFilterRows(filters, draft, context)
         filter = type(filter) == "table" and filter or {}
         local filter_type = tostring(filter.type or "")
         if filter_type == "HeaderFilter" or filter_type == "SeparatorFilter" then
-            table.insert(rows, {
-                text = filter.name or "",
-                select_enabled = false,
-            })
+            if hasFilterLabel(filter) then
+                table.insert(rows, {
+                    text = filter.name,
+                    select_enabled = false,
+                })
+            end
         elseif filter_type == "CheckBoxFilter" then
             local value = getDraftState(draft, index, "checkBoxState", filter.default == true, context.group_position)
             local row = {

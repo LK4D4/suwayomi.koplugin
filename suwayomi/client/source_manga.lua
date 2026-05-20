@@ -615,6 +615,58 @@ function SuwayomiClient:showSourceMangaFailureStatus(menu, source, browse_option
     )
 end
 
+function SuwayomiClient:isSourceFilterSearch(browse_options)
+    return browse_options
+        and browse_options.type == "SEARCH"
+        and (type(browse_options.filter_schema) == "table"
+            or (type(browse_options.filters) == "table" and #browse_options.filters > 0))
+end
+
+function SuwayomiClient:buildSourceMangaEmptyMessage(browse_options)
+    if self:isSourceFilterSearch(browse_options) then
+        return self:translate("No manga match these filters.")
+    elseif browse_options and browse_options.type == "SEARCH" then
+        return self:translate("No manga match this search.")
+    end
+    return self:translate("This source has no manga.")
+end
+
+function SuwayomiClient:buildSourceMangaEmptyRows(source, browse_options, message)
+    local rows = {
+        {
+            text = message,
+            raw_menu_row = true,
+            select_enabled = false,
+        },
+    }
+    if type(browse_options and browse_options.filter_schema) == "table" then
+        table.insert(rows, {
+            text = self:translate("Edit filters"),
+            raw_menu_row = true,
+            callback = function()
+                local credentials = self.settings:load()
+                return self:openSourceFilterEditor(
+                    credentials,
+                    source,
+                    browse_options.filter_schema,
+                    browse_options.filter_draft or { query = browse_options.query, filters = {} }
+                )
+            end,
+        })
+    elseif browse_options and browse_options.type == "SEARCH" then
+        table.insert(rows, {
+            text = self:translate("Edit search"),
+            raw_menu_row = true,
+            callback = function()
+                return self:showSourceSearchPrompt(source, {
+                    query = browse_options.query,
+                })
+            end,
+        })
+    end
+    return rows
+end
+
 function SuwayomiClient:isCurrentSourceMangaLoad(state)
     return state
         and self._active_source_manga_load == state
@@ -915,13 +967,15 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
         and page <= 1
         and session.has_next_page ~= true
     then
+        local empty_message = self:buildSourceMangaEmptyMessage(browse_options)
         if not self:showSourceMangaStatus(
             existing_menu,
             menu_options.title,
-            self:translate("This source has no manga."),
-            self:buildBrowseResultTitle(source, browse_options)
+            empty_message,
+            self:buildBrowseResultTitle(source, browse_options),
+            self:buildSourceMangaEmptyRows(source, browse_options, empty_message)
         ) then
-            self.plugin:showMessage(self:translate("This source has no manga."))
+            self.plugin:showMessage(empty_message)
         end
         return
     end

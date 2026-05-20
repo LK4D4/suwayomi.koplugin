@@ -364,6 +364,65 @@ describe("suwayomi/client source manga flows", function()
         assert.is_nil(updated_rows[2])
     end)
 
+    it("shows source filter search empty results with edit filters action", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local updated_rows
+        local editor_draft
+        local filter_draft = {
+            query = "",
+            filters = {
+                { position = 1, type = "checkBoxState", state = true },
+            },
+        }
+        local filter_schema = {
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+        }
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function()
+                    return { name = "source-search-menu" }
+                end,
+                updateMangaMenu = function(_, rows)
+                    updated_rows = rows
+                end,
+                showSourceFilterEditor = function(_, _, draft)
+                    editor_draft = draft
+                end,
+            },
+        })
+
+        client:showMangaForSource({ id = "s1", display_name = "ComicK", lang = "en" }, {
+            type = "SEARCH",
+            query = "",
+            filters = {
+                { position = 0, checkBoxState = true },
+            },
+            filter_draft = filter_draft,
+            filter_schema = filter_schema,
+            skip_mode_menu = true,
+        })
+        started[1].on_finish(started[1], {
+            ok = true,
+            source = { id = "s1", display_name = "ComicK", lang = "en" },
+            browse_options = { type = "SEARCH", query = "", page = 1 },
+            manga = {},
+            has_next_page = false,
+        })
+
+        assert.are.equal("No manga match these filters.", updated_rows[1].text)
+        assert.is_false(updated_rows[1].select_enabled)
+        assert.is_nil(updated_rows[1].subtitle)
+        assert.are.equal("Edit filters", updated_rows[2].text)
+
+        updated_rows[2].callback()
+        assert.are.same(filter_draft, editor_draft)
+    end)
+
     it("keeps local sources on the direct manga listing flow", function()
         local mode_menu_shown = false
         local fetched_options
