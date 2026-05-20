@@ -13,6 +13,11 @@ local POSTER_CACHE_OPTIONS = {
     width = 240,
     height = 360,
 }
+local POSTER_BUCKETS = {
+    compact = { variant = "poster", width = 160, height = 240 },
+    normal = POSTER_CACHE_OPTIONS,
+    large = { variant = "poster", width = 320, height = 480 },
+}
 
 local function requireWidgetModules()
     local Device = require("device")
@@ -31,6 +36,7 @@ local function requireWidgetModules()
         LineWidget = require("ui/widget/linewidget"),
         MovableContainer = require("ui/widget/container/movablecontainer"),
         ScrollHtmlWidget = require("ui/widget/scrollhtmlwidget"),
+        ScrollableContainer = require("ui/widget/container/scrollablecontainer"),
         Size = require("ui/size"),
         TextBoxWidget = require("ui/widget/textboxwidget"),
         TextWidget = require("ui/widget/textwidget"),
@@ -224,6 +230,125 @@ local function screenHeight(Screen)
     return 800
 end
 
+local function countLines(text)
+    if text == nil or text == "" then
+        return 0
+    end
+    local _, count = tostring(text):gsub("\n", "\n")
+    return count + 1
+end
+
+local function estimateWrappedLineCount(text, width, char_width)
+    local chars_per_line = math.max(1, math.floor(width / math.max(1, char_width)))
+    local lines = 0
+    text = tostring(text or "")
+    for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+        lines = lines + math.max(1, math.ceil(#line / chars_per_line))
+    end
+    return lines
+end
+
+local function copyPosterOptions(options)
+    return {
+        variant = options.variant,
+        width = options.width,
+        height = options.height,
+    }
+end
+
+local function posterCacheOptionsForSlot(width, height)
+    if width >= 280 or height >= 420 then
+        return copyPosterOptions(POSTER_BUCKETS.large)
+    end
+    if width <= 180 or height <= 270 then
+        return copyPosterOptions(POSTER_BUCKETS.compact)
+    end
+    return copyPosterOptions(POSTER_BUCKETS.normal)
+end
+
+local function computeDialogBounds(modules)
+    local Screen = modules.Screen
+    local width = screenWidth(Screen)
+    local height = screenHeight(Screen)
+    local margin = scale(Screen, 12)
+    local max_width = scale(Screen, 920)
+    local dialog_width = math.floor(math.min(math.max(1, width - 2 * margin), math.min(width, height) * 0.92, max_width))
+    local dialog_height = math.floor(math.min(math.max(1, height - 2 * margin), height * 0.86))
+    return {
+        screen_width = width,
+        screen_height = height,
+        width = math.max(1, dialog_width),
+        height = math.max(1, dialog_height),
+    }
+end
+
+local function computeContentLayout(modules, manga, bounds, chrome)
+    local Screen = modules.Screen
+    local padding = modules.Size.padding.default
+    local gap = scale(Screen, 12)
+    local body_width = math.max(1, bounds.width - 2 * padding)
+    local body_height = math.max(1, bounds.height
+        - chrome.title_height
+        - chrome.separator_height
+        - chrome.button_height
+        - 2 * padding)
+    local metadata_text = MangaInfo.buildMetadataText(manga)
+    local metadata_lines = countLines(metadata_text)
+    local split_poster_width = math.floor(math.min(scale(Screen, 320), math.max(scale(Screen, 180), body_width * 0.34)))
+    local split_poster_height = math.floor(split_poster_width * 1.5)
+    local split_metadata_width = body_width - split_poster_width - gap
+    local split_description_height = body_height - split_poster_height - gap
+    local split_metadata_lines = estimateWrappedLineCount(metadata_text, split_metadata_width, scale(Screen, 12))
+    local metadata_min_height = math.max(scale(Screen, 120), split_metadata_lines * scale(Screen, 24))
+
+    local split_fits = body_width >= scale(Screen, 520)
+        and body_height >= scale(Screen, 420)
+        and split_metadata_width >= scale(Screen, 220)
+        and split_poster_height >= scale(Screen, 240)
+        and split_poster_height >= metadata_min_height
+        and split_description_height >= scale(Screen, 120)
+
+    if split_fits then
+        return {
+            mode = "split",
+            scroll_mode = "description",
+            width = bounds.width,
+            height = bounds.height,
+            body_width = body_width,
+            body_height = body_height,
+            gap = gap,
+            poster_width = split_poster_width,
+            poster_height = split_poster_height,
+            metadata_width = split_metadata_width,
+            metadata_height = split_poster_height,
+            description_width = body_width,
+            description_height = split_description_height,
+            poster_cache_options = posterCacheOptionsForSlot(split_poster_width, split_poster_height),
+        }
+    end
+
+    local stacked_poster_width = math.floor(math.min(scale(Screen, 240), math.max(scale(Screen, 96), body_width * 0.45)))
+    local stacked_poster_height = math.floor(stacked_poster_width * 1.5)
+    local stacked_metadata_height = math.max(scale(Screen, 72), metadata_lines * scale(Screen, 20))
+    local stacked_description_height = math.max(scale(Screen, 64), math.min(scale(Screen, 180), body_height - stacked_poster_height - stacked_metadata_height - 2 * gap))
+    return {
+        mode = "stacked",
+        scroll_mode = "body",
+        width = bounds.width,
+        height = bounds.height,
+        body_width = body_width,
+        body_height = body_height,
+        gap = gap,
+        poster_width = stacked_poster_width,
+        poster_height = stacked_poster_height,
+        metadata_width = body_width,
+        metadata_height = stacked_metadata_height,
+        description_width = body_width,
+        description_height = stacked_description_height,
+        poster_cache_options = posterCacheOptionsForSlot(stacked_poster_width, stacked_poster_height),
+    }
+end
+
 local function thumbnailCredentials(options)
     local credentials = options and options.thumbnail_credentials
     if not credentials then
@@ -235,7 +360,7 @@ local function thumbnailCredentials(options)
     return credentials
 end
 
-local function findCachedPosterPath(manga, options)
+local function findCachedPosterPath(manga, options, cache_options)
     manga = manga or {}
     if not cleanText(manga.thumbnail_url) then
         return nil
@@ -244,15 +369,15 @@ local function findCachedPosterPath(manga, options)
     if not ok_cache then
         return nil
     end
-    return ThumbnailCache.find(thumbnailCredentials(options), manga.thumbnail_url, POSTER_CACHE_OPTIONS)
+    return ThumbnailCache.find(thumbnailCredentials(options), manga.thumbnail_url, cache_options or POSTER_CACHE_OPTIONS)
 end
 
-local function findPosterPath(manga, options)
+local function findPosterPath(manga, options, cache_options)
     manga = manga or {}
     if cleanText(options and options.poster_path) then
         return options.poster_path
     end
-    local poster_path = findCachedPosterPath(manga, options)
+    local poster_path = findCachedPosterPath(manga, options, cache_options)
     if poster_path then
         return poster_path
     end
@@ -337,7 +462,8 @@ local function bindDialog(widget, dialog)
 end
 
 local function buildPosterWidget(modules, manga, options, width, height)
-    local poster_path = findPosterPath(manga, options)
+    local cache_options = options and options.poster_cache_options
+    local poster_path = findPosterPath(manga, options, cache_options)
     local poster_image = loadPosterImage(poster_path)
     local poster
     if poster_image then
@@ -382,47 +508,75 @@ function MangaInfo.buildContentWidget(manga, options, layout)
     local modules = requireWidgetModules()
     local Screen = modules.Screen
     layout = layout or {}
-    local dialog_width = layout.width or math.floor(math.min(screenWidth(Screen), screenHeight(Screen)) * 0.84)
-    local gap = scale(Screen, 12)
-    local poster_width = math.floor(dialog_width * 0.34)
-    local poster_height = math.floor(poster_width * 1.45)
-    local text_width = dialog_width - poster_width - gap
-    local description_height = math.max(
-        scale(Screen, 180),
-        (layout.height or math.floor(screenHeight(Screen) * 0.75)) - poster_height - modules.Size.padding.default
-    )
+    if not layout.poster_width then
+        local bounds = computeDialogBounds(modules)
+        layout = computeContentLayout(modules, manga, bounds, {
+            title_height = 0,
+            separator_height = 0,
+            button_height = 0,
+        })
+    end
+    local gap = layout.gap or scale(Screen, 12)
 
-    local poster = buildPosterWidget(modules, manga, options, poster_width, poster_height)
+    options = options or {}
+    options.poster_cache_options = layout.poster_cache_options or POSTER_CACHE_OPTIONS
+
+    local poster = buildPosterWidget(modules, manga, options, layout.poster_width, layout.poster_height)
     local metadata = modules.TextBoxWidget:new{
         text = MangaInfo.buildMetadataText(manga),
-        width = text_width,
-        height = poster_height,
+        width = layout.metadata_width,
+        height = layout.metadata_height,
         face = modules.Font:getFace("infofont"),
         alignment = "left",
         auto_para_direction = true,
     }
-    local top = modules.HorizontalGroup:new{
-        align = "top",
-        poster,
-        modules.HorizontalSpan:new{ width = gap },
-        metadata,
-    }
     local description = modules.ScrollHtmlWidget:new{
         html_body = MangaInfo.buildDescriptionHtml(manga),
         css = DESCRIPTION_CSS,
-        width = dialog_width,
-        height = description_height,
+        width = layout.description_width,
+        height = layout.description_height,
         default_font_size = scale(Screen, 28),
         html_link_tapped_callback = function(link)
             openLink(modules.Device, link)
         end,
     }
     description.manga_info_scroll_html = true
-    return modules.VerticalGroup:new{
-        top,
-        modules.VerticalSpan:new{ width = modules.Size.padding.default },
-        description,
-    }
+    local content
+    if layout.mode == "stacked" then
+        content = modules.ScrollableContainer:new{
+            dimen = modules.Geom:new{
+                w = layout.body_width,
+                h = layout.body_height,
+            },
+            modules.VerticalGroup:new{
+                modules.CenterContainer:new{
+                    dimen = modules.Geom:new{
+                        w = layout.body_width,
+                        h = layout.poster_height,
+                    },
+                    poster,
+                },
+                modules.VerticalSpan:new{ width = gap },
+                metadata,
+                modules.VerticalSpan:new{ width = gap },
+                description,
+            },
+        }
+    else
+        local top = modules.HorizontalGroup:new{
+            align = "top",
+            poster,
+            modules.HorizontalSpan:new{ width = gap },
+            metadata,
+        }
+        content = modules.VerticalGroup:new{
+            top,
+            modules.VerticalSpan:new{ width = gap },
+            description,
+        }
+    end
+    content.manga_info_layout = layout
+    return content
 end
 
 local function widgetHeight(widget)
@@ -440,19 +594,15 @@ local function widgetHeight(widget)
 end
 
 local function buildDialog(modules, manga, options)
-    local Screen = modules.Screen
-    local screen_width = screenWidth(Screen)
-    local screen_height = screenHeight(Screen)
-    local dialog_width = math.floor(math.min(screen_width, screen_height) * 0.92)
-    local dialog_height = math.floor(screen_height * 0.82)
     local content_padding = modules.Size.padding.default
     local button_padding = modules.Size.padding.default
+    local bounds = computeDialogBounds(modules)
 
     local Dialog = modules.InputContainer:extend{
         manga = manga,
         options = options,
-        width = dialog_width,
-        height = dialog_height,
+        width = bounds.width,
+        height = bounds.height,
     }
 
     function Dialog:onClose()
@@ -491,7 +641,8 @@ local function buildDialog(modules, manga, options)
     end
 
     function Dialog:startPosterJob()
-        if self.poster_job or findCachedPosterPath(self.manga, self.options) or cleanText(self.options and self.options.poster_path) then
+        local cache_options = (self.content_layout and self.content_layout.poster_cache_options) or POSTER_CACHE_OPTIONS
+        if self.poster_job or findCachedPosterPath(self.manga, self.options, cache_options) or cleanText(self.options and self.options.poster_path) then
             return
         end
         local thumbnail_url = cleanText(self.manga and self.manga.thumbnail_url)
@@ -516,7 +667,7 @@ local function buildDialog(modules, manga, options)
             poll_interval_seconds = 0.5,
             timeout_seconds = 15,
             run = function(path)
-                ThumbnailWorker:run(credentials, thumbnail_url, path, POSTER_CACHE_OPTIONS)
+                ThumbnailWorker:run(credentials, thumbnail_url, path, cache_options)
             end,
             read_result = function(path)
                 return ThumbnailWorker:readResult(path)
@@ -558,12 +709,15 @@ local function buildDialog(modules, manga, options)
         end
     end
 
-    function Dialog:init()
+    function Dialog:buildFrame()
+        local current_bounds = computeDialogBounds(modules)
+        self.width = current_bounds.width
+        self.height = current_bounds.height
         self.region = modules.Geom:new{
             x = 0,
             y = 0,
-            w = screen_width,
-            h = screen_height,
+            w = current_bounds.screen_width,
+            h = current_bounds.screen_height,
         }
 
         local titlebar = modules.TitleBar:new{
@@ -578,6 +732,7 @@ local function buildDialog(modules, manga, options)
             end,
             show_parent = self,
         }
+        self.titlebar = titlebar
 
         local title_separator = modules.LineWidget:new{
             background = modules.Blitbuffer.COLOR_GRAY or modules.Blitbuffer.COLOR_BLACK,
@@ -602,16 +757,16 @@ local function buildDialog(modules, manga, options)
             zero_sep = true,
             show_parent = self,
         }
+        self.button_table = button_table
 
-        local content_height = self.height
-            - widgetHeight(titlebar)
-            - lineThickness(modules.Size)
-            - widgetHeight(button_table)
-            - 2 * content_padding
-        self.content_layout = {
-            width = self.width - 2 * content_padding,
-            height = math.max(scale(Screen, 220), content_height),
-        }
+        self.content_layout = computeContentLayout(modules, self.manga, {
+            width = self.width,
+            height = self.height,
+        }, {
+            title_height = widgetHeight(titlebar),
+            separator_height = lineThickness(modules.Size),
+            button_height = widgetHeight(button_table),
+        })
         local content = MangaInfo.buildContentWidget(self.manga, self.options, self.content_layout)
         self.content_frame = modules.FrameContainer:new{
             padding = content_padding,
@@ -623,7 +778,7 @@ local function buildDialog(modules, manga, options)
         local body = modules.CenterContainer:new{
             dimen = modules.Geom:new{
                 w = self.width,
-                h = content_height + 2 * content_padding,
+                h = self.content_layout.body_height + 2 * content_padding,
             },
             self.content_frame,
         }
@@ -656,6 +811,23 @@ local function buildDialog(modules, manga, options)
         }
 
         bindDialog(self, self)
+    end
+
+    function Dialog:onSetDimensions()
+        if self[1] and self[1].free then
+            self[1]:free()
+        end
+        self:buildFrame()
+        if modules.UIManager.setDirty then
+            modules.UIManager:setDirty(self, function()
+                return "ui", self.frame and self.frame.dimen or self.region
+            end)
+        end
+        return true
+    end
+
+    function Dialog:init()
+        self:buildFrame()
         self:startPosterJob()
     end
 

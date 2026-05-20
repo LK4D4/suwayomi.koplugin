@@ -7,6 +7,8 @@ describe("suwayomi/ui", function()
     local record_next_tick
     local run_close_callback_on_close
     local dialog_fields
+    local screen_width
+    local screen_height
 
     before_each(function()
         shown_dialog = nil
@@ -14,6 +16,8 @@ describe("suwayomi/ui", function()
         events = {}
         record_next_tick = false
         run_close_callback_on_close = false
+        screen_width = 600
+        screen_height = 900
         dialog_fields = {
             "https://suwayomi.example",
             "alice",
@@ -42,6 +46,7 @@ describe("suwayomi/ui", function()
         package.loaded["ui/widget/container/framecontainer"] = nil
         package.loaded["ui/widget/container/inputcontainer"] = nil
         package.loaded["ui/widget/container/movablecontainer"] = nil
+        package.loaded["ui/widget/container/scrollablecontainer"] = nil
         package.loaded["ui/widget/container/widgetcontainer"] = nil
         package.loaded["ui/widget/horizontalgroup"] = nil
         package.loaded["ui/widget/horizontalspan"] = nil
@@ -148,10 +153,10 @@ describe("suwayomi/ui", function()
             return {
                 screen = {
                     getWidth = function()
-                        return 600
+                        return screen_width
                     end,
                     getHeight = function()
-                        return 900
+                        return screen_height
                     end,
                     scaleBySize = function(_, value)
                         return value
@@ -244,6 +249,10 @@ describe("suwayomi/ui", function()
             return widgetFactory("movablecontainer")
         end
 
+        package.preload["ui/widget/container/scrollablecontainer"] = function()
+            return widgetFactory("scrollablecontainer")
+        end
+
         package.preload["ui/widget/container/widgetcontainer"] = function()
             return widgetFactory("widgetcontainer")
         end
@@ -324,6 +333,7 @@ describe("suwayomi/ui", function()
                     return "/tmp/" .. tostring(prefix) .. ".json"
                 end,
                 start = function(options)
+                    events.poster_job_starts = (events.poster_job_starts or 0) + 1
                     events.poster_job = options
                     if options.run then
                         options.run(options.active.result_path)
@@ -459,6 +469,14 @@ describe("suwayomi/ui", function()
                         callback()
                     end
                 end,
+                setDirty = function(_, widget, callback)
+                    events.dirty_widget = widget
+                    if callback then
+                        local mode, region = callback()
+                        events.dirty_mode = mode
+                        events.dirty_region = region
+                    end
+                end,
             }
         end
 
@@ -504,6 +522,7 @@ describe("suwayomi/ui", function()
         package.preload["ui/widget/multiinputdialog"] = nil
         package.preload["ui/widget/container/centercontainer"] = nil
         package.preload["ui/widget/container/framecontainer"] = nil
+        package.preload["ui/widget/container/scrollablecontainer"] = nil
         package.preload["ui/widget/horizontalgroup"] = nil
         package.preload["ui/widget/horizontalspan"] = nil
         package.preload["ui/widget/imagewidget"] = nil
@@ -538,6 +557,11 @@ describe("suwayomi/ui", function()
         assert.are.equal(expected_fixed_item_heights or false, menu.fixed_item_heights)
         assert.is_true(menu.multilines_show_more_text)
         assert.is_nil(menu.items_mandatory_font_size)
+    end
+
+    local function setScreenDimensions(width, height)
+        screen_width = width
+        screen_height = height
     end
 
     it("preserves facade access to browse menus", function()
@@ -662,6 +686,27 @@ describe("suwayomi/ui", function()
         return nil
     end
 
+    local function sampleManga()
+        return {
+            id = 42,
+            title = "Manga Title",
+            source = { displayName = "Source A" },
+            author = "Writer",
+            artist = "Artist",
+            status = "ONGOING",
+            chapter_count = 120,
+            unread_count = 12,
+            download_count = 4,
+            in_library = true,
+            categories = { "Reading", "Favorites" },
+            genres = { "Action", "Mystery" },
+            first_unread_chapter = { name = "Chapter 5" },
+            latest_fetched_chapter = { name = "Chapter 8" },
+            description = "Synopsis with [Site](https://example.invalid).",
+            thumbnail_url = "thumb://cached",
+        }
+    end
+
     it("shows manga information in a framed poster dialog", function()
         local ui = require("suwayomi/ui")
         local credentials = { server_url = "https://suwayomi.example" }
@@ -783,6 +828,107 @@ describe("suwayomi/ui", function()
         local poster_text = findWidget(dialog, "textwidget")
         assert.are.equal("No poster", poster_text.text)
         assert.is_nil(events.poster_worker_run)
+    end)
+
+    it("adapts manga information layout across screen shapes", function()
+        local cases = {
+            { name = "small landscape", width = 640, height = 360, mode = "stacked", bucket = { width = 160, height = 240 } },
+            { name = "very small landscape", width = 480, height = 320, mode = "stacked", bucket = { width = 160, height = 240 } },
+            { name = "phone portrait", width = 360, height = 640, mode = "stacked", bucket = { width = 160, height = 240 } },
+            { name = "e-reader portrait", width = 758, height = 1024, mode = "split", bucket = { width = 240, height = 360 } },
+            { name = "large display", width = 1200, height = 1600, mode = "split", bucket = { width = 320, height = 480 } },
+        }
+
+        for _, case in ipairs(cases) do
+            package.loaded["suwayomi/ui"] = nil
+            package.loaded["suwayomi/ui/manga_info"] = nil
+            events = {}
+            setScreenDimensions(case.width, case.height)
+            local ui = require("suwayomi/ui")
+
+            local dialog = ui.showMangaInformation(sampleManga(), {
+                thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            })
+            local layout = dialog.content_layout
+            local description = findWidget(dialog, "scrollhtmlwidget")
+            local poster = findWidget(dialog, "imagewidget")
+
+            assert.are.equal(case.mode, layout.mode, case.name)
+            assert.is_true(dialog.width <= case.width, case.name)
+            assert.is_true(dialog.height <= case.height, case.name)
+            assert.is_true(layout.body_width > 0, case.name)
+            assert.is_true(layout.body_height > 0, case.name)
+            assert.is_true(layout.poster_width > 0, case.name)
+            assert.is_true(layout.poster_height > 0, case.name)
+            assert.is_true(layout.metadata_width > 0, case.name)
+            assert.is_true(layout.metadata_height > 0, case.name)
+            assert.is_true(layout.description_width > 0, case.name)
+            assert.is_true(layout.description_height > 0, case.name)
+            assert.are.equal(layout.poster_width, poster.width, case.name)
+            assert.are.equal(layout.poster_height, poster.height, case.name)
+            assert.are.equal(layout.description_width, description.width, case.name)
+            assert.are.equal(layout.description_height, description.height, case.name)
+            assert.are.equal(dialog, description.dialog, case.name)
+            assert.are.same({
+                variant = "poster",
+                width = case.bucket.width,
+                height = case.bucket.height,
+            }, events.thumbnail_lookup.options, case.name)
+
+            if case.mode == "stacked" then
+                assert.are.equal("body", layout.scroll_mode, case.name)
+                assert.is_not_nil(findWidget(dialog, "scrollablecontainer"), case.name)
+                assert.is_not_nil(findWidget(dialog, "textboxwidget"), case.name)
+            else
+                assert.are.equal("description", layout.scroll_mode, case.name)
+                assert.is_not_nil(findWidget(dialog, "horizontalgroup"), case.name)
+            end
+        end
+    end)
+
+    it("uses body scrolling when wrapped metadata cannot safely fit beside the poster", function()
+        setScreenDimensions(758, 1024)
+        local ui = require("suwayomi/ui")
+        local manga = sampleManga()
+        manga.genres = {
+            "Action Mystery Drama Historical Supernatural Psychological Adventure Slice of Life",
+            "Another Very Long Genre Label That Wraps Across Several Lines On Ereader Screens",
+        }
+
+        local dialog = ui.showMangaInformation(manga, {
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+        })
+
+        assert.are.equal("stacked", dialog.content_layout.mode)
+        assert.are.equal("body", dialog.content_layout.scroll_mode)
+        assert.is_not_nil(findWidget(dialog, "scrollablecontainer"))
+    end)
+
+    it("recomputes manga information layout after screen dimensions change", function()
+        setScreenDimensions(640, 360)
+        local ui = require("suwayomi/ui")
+        local manga = sampleManga()
+        manga.thumbnail_url = "thumb://missing"
+        local dialog = ui.showMangaInformation(manga, {
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+        })
+
+        assert.are.equal("stacked", dialog.content_layout.mode)
+        local old_width = dialog.width
+        assert.are.equal(1, events.poster_job_starts)
+
+        setScreenDimensions(758, 1024)
+        dialog:onSetDimensions()
+
+        assert.are.equal("split", dialog.content_layout.mode)
+        assert.is_true(dialog.width > old_width)
+        assert.are.equal(758, dialog.region.w)
+        assert.are.equal(1024, dialog.region.h)
+        assert.are.equal(dialog, events.dirty_widget)
+        assert.are.equal("ui", events.dirty_mode)
+        assert.are.equal(758, events.dirty_region.w)
+        assert.are.equal(1024, events.dirty_region.h)
+        assert.are.equal(1, events.poster_job_starts)
     end)
 
     it("formats manga information description markup and opens links", function()
