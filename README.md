@@ -1,140 +1,102 @@
-# Suwayomi Downloader for KOReader
+# Suwayomi Client for KOReader
 
 [![Test](https://github.com/LK4D4/suwayomi_dl.koplugin/actions/workflows/test.yml/badge.svg)](https://github.com/LK4D4/suwayomi_dl.koplugin/actions/workflows/test.yml)
 
-A KOReader plugin that allows you to browse your self-hosted [Suwayomi (Tachidesk)](https://github.com/Suwayomi/Suwayomi-Server) server and download chapters directly to your e-ink device.
+Browse a self-hosted [Suwayomi](https://github.com/Suwayomi/Suwayomi-Server) server from KOReader, install or update source extensions, download manga chapters as local CBZ files, and read them with KOReader's normal reader.
 
-## Development Status
+This plugin is for readers who already use Suwayomi on another machine and want a comfortable e-ink workflow: choose manga on the device, keep a small local reading queue, and sync read/unread state back when possible.
 
-This plugin is experimental and still under active development.
+## What You Need
 
-- Expect rough edges and incomplete features.
-- The login flow, Suwayomi hub, Library entry point, source browsing/search, extension install/update/uninstall, global search, manga browsing, manga actions, chapter browsing, chapter actions menu, single-chapter downloads, source-scoped download paths, cached source refresh, local queue inspection, and read-state syncing are currently implemented and being tested.
-- The practical flow has been verified on device with the Suwayomi **Local Source** and a live Comick remote-source browse/latest workflow. Remote source search still depends heavily on source/server behavior; global search is partial and cancellable, while individual source requests can still time out.
-- The top-level Downloads screen can inspect active, queued, and failed local downloads, although completed history is not implemented yet.
+- KOReader on your device.
+- A Suwayomi server reachable from that device.
+- Basic Auth credentials if your Suwayomi server uses login protection.
 
-## Features
-- Native KOReader UI integration
-- Native Suwayomi hub with Library, Browse, Downloads, Sync, Settings, and Close actions
-- Library entry point with category picker behavior settings
-- Browse sources, search across visible sources, search within a source with optional source filters, page source results, and open manga/chapter actions directly from the server
-- Browse available Suwayomi extensions from KOReader and install, update, or uninstall extensions on the server
-- Cached source list with silent background refresh
-- Basic auth login against a self-hosted Suwayomi server
-- Filter sources by language
-- Browse title-menu settings for source languages, NSFW source visibility, and optionally hiding in-library source results
-- Select a custom download directory
-- Source-scoped download layout: `<download directory>/<source>/<manga>/<chapter>.cbz`, with duplicate-safe chapter suffixes when stable chapter metadata is available
-- Download individual chapters as `.cbz`
-- Chapter actions menu with `Open`, `Download`, `Delete from device`, and `Mark as read` / `Mark as unread`
-- Bulk chapter menu actions for selected chapters, one-shot `Download next 5/10/50` commands, per-manga `Keep next 5/10/50 downloaded` auto-refill buffers, and deleting read chapters
-- Downloads settings can delete local chapter files after manual mark-read actions or after finishing chapters while reading
-- Chapter action to mark the selected chapter and all previous chapters as read, useful for setting up a clean device from an existing reading position
-- Batch downloads queue chapters in the visible chapter-list order
-- Queued chapter downloads run in parallel with a conservative default of 2 active chapters
-- Bulk queueing is capped at 50 new downloads per action to avoid accidental huge queues
-- Chapter rows show lightweight read/download status symbols, including queued and in-progress downloads
-- Read-state tracking from Suwayomi, the local plugin ledger, and KOReader sidecar metadata
-- Background retry of pending read/unread syncs when Suwayomi is temporarily unavailable
-- Manual `Sync` action for flushing pending read/unread changes immediately
+Sources do not have to be installed before first use. You can install and update Suwayomi source extensions from the plugin's **Browse** screen.
 
-Current limitations:
-- Remote source browse/latest workflows can be usable. Global search now keeps per-source failures isolated and can be cancelled, and source-specific result loading is cancellable, but source-specific search and source filters still depend on the selected source/server and may end in a timeout or source error instead of results.
-- Some Suwayomi extensions mark broadly used sources, including MangaDex and Comick in the tested server setup, as NSFW. Enable **Settings** > **Browse** > **Show NSFW sources** if expected sources are missing.
-- Source-specific quirks are expected. In the May 2026 live test, MangaDex search returned results quickly, but one tested result had no chapters from Suwayomi; Comick Latest returned manga and chapters, while Comick text search timed out at the server.
-- Source filters are available for source-specific search when the Suwayomi server and selected source expose a filter schema.
-- `Downloads` currently shows KOReader-local active, queued, and failed downloads. Completed history and server-side Suwayomi download queue management are not implemented.
-- Downloaded files are KOReader-device-local CBZ files under the configured download directory. The plugin does not manage Suwayomi's server-side download queue.
+Downloaded chapters stay on the KOReader device. The plugin does not use or manage Suwayomi's server-side download queue.
 
 ## Installation
 
-Recommended:
+### Recommended: KOReader App Store
 
-1. Open KOReader.
-2. Go to **Tools** > **App Store**.
-3. Find `LK4D4/suwayomi_dl.koplugin`.
-4. Install the plugin from the App Store.
+1. Install the [KOReader App Store plugin](https://github.com/omer-faruq/appstore.koplugin) if it is not already on your device.
+2. In KOReader, open **Tools** > **App Store**.
+3. Search for `suwayomi_dl.koplugin` or `LK4D4/suwayomi_dl.koplugin`.
+4. Install the plugin.
 5. Restart KOReader.
 
-Manual installation:
+### Manual Install
 
-1. Download the latest `suwayomi_dl.koplugin.zip` from the [Releases page](../../releases).
-2. Extract the zip file.
-3. Copy the `suwayomi_dl.koplugin` directory to the KOReader plugins directory on your device:
-   - For Android/e-readers: usually `koreader/plugins/`
-   - The final path should be `koreader/plugins/suwayomi_dl.koplugin`
-4. Restart KOReader.
-
-## Usage
-
-1. Open the **Search** tab in KOReader's top menu.
-2. Tap **Suwayomi** to open the hub.
-3. First time use opens **Suwayomi setup**. Enter your server URL, username, and password, tap **Test connection**, then choose the download folder used for KOReader-local CBZ files.
-4. To re-run setup later, tap **Settings** > **Setup wizard**. To edit only the saved login, tap **Settings** > **Connection** > **Login information**.
-5. Optionally tap **Sync** to flush any pending local read/unread changes.
-6. Optionally tap **Browse**, then open the title-bar menu to filter source languages, show/hide NSFW sources, or hide in-library source results.
-7. Tap **Settings** > **Downloads** > **Download directory** to change where manga will be downloaded. The same Downloads settings section also controls optional local-file deletion after mark-read or finished-reading events.
-8. Tap **Library** to open manga already in your Suwayomi library, or **Browse** to explore sources.
-9. In **Browse**, use **Global search** or choose a source, then pick **Popular**, **Latest** when supported, **Search**, or **Source filters**.
-10. Source results load more API pages automatically as KOReader paging reaches the end of loaded rows.
-11. Use the title-bar burger menu on Suwayomi Library/Browse/Search screens to return to the hub.
-12. Tap a manga result to open manga actions, or tap a chapter to open the chapter actions dialog.
-13. Use the chapter actions dialog to open, download, delete, or toggle read state for that chapter.
-14. Tap **Downloads** from the hub to inspect active, queued, and failed KOReader-local jobs.
-14. For a clean device with existing reading progress, tap the first unread chapter and use **Mark previous as read**, or tap the last read chapter and use **Mark this and previous as read**. Then use the chapter-list menu to queue a one-shot **Download next** batch or enable a **Download ahead** buffer.
-
-## Remote Source Notes
-
-Remote sources must already be installed and enabled on your Suwayomi server. KOReader only sees the sources Suwayomi exposes through GraphQL and the plugin's Browse settings.
-
-The May 2026 Boox Palma verification used a live Suwayomi server with MangaDex and Comick enabled. The strongest verified remote-source path was:
+1. Download `suwayomi_dl.koplugin.zip` from the [latest release](https://github.com/LK4D4/suwayomi_dl.koplugin/releases/latest).
+2. Extract the zip.
+3. Copy the extracted `suwayomi_dl.koplugin` folder into KOReader's plugin directory.
+4. Confirm the final path is exactly one plugin folder deep. KOReader discovers the plugin from that folder name:
 
 ```text
-Suwayomi -> Browse -> Comick (Unoriginal) (EN) -> Latest -> choose a manga -> Open chapters -> Scanlator filter -> Download -> Open
+<your-device-root>/koreader/plugins/suwayomi_dl.koplugin/
 ```
 
-That flow opened duplicate scanlator choices, marked chapters read/unread, and downloaded a chapter to:
+On Android, `<your-device-root>` is usually `/sdcard`. On Kobo or Kindle, use the device storage root that contains `koreader/`. On Linux desktop, the full path is usually `~/.config/koreader/plugins/suwayomi_dl.koplugin/`.
+
+Do not leave the files in a nested path such as `koreader/plugins/suwayomi_dl.koplugin/suwayomi_dl.koplugin/`; KOReader will not discover the plugin there.
+
+5. Confirm the folder contains `_meta.lua`, `main.lua`, and `suwayomi/`.
+6. Restart KOReader.
+
+To update a manual install, replace the old `suwayomi_dl.koplugin` folder with the new release folder, then restart KOReader.
+
+## First Run
+
+1. Open KOReader's top menu.
+2. Go to **Search** and tap **Suwayomi**.
+3. Enter your Suwayomi server URL, username, and password.
+4. Tap **Test connection**.
+5. Choose a download folder for local CBZ files.
+
+You can rerun setup later from **Suwayomi** > **Settings** > **Setup wizard**. To edit only the saved login, use **Settings** > **Connection** > **Login information**.
+
+## Daily Use
+
+Open **Suwayomi** from KOReader's **Search** menu. The hub has the main actions:
+
+- **Library** opens manga already in your Suwayomi library.
+- **Browse** searches enabled sources, opens Popular or Latest lists where a source supports them, and installs or updates Suwayomi source extensions.
+- **Downloads** shows active, queued, and failed local downloads.
+- **Sync** sends pending read/unread changes to Suwayomi.
+- **Settings** changes connection, library, browse, and download behavior.
+
+Tap a manga to open actions, then open its chapters. Tap a chapter to open, download, delete the local file, or change read state. For a new device, use **Mark this and previous as read** on your current reading position, then queue a small **Download next** batch or enable a **Download ahead** buffer.
+
+Downloaded files use this layout:
 
 ```text
-<download directory>/<source label>/<manga title>/<chapter title>.cbz
+<download folder>/<source>/<manga>/<chapter>.cbz
 ```
 
-When Suwayomi provides stable chapter metadata, the filename adds a duplicate-safe suffix before `.cbz`, such as `<chapter title> [id-398].cbz`, `<chapter title> [order-3].cbz`, or `<chapter title> [chapter-1].cbz`. This keeps same-titled chapters from colliding on disk. The downloaded CBZ opens in KOReader's normal reader. MangaDex search and library add/remove were also verified, but one tested result returned no chapters from Suwayomi. Comick text search timed out on the tested server; Comick Latest still worked.
+When Suwayomi provides stable chapter metadata, the plugin adds a suffix such as `[id-398]`, `[order-3]`, or `[chapter-1]` before `.cbz` so same-named chapters do not overwrite each other.
 
-## Unsupported / Deferred
+## Current Limits
 
-The current client MVP intentionally does not implement:
+This release focuses on KOReader-local reading. It does not edit source preferences, manage extension repositories, show completed download history, or control Suwayomi's server-side download queue. Some sources search quickly, some time out, and some expose incomplete metadata. Downloaded chapters open in KOReader's normal reader; the plugin is not a custom manga reader.
 
-- Source preference editing
-- Extension repository editing or source enable/disable management
-- Server-side Suwayomi download queue, download settings, or completed history management
-- Per-source download directory overrides
-- A custom in-plugin manga reader; downloaded chapters open in KOReader's normal reader
+## Troubleshooting
 
-## Testing Locally
+| Problem | What to check |
+| --- | --- |
+| Plugin does not appear | Folder must be named `suwayomi_dl.koplugin`; restart KOReader after install. |
+| Cannot connect | Check server URL from the device, Basic Auth credentials, and whether Suwayomi is running. |
+| Source is missing | Install or update the source from **Browse**; also check **Show NSFW sources** in Browse settings. |
+| Search times out | Try a source-specific Popular or Latest list, or retry with a narrower search term. |
+| Chapter will not download | Open **Downloads** to inspect failed jobs, then retry or clear the failed entry. |
 
-This plugin targets KOReader's LuaJIT runtime. Local checks use Luacheck for
-project Lua parsing/linting, avoiding generated dependency directories such as
-`.lua` and `.luarocks`, and Busted for unit tests:
+## Development
+
+Run commands from the plugin root:
 
 ```bash
-# Confirm LuaRocks is configured for LuaJIT
-luarocks config lua_interpreter
-
-# Install test and lint dependencies via LuaJIT-backed LuaRocks
-luarocks install --local busted
-luarocks install --local dkjson
-luarocks install --local luasocket
-luarocks install --local luasec
-luarocks install --local luacheck
-
-# Run project Lua parsing/linting while avoiding generated dependency directories
-PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes spec suwayomi main.lua _meta.lua
-
-# Run tests
-PATH="$HOME/.luarocks/bin:$PATH" busted spec
+luacheck --codes spec suwayomi main.lua _meta.lua
+busted spec
 ```
 
-## Contributing
-
-Pull requests are welcome! Please ensure any new features have accompanying unit tests in the `spec/` directory.
+Pull requests are welcome. Please keep runtime code under `suwayomi/`, add focused specs for behavior changes, and update `docs/ARCHITECTURE.md` when module ownership or packaging boundaries change.
