@@ -62,6 +62,7 @@ local function newClient(options)
     local shown_messages = {}
     local opened_manga
     local shown_manga_actions
+    local shown_manga_action_options
     local scheduled_sync_credentials
     local shown_onboarding_setup
     local log_events = {}
@@ -127,8 +128,9 @@ local function newClient(options)
             showChaptersForManga = function(_, manga)
                 opened_manga = manga
             end,
-            showMangaActions = function(_, manga)
+            showMangaActions = function(_, manga, action_options)
                 shown_manga_actions = manga
+                shown_manga_action_options = action_options
             end,
             schedulePendingReadSync = function(_, credentials)
                 scheduled_sync_credentials = credentials
@@ -168,6 +170,9 @@ local function newClient(options)
         end,
         shown_manga_actions = function()
             return shown_manga_actions
+        end,
+        shown_manga_action_options = function()
+            return shown_manga_action_options
         end,
         scheduled_sync_credentials = function()
             return scheduled_sync_credentials

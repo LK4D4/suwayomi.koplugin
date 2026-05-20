@@ -58,7 +58,7 @@ describe("suwayomi/client library flows", function()
         assert.is_nil(state.scheduled_sync_credentials())
     end)
 
-    it("skips the category picker for a single category and opens selected library manga actions", function()
+    it("skips the category picker for a single category and routes row taps to manga information", function()
         local shown_manga
         local shown_menu_options
         local tracked = {}
@@ -109,6 +109,7 @@ describe("suwayomi/client library flows", function()
         assert.are.equal("appbar.menu", shown_menu_options.title_bar_left_icon)
         assert.are.equal("https://suwayomi.example", shown_menu_options.thumbnail_credentials.server_url)
         assert.are.equal("m1", state.shown_manga_actions().id)
+        assert.is_function(state.shown_manga_action_options().onMangaUpdated)
         assert.are.equal("library_manga_loaded", state.log_events[#state.log_events].event)
         assert.are.equal("library", tracked[1].route_id)
         assert.are.equal("library-menu", tracked[1].widget.name)

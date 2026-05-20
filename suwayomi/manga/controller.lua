@@ -75,6 +75,14 @@ local function hasSourceId(source)
     return type(source) == "table" and source.id ~= nil and tostring(source.id):match("%S") ~= nil
 end
 
+local function copyOptions(options)
+    local copied = {}
+    for key, value in pairs(options or {}) do
+        copied[key] = value
+    end
+    return copied
+end
+
 function Methods:attachSourceToManga(manga, source)
     return self:getClient():attachSourceToManga(manga, source)
 end
@@ -386,17 +394,36 @@ function Methods:getMangaActions(manga)
 end
 
 
+function Methods:getMangaInformationActions(manga)
+    local actions = {
+        { id = "open_chapters", text = _("Open chapters") },
+    }
+    if MangaActionMenu.canOpenFirstUnread(self, manga) then
+        table.insert(actions, { id = "open_first_unread", text = _("Open next unread") })
+    end
+    if manga and manga.id then
+        if manga.in_library == true then
+            table.insert(actions, { id = "remove_from_library", text = _("Remove from library"), destructive = true })
+        else
+            table.insert(actions, { id = "add_to_library", text = _("Add to library") })
+        end
+    end
+    return actions
+end
+
+
 function Methods:showMangaActions(manga, options)
     options = options or {}
+    local action_options = copyOptions(options)
+    action_options.refresh_action_menu_after_library_update = true
+
+    if SuwayomiUI.showMangaInformation then
+        return self:performMangaAction(manga, "manga_information", action_options)
+    end
+
     if not SuwayomiUI.showMangaActionsMenu then
         return self:showChaptersForManga(manga)
     end
-
-    local action_options = {}
-    for key, value in pairs(options) do
-        action_options[key] = value
-    end
-    action_options.refresh_action_menu_after_library_update = true
 
     local menu = SuwayomiUI.showMangaActionsMenu({
         title = manga and (manga.title or tostring(manga.id)) or _("Manga actions"),
@@ -565,17 +592,13 @@ function Methods:performMangaAction(manga, action_id, options)
     end
     if action_id == "manga_information" then
         if SuwayomiUI.showMangaInformation then
-            local info_actions = {
-                { id = "open_chapters", text = _("Open chapters") },
-            }
-            if MangaActionMenu.canOpenFirstUnread(self, manga) then
-                table.insert(info_actions, { id = "open_first_unread", text = _("Open next unread") })
-            end
+            local info_action_options = copyOptions(options)
+            info_action_options.refresh_action_menu_after_library_update = true
             SuwayomiUI.showMangaInformation(manga, {
-                actions = info_actions,
+                actions = self:getMangaInformationActions(manga),
                 onAction = function(action)
                     if action and action.id then
-                        self:performMangaAction(manga, action.id, options)
+                        self:performMangaAction(manga, action.id, info_action_options)
                     end
                 end,
             })

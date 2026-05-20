@@ -11,7 +11,7 @@ describe("suwayomi/client source manga flows", function()
     local buildSourceMangaSubprocessFake = helper.buildSourceMangaSubprocessFake
     local buildChapterCountSubprocessFake = helper.buildChapterCountSubprocessFake
 
-    it("loads manga for a source and opens the selected manga actions through the plugin", function()
+    it("loads manga for a source and routes row taps to manga information", function()
         local captured_title_options
         local client, state = newClient({
             api = {
@@ -59,6 +59,7 @@ describe("suwayomi/client source manga flows", function()
             name = "MangaDex",
             lang = "en",
         }, state.shown_manga_actions().source)
+        assert.is_function(state.shown_manga_action_options().onMangaUpdated)
         assert.are.equal("manga_loaded", state.log_events[1].event)
         assert.are.equal(1, state.log_events[1].manga_count)
         assert.are.equal("browse-results", state.tracked_screens[1].route_id)
@@ -1872,7 +1873,7 @@ describe("suwayomi/client source manga flows", function()
         assert.is_true(updated_manga[#updated_manga].second_loading)
     end)
 
-    it("opens browse result manga actions without changing the action surface", function()
+    it("routes browse result row taps without leaking browse title actions", function()
         local shown_manga_action_options
         local client = newClient({
             title_menu_options = {
