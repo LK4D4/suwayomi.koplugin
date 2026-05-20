@@ -118,6 +118,7 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
     local row = {}
 
     options = options or {}
+    local columns = options.vertical and 1 or (options.columns or 1)
     for _, action in ipairs(options.actions or {}) do
         table.insert(row, {
             text = action.text,
@@ -135,7 +136,7 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
                 end
             end,
         })
-        if #row == 2 then
+        if #row == columns then
             table.insert(buttons, row)
             row = {}
         end
@@ -235,7 +236,7 @@ end
 
 local function buildActionMenuButtons(options, dialogProvider, UIManager, onSelectCallback)
     local buttons = {}
-    local columns = options.vertical and 1 or (options.columns or 2)
+    local columns = options.vertical and 1 or (options.columns or 1)
     local normal_actions = options.actions or {}
     local destructive_actions = {}
     local back_button = buildBackActionButton(options, dialogProvider, UIManager)

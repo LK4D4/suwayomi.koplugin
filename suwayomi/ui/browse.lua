@@ -164,6 +164,7 @@ function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
     return require("suwayomi/ui").showActionMenu({
         title = source and (source.name or source.display_name or source.displayName) or _("Suwayomi Source"),
         actions = actions,
+        columns = 2,
         anchor = options.anchor,
         close_callback = options.close_callback,
         on_back = options.on_back,

@@ -1220,7 +1220,7 @@ describe("suwayomi/ui", function()
         assert.is_false(closed)
     end)
 
-    it("shows a generic action menu", function()
+    it("shows a generic action menu as single-column actions by default", function()
         local ui = require("suwayomi/ui")
         local selected = {}
         local closed = false
@@ -1241,11 +1241,11 @@ describe("suwayomi/ui", function()
 
         assert.are.equal("Title actions", shown_dialog.title)
         assert.are.equal("Suwayomi home", shown_dialog.buttons[1][1].text)
-        assert.are.equal("Refresh", shown_dialog.buttons[1][2].text)
-        assert.are.equal("Cancel search", shown_dialog.buttons[2][1].text)
+        assert.are.equal("Refresh", shown_dialog.buttons[2][1].text)
+        assert.are.equal("Cancel search", shown_dialog.buttons[3][1].text)
 
         shown_dialog.buttons[1][1].callback()
-        shown_dialog.buttons[2][1].callback()
+        shown_dialog.buttons[3][1].callback()
 
         assert.are.same({
             { id = "home", text = "Suwayomi home" },
@@ -1255,6 +1255,24 @@ describe("suwayomi/ui", function()
         shown_dialog.close_callback()
 
         assert.is_true(closed)
+    end)
+
+    it("honors explicit action menu columns", function()
+        local ui = require("suwayomi/ui")
+
+        ui.showActionMenu({
+            title = "Title actions",
+            columns = 2,
+            actions = {
+                { id = "home", text = "Suwayomi home" },
+                { id = "refresh", text = "Refresh" },
+                { id = "cancel", text = "Cancel search" },
+            },
+        })
+
+        assert.are.equal("Suwayomi home", shown_dialog.buttons[1][1].text)
+        assert.are.equal("Refresh", shown_dialog.buttons[1][2].text)
+        assert.are.equal("Cancel search", shown_dialog.buttons[2][1].text)
     end)
 
     it("runs generic action callbacks after the action dialog close tick", function()
@@ -1291,9 +1309,9 @@ describe("suwayomi/ui", function()
         end)
 
         assert.are.equal("Select all", shown_dialog.buttons[1][1].text)
-        assert.are.equal("Bulk downloads >", shown_dialog.buttons[1][2].text)
+        assert.are.equal("Bulk downloads >", shown_dialog.buttons[2][1].text)
 
-        shown_dialog.buttons[1][2].callback()
+        shown_dialog.buttons[2][1].callback()
 
         assert.are.equal("bulk_downloads", selected.id)
         assert.are.equal("Bulk downloads", selected.text)
@@ -1413,7 +1431,7 @@ describe("suwayomi/ui", function()
         assert.is_true(updated)
     end)
 
-    it("shows the Suwayomi home hub as two-column buttons", function()
+    it("shows the Suwayomi home hub as single-column actions by default", function()
         local ui = require("suwayomi/ui")
         local selected = {}
 
@@ -1433,10 +1451,10 @@ describe("suwayomi/ui", function()
 
         assert.are.equal("Suwayomi", shown_dialog.title)
         assert.are.equal("Library", shown_dialog.buttons[1][1].text)
-        assert.are.equal("Browse", shown_dialog.buttons[1][2].text)
-        assert.are.equal("Downloads", shown_dialog.buttons[2][1].text)
+        assert.are.equal("Browse", shown_dialog.buttons[2][1].text)
+        assert.are.equal("Downloads", shown_dialog.buttons[3][1].text)
 
-        shown_dialog.buttons[1][2].callback()
+        shown_dialog.buttons[2][1].callback()
 
         assert.are.same({ "close", "home-close", "browse" }, events)
         assert.are.equal(shown_dialog, closed_dialog)

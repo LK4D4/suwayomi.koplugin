@@ -74,12 +74,14 @@ describe("suwayomi/ui/downloads", function()
 
     it("builds downloads menu rows for active queued and failed items", function()
         local downloads = require("suwayomi/ui/downloads")
+        local long_title = string.rep("Long Manga Title ", 8)
+        local long_error = string.rep("server returned a detailed network error ", 4)
 
         local rows = downloads.buildDownloadsMenuTable({
             active = {
                 {
                     key = "m-active:144",
-                    manga = { title = "Frieren" },
+                    manga = { title = long_title },
                     chapter = { name = "Ch. 144" },
                     progress = { current = 3, total = 24 },
                 },
@@ -96,18 +98,18 @@ describe("suwayomi/ui/downloads", function()
                     key = "m-failed:205",
                     manga = { title = "Chainsaw Man" },
                     chapter = { name = "Ch. 205" },
-                    progress = { error = "network timeout" },
+                    progress = { error = long_error },
                 },
             },
         }, {})
 
-        assert.are.equal("Frieren / Ch. 144", rows[1].text)
+        assert.are.equal(long_title .. " / Ch. 144", rows[1].text)
         assert.are.equal("Downloading 3/24", rows[1].mandatory)
         assert.are.equal("Dandadan / Ch. 192", rows[2].text)
         assert.are.equal("Queued", rows[2].mandatory)
         assert.are.equal("Chainsaw Man / Ch. 205", rows[3].text)
         assert.are.equal("Failed", rows[3].mandatory)
-        assert.are.equal("network timeout", rows[3].subtitle)
+        assert.are.equal(long_error, rows[3].subtitle)
         assert.are.equal("Clear failed", rows[4].text)
     end)
 

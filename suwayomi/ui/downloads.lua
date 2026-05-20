@@ -16,15 +16,6 @@ local function getListMenu()
     return require("suwayomi/ui/list_menu")
 end
 
-local function shortenMenuText(text, max_chars)
-    text = tostring(text or "")
-    max_chars = max_chars or 96
-    if #text <= max_chars then
-        return text
-    end
-    return text:sub(1, max_chars - 3) .. "..."
-end
-
 local function formatDownloadJobLabel(job)
     local manga_title = job and job.manga and job.manga.title or nil
     local chapter_name = job and job.chapter and job.chapter.name or nil
@@ -48,7 +39,7 @@ end
 local function formatFailedDownloadText(job)
     local error_message = job and job.progress and job.progress.error or nil
     if error_message and error_message ~= "" then
-        return shortenMenuText(error_message)
+        return tostring(error_message)
     end
     return nil
 end
@@ -108,7 +99,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
         local progress = formatDownloadProgress(job)
         local prefix = progress ~= "" and ("Downloading " .. progress) or "Downloading"
         table.insert(menu_table, {
-            text = shortenMenuText(formatDownloadJobLabel(job)),
+            text = formatDownloadJobLabel(job),
             mandatory = prefix,
             callback = callbacks.onSelectActive and function(menu)
                 callbacks.onSelectActive(job, menu)
@@ -119,7 +110,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
     local queued_label = _("Queued")
     for _, job in ipairs(snapshot.queued or {}) do
         table.insert(menu_table, {
-            text = shortenMenuText(formatDownloadJobLabel(job)),
+            text = formatDownloadJobLabel(job),
             mandatory = queued_label,
             callback = function(menu)
                 if callbacks.onSelectQueued then
@@ -132,7 +123,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
     local failed_label = _("Failed")
     for _, job in ipairs(snapshot.failed or {}) do
         table.insert(menu_table, {
-            text = shortenMenuText(formatDownloadJobLabel(job)),
+            text = formatDownloadJobLabel(job),
             subtitle = formatFailedDownloadText(job),
             mandatory = failed_label,
             callback = function(menu)

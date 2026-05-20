@@ -591,6 +591,62 @@ describe("suwayomi/ui/list_menu", function()
         assert.are.equal(0, #menu.item_group)
     end)
 
+    it("keeps landscape fixed-height pagination positive and complete", function()
+        package.loaded["suwayomi/ui/list_menu"] = nil
+        package.loaded["ui/widget/menu"] = nil
+        package.loaded.device = nil
+        package.preload.device = function()
+            return {
+                screen = {
+                    scaleBySize = function(_, value) return value end,
+                    getWidth = function() return 800 end,
+                    getHeight = function() return 480 end,
+                },
+            }
+        end
+        package.preload["ui/widget/menu"] = function()
+            return {
+                new = function(_, options)
+                    options.inner_dimen = { w = 800, h = 360 }
+                    options.page = 1
+                    options.itemnumber = 1
+                    options.item_group = {
+                        clear = function(self)
+                            for index = #self, 1, -1 do
+                                self[index] = nil
+                            end
+                        end,
+                    }
+                    options.page_info = { resetLayout = function() end }
+                    options.return_button = { resetLayout = function() end }
+                    options.content_group = { resetLayout = function() end }
+                    options.updatePageInfo = function() end
+                    options.mergeTitleBarIntoLayout = function() end
+                    return options
+                end,
+            }
+        end
+        local ListMenu = require("suwayomi/ui/list_menu")
+        local rows = {
+            { text = "Downloaded", is_section_header = true },
+        }
+        for index = 2, 9 do
+            rows[index] = { text = "Chapter " .. tostring(index - 1) }
+        end
+
+        local menu = ListMenu.show({
+            title = "Landscape",
+            item_table = rows,
+            fixed_item_heights = true,
+            items_max_lines = 3,
+        })
+
+        assert.is_true(menu.perpage >= 1)
+        assert.is_true(menu.item_height > 0)
+        assert.are.equal(9, menu.page_items[#menu.page_items][#menu.page_items[#menu.page_items]])
+        assert.are.equal(menu.page_num, #menu.page_items)
+    end)
+
     it("shrinks long row titles before clipping fixed-height rows", function()
         package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["ui/widget/menu"] = nil
