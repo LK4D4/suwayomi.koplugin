@@ -4,14 +4,17 @@ package.path = "?.lua;" .. package.path
 -- retry flow are covered in suwayomi_downloads_directory_spec.lua.
 describe("suwayomi/ui/directory", function()
     local shown_dialog
+    local created_folder_with
 
     before_each(function()
         shown_dialog = nil
+        created_folder_with = nil
 
         package.loaded["suwayomi/ui/directory"] = nil
         package.loaded.gettext = nil
         package.loaded["ui/widget/pathchooser"] = nil
         package.loaded["ui/uimanager"] = nil
+        package.loaded["apps/filemanager/filemanager"] = nil
 
         package.preload.gettext = function()
             return function(text)
@@ -89,12 +92,21 @@ describe("suwayomi/ui/directory", function()
                 end,
             }
         end
+
+        package.preload["apps/filemanager/filemanager"] = function()
+            return {
+                createFolder = function(self)
+                    created_folder_with = self.file_chooser
+                end,
+            }
+        end
     end)
 
     after_each(function()
         package.preload.gettext = nil
         package.preload["ui/widget/pathchooser"] = nil
         package.preload["ui/uimanager"] = nil
+        package.preload["apps/filemanager/filemanager"] = nil
     end)
 
     it("uses KOReader path chooser to choose a directory", function()
@@ -173,10 +185,25 @@ describe("suwayomi/ui/directory", function()
 
         local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books/Manga")
 
-        shown_dialog:onMenuSelect(item_table[2])
+        shown_dialog:onMenuSelect(item_table[3])
 
         assert.are.equal("/storage/emulated/0/Books/Manga/Sousou no Frieren", shown_dialog.selected_path)
         assert.is_nil(shown_dialog.held_path)
         assert.is_nil(chosen_path)
+    end)
+
+    it("shows a visible new-folder action that opens KOReader folder creation", function()
+        local directory = require("suwayomi/ui/directory")
+
+        directory.showDirectoryChooser(function() end, "/storage/emulated/0/Books")
+
+        local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books")
+
+        assert.are.equal("Use this folder", item_table[1].text)
+        assert.are.equal("New folder", item_table[2].text)
+
+        shown_dialog:onMenuSelect(item_table[2])
+
+        assert.are.equal(shown_dialog, created_folder_with)
     end)
 end)
