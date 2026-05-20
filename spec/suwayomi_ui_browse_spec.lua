@@ -466,7 +466,7 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("Completed", shown_dialog.item_table[2].text)
         assert.are.equal("On", shown_dialog.item_table[2].mandatory)
         assert.are.equal("Licensed", shown_dialog.item_table[3].text)
-        assert.are.equal("IGNORE", shown_dialog.item_table[3].mandatory)
+        assert.are.equal("Any", shown_dialog.item_table[3].mandatory)
         assert.are.equal("Length", shown_dialog.item_table[4].text)
         assert.are.equal("Any", shown_dialog.item_table[4].mandatory)
         assert.are.equal("Author", shown_dialog.item_table[5].text)
@@ -475,7 +475,7 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("Name - Ascending", shown_dialog.item_table[6].mandatory)
         assert.is_nil(shown_dialog.item_table[6].sub_item_table)
         assert.are.equal("Small group", shown_dialog.item_table[7].text)
-        assert.are.equal("Group", shown_dialog.item_table[7].mandatory)
+        assert.are.equal("Any", shown_dialog.item_table[7].mandatory)
         assert.is_nil(shown_dialog.item_table[7].sub_item_table)
         assert.are.equal("Large group", shown_dialog.item_table[8].text)
         assert.are.equal("One", shown_dialog.item_table[8].sub_item_table[1].text)
@@ -491,6 +491,8 @@ describe("suwayomi/ui/browse", function()
         local editor = shown_dialog
         shown_dialog.item_table[2].callback()
         editor.item_table[3].callback()
+        assert.are.equal("Licensed", shown_dialog.title)
+        shown_dialog.buttons[2][1].callback()
         assert.is_nil(editor.item_table[4].sub_item_table)
         editor.item_table[4].callback()
         assert.are.equal("Length", shown_dialog.title)
@@ -520,10 +522,11 @@ describe("suwayomi/ui/browse", function()
         assert.is_false(shown_dialog.buttons[2][1].checked_func())
         assert.are.equal("Done", shown_dialog.buttons[3][1].text)
         shown_dialog.buttons[1][1].callback()
-        assert.are.equal("Modified", editor.item_table[7].mandatory)
+        assert.are.equal("1 selected", editor.item_table[7].mandatory)
         assert.is_true(shown_dialog.buttons[1][1].checked_func())
         assert.is_false(shown_dialog.buttons[2][1].checked_func())
         shown_dialog.buttons[2][1].callback()
+        assert.are.equal("2 selected", editor.item_table[7].mandatory)
         assert.is_true(shown_dialog.buttons[2][1].checked_func())
         shown_dialog.buttons[3][1].callback()
         editor.item_table[11].callback()
@@ -652,6 +655,85 @@ describe("suwayomi/ui/browse", function()
         assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
     end)
 
+    it("refreshes source filter checkbox rows after inline edits", function()
+        local browse = require("suwayomi/ui/browse")
+        local refreshes = {}
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "Random Source",
+        }, {
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+        })
+
+        local editor = shown_dialog
+        editor.updateItems = function(_, select_number, no_recalculate_dimen)
+            table.insert(refreshes, { select_number = select_number, no_recalculate_dimen = no_recalculate_dimen })
+        end
+
+        editor.item_table[1].callback(editor)
+
+        assert.are.equal("On", editor.item_table[1].mandatory)
+        assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
+    end)
+
+    it("shows source filter tri-state rows as explicit modal choices", function()
+        local browse = require("suwayomi/ui/browse")
+        local refreshes = {}
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "Random Source",
+        }, {
+            { type = "TriStateFilter", name = "Licensed", default = "IGNORE" },
+        })
+
+        local editor = shown_dialog
+        editor.updateItems = function(_, select_number, no_recalculate_dimen)
+            table.insert(refreshes, { select_number = select_number, no_recalculate_dimen = no_recalculate_dimen })
+        end
+
+        assert.are.equal("Any", editor.item_table[1].mandatory)
+        editor.item_table[1].callback(editor)
+
+        assert.are.equal("Licensed", shown_dialog.title)
+        assert.are.equal("Any", shown_dialog.buttons[1][1].text)
+        assert.is_true(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("Include", shown_dialog.buttons[2][1].text)
+        assert.are.equal("Exclude", shown_dialog.buttons[3][1].text)
+
+        shown_dialog.buttons[2][1].callback()
+
+        assert.are.equal("Include", editor.item_table[1].mandatory)
+        assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
+    end)
+
+    it("refreshes source filter text rows after edits", function()
+        local browse = require("suwayomi/ui/browse")
+        local refreshes = {}
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "Random Source",
+        }, {
+            { type = "TextFilter", name = "Author", default = "" },
+        })
+
+        local editor = shown_dialog
+        editor.updateItems = function(_, select_number, no_recalculate_dimen)
+            table.insert(refreshes, { select_number = select_number, no_recalculate_dimen = no_recalculate_dimen })
+        end
+
+        editor.item_table[1].callback(editor)
+        shown_dialog.getFields = function()
+            return { "isekai" }
+        end
+        shown_dialog.buttons[1][2].callback()
+
+        assert.are.equal("isekai", editor.item_table[1].mandatory)
+        assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
+    end)
+
     it("refreshes small source filter group rows after modal edits", function()
         local browse = require("suwayomi/ui/browse")
         local refreshes = {}
@@ -692,13 +774,22 @@ describe("suwayomi/ui/browse", function()
 
         assert.is_nil(editor.item_table[1].sub_item_table)
         assert.are.equal("One", editor.item_table[2].sub_item_table[1].text)
+        assert.are.equal("Any", editor.item_table[1].mandatory)
 
         editor.item_table[1].callback(editor)
         shown_dialog.buttons[1][1].callback()
 
-        assert.are.equal("Modified", editor.item_table[1].mandatory)
+        assert.are.equal("1 selected", editor.item_table[1].mandatory)
         assert.is_true(shown_dialog.buttons[1][1].checked_func())
         assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
+
+        shown_dialog.buttons[1][1].callback()
+
+        assert.are.equal("Any", editor.item_table[1].mandatory)
+        assert.are.same({
+            { select_number = nil, no_recalculate_dimen = true },
+            { select_number = nil, no_recalculate_dimen = true },
+        }, refreshes)
     end)
 
     it("shows latest for unknown source support and collects search queries", function()

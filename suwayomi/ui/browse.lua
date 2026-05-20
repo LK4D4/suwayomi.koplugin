@@ -313,6 +313,67 @@ local function sortStateText(filter, state)
     return label .. " - " .. direction
 end
 
+local function triStateText(value)
+    value = tostring(value or "IGNORE")
+    if value == "INCLUDE" then
+        return _("Include")
+    elseif value == "EXCLUDE" then
+        return _("Exclude")
+    end
+    return _("Any")
+end
+
+local function triStateChoices()
+    return {
+        { value = "IGNORE", text = _("Any") },
+        { value = "INCLUDE", text = _("Include") },
+        { value = "EXCLUDE", text = _("Exclude") },
+    }
+end
+
+local function sortStatesEqual(left, right)
+    left = type(left) == "table" and left or {}
+    right = type(right) == "table" and right or {}
+    return (tonumber(left.index) or 0) == (tonumber(right.index) or 0)
+        and (left.ascending ~= false) == (right.ascending ~= false)
+end
+
+local function childFilterHasDraftChange(child, child_index, draft, group_position)
+    child = type(child) == "table" and child or {}
+    if child.type == "CheckBoxFilter" then
+        local default = child.default == true
+        return getDraftState(draft, child_index, "checkBoxState", default, group_position) ~= default
+    elseif child.type == "TriStateFilter" then
+        local default = tostring(child.default or "IGNORE")
+        return tostring(getDraftState(draft, child_index, "triState", default, group_position)) ~= default
+    elseif child.type == "SelectFilter" then
+        local default = tonumber(child.default) or 0
+        return (tonumber(getDraftState(draft, child_index, "selectState", default, group_position)) or 0) ~= default
+    elseif child.type == "TextFilter" then
+        local default = tostring(child.default or "")
+        return tostring(getDraftState(draft, child_index, "textState", default, group_position)) ~= default
+    elseif child.type == "SortFilter" then
+        local default = type(child.default) == "table" and child.default or { index = 0, ascending = true }
+        return not sortStatesEqual(getDraftState(draft, child_index, "sortState", default, group_position), default)
+    end
+    return false
+end
+
+local function groupStateText(filter, draft, group_position)
+    local active_count = 0
+    for child_index, child in ipairs(type(filter.filters) == "table" and filter.filters or {}) do
+        if childFilterHasDraftChange(child, child_index, draft, group_position) then
+            active_count = active_count + 1
+        end
+    end
+    if active_count == 0 then
+        return _("Any")
+    elseif active_count == 1 then
+        return _("1 selected")
+    end
+    return tostring(active_count) .. _(" selected")
+end
+
 local function showTextFilterDialog(filter, current, onSave)
     local UIManager = require("ui/uimanager")
     local dialog
@@ -396,7 +457,7 @@ local function buildSourceFilterRows(filters, draft, context)
                 mandatory = stateText(value),
                 keep_menu_open = true,
             }
-            row.callback = function()
+            row.callback = function(menu)
                 local entry = findDraftStateEntry(draft, index, "checkBoxState", context.group_position)
                 entry.state = getDraftState(
                     draft,
@@ -406,25 +467,34 @@ local function buildSourceFilterRows(filters, draft, context)
                     context.group_position
                 ) ~= true
                 row.mandatory = stateText(entry.state)
+                refreshSourceFilterMenu(context, menu)
             end
             table.insert(rows, row)
         elseif filter_type == "TriStateFilter" then
             local value = tostring(getDraftState(draft, index, "triState", filter.default or "IGNORE", context.group_position))
             local row = {
                 text = filter.name or "",
-                mandatory = value,
-                keep_menu_open = true,
+                mandatory = triStateText(value),
             }
-            row.callback = function()
-                local next_value = "INCLUDE"
-                if row.mandatory == "INCLUDE" then
-                    next_value = "EXCLUDE"
-                elseif row.mandatory == "EXCLUDE" then
-                    next_value = "IGNORE"
-                end
-                local entry = findDraftStateEntry(draft, index, "triState", context.group_position)
-                entry.state = next_value
-                row.mandatory = next_value
+            row.callback = function(menu)
+                local current = tostring(getDraftState(
+                    draft,
+                    index,
+                    "triState",
+                    filter.default or "IGNORE",
+                    context.group_position
+                ))
+                return getUI().showChoiceDialog({
+                    title = filter.name or "",
+                    current = current,
+                    choices = triStateChoices(),
+                    onSelect = function(state)
+                        local entry = findDraftStateEntry(draft, index, "triState", context.group_position)
+                        entry.state = state
+                        row.mandatory = triStateText(state)
+                        refreshSourceFilterMenu(context, menu)
+                    end,
+                })
             end
             table.insert(rows, row)
         elseif filter_type == "SelectFilter" then
@@ -471,11 +541,12 @@ local function buildSourceFilterRows(filters, draft, context)
                 text = filter.name or "",
                 mandatory = tostring(getDraftState(draft, index, "textState", filter.default or "", context.group_position)),
             }
-            row.callback = function()
+            row.callback = function(menu)
                 return showTextFilterDialog(filter, row.mandatory, function(value)
                     local entry = findDraftStateEntry(draft, index, "textState", context.group_position)
                     entry.state = value
                     row.mandatory = value
+                    refreshSourceFilterMenu(context, menu)
                 end)
             end
             table.insert(rows, row)
@@ -544,7 +615,7 @@ local function buildSourceFilterRows(filters, draft, context)
         elseif filter_type == "GroupFilter" then
             local row = {
                 text = filter.name or "",
-                mandatory = _("Group"),
+                mandatory = groupStateText(filter, draft, index),
             }
             if canShowGroupAsChecklist(filter.filters) then
                 row.callback = function(menu)
@@ -578,7 +649,7 @@ local function buildSourceFilterRows(filters, draft, context)
                                 entry.state = selected == true
                             end
                             choice.text = childChoiceText(child, value.child_index)
-                            row.mandatory = _("Modified")
+                            row.mandatory = groupStateText(filter, draft, index)
                             refreshSourceFilterMenu(context, menu)
                         end,
                     })
