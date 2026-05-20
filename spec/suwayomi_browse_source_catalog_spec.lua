@@ -251,10 +251,11 @@ describe("suwayomi/browse/source_catalog", function()
         }, { credentials = { server_url = "https://suwayomi.example" } })
 
         assert.are.same({ "english" }, { ui_calls.shown.sources[1].id })
+        local source_menu = controller.current_sources_menu
 
         controller.title_menu_options.onSelect({ id = "source_language_filter" }, nil, { anchor = "anchor" })
         assert.are.equal("Source languages", ui_calls.language_menu.options.title)
-        assert.is_false(ui_calls.language_menu.options.show_done)
+        assert.are.same(source_menu, controller.current_sources_menu)
         assert.are.same({
             { code = "en", label = "English", enabled = true },
             { code = "es", label = "Español", enabled = false },
@@ -267,12 +268,13 @@ describe("suwayomi/browse/source_catalog", function()
             ui_calls.updated.sources[1].id,
             ui_calls.updated.sources[2].id,
         })
+        assert.are.same(source_menu, ui_calls.updated.menu)
+        assert.are.same(source_menu, controller.current_sources_menu)
         assert.are.same({
             { code = "en", label = "English", enabled = true },
             { code = "es", label = "Español", enabled = true },
             { code = "ja", label = "日本語", enabled = false },
         }, ui_calls.updated_language_menu.options.languages)
-        assert.is_false(ui_calls.updated_language_menu.options.show_done)
 
         ui_calls.updated_language_menu.onToggle("en", false)
 

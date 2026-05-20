@@ -68,9 +68,21 @@ function Methods:performDownloadsTitleAction(action, menu)
 
     local queue = self:getDownloadQueue()
     if action.id == "cancel_all" then
-        queue:cancelAll()
-        self:closeMenu(menu)
-        self:showDownloads()
+        local callback = function()
+            queue:cancelAll()
+            self:closeMenu(menu)
+            self:showDownloads()
+        end
+        if SuwayomiUI.showConfirm then
+            SuwayomiUI.showConfirm({
+                text = _("Cancel all downloads?"),
+                ok_text = _("Cancel downloads"),
+                ok_callback = callback,
+                cancel_text = _("Keep downloads"),
+            })
+        else
+            callback()
+        end
         return true
     elseif action.id == "cancel_queued" then
         queue:cancelQueued()
@@ -111,6 +123,30 @@ function Methods:getDownloadsMenuOptions(snapshot)
         end
     end
     return options
+end
+
+
+function Methods:showFailedDownloadActions(job, menu)
+    if not SuwayomiUI.showChapterActionsMenu then
+        return
+    end
+
+    SuwayomiUI.showChapterActionsMenu({
+        title = _("Download actions"),
+        actions = {
+            { id = "retry", text = _("Retry") },
+            { id = "cancel", text = _("Cancel") },
+        },
+    }, function(action)
+        if action and action.id == "retry" then
+            local ok = self:getDownloadQueue():retryFailed(job.key)
+            self:closeMenu(menu)
+            if not ok then
+                self:showMessage(_("Could not retry download."))
+            end
+            self:showDownloads()
+        end
+    end)
 end
 
 
@@ -195,13 +231,8 @@ function Methods:showDownloads()
         onSelectQueued = function(job, menu)
             self:showQueuedDownloadActions(job, menu)
         end,
-        onRetryFailed = function(job, menu)
-            local ok = queue:retryFailed(job.key)
-            self:closeMenu(menu)
-            if not ok then
-                self:showMessage(_("Could not retry download."))
-            end
-            self:showDownloads()
+        onSelectFailed = function(job, menu)
+            self:showFailedDownloadActions(job, menu)
         end,
         onClearFailed = function(menu)
             queue:clearFailed()

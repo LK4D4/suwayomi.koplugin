@@ -5,6 +5,7 @@ describe("suwayomi/ui", function()
     local closed_dialog
     local events
     local record_next_tick
+    local run_close_callback_on_close
     local dialog_fields
 
     before_each(function()
@@ -12,6 +13,7 @@ describe("suwayomi/ui", function()
         closed_dialog = nil
         events = {}
         record_next_tick = false
+        run_close_callback_on_close = false
         dialog_fields = {
             "https://suwayomi.example",
             "alice",
@@ -445,6 +447,9 @@ describe("suwayomi/ui", function()
                 close = function(_, widget)
                     closed_dialog = widget
                     table.insert(events, "close")
+                    if run_close_callback_on_close and widget and widget.close_callback then
+                        widget.close_callback()
+                    end
                 end,
                 nextTick = function(_, callback)
                     if record_next_tick then
@@ -1393,7 +1398,98 @@ describe("suwayomi/ui", function()
         assert.is_true(confirmed)
     end)
 
-    it("shows a parallel chapter downloads menu", function()
+    it("shows a choice dialog and marks the current value", function()
+        local ui = require("suwayomi/ui")
+        local selected
+        record_next_tick = true
+
+        ui.showChoiceDialog({
+            title = "Pick count",
+            current = 2,
+            choices = {
+                { value = 1, text = "1" },
+                { value = 2, text = "2" },
+            },
+            onSelect = function(value)
+                selected = value
+            end,
+        })
+
+        assert.are.equal("Pick count", shown_dialog.title)
+        assert.are.equal("1", shown_dialog.buttons[1][1].text)
+        assert.are.equal("left", shown_dialog.buttons[1][1].align)
+        assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.is_true(shown_dialog.buttons[1][1].no_refresh_checkmark)
+        assert.are.equal("2", shown_dialog.buttons[2][1].text)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
+        assert.is_true(shown_dialog.buttons[2][1].no_refresh_checkmark)
+
+        shown_dialog.buttons[1][1].callback()
+
+        assert.are.same({ "next-tick", "close" }, events)
+        assert.are.equal(shown_dialog, closed_dialog)
+        assert.are.equal(1, selected)
+    end)
+
+    it("shows a checklist dialog and toggles selected values", function()
+        local ui = require("suwayomi/ui")
+        local selected = { en = true }
+        local toggles = {}
+        local done = false
+        local close_count = 0
+        record_next_tick = true
+        run_close_callback_on_close = true
+
+        ui.showChecklistDialog({
+            title = "Languages",
+            choices = {
+                { value = "en", text = "English" },
+                { value = "ja", text = "Japanese" },
+            },
+            isSelected = function(value)
+                return selected[value] == true
+            end,
+            onToggle = function(value, is_selected)
+                selected[value] = is_selected
+                table.insert(toggles, { value = value, selected = is_selected })
+            end,
+            onDone = function()
+                done = true
+            end,
+            close_callback = function()
+                close_count = close_count + 1
+            end,
+        })
+
+        assert.are.equal("English", shown_dialog.buttons[1][1].text)
+        assert.are.equal("left", shown_dialog.buttons[1][1].align)
+        assert.is_true(shown_dialog.buttons[1][1].checked_func())
+        assert.is_nil(shown_dialog.buttons[1][1].no_refresh_checkmark)
+        assert.are.equal("Japanese", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
+        assert.is_nil(shown_dialog.buttons[2][1].no_refresh_checkmark)
+
+        local first_dialog = shown_dialog
+        shown_dialog.buttons[2][1].callback()
+        assert.are.same({ value = "ja", selected = true }, toggles[1])
+        assert.is_nil(closed_dialog)
+        assert.are.equal(first_dialog, shown_dialog)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
+        assert.are.equal(0, close_count)
+
+        shown_dialog.buttons[2][1].callback()
+        assert.are.same({ value = "ja", selected = false }, toggles[2])
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
+        assert.are.equal(0, close_count)
+
+        shown_dialog.buttons[3][1].callback()
+        assert.is_true(done)
+        assert.are.same({ "next-tick", "close" }, events)
+        assert.are.equal(shown_dialog, closed_dialog)
+        assert.are.equal(1, close_count)
+    end)
+
+    it("shows a parallel chapter downloads choice dialog", function()
         local ui = require("suwayomi/ui")
         local selected
 
@@ -1406,21 +1502,19 @@ describe("suwayomi/ui", function()
         })
 
         assert.are.equal("Parallel chapter downloads", shown_dialog.title)
-        assert.are.equal("list_menu", shown_dialog.renderer)
-        assert.are.equal(32, shown_dialog.state_w)
-        assert.are.equal("1", shown_dialog.item_table[1].text)
-        assert.is_true(shown_dialog.item_table[1].radio)
-        assert.is_false(shown_dialog.item_table[1].checked_func())
-        assert.are.equal("* 2", shown_dialog.item_table[2].text)
-        assert.is_true(shown_dialog.item_table[2].checked_func())
-        assert.is_true(shown_dialog.item_table[2].state.checked)
+        assert.is_nil(shown_dialog.renderer)
+        assert.are.equal("1", shown_dialog.buttons[1][1].text)
+        assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("2", shown_dialog.buttons[2][1].text)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
 
-        shown_dialog.item_table[3].callback()
+        shown_dialog.buttons[3][1].callback()
 
         assert.are.equal(3, selected)
+        assert.are.equal(shown_dialog, closed_dialog)
     end)
 
-    it("renders library picker behavior as a shared choice menu", function()
+    it("renders library picker behavior as a choice dialog", function()
         local ui = require("suwayomi/ui")
         local selected
 
@@ -1433,17 +1527,17 @@ describe("suwayomi/ui", function()
         })
 
         assert.are.equal("Library category picker", shown_dialog.title)
-        assert.are.equal("list_menu", shown_dialog.renderer)
-        assert.are.equal("Automatic", shown_dialog.item_table[1].text)
-        assert.are.equal("* Always ask", shown_dialog.item_table[2].text)
-        assert.is_true(shown_dialog.item_table[2].checked_func())
+        assert.are.equal("Automatic", shown_dialog.buttons[1][1].text)
+        assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("Always ask", shown_dialog.buttons[2][1].text)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
 
-        shown_dialog.item_table[3].callback()
+        shown_dialog.buttons[3][1].callback()
 
         assert.are.equal("never", selected)
     end)
 
-    it("renders delete-finished choices as a shared choice menu", function()
+    it("renders delete-finished choices as a choice dialog", function()
         local ui = require("suwayomi/ui")
         local selected
 
@@ -1456,66 +1550,17 @@ describe("suwayomi/ui", function()
         })
 
         assert.are.equal("Delete finished chapters", shown_dialog.title)
-        assert.are.equal("list_menu", shown_dialog.renderer)
-        assert.are.equal("Disabled", shown_dialog.item_table[1].text)
-        assert.are.equal("* Second to last read chapter", shown_dialog.item_table[3].text)
-        assert.is_true(shown_dialog.item_table[3].checked_func())
+        assert.are.equal("Disabled", shown_dialog.buttons[1][1].text)
+        assert.is_false(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("Second to last read chapter", shown_dialog.buttons[3][1].text)
+        assert.is_true(shown_dialog.buttons[3][1].checked_func())
 
-        shown_dialog.item_table[2].callback()
+        shown_dialog.buttons[2][1].callback()
 
         assert.are.equal(1, selected)
     end)
 
-    it("updates settings choice menus without dropping selection callbacks", function()
-        local ui = require("suwayomi/ui")
-        local selected
-        local update_count = 0
-        local menu = {
-            updateItems = function()
-                update_count = update_count + 1
-            end,
-        }
-
-        ui.updateParallelDownloadsMenu(menu, {
-            current = 4,
-            choices = { 1, 4 },
-            onSelect = function(value)
-                selected = value
-            end,
-        })
-
-        assert.are.equal("* 4", menu.item_table[2].text)
-        menu.item_table[1].callback()
-        assert.are.equal(1, selected)
-        assert.are.equal(1, update_count)
-
-        ui.updateLibraryCategoryPickerBehaviorMenu(menu, {
-            current = "never",
-            choices = { "always", "never" },
-            onSelect = function(value)
-                selected = value
-            end,
-        })
-
-        assert.are.equal("* Never ask", menu.item_table[2].text)
-        menu.item_table[1].callback()
-        assert.are.equal("always", selected)
-
-        ui.updateDeleteFinishedWhileReadingMenu(menu, {
-            current = 1,
-            choices = { 0, 1 },
-            onSelect = function(value)
-                selected = value
-            end,
-        })
-
-        assert.are.equal("* Last read chapter", menu.item_table[2].text)
-        menu.item_table[1].callback()
-        assert.are.equal(0, selected)
-        assert.are.equal(3, update_count)
-    end)
-
-    it("closes the language menu from Done before running the close callback", function()
+    it("shows the language menu as a checklist dialog", function()
         local ui = require("suwayomi/ui")
 
         ui.showLanguageMenu({
@@ -1530,62 +1575,68 @@ describe("suwayomi/ui", function()
         })
 
         assert.are.equal("Source languages", shown_dialog.title)
-        assert.are.equal(32, shown_dialog.state_w)
-        assert.are.equal("check", shown_dialog.item_table[1].state.mark_type)
-        assert.is_true(shown_dialog.item_table[1].state.checked)
-        assert.is_false(shown_dialog.item_table[2].state.checked)
+        assert.is_nil(shown_dialog.renderer)
+        assert.are.equal("English", shown_dialog.buttons[1][1].text)
+        assert.is_true(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("Russian", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
 
-        shown_dialog.item_table[3].callback()
+        shown_dialog.buttons[3][1].callback()
 
         assert.are.same({ "close", "summary" }, events)
         assert.are.equal(shown_dialog, closed_dialog)
     end)
 
-    it("can show a language menu without a Done row", function()
+    it("refreshes checked language state without running close cleanup", function()
         local ui = require("suwayomi/ui")
+        local toggles = {}
+        local close_count = 0
+        run_close_callback_on_close = true
 
         ui.showLanguageMenu({
             title = "Source languages",
-            show_done = false,
             languages = {
                 { code = "en", label = "English", enabled = true },
                 { code = "es", label = "Español", enabled = false },
             },
+            onToggle = function(code, enabled)
+                table.insert(toggles, { code = code, enabled = enabled })
+            end,
+            onClose = function()
+                close_count = close_count + 1
+            end,
         })
 
-        assert.are.equal(2, #shown_dialog.item_table)
-        assert.are.equal("English", shown_dialog.item_table[1].text)
-        assert.are.equal("Español", shown_dialog.item_table[2].text)
+        assert.are.equal("English", shown_dialog.buttons[1][1].text)
+        assert.is_true(shown_dialog.buttons[1][1].checked_func())
+        assert.are.equal("Español", shown_dialog.buttons[2][1].text)
+        assert.is_false(shown_dialog.buttons[2][1].checked_func())
+
+        local first_dialog = shown_dialog
+        shown_dialog.buttons[2][1].callback()
+
+        assert.are.same({ code = "es", enabled = true }, toggles[1])
+        assert.is_nil(closed_dialog)
+        assert.are.equal(first_dialog, shown_dialog)
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
+        assert.are.equal(0, close_count)
+
+        shown_dialog.buttons[3][1].callback()
+
+        assert.are.equal(1, close_count)
     end)
 
-    it("does not run the language close callback during an in-place menu refresh", function()
+    it("keeps updateLanguageMenu compatible as a no-op for checklist dialogs", function()
         local ui = require("suwayomi/ui")
-        local summary_count = 0
-        local menu = {
-            close_callback = function()
-                summary_count = summary_count + 10
-            end,
-            updateItems = function(self)
-                if self.close_callback then
-                    self.close_callback()
-                end
-            end,
-        }
+        local menu = { kind = "language-dialog" }
 
         ui.updateLanguageMenu(menu, {
             languages = {
                 { code = "en", label = "EN", enabled = true },
                 { code = "ru", label = "RU", enabled = true },
             },
-            onClose = function()
-                summary_count = summary_count + 1
-            end,
         }, function() end)
 
-        assert.are.equal(0, summary_count)
-
-        menu.close_callback()
-
-        assert.are.equal(1, summary_count)
+        assert.are.same({ kind = "language-dialog" }, menu)
     end)
 end)

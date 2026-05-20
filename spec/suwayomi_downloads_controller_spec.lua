@@ -68,6 +68,10 @@ local function installController(options)
                 state.actions_menu_callback = onSelect
                 return { name = "actions-menu" }
             end,
+            showConfirm = function(confirm_options)
+                state.confirm_options = confirm_options
+                return { name = "confirm-dialog" }
+            end,
         }
     end
 
@@ -258,12 +262,17 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(menu, state.title_menu_tapped)
 
         state.title_menu_options.onSelect(state.title_menu_options.actions[1], menu)
+        assert.is_nil(queue.cancel_all_count)
+        assert.are.equal("Cancel all downloads?", state.confirm_options.text)
+        assert.are.equal(1, state.downloads_count)
+
+        state.confirm_options.ok_callback()
         assert.are.equal(1, queue.cancel_all_count)
         assert.are.equal(menu, state.closed_menus[1])
         assert.are.equal(2, state.downloads_count)
     end)
 
-    it("delegates retry and clear callbacks from the downloads hub", function()
+    it("opens failed download actions before retrying", function()
         local queue = {
             snapshot = {
                 active = {},
@@ -276,8 +285,26 @@ describe("suwayomi/downloads/controller", function()
         local plugin, state = installController({ queue = queue, cleared_failed = 1 })
         local menu = plugin:showDownloads()
 
-        state.downloads_menu_callbacks.onRetryFailed(queue.snapshot.failed[1], menu)
+        state.downloads_menu_callbacks.onSelectFailed(queue.snapshot.failed[1], menu)
+        assert.are.equal("Download actions", state.actions_menu_options.title)
+        assert.are.equal("Retry", state.actions_menu_options.actions[1].text)
+        assert.are.equal("Cancel", state.actions_menu_options.actions[2].text)
+        assert.is_nil(queue.retried_key)
+
+        state.actions_menu_callback(state.actions_menu_options.actions[1])
         assert.are.equal("m1:c1", queue.retried_key)
+        assert.are.equal(menu, state.closed_menus[1])
+        assert.are.equal(2, state.downloads_count)
+        assert.are.same({}, state.messages)
+
+        queue.retried_key = nil
+        state.downloads_count = 0
+        state.closed_menus = {}
+        state.actions_menu_callback(state.actions_menu_options.actions[2])
+        assert.is_nil(queue.retried_key)
+        assert.is_nil(queue.clear_failed_count)
+        assert.are.equal(0, state.downloads_count)
+        assert.are.same({}, state.closed_menus)
         assert.are.same({}, state.messages)
 
         state.downloads_menu_callbacks.onClearFailed(menu)

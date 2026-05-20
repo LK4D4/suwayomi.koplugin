@@ -328,15 +328,19 @@ function SuwayomiClient:openSourceFilterEditor(credentials, source, schema, draf
                 { id = "reset_source_filters", text = self:translate("Reset filters") },
                 { id = "source_filter_search_text", text = self:translate("Search text") },
             },
-            onSelect = function(action)
+            onSelect = function(action, menu)
                 local action_id = action and action.id
+                local current_draft = type(menu) == "table" and menu.suwayomi_source_filter_draft or nil
+                if type(current_draft) ~= "table" then
+                    current_draft = draft
+                end
                 if action_id == "apply_source_filters" then
-                    return self:applySourceFilterDraft(credentials, source, schema, draft)
+                    return self:applySourceFilterDraft(credentials, source, schema, current_draft)
                 elseif action_id == "reset_source_filters" then
                     self:clearSourceFilterDraft(credentials, source)
                     return self:openSourceFilterEditor(credentials, source, schema, { query = "", filters = {} })
                 elseif action_id == "source_filter_search_text" then
-                    return self:showSourceFilterSearchPrompt(source, schema, draft, credentials)
+                    return self:showSourceFilterSearchPrompt(source, schema, current_draft, credentials)
                 end
             end,
         }),

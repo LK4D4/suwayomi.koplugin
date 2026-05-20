@@ -150,16 +150,14 @@ local function installController(options)
                 return { name = "parallel-downloads-menu" }
             end,
             updateParallelDownloadsMenu = function(menu, menu_options)
-                state.parallel_menu_options = menu_options
-                state.parallel_menu_options.menu = menu
+                state.unexpected_parallel_menu_update = { menu = menu, options = menu_options }
             end,
             showDeleteFinishedWhileReadingMenu = function(menu_options)
                 state.delete_finished_menu_options = menu_options
                 return { name = "delete-finished-menu" }
             end,
             updateDeleteFinishedWhileReadingMenu = function(menu, menu_options)
-                state.delete_finished_menu_options = menu_options
-                state.delete_finished_menu_options.menu = menu
+                state.unexpected_delete_finished_menu_update = { menu = menu, options = menu_options }
             end,
             updateKeepNextUnreadDownloadsMenu = function(menu, menu_options)
                 state.keep_next_menu_options = menu_options
@@ -170,8 +168,7 @@ local function installController(options)
                 return { name = "library-category-picker-menu" }
             end,
             updateLibraryCategoryPickerBehaviorMenu = function(menu, menu_options)
-                state.category_menu_options = menu_options
-                state.category_menu_options.menu = menu
+                state.unexpected_category_menu_update = { menu = menu, options = menu_options }
             end,
         }
     end
@@ -710,7 +707,8 @@ describe("suwayomi/plugin/settings_controller", function()
 
         assert.are.equal(3, state.saved_parallel)
         assert.are.equal(3, plugin.download_queue.max_active_chapters)
-        assert.are.equal("parallel-downloads-menu", state.parallel_menu_options.menu.name)
+        assert.is_nil(state.unexpected_parallel_menu_update)
+        assert.are.equal(1, state.refresh_count)
         assert.are.same({}, state.messages)
         assert.are.equal("Delete after manual mark-read: no", download_items[3].text_func())
     end)
@@ -745,7 +743,8 @@ describe("suwayomi/plugin/settings_controller", function()
         state.category_menu_options.onSelect("always")
 
         assert.are.equal("always", state.saved_category_behavior)
-        assert.are.equal("library-category-picker-menu", state.category_menu_options.menu.name)
+        assert.is_nil(state.unexpected_category_menu_update)
+        assert.are.equal(1, state.refresh_count)
         assert.are.same({}, state.messages)
 
         local unavailable_plugin, unavailable_state = installController({ no_category_persistence = true })
@@ -775,7 +774,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         assert.are.equal(2, state.saved_delete_chapters_settings.delete_finished_while_reading)
         assert.are.same({}, state.messages)
-        assert.are.equal(2, state.delete_finished_menu_options.current)
-        assert.are.equal("delete-finished-menu", state.delete_finished_menu_options.menu.name)
+        assert.is_nil(state.unexpected_delete_finished_menu_update)
+        assert.are.equal(2, state.refresh_count)
     end)
 end)

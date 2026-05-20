@@ -141,7 +141,7 @@ describe("suwayomi/ui/downloads", function()
     it("shows downloads menu and passes the native menu to row callbacks", function()
         local downloads = require("suwayomi/ui/downloads")
         local cancelled_key
-        local retried_key
+        local selected_failed_key
         local selected_active_key
         local active_menu
         local queued_menu
@@ -182,8 +182,8 @@ describe("suwayomi/ui/downloads", function()
                 cancelled_key = job.key
                 queued_menu = menu
             end,
-            onRetryFailed = function(job, menu)
-                retried_key = job.key
+            onSelectFailed = function(job, menu)
+                selected_failed_key = job.key
                 failed_menu = menu
             end,
             onClearFailed = function(menu)
@@ -202,7 +202,7 @@ describe("suwayomi/ui/downloads", function()
 
         assert.are.equal("m-active:144", selected_active_key)
         assert.are.equal("m-queued:192", cancelled_key)
-        assert.are.equal("m-failed:205", retried_key)
+        assert.are.equal("m-failed:205", selected_failed_key)
         assert.are.equal(shown_dialog, active_menu)
         assert.are.equal(shown_dialog, queued_menu)
         assert.are.equal(shown_dialog, failed_menu)

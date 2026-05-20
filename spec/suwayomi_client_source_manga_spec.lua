@@ -171,6 +171,71 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal("Team A", client.plugin.current_scanlator_filter)
     end)
 
+    it("applies edited source filter draft from title menu context", function()
+        local captured_title_options
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local saved_draft
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            capture_title_options = function(menu_options)
+                captured_title_options = menu_options
+            end,
+            title_menu_options = {
+                title_bar_left_icon = "appbar.menu",
+                on_title_bar_left_tap = function() end,
+            },
+            ui = {
+                showSourceModeMenu = function(_, onSelect)
+                    onSelect("FILTERS")
+                end,
+                showMangaMenu = function()
+                    return { name = "loading-menu" }
+                end,
+                showSourceFilterEditor = function()
+                    return { name = "filter-editor" }
+                end,
+            },
+        })
+        client.source_filter_worker = {}
+        client.settings.loadSourceFilterDraft = function()
+            return { query = "", filters = {} }
+        end
+        client.settings.saveSourceFilterDraft = function(_, _, _, draft)
+            saved_draft = draft
+            return draft
+        end
+
+        client:showMangaForSource({ id = "s1", name = "Random Source", lang = "en" })
+        started[1].on_finish(started[1], {
+            ok = true,
+            source = { id = "s1", name = "Random Source", lang = "en" },
+            filters = {
+                { type = "SelectFilter", name = "Length", values = { "Any", "Long" }, default = 0 },
+            },
+        })
+        captured_title_options.onSelect({
+            id = "apply_source_filters",
+        }, {
+            suwayomi_source_filter_draft = {
+                query = "",
+                filters = {
+                    { position = 1, type = "selectState", state = 1 },
+                },
+            },
+        })
+
+        assert.are.same({
+            query = "",
+            filters = {
+                { position = 1, type = "selectState", state = 1 },
+            },
+        }, saved_draft)
+    end)
+
     it("ignores stale source filter worker results after a newer filter load starts", function()
         local subprocess_job, started, canceled = buildSourceMangaSubprocessFake()
         local opened_sources = {}
