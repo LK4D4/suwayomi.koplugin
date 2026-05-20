@@ -92,6 +92,15 @@ local function chapterName(chapter)
     return cleanText(chapter.name or chapter.title or chapter.id)
 end
 
+local function formatStatus(status)
+    status = cleanText(status)
+    if not status then
+        return nil
+    end
+    local normalized = status:gsub("_", " "):lower()
+    return normalized:sub(1, 1):upper() .. normalized:sub(2)
+end
+
 local function appendField(lines, label, value)
     value = cleanText(value)
     if value then
@@ -104,7 +113,7 @@ function MangaInfo.buildMetadataText(manga)
     local lines = {}
 
     appendField(lines, _("Source"), sourceName(manga.source))
-    appendField(lines, _("Status"), manga.status)
+    appendField(lines, _("Status"), formatStatus(manga.status))
     appendField(lines, _("Author"), joinList(manga.authors or manga.author))
     appendField(lines, _("Artist"), joinList(manga.artists or manga.artist))
     appendField(lines, _("Chapters"), manga.chapter_count)
@@ -125,7 +134,7 @@ function MangaInfo.buildPrimaryMetadataText(manga)
     local lines = {}
 
     appendField(lines, _("Source"), sourceName(manga.source))
-    appendField(lines, _("Status"), manga.status)
+    appendField(lines, _("Status"), formatStatus(manga.status))
     appendField(lines, _("Author"), joinList(manga.authors or manga.author))
     appendField(lines, _("Artist"), joinList(manga.artists or manga.artist))
     appendField(lines, _("Chapters"), manga.chapter_count)

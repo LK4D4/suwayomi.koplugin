@@ -647,7 +647,7 @@ describe("suwayomi/ui", function()
 
         local text = ui.buildMangaInformationText({
             source = { displayName = "  Source A  " },
-            status = "ONGOING",
+            status = "COMPLETED",
             authors = {
                 { name = "Author One" },
                 " Author Two ",
@@ -675,7 +675,7 @@ describe("suwayomi/ui", function()
 
         assert.are.equal(table.concat({
             "Source: Source A",
-            "Status: ONGOING",
+            "Status: Completed",
             "Author: Author One, Author Two",
             "Artist: Artist One",
             "Chapters: 12",
