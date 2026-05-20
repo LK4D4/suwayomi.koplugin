@@ -63,6 +63,12 @@ local function installController(options)
                 state.downloads_menu_options = menu_options
                 return { name = "downloads-menu" }
             end,
+            updateDownloadsMenu = function(menu, snapshot, callbacks, menu_options)
+                state.updated_downloads_menu = menu
+                state.updated_downloads_menu_snapshot = snapshot
+                state.updated_downloads_menu_callbacks = callbacks
+                state.updated_downloads_menu_options = menu_options
+            end,
             showChapterActionsMenu = function(menu_options, onSelect)
                 state.actions_menu_options = menu_options
                 state.actions_menu_callback = onSelect
@@ -272,6 +278,51 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(2, state.downloads_count)
     end)
 
+    it("refreshes the active downloads hub in place when queue status changes", function()
+        local queue = {
+            snapshot = {
+                active = {
+                    { key = "m1:c1", manga = { id = "m1", title = "Frieren" }, chapter = { id = "c1", name = "Ch. 1" } },
+                },
+                queued = {},
+                failed = {},
+            },
+        }
+        local plugin, state = installController({ queue = queue })
+        local menu = plugin:showDownloads()
+
+        queue.snapshot = {
+            active = {
+                {
+                    key = "m1:c2",
+                    manga = { id = "m1", title = "Frieren" },
+                    chapter = { id = "c2", name = "Ch. 2" },
+                    progress = { current = 2, total = 5 },
+                },
+            },
+            queued = {},
+            failed = {},
+        }
+
+        assert.is_true(plugin:refreshDownloadsMenu())
+
+        assert.are.equal(menu, state.updated_downloads_menu)
+        assert.are.equal("m1:c2", state.updated_downloads_menu_snapshot.active[1].key)
+        assert.are.equal("Downloads", state.title_menu_options.title)
+        assert.are.equal("cancel_all", state.title_menu_options.actions[1].id)
+        assert.is_function(state.updated_downloads_menu_callbacks.onSelectActive)
+    end)
+
+    it("drops the tracked downloads menu when the downloads route is no longer active", function()
+        local plugin, state = installController({ inactive_downloads_menu = true })
+
+        plugin:showDownloads()
+
+        assert.is_false(plugin:refreshDownloadsMenu())
+        assert.is_nil(plugin.current_downloads_menu)
+        assert.is_nil(state.updated_downloads_menu)
+    end)
+
     it("opens failed download actions before retrying", function()
         local queue = {
             snapshot = {
@@ -288,7 +339,7 @@ describe("suwayomi/downloads/controller", function()
         state.downloads_menu_callbacks.onSelectFailed(queue.snapshot.failed[1], menu)
         assert.are.equal("Download actions", state.actions_menu_options.title)
         assert.are.equal("Retry", state.actions_menu_options.actions[1].text)
-        assert.are.equal("Cancel", state.actions_menu_options.actions[2].text)
+        assert.are.equal("Close", state.actions_menu_options.actions[2].text)
         assert.is_nil(queue.retried_key)
 
         state.actions_menu_callback(state.actions_menu_options.actions[1])

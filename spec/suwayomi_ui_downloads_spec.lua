@@ -4,9 +4,11 @@ package.path = "?.lua;" .. package.path
 -- own state transitions, retries, cancellation, and navigation callbacks.
 describe("suwayomi/ui/downloads", function()
     local shown_dialog
+    local updated_dialog
 
     before_each(function()
         shown_dialog = nil
+        updated_dialog = nil
 
         package.loaded["suwayomi/ui/downloads"] = nil
         package.loaded["suwayomi/ui/list_menu"] = nil
@@ -59,6 +61,15 @@ describe("suwayomi/ui/downloads", function()
                     end
                     shown_dialog = options
                     return options
+                end,
+                update = function(menu, options)
+                    updated_dialog = {
+                        menu = menu,
+                        options = options,
+                    }
+                    menu.title = options.title or menu.title
+                    menu.item_table = options.item_table or {}
+                    return true
                 end,
             }
         end
@@ -249,5 +260,41 @@ describe("suwayomi/ui/downloads", function()
         shown_dialog.close_callback()
 
         assert.is_true(closed)
+    end)
+
+    it("updates downloads menu rows and binds callbacks to the existing menu", function()
+        local downloads = require("suwayomi/ui/downloads")
+        local menu = { name = "downloads-menu", item_table = {} }
+        local selected_key
+        local selected_menu
+
+        downloads.updateDownloadsMenu(menu, {
+            active = {},
+            queued = {
+                {
+                    key = "m-queued:192",
+                    manga = { title = "Dandadan" },
+                    chapter = { name = "Ch. 192" },
+                },
+            },
+            failed = {},
+        }, {
+            onSelectQueued = function(job, callback_menu)
+                selected_key = job.key
+                selected_menu = callback_menu
+            end,
+        }, {
+            title = "Downloads",
+            title_bar_left_icon = "appbar.menu",
+        })
+
+        assert.are.equal(menu, updated_dialog.menu)
+        assert.are.equal("Downloads", menu.title)
+        assert.are.equal("Dandadan / Ch. 192", menu.item_table[1].text)
+
+        menu.item_table[1].callback()
+
+        assert.are.equal("m-queued:192", selected_key)
+        assert.are.equal(menu, selected_menu)
     end)
 end)

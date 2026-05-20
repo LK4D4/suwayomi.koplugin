@@ -135,7 +135,7 @@ function Methods:showFailedDownloadActions(job, menu)
         title = _("Download actions"),
         actions = {
             { id = "retry", text = _("Retry") },
-            { id = "cancel", text = _("Cancel") },
+            { id = "close", text = _("Close") },
         },
     }, function(action)
         if action and action.id == "retry" then
@@ -147,6 +147,60 @@ function Methods:showFailedDownloadActions(job, menu)
             self:showDownloads()
         end
     end)
+end
+
+function Methods:getDownloadsMenuCallbacks()
+    return {
+        onSelectActive = function(job, menu)
+            self:showActiveDownloadActions(job, menu)
+        end,
+        onSelectQueued = function(job, menu)
+            self:showQueuedDownloadActions(job, menu)
+        end,
+        onSelectFailed = function(job, menu)
+            self:showFailedDownloadActions(job, menu)
+        end,
+        onClearFailed = function(menu)
+            self:getDownloadQueue():clearFailed()
+            self:closeMenu(menu)
+            self:showDownloads()
+        end,
+    }
+end
+
+function Methods:withDownloadsMenuTracking(options)
+    options = options or {}
+    local previous_close_callback = options.close_callback
+    local tracked_menu
+    options.close_callback = function(...)
+        if self.current_downloads_menu == tracked_menu then
+            self.current_downloads_menu = nil
+        end
+        if previous_close_callback then
+            return previous_close_callback(...)
+        end
+    end
+    return options, function(menu)
+        tracked_menu = menu
+        self.current_downloads_menu = menu
+    end
+end
+
+function Methods:refreshDownloadsMenu()
+    local menu = self.current_downloads_menu
+    if not menu or not SuwayomiUI.updateDownloadsMenu then
+        return false
+    end
+    if self.isSuwayomiScreenActive and not self:isSuwayomiScreenActive(menu) then
+        self.current_downloads_menu = nil
+        return false
+    end
+
+    local queue = self:getDownloadQueue()
+    local snapshot = queue:getSnapshot()
+    local options = self:getDownloadsMenuOptions(snapshot)
+    SuwayomiUI.updateDownloadsMenu(menu, snapshot, self:getDownloadsMenuCallbacks(), options)
+    return true
 end
 
 
@@ -223,23 +277,10 @@ end
 function Methods:showDownloads()
     local queue = self:getDownloadQueue()
     local snapshot = queue:getSnapshot()
+    local options, trackMenu = self:withDownloadsMenuTracking(self:getDownloadsMenuOptions(snapshot))
 
-    local menu = SuwayomiUI.showDownloadsMenu(snapshot, {
-        onSelectActive = function(job, menu)
-            self:showActiveDownloadActions(job, menu)
-        end,
-        onSelectQueued = function(job, menu)
-            self:showQueuedDownloadActions(job, menu)
-        end,
-        onSelectFailed = function(job, menu)
-            self:showFailedDownloadActions(job, menu)
-        end,
-        onClearFailed = function(menu)
-            queue:clearFailed()
-            self:closeMenu(menu)
-            self:showDownloads()
-        end,
-    }, self:getDownloadsMenuOptions(snapshot))
+    local menu = SuwayomiUI.showDownloadsMenu(snapshot, self:getDownloadsMenuCallbacks(), options)
+    trackMenu(menu)
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("downloads", menu)
     end

@@ -50,6 +50,18 @@ local function isDownloadsSnapshotEmpty(snapshot)
         and #(snapshot.failed or {}) == 0
 end
 
+local function buildMenuOptions(snapshot, callbacks, options)
+    options = options or {}
+    return {
+        title = options.title or _("Suwayomi Downloads"),
+        title_bar_left_icon = options.title_bar_left_icon,
+        item_table = DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options),
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+    }
+end
+
 local function appendEmptyStateRows(menu_table, snapshot, options)
     local active_count = #(snapshot.active or {})
     local queued_count = #(snapshot.queued or {})
@@ -151,18 +163,19 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
 end
 
 function DownloadsUI.showDownloadsMenu(snapshot, callbacks, options)
-    options = options or {}
-    local menu_options = {
-        title = options.title or _("Suwayomi Downloads"),
-        title_bar_left_icon = options.title_bar_left_icon,
-        item_table = DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options),
-        close_callback = options.close_callback,
-        on_title_bar_left_tap = options.on_title_bar_left_tap,
-        on_title_bar_left_hold = options.on_title_bar_left_hold,
-    }
+    local menu_options = buildMenuOptions(snapshot, callbacks, options)
     local menu = getListMenu().show(menu_options)
     menu_utils.bindMenuCallbacks(menu.item_table, menu)
     return menu
+end
+
+function DownloadsUI.updateDownloadsMenu(menu, snapshot, callbacks, options)
+    if not menu then
+        return
+    end
+    local menu_options = buildMenuOptions(snapshot, callbacks, options)
+    menu_utils.bindMenuCallbacks(menu_options.item_table, menu)
+    return getListMenu().update(menu, menu_options)
 end
 
 return DownloadsUI

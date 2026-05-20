@@ -72,6 +72,9 @@ function SuwayomiPlugin:createDownloadQueue()
                 return
             end
             self:refreshChapterMenu({ quick = true })
+            if self.refreshDownloadsMenu then
+                self:refreshDownloadsMenu()
+            end
         end,
         onMessage = function(message)
             self:showMessage(message)
@@ -167,11 +170,22 @@ function SuwayomiPlugin:withChapterMenuRefreshSuppressed(callback)
     self.chapter_menu_refresh_suppressed = (self.chapter_menu_refresh_suppressed or 0) + 1
     local ok, result = pcall(callback)
     self.chapter_menu_refresh_suppressed = (self.chapter_menu_refresh_suppressed or 1) - 1
+    local should_refresh_chapters = false
     if self.chapter_menu_refresh_suppressed <= 0 then
         self.chapter_menu_refresh_suppressed = nil
+        should_refresh_chapters = ok and self.pending_chapter_menu_refresh == true
+        if should_refresh_chapters then
+            self.pending_chapter_menu_refresh = nil
+        end
     end
     if not ok then
         error(result)
+    end
+    if should_refresh_chapters then
+        self:refreshChapterMenu({ quick = true })
+        if self.refreshDownloadsMenu then
+            self:refreshDownloadsMenu()
+        end
     end
     return result
 end

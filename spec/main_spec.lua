@@ -247,6 +247,24 @@ describe("suwayomi plugin", function()
         }, ledger_context.updates)
     end)
 
+    it("drains suppressed download status refreshes after the outer callback finishes", function()
+        local plugin = build_plugin()
+        local refreshes = {}
+        plugin.refreshChapterMenu = function(_, options)
+            table.insert(refreshes, options)
+        end
+
+        local queue = plugin:getDownloadQueue()
+        plugin:withChapterMenuRefreshSuppressed(function()
+            queue.options.onStatusChanged()
+            assert.are.equal(0, #refreshes)
+            assert.is_true(plugin.pending_chapter_menu_refresh)
+        end)
+
+        assert.are.same({ { quick = true } }, refreshes)
+        assert.is_nil(plugin.pending_chapter_menu_refresh)
+    end)
+
     it("constructs navigation lazily and closes tracked Suwayomi screens", function()
         local plugin = build_plugin()
         local first = { name = "sources" }

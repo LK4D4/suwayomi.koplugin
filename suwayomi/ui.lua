@@ -51,6 +51,7 @@ SuwayomiUI.updateLibraryMangaMenu = BrowseUI.updateLibraryMangaMenu
 
 SuwayomiUI.buildDownloadsMenuTable = DownloadsUI.buildDownloadsMenuTable
 SuwayomiUI.showDownloadsMenu = DownloadsUI.showDownloadsMenu
+SuwayomiUI.updateDownloadsMenu = DownloadsUI.updateDownloadsMenu
 SuwayomiUI.buildMangaInformationText = MangaInfoUI.buildText
 SuwayomiUI.showMangaInformation = MangaInfoUI.show
 SuwayomiUI.showChoiceDialog = ChoiceDialogs.showChoiceDialog
