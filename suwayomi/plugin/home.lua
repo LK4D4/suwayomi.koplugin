@@ -126,7 +126,7 @@ function Methods:showHome()
         end
     end)
     if dialog and self.trackSuwayomiScreen then
-        self:trackSuwayomiScreen("home", dialog)
+        self:trackSuwayomiScreen("home", dialog, { close_current = false })
     end
     return dialog
 end

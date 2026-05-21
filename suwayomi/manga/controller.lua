@@ -594,7 +594,7 @@ function Methods:performMangaAction(manga, action_id, options)
         if SuwayomiUI.showMangaInformation then
             local info_action_options = copyOptions(options)
             info_action_options.refresh_action_menu_after_library_update = true
-            SuwayomiUI.showMangaInformation(manga, {
+            local dialog = SuwayomiUI.showMangaInformation(manga, {
                 actions = self:getMangaInformationActions(manga),
                 onAction = function(action)
                     if action and action.id then
@@ -602,6 +602,9 @@ function Methods:performMangaAction(manga, action_id, options)
                     end
                 end,
             })
+            if dialog and self.trackSuwayomiScreen then
+                self:trackSuwayomiScreen("manga-information", dialog)
+            end
             return true
         end
         return false

@@ -310,6 +310,47 @@ describe("suwayomi plugin", function()
         assert.is_nil(plugin.suwayomi_plugin_closing)
     end)
 
+    it("closes the whole plugin stack when the active plugin screen is closed", function()
+        local plugin = build_plugin()
+        local original_close_calls = 0
+        local library = {
+            name = "library",
+            onClose = function()
+                original_close_calls = original_close_calls + 1
+                return true
+            end,
+        }
+        local chapters = {
+            name = "chapters",
+            onClose = function()
+                original_close_calls = original_close_calls + 1
+                return true
+            end,
+        }
+
+        plugin:trackSuwayomiScreen("library", library)
+        plugin:trackSuwayomiScreen("chapters", chapters)
+
+        assert.is_true(chapters:onClose())
+
+        assert.are.same({ chapters, library }, runtime.closed_widgets)
+        assert.are.equal(0, original_close_calls)
+        assert.is_false(plugin:isSuwayomiScreenActive(library))
+        assert.is_false(plugin:isSuwayomiScreenActive(chapters))
+    end)
+
+    it("does not track truthy non-widget route results", function()
+        local plugin = build_plugin()
+        local library = { name = "library" }
+
+        plugin:trackSuwayomiScreen("library", library)
+        assert.is_nil(plugin:trackSuwayomiScreen("library", true))
+
+        plugin:closeSuwayomiPlugin()
+
+        assert.are.same({ library }, runtime.closed_widgets)
+    end)
+
     it("configures API debug logging and plugin read-sync defaults on init", function()
         local plugin = build_plugin({
             ui = {

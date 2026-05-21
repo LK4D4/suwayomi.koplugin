@@ -18,6 +18,11 @@ local function findEntryIndex(entries, widget)
     return nil
 end
 
+local function isTrackableWidget(widget)
+    local kind = type(widget)
+    return kind == "table" or kind == "userdata"
+end
+
 local function removeEntry(entries, index)
     if not index then
         return nil
@@ -30,6 +35,7 @@ end
 local function restoreCallback(entry)
     if type(entry.widget) == "table" then
         entry.widget.close_callback = entry.original_close_callback
+        entry.widget.onClose = entry.original_on_close
     end
 end
 
@@ -59,10 +65,32 @@ function Navigator:_wrapCloseCallback(entry)
         end
         return nil
     end
+
+    local original_on_close = widget.onClose
+    if type(original_on_close) ~= "function" then
+        return
+    end
+    if entry.options and entry.options.close_current == false then
+        return
+    end
+    entry.original_on_close = original_on_close
+    widget.onClose = function(...)
+        if navigator.closing_widgets[widget] then
+            return original_on_close(...)
+        end
+
+        if navigator:isCurrent(widget) and navigator.on_close_current then
+            local handled = navigator.on_close_current(entry.route_id, widget, entry.options)
+            if handled then
+                return true
+            end
+        end
+        return original_on_close(...)
+    end
 end
 
 function Navigator:push(route_id, widget, options)
-    if widget == nil then
+    if not isTrackableWidget(widget) then
         return nil
     end
 
@@ -82,7 +110,7 @@ function Navigator:push(route_id, widget, options)
 end
 
 function Navigator:replaceBranch(route_id, widget, options)
-    if widget == nil then
+    if not isTrackableWidget(widget) then
         return nil
     end
 
@@ -118,7 +146,7 @@ function Navigator:closeAll()
 end
 
 function Navigator:isCurrent(widget)
-    if widget == nil then
+    if not isTrackableWidget(widget) then
         return false
     end
     local entry = self.entries[#self.entries]
@@ -126,17 +154,19 @@ function Navigator:isCurrent(widget)
 end
 
 function Navigator:contains(widget)
-    if widget == nil then
+    if not isTrackableWidget(widget) then
         return false
     end
     return findEntryIndex(self.entries, widget) ~= nil
 end
 
-function Navigation.new(ui_manager)
+function Navigation.new(ui_manager, options)
+    options = options or {}
     return setmetatable({
         ui_manager = ui_manager,
         entries = {},
         closing_widgets = {},
+        on_close_current = options.onCloseCurrent,
     }, Navigator)
 end
 

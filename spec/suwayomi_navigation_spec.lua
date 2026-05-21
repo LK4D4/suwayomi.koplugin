@@ -152,4 +152,29 @@ describe("suwayomi/navigation", function()
         assert.are.equal(1, original_calls)
         assert.is_false(navigator:contains(widget))
     end)
+
+    it("current tracked menu close requests full plugin close without running row close callbacks", function()
+        local Navigation = load_navigation()
+        local closed_routes = {}
+        local original_on_close_calls = 0
+        local navigator = Navigation.new(ui_manager, {
+            onCloseCurrent = function(route_id)
+                table.insert(closed_routes, route_id)
+                return true
+            end,
+        })
+        local widget = {
+            onClose = function()
+                original_on_close_calls = original_on_close_calls + 1
+                return true
+            end,
+        }
+
+        navigator:push("library", widget)
+
+        assert.is_true(widget:onClose())
+        assert.are.same({ "library" }, closed_routes)
+        assert.are.equal(0, original_on_close_calls)
+        assert.is_true(navigator:contains(widget))
+    end)
 end)

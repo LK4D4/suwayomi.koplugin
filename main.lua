@@ -119,7 +119,12 @@ end
 
 function SuwayomiPlugin:getNavigation()
     if not self.suwayomi_navigation then
-        self.suwayomi_navigation = SuwayomiNavigation.new(UIManager)
+        self.suwayomi_navigation = SuwayomiNavigation.new(UIManager, {
+            onCloseCurrent = function()
+                self:closeSuwayomiPlugin()
+                return true
+            end,
+        })
     end
     return self.suwayomi_navigation
 end

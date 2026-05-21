@@ -753,7 +753,7 @@ local function buildActionButtons(dialog)
             table.insert(buttons, {
                 text = gettext(action.text),
                 callback = function()
-                    dialog:onClose()
+                    dialog:dismiss()
                     if options.onAction then
                         options.onAction(action)
                     end
@@ -776,7 +776,7 @@ local function buildDialog(modules, manga, options)
         height = bounds.height,
     }
 
-    function Dialog:onClose()
+    function Dialog:dismiss()
         if self.poster_job then
             local ok_job, SubprocessJob = pcall(require, "suwayomi/subprocess/job")
             if ok_job and SubprocessJob and SubprocessJob.cancel then
@@ -786,6 +786,10 @@ local function buildDialog(modules, manga, options)
         end
         modules.UIManager:close(self)
         return true
+    end
+
+    function Dialog:onClose()
+        return self:dismiss()
     end
 
     function Dialog:refreshContent()

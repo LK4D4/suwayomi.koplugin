@@ -113,6 +113,7 @@ local function installController(options)
             showMangaInformation = function(manga, info_options)
                 state.shown_manga_information = manga
                 state.manga_information_options = info_options
+                return { name = "manga-information" }
             end,
             showChapterMenu = function(chapter_options)
                 state.chapter_menu_options = chapter_options
@@ -395,6 +396,8 @@ describe("suwayomi/manga/controller", function()
         assert.is_false(hasAction(state.manga_information_options.actions, "bulk_downloads"))
         assert.is_false(hasAction(state.manga_information_options.actions, "delete_read_downloaded"))
         assert.is_function(state.manga_information_options.onAction)
+        assert.are.equal("manga-information", state.tracked_screens[1].route_id)
+        assert.are.equal("manga-information", state.tracked_screens[1].widget.name)
 
         state.manga_information_options.onAction({ id = "open_chapters" })
 
