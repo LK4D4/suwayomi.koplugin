@@ -21,8 +21,8 @@ describe("plugin metadata", function()
         local metadata = require("_meta")
 
         assert.are.equal("suwayomi", metadata.name)
-        assert.are.equal("1.0.1", metadata.version)
-        assert.are.equal("Suwayomi Client v1.0.1", metadata.fullname)
+        assert.are.equal("1.0.2", metadata.version)
+        assert.are.equal("Suwayomi Client v1.0.2", metadata.fullname)
     end)
 
     it("prints versioned release asset name from metadata", function()
@@ -31,6 +31,6 @@ describe("plugin metadata", function()
         local ok = handle:close()
 
         assert.is_true(ok)
-        assert.are.equal("suwayomi.koplugin-v1.0.1.zip\n", output)
+        assert.are.equal("suwayomi.koplugin-v1.0.2.zip\n", output)
     end)
 end)
