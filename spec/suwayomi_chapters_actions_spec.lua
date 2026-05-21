@@ -523,6 +523,7 @@ describe("suwayomi/chapters/actions", function()
         assert.is_nil(plugin.ledger["m1:c1"])
         assert.is_nil(plugin.ledger["m1:c2"])
         assert.are.equal(true, plugin.selection_cleared)
+        assert.are.same({ "bulk deleted=2 missing=0 active=0" }, plugin.messages)
         assert.are.same({
             "/downloads/Manga/Chapter 1.cbz",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",

@@ -11,6 +11,10 @@
 local JobStore = {}
 JobStore.__index = JobStore
 
+local function hasValidJobKey(job)
+    return type(job) == "table" and type(job.key) == "string" and job.key ~= ""
+end
+
 local function normalizeJobList(jobs)
     local normalized = {}
     if type(jobs) ~= "table" then
@@ -33,7 +37,7 @@ local function normalizeJobList(jobs)
             changed = true
         end
         local job = jobs[key]
-        if type(job) == "table" then
+        if hasValidJobKey(job) then
             table.insert(normalized, job)
         else
             changed = true
@@ -214,16 +218,20 @@ function JobStore:upsertMany(new_jobs)
     local jobs = self:load()
     local indexes_by_key = {}
     for index, existing in ipairs(jobs) do
-        indexes_by_key[existing.key] = index
+        if hasValidJobKey(existing) then
+            indexes_by_key[existing.key] = index
+        end
     end
 
     for _, job in ipairs(new_jobs or {}) do
-        local existing_index = indexes_by_key[job.key]
-        if existing_index then
-            jobs[existing_index] = job
-        else
-            table.insert(jobs, job)
-            indexes_by_key[job.key] = #jobs
+        if hasValidJobKey(job) then
+            local existing_index = indexes_by_key[job.key]
+            if existing_index then
+                jobs[existing_index] = job
+            else
+                table.insert(jobs, job)
+                indexes_by_key[job.key] = #jobs
+            end
         end
     end
 

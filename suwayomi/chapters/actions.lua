@@ -303,8 +303,8 @@ function Methods:deleteSelectedChapters()
     self:clearChapterSelection(true)
     self:refreshChapterMenu()
 
-    if missing > 0 or active > 0 then
-        self:showMessage(self:formatBulkDeleteMessage(deleted, 0, missing, active))
+    if deleted > 0 or canceled > 0 or missing > 0 or active > 0 then
+        self:showMessage(self:formatBulkDeleteMessage(deleted, canceled, missing, active))
     end
     SuwayomiDebug.log({
         operation = "deleteSelectedChapters",

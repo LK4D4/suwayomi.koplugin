@@ -163,4 +163,36 @@ describe("suwayomi/downloads/job_store", function()
         store:remove("m1:c1")
         assert.are.same({}, saved())
     end)
+
+    it("skips malformed existing jobs while batch upserting", function()
+        local existing_job = {
+            key = "m1:c1",
+            state = "queued",
+            download_directory = "/books",
+            manga = { id = "m1", title = "Manga" },
+            chapter = { id = "c1", name = "Chapter" },
+        }
+        local replacement = {
+            key = "m1:c1",
+            state = "queued",
+            download_directory = "/books-new",
+            manga = { id = "m1", title = "Manga" },
+            chapter = { id = "c1", name = "Chapter" },
+        }
+        local added = {
+            key = "m1:c2",
+            state = "queued",
+            download_directory = "/books",
+            manga = { id = "m1", title = "Manga" },
+            chapter = { id = "c2", name = "Chapter 2" },
+        }
+        local store, saved = build_store({
+            { state = "queued", manga = { id = "legacy" }, chapter = { id = "broken" } },
+            existing_job,
+        })
+
+        store:upsertMany({ replacement, added })
+
+        assert.are.same({ replacement, added }, saved())
+    end)
 end)

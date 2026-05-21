@@ -156,7 +156,6 @@ function Methods:startOnboardingConnectionTest(credentials, options)
             self:showMessage(_("Suwayomi connection test timed out."))
             if timed_out_active then
                 timed_out_active.canceled = true
-                SubprocessJob.cleanup(timed_out_active)
             end
         end,
         on_error = function(err)

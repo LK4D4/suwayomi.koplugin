@@ -315,6 +315,23 @@ describe("suwayomi/api/transport", function()
         assert.are.equal("Connection timed out while waiting for Suwayomi.", result.error)
     end)
 
+    it("reports oversized GraphQL responses clearly", function()
+        install_ltn12()
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    local ok, err = options.sink(string.rep("x", 8 * 1024 * 1024 + 1))
+                    return ok, err
+                end,
+            }
+        end
+
+        local result = transport.performGraphQLRequest(valid_credentials(), "{}", "hugeOperation")
+
+        assert.are.equal(false, result.ok)
+        assert.are.equal("Suwayomi response was too large.", result.error)
+    end)
+
     it("uses socket.http for absolute http page URLs without rewriting them", function()
         install_ltn12()
         local requested_url
@@ -532,6 +549,36 @@ describe("suwayomi/api/transport", function()
         assert.are.equal(false, result.ok)
         assert.are.equal("Downloaded response was too large.", result.error)
         assert.is_false(result.retryable)
+        assert.is_nil(io.open(target_path, "rb"))
+    end)
+
+    it("reports archive stream timeouts as network timeouts", function()
+        local target_path = os.tmpname()
+        os.remove(target_path)
+        local times = { 0, 31, 31 }
+        package.loaded.socket = nil
+        package.preload.socket = function()
+            return {
+                gettime = function()
+                    return table.remove(times, 1) or 31
+                end,
+            }
+        end
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    local ok, err = options.sink("PK\003\004archive")
+                    return ok, err
+                end,
+            }
+        end
+
+        local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path)
+
+        assert.are.equal(false, result.ok)
+        assert.are.equal("Connection timed out while downloading chapter archive.", result.error)
+        assert.is_true(result.retryable)
         assert.is_nil(io.open(target_path, "rb"))
     end)
 

@@ -1,6 +1,6 @@
 -- Boundary: Downloads hub menu UI.
 --
--- Responsibility: format active, queued, failed, and completed download rows and
+-- Responsibility: format active, queued, and failed download rows and
 -- wire row callbacks to the downloads controller.
 -- Owned state: none.
 -- Dependencies: shared list menu widget, gettext, and shared menu utilities.

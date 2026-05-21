@@ -115,6 +115,9 @@ local function formatReachabilityError(code)
     if code == "wantread" or code == "wantwrite" or code == "timeout" or code == RESPONSE_TIMEOUT_ERROR then
         return "Connection timed out while waiting for Suwayomi."
     end
+    if code == RESPONSE_TOO_LARGE_ERROR then
+        return "Suwayomi response was too large."
+    end
     return "Could not reach the Suwayomi server: " .. tostring(code)
 end
 
@@ -496,6 +499,14 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
             ok = false,
             error = "Downloaded response was too large.",
             retryable = false,
+        }
+    end
+    if write_error == RESPONSE_TIMEOUT_ERROR then
+        return {
+            ok = false,
+            error = "Connection timed out while downloading chapter archive.",
+            detail = write_error,
+            retryable = true,
         }
     end
     if write_error then

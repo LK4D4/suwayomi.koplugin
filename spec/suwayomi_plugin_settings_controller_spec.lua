@@ -188,6 +188,12 @@ local function installController(options)
                     active.canceled = true
                 end
             end,
+            cleanup = function(active)
+                state.cleaned_connection_job = active
+                if active then
+                    active.cleaned = true
+                end
+            end,
             poll = function() end,
         }
     end
@@ -357,6 +363,18 @@ describe("suwayomi/plugin/settings_controller", function()
 
         downloads_menu.sub_item_table[4].callback(state.touchmenu)
         assert.are.same({ 0, 1, 2, 3, 4, 5 }, state.delete_finished_menu_options.choices)
+    end)
+
+    it("waits for timed-out onboarding connection workers to finish before cleanup", function()
+        local plugin, state = installController()
+
+        plugin:startOnboardingConnectionTest({ server_url = "https://suwayomi.example" })
+        state.started_connection_job.on_timeout(state.started_connection_job.active)
+
+        assert.is_nil(plugin.onboarding_connection_test_active)
+        assert.are.equal("Suwayomi connection test timed out.", state.messages[#state.messages])
+        assert.is_true(state.started_connection_job.active.canceled)
+        assert.is_nil(state.cleaned_connection_job)
     end)
 
     it("runs first-run setup as connection test then download folder", function()

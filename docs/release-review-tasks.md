@@ -125,43 +125,43 @@ Fresh review baseline:
 
 ## P3 Polish
 
-- [ ] Improve GraphQL oversized response error message.
+- [x] Improve GraphQL oversized response error message.
   - Files: `suwayomi/api/transport.lua`, API transport specs
   - Risk: byte-cap failure reports as generic reachability, making support/debug harder.
   - Direction: preserve guarded sink error reason for GraphQL responses.
   - Test: oversized GraphQL response returns size-specific error.
 
-- [ ] Improve archive stream timeout error message.
+- [x] Improve archive stream timeout error message.
   - Files: `suwayomi/api/transport.lua`, API transport specs
   - Risk: network timeout can report as write failure.
   - Direction: distinguish stream timeout from local write error in final user-facing message.
   - Test: archive timeout path returns timeout-specific retryable error.
 
-- [ ] Reap onboarding connection worker before deleting result path on timeout.
+- [x] Reap onboarding connection worker before deleting result path on timeout.
   - Files: `suwayomi/plugin/settings_controller.lua`, onboarding settings specs
   - Risk: low-impact orphan result file if child writes after early cleanup.
   - Direction: follow `SubprocessJob` normal terminate-and-reap cleanup pattern.
   - Test: timeout path keeps polling until child done, then removes result path.
 
-- [ ] Show success feedback after selected delete removes files.
+- [x] Show success feedback after selected delete removes files.
   - Files: `suwayomi/chapters/actions.lua`, chapter action specs
   - Risk: destructive action appears silent except row refresh, inviting repeat action.
   - Direction: always show bulk delete result message when at least one file was deleted.
   - Test: selected delete success asserts success toast/message.
 
-- [ ] Guard `JobStore.upsertMany()` against malformed existing jobs.
+- [x] Guard `JobStore.upsertMany()` against malformed existing jobs.
   - Files: `suwayomi/downloads/job_store.lua`, job store specs
   - Risk: bad old settings entry without `key` can crash bulk download enqueue.
   - Direction: skip or normalize existing entries without valid keys before indexing.
   - Test: malformed existing job without key does not crash upsert.
 
-- [ ] Fix duplicate numbering in README usage list.
+- [x] Fix duplicate numbering in README usage list.
   - Files: `README.md`
   - Risk: low doc polish issue.
   - Direction: renumber usage list.
   - Test: markdown diff review.
 
-- [ ] Correct downloads UI boundary header.
+- [x] Correct downloads UI boundary header.
   - Files: `suwayomi/ui/downloads.lua`, `README.md`
   - Risk: source header says completed rows exist while README says completed history is not implemented.
   - Direction: update boundary comment to match actual UI responsibility.
