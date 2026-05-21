@@ -41,13 +41,15 @@ jobs:
 
       - name: Build project
         run: |
+          asset_name="$(luajit .github/scripts/release-asset-name.lua _meta.lua)"
           bash .github/scripts/stage-release-payload.sh
-          zip -r suwayomi.koplugin.zip suwayomi.koplugin/
+          zip -r "$asset_name" suwayomi.koplugin/
+          echo "RELEASE_ASSET_NAME=$asset_name" >> "$GITHUB_ENV"
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: suwayomi.koplugin.zip
+          files: ${{ env.RELEASE_ASSET_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

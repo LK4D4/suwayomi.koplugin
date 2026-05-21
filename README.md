@@ -28,7 +28,7 @@ Downloaded chapters stay on the KOReader device. The plugin does not use or mana
 
 ### Manual Install
 
-1. Download `suwayomi.koplugin.zip` from the [latest release](https://github.com/LK4D4/suwayomi.koplugin/releases/latest).
+1. Download the versioned `suwayomi.koplugin-vX.Y.Z.zip` asset from the [latest release](https://github.com/LK4D4/suwayomi.koplugin/releases/latest).
 2. Extract the zip.
 3. Copy the extracted `suwayomi.koplugin` folder into KOReader's plugin directory.
 4. Confirm the final path is exactly one plugin folder deep. KOReader discovers the plugin from that folder name:
