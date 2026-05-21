@@ -63,13 +63,13 @@ describe("suwayomi plugin", function()
 
         plugin:addToMainMenu(menu_items)
 
-        assert.is_table(menu_items.suwayomi_dl)
-        assert.are.equal("Suwayomi", menu_items.suwayomi_dl.text)
-        assert.are.equal("search", menu_items.suwayomi_dl.sorting_hint)
-        assert.is_function(menu_items.suwayomi_dl.callback)
-        assert.is_nil(menu_items.suwayomi_dl.sub_item_table)
+        assert.is_table(menu_items.suwayomi)
+        assert.are.equal("Suwayomi", menu_items.suwayomi.text)
+        assert.are.equal("search", menu_items.suwayomi.sorting_hint)
+        assert.is_function(menu_items.suwayomi.callback)
+        assert.is_nil(menu_items.suwayomi.sub_item_table)
 
-        menu_items.suwayomi_dl.callback()
+        menu_items.suwayomi.callback()
 
         assert.is_table(runtime.shown_home_dialog)
         assert.are.equal("Library", runtime.shown_home_dialog.actions[1].text)
@@ -86,7 +86,7 @@ describe("suwayomi plugin", function()
         local parent_menu = { name = "search-menu" }
 
         plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi_dl.callback(parent_menu)
+        menu_items.suwayomi.callback(parent_menu)
 
         assert.are.same({ parent_menu }, runtime.closed_widgets)
         assert.is_table(runtime.shown_home_dialog)
@@ -118,7 +118,7 @@ describe("suwayomi plugin", function()
 
         plugin:addToMainMenu(menu_items)
 
-        assert.is_nil(menu_items.suwayomi_dl)
+        assert.is_nil(menu_items.suwayomi)
         assert.is_table(menu_items.suwayomi_reader_return)
         assert.are.equal("Go to Suwayomi", menu_items.suwayomi_reader_return.text)
         assert.are.equal("main", menu_items.suwayomi_reader_return.sorting_hint)
@@ -168,7 +168,7 @@ describe("suwayomi plugin", function()
 
         plugin:addToMainMenu(menu_items)
 
-        assert.is_nil(menu_items.suwayomi_dl)
+        assert.is_nil(menu_items.suwayomi)
         assert.is_nil(menu_items.suwayomi_reader_return)
     end)
 

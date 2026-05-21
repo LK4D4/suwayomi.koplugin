@@ -98,7 +98,7 @@ describe("suwayomi/debug", function()
     end)
 
     it("logs redacted events when the QA debug config enables logging", function()
-        loaded_configs["/mock/settings/suwayomi_dl_debug.lua"] = {
+        loaded_configs["/mock/settings/suwayomi_debug.lua"] = {
             enabled = true,
             log_to_file = true,
             log_to_koreader_log = true,
@@ -113,7 +113,7 @@ describe("suwayomi/debug", function()
         })
 
         assert.are.equal(1, #logs)
-        assert.truthy(logs[1]:match("SuwayomiDL"))
+        assert.truthy(logs[1]:match("Suwayomi"))
         assert.truthy(logs[1]:match("operation=login"))
         assert.truthy(logs[1]:match("password=<redacted>"))
         assert.are.equal(1, #file_lines)
@@ -122,7 +122,7 @@ describe("suwayomi/debug", function()
     end)
 
     it("redacts user data, paths, and URLs from QA debug events", function()
-        loaded_configs["/mock/settings/suwayomi_dl_debug.lua"] = {
+        loaded_configs["/mock/settings/suwayomi_debug.lua"] = {
             enabled = true,
             log_to_file = true,
             log_to_koreader_log = true,
@@ -185,7 +185,7 @@ describe("suwayomi/debug", function()
                 end,
             }
         end
-        loaded_configs["/mock/settings/suwayomi_dl_debug.lua"] = {
+        loaded_configs["/mock/settings/suwayomi_debug.lua"] = {
             enabled = true,
             log_to_file = true,
             slow_threshold_ms = 250,
@@ -211,7 +211,7 @@ describe("suwayomi/debug", function()
                 end,
             }
         end
-        loaded_configs["/mock/settings/suwayomi_dl_debug.lua"] = {
+        loaded_configs["/mock/settings/suwayomi_debug.lua"] = {
             enabled = true,
             log_to_file = true,
             slow_threshold_ms = 250,

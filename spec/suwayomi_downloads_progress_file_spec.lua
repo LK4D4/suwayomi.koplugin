@@ -83,11 +83,11 @@ describe("suwayomi/downloads/progress_file", function()
 
     it("builds hidden progress filenames from encoded full keys", function()
         assert.are.equal(
-            "/books/.suwayomi_dl_progress_6d313a333938.txt",
+            "/books/.suwayomi_progress_6d313a333938.txt",
             progress_file.buildPath("m1:398", "/books/")
         )
         assert.are.equal(
-            "/books/.suwayomi_dl_progress_6d3153333938.txt",
+            "/books/.suwayomi_progress_6d3153333938.txt",
             progress_file.buildPath("m1S398", "/books/")
         )
         assert.are_not.equal(
@@ -95,33 +95,33 @@ describe("suwayomi/downloads/progress_file", function()
             progress_file.buildPath("m1/398", "/books/")
         )
         assert.are.equal(
-            "/books/.suwayomi_dl_progress_m1_398.txt",
+            "/books/.suwayomi_progress_m1_398.txt",
             progress_file.buildLegacyPath("m1:398", "/books/")
         )
     end)
 
     it("writes fallback progress through a temporary file before renaming", function()
-        progress_file.writeFallback("/books/.suwayomi_dl_progress_m1_398.txt", "failed", 2, 5, "/books/chapter.cbz", "boom")
+        progress_file.writeFallback("/books/.suwayomi_progress_m1_398.txt", "failed", 2, 5, "/books/chapter.cbz", "boom")
 
         assert.are.same({
             {
-                from = "/books/.suwayomi_dl_progress_m1_398.txt.tmp",
-                to = "/books/.suwayomi_dl_progress_m1_398.txt",
+                from = "/books/.suwayomi_progress_m1_398.txt.tmp",
+                to = "/books/.suwayomi_progress_m1_398.txt",
             },
         }, renames)
-        assert.is_nil(files["/books/.suwayomi_dl_progress_m1_398.txt.tmp"])
+        assert.is_nil(files["/books/.suwayomi_progress_m1_398.txt.tmp"])
         assert.are.same({
             state = "failed",
             current = 2,
             total = 5,
             path = "/books/chapter.cbz",
             error = "boom",
-        }, progress_file.read("/books/.suwayomi_dl_progress_m1_398.txt"))
+        }, progress_file.read("/books/.suwayomi_progress_m1_398.txt"))
     end)
 
     it("keeps fallback progress values line-safe", function()
         progress_file.writeFallback(
-            "/books/.suwayomi_dl_progress_m1_398.txt",
+            "/books/.suwayomi_progress_m1_398.txt",
             "downloading",
             2,
             5,
@@ -135,7 +135,7 @@ describe("suwayomi/downloads/progress_file", function()
             total = 5,
             path = "/books/Manga state=failed path=x/chapter.cbz",
             error = "first line state=failed path=x",
-        }, progress_file.read("/books/.suwayomi_dl_progress_m1_398.txt"))
+        }, progress_file.read("/books/.suwayomi_progress_m1_398.txt"))
     end)
 
     it("returns nil when no progress file exists", function()

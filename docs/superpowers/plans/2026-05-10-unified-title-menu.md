@@ -499,7 +499,7 @@ Expected: `Total: 0 warnings / 0 errors`.
 Run:
 
 ```powershell
-$target = '/sdcard/koreader/plugins/suwayomi_dl.koplugin'
+$target = '/sdcard/koreader/plugins/suwayomi.koplugin'
 adb -s E035AD62 shell "mkdir -p $target"
 adb -s E035AD62 push _meta.lua "$target/_meta.lua"
 adb -s E035AD62 push main.lua "$target/main.lua"

@@ -9,8 +9,8 @@
 local _ = require("gettext")
 
 return {
-    name = "suwayomi_dl",
-    fullname = _("Suwayomi Downloader"),
-    description = _([[Experimental plugin in active development. Browse and asynchronously download manga chapters from a Suwayomi server.]]),
+    name = "suwayomi",
+    fullname = _("Suwayomi Client"),
+    description = _([[Suwayomi client for KOReader. Browse your Suwayomi server, manage source extensions, sync read state, and download chapters as local CBZ files.]]),
     version = "1.0.0",
 }

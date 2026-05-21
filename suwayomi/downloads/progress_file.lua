@@ -36,12 +36,12 @@ function ProgressFile.buildPath(key, download_directory)
     if encoded_key == "" then
         encoded_key = "empty"
     end
-    return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_dl_progress_" .. encoded_key .. ".txt"
+    return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_progress_" .. encoded_key .. ".txt"
 end
 
 function ProgressFile.buildLegacyPath(key, download_directory)
     local sanitized_key = buildLegacyName(key)
-    return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_dl_progress_" .. sanitized_key .. ".txt"
+    return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_progress_" .. sanitized_key .. ".txt"
 end
 
 function ProgressFile.read(progress_path)

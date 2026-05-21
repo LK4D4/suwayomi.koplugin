@@ -225,7 +225,7 @@ function Methods:addToMainMenu(menu_items)
         return
     end
 
-    menu_items.suwayomi_dl = {
+    menu_items.suwayomi = {
         text = _("Suwayomi"),
         sorting_hint = "search",
         callback = function(menu)

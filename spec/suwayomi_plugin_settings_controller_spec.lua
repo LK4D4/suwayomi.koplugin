@@ -176,7 +176,7 @@ local function installController(options)
     package.preload["suwayomi/subprocess/job"] = function()
         return {
             buildResultPath = function()
-                return "/mock/settings/suwayomi_dl_onboarding_connection.json"
+                return "/mock/settings/suwayomi_onboarding_connection.json"
             end,
             start = function(job_options)
                 state.started_connection_job = job_options

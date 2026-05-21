@@ -12,7 +12,7 @@ local LuaSettings = require("luasettings")
 local SourceFilters = require("suwayomi/source_filters")
 
 local SuwayomiSettings = {
-    settings_file = DataStorage:getSettingsDir() .. "/suwayomi_dl.lua",
+    settings_file = DataStorage:getSettingsDir() .. "/suwayomi.lua",
     settings = nil,
 }
 

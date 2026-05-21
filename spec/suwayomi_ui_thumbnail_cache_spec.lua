@@ -135,7 +135,7 @@ describe("suwayomi/ui/thumbnail_cache", function()
             server_url = "https://suwayomi.example",
         }, "/api/v1/manga/123/thumbnail", "image/png")
 
-        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.png$", path)
+        assert.matches("^/settings/suwayomi_thumbnails/%x+%.png$", path)
         assert.are.equal(16, cache.getKey({
             server_url = "https://suwayomi.example",
         }, "/api/v1/manga/123/thumbnail"):len())
@@ -173,7 +173,7 @@ describe("suwayomi/ui/thumbnail_cache", function()
         assert.are_not.equal(alice_path, bob_path)
         assert.are.equal(alice_path, alice_new_password_path)
         assert.are_not.equal(alice_path, alice_no_auth_path)
-        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.png$", alice_path)
+        assert.matches("^/settings/suwayomi_thumbnails/%x+%.png$", alice_path)
         assert.is_nil(alice_path:match("alice"))
         assert.is_nil(alice_path:match("secret"))
     end)
@@ -184,15 +184,15 @@ describe("suwayomi/ui/thumbnail_cache", function()
 
         local path = cache.write(credentials, "/cover.png", "PNGDATA", "image/png")
 
-        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.png$", path)
+        assert.matches("^/settings/suwayomi_thumbnails/%x+%.png$", path)
         assert.are.equal("PNGDATA", written_files[path].body)
-        assert.is_true(directories["/settings/suwayomi_dl_thumbnails"])
+        assert.is_true(directories["/settings/suwayomi_thumbnails"])
     end)
 
     it("removes stale raw image thumbnails instead of returning them to the UI", function()
         local cache = require("suwayomi/ui/thumbnail_cache")
         local credentials = { server_url = "https://suwayomi.example" }
-        local raw_path = "/settings/suwayomi_dl_thumbnails/" .. cache.getKey(credentials, "/cover.jpg") .. ".jpg"
+        local raw_path = "/settings/suwayomi_thumbnails/" .. cache.getKey(credentials, "/cover.jpg") .. ".jpg"
         written_files[raw_path] = {
             mode = "wb",
             body = "JPGDATA",
@@ -253,7 +253,7 @@ describe("suwayomi/ui/thumbnail_cache", function()
         local found = cache.find(credentials, "/cover.webp")
         local loaded = cache.loadDecoded(path)
 
-        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.bb$", path)
+        assert.matches("^/settings/suwayomi_thumbnails/%x+%.bb$", path)
         assert.are.equal(path, found)
         assert.are.equal("loaded_bitmap", loaded.kind)
         assert.are.same({
@@ -305,7 +305,7 @@ describe("suwayomi/ui/thumbnail_cache", function()
             width = 240,
             height = 360,
         }))
-        assert.matches("^/settings/suwayomi_dl_thumbnails/%x+%.bb$", poster_path)
+        assert.matches("^/settings/suwayomi_thumbnails/%x+%.bb$", poster_path)
         assert.is_nil(poster_path:match("suwayomi%.example"))
         assert.is_nil(poster_path:match("manga/123"))
         assert.is_nil(poster_path:match("alice"))

@@ -38,7 +38,7 @@
 - Specs isolate KOReader/runtime dependencies with `package.preload` and clear `package.loaded`; follow that pattern.
 - Clear module-level state in specs before requiring changed modules.
 - Keep `spec/main_spec.lua` focused on KOReader lifecycle and shell composition.
-- Settings specs stub `datastorage` and `luasettings`; real settings live under KOReader settings as `suwayomi_dl.lua`.
+- Settings specs stub `datastorage` and `luasettings`; real settings live under KOReader settings as `suwayomi.lua`.
 - Tests must not require a live Suwayomi server, KOReader install, or local manga library unless the task explicitly asks for integration/manual QA.
 
 ## Data Safety
@@ -50,7 +50,7 @@
 ## Android Packaging
 
 - Release zips and manual device pushes include only `_meta.lua`, `main.lua`, `README.md`, and `suwayomi/`.
-- For Android QA, push the runtime payload to `/sdcard/koreader/plugins/suwayomi_dl.koplugin/`; do not push `.git`, `spec`, docs, CI files, or worktrees.
+- For Android QA, push the runtime payload to `/sdcard/koreader/plugins/suwayomi.koplugin/`; do not push `.git`, `spec`, docs, CI files, or worktrees.
 
 ## Maintenance
 

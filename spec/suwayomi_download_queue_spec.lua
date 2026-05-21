@@ -17,7 +17,7 @@ describe("suwayomi/downloads/queue", function()
         progress_files = {}
 
         io.open = function(path, mode)
-            if tostring(path):match("%.suwayomi_dl_progress_") then
+            if tostring(path):match("%.suwayomi_progress_") then
                 if mode == "w" then
                     local chunks = {}
                     return {
@@ -562,7 +562,7 @@ describe("suwayomi/downloads/queue", function()
         assert.is_nil(context.saved_queue()[1].progress)
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_paths[1])
         assert.are.equal(progress_path, removed_paths[2])
-        assert.are.equal("/books/.suwayomi_dl_progress_m1_398.txt", removed_paths[3])
+        assert.are.equal("/books/.suwayomi_progress_m1_398.txt", removed_paths[3])
         assert.is_nil(context.progress_files[progress_path])
 
         context.run_scheduled()
@@ -992,8 +992,8 @@ describe("suwayomi/downloads/queue", function()
 
         assert.are.same({
             "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part",
-            "/books/.suwayomi_dl_progress_6d313a333938.txt",
-            "/books/.suwayomi_dl_progress_m1_398.txt",
+            "/books/.suwayomi_progress_6d313a333938.txt",
+            "/books/.suwayomi_progress_m1_398.txt",
         }, removed_paths)
     end)
 

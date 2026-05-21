@@ -162,8 +162,8 @@ describe("suwayomi/subprocess/job", function()
         local first = Job.buildResultPath("source_fetch")
         local second = Job.buildResultPath("source_fetch")
 
-        assert.are.equal("/settings/suwayomi_dl_source_fetch_1.json", first)
-        assert.are.equal("/settings/suwayomi_dl_source_fetch_2.json", second)
+        assert.are.equal("/settings/suwayomi_source_fetch_1.json", first)
+        assert.are.equal("/settings/suwayomi_source_fetch_2.json", second)
     end)
 
     it("cleans result files and reports launch failures", function()

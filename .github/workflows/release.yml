@@ -42,12 +42,12 @@ jobs:
       - name: Build project
         run: |
           bash .github/scripts/stage-release-payload.sh
-          zip -r suwayomi_dl.koplugin.zip suwayomi_dl.koplugin/
+          zip -r suwayomi.koplugin.zip suwayomi.koplugin/
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: suwayomi_dl.koplugin.zip
+          files: suwayomi.koplugin.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

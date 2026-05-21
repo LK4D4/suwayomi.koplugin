@@ -14,7 +14,7 @@ local lfs = require("suwayomi/fs")
 local ThumbnailCache = {}
 ThumbnailCache.MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
 
-local CACHE_DIR_NAME = "suwayomi_dl_thumbnails"
+local CACHE_DIR_NAME = "suwayomi_thumbnails"
 local DECODED_EXTENSION = "bb"
 local DECODED_MAGIC = "SWTHUMB1"
 local RAW_IMAGE_EXTENSIONS = { "webp", "jpg", "jpeg", "png", "gif", "svg" }

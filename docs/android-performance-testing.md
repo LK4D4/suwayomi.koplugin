@@ -1,6 +1,6 @@
 # Android performance testing
 
-This document records the repeatable Android checks for Suwayomi Downloader UI stalls.
+This document records the repeatable Android checks for Suwayomi Client UI stalls.
 
 ## Setup
 
@@ -11,20 +11,20 @@ This document records the repeatable Android checks for Suwayomi Downloader UI s
 3. Install the plugin:
 
 ```powershell
-$stage = Join-Path $env:TEMP "suwayomi_dl.koplugin"
+$stage = Join-Path $env:TEMP "suwayomi.koplugin"
 Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $stage | Out-Null
 Copy-Item _meta.lua, main.lua, README.md $stage
 Copy-Item suwayomi $stage -Recurse
 
-adb shell mkdir -p /sdcard/koreader/plugins/suwayomi_dl.koplugin
-adb push "$stage/." /sdcard/koreader/plugins/suwayomi_dl.koplugin/
+adb shell mkdir -p /sdcard/koreader/plugins/suwayomi.koplugin
+adb push "$stage/." /sdcard/koreader/plugins/suwayomi.koplugin/
 ```
 
 The staged directory contains only plugin runtime files: `_meta.lua`, `main.lua`,
 `README.md`, and `suwayomi/`.
 
-4. Optional test settings can be pushed to `/sdcard/koreader/settings/suwayomi_dl.lua`:
+4. Optional test settings can be pushed to `/sdcard/koreader/settings/suwayomi.lua`:
 
 ```lua
 return {
@@ -43,10 +43,10 @@ return {
 ## Capturing evidence
 
 Debug instrumentation is off by default, including in release installs. Enable it for a QA run by pushing
-`/sdcard/koreader/settings/suwayomi_dl_debug.lua` before launching KOReader:
+`/sdcard/koreader/settings/suwayomi_debug.lua` before launching KOReader:
 
 ```powershell
-$debugConfig = "$env:TEMP\suwayomi_dl_debug.lua"
+$debugConfig = "$env:TEMP\suwayomi_debug.lua"
 @'
 return {
     enabled = true,
@@ -55,7 +55,7 @@ return {
     slow_threshold_ms = 0,
 }
 '@ | Set-Content -NoNewline -Encoding ASCII $debugConfig
-adb push $debugConfig /sdcard/koreader/settings/suwayomi_dl_debug.lua
+adb push $debugConfig /sdcard/koreader/settings/suwayomi_debug.lua
 ```
 
 `slow_threshold_ms` filters timing events below the configured duration. Use `0` for full traces, or a value
@@ -65,7 +65,7 @@ after changing it.
 Disable QA instrumentation and remove captured logs with:
 
 ```powershell
-adb shell rm -f /sdcard/koreader/settings/suwayomi_dl_debug.lua
+adb shell rm -f /sdcard/koreader/settings/suwayomi_debug.lua
 adb shell rm -f /sdcard/koreader/settings/suwayomi_debug.log
 ```
 
@@ -80,7 +80,7 @@ adb shell am start -n org.koreader.launcher/.MainActivity
 Capture KOReader/plugin logs:
 
 ```powershell
-adb logcat -d | rg "SuwayomiDL|KOReader|ANR"
+adb logcat -d | rg "Suwayomi|KOReader|ANR"
 adb shell cat /sdcard/koreader/settings/suwayomi_debug.log
 ```
 
@@ -112,7 +112,7 @@ adb shell dumpsys gfxinfo org.koreader.launcher framestats > gfxinfo-flow-frames
 7. Open the chapter list.
 8. Long-press/select about 70 chapters.
 9. Open the chapter-list menu and run Mark selected as read.
-10. Stay on the chapter list for at least two minutes and collect `SuwayomiDL` timing logs while pending read syncs run.
+10. Stay on the chapter list for at least two minutes and collect `Suwayomi` timing logs while pending read syncs run.
 11. Repeat with Mark selected as unread.
 12. Queue a large batch download, then collect queue/process/poll logs.
 
@@ -162,8 +162,8 @@ Direct GraphQL probing against the same Suwayomi server is useful when a live so
 
 ## Instrumentation
 
-When `/sdcard/koreader/settings/suwayomi_dl_debug.lua` sets `enabled = true`, the plugin emits redacted timing
-events with the prefix `SuwayomiDL`. Without that file, instrumentation call sites are no-ops.
+When `/sdcard/koreader/settings/suwayomi_debug.lua` sets `enabled = true`, the plugin emits redacted timing
+events with the prefix `Suwayomi`. Without that file, instrumentation call sites are no-ops.
 
 Important operations:
 

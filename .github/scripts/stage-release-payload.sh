@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-payload_dir="${1:-suwayomi_dl.koplugin}"
+payload_dir="${1:-suwayomi.koplugin}"
 mode="${2:-stage}"
 
 fail() {

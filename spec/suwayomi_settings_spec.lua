@@ -62,7 +62,7 @@ describe("suwayomi/settings", function()
         local settings = require("suwayomi/settings")
         local credentials = settings:load()
 
-        assert.are.equal("/mock/settings/suwayomi_dl.lua", settings.settings_file)
+        assert.are.equal("/mock/settings/suwayomi.lua", settings.settings_file)
         assert.are.same(stored_data.credentials, credentials)
     end)
 

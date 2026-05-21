@@ -1,7 +1,7 @@
 -- Boundary: optional debug logging.
 --
 -- Responsibility: load debug settings, redact sensitive values, and send
--- structured SuwayomiDL-prefixed logs when enabled.
+-- structured Suwayomi-prefixed logs when enabled.
 -- Owned state: cached logger, settings dir, and debug config.
 -- Dependencies: KOReader logger/datastorage/luasettings when available.
 -- External data: log payloads are redacted before leaving this module.
@@ -51,7 +51,7 @@ local function loadConfig()
         return config
     end
 
-    local loader = loadfile(dir .. "/suwayomi_dl_debug.lua")
+    local loader = loadfile(dir .. "/suwayomi_debug.lua")
     if not loader then
         config = false
         return config
@@ -188,13 +188,13 @@ function Debug.log(event)
         return
     end
 
-    event.plugin = event.plugin or "suwayomi_dl"
+    event.plugin = event.plugin or "suwayomi"
     local line = formatEvent(event)
     local loaded_config = loadConfig() or {}
 
     local loaded_logger = loaded_config.log_to_koreader_log ~= false and loadLogger() or nil
     if loaded_logger and loaded_logger.info then
-        pcall(loaded_logger.info, "SuwayomiDL " .. line)
+        pcall(loaded_logger.info, "Suwayomi " .. line)
     end
     if loaded_config.log_to_file ~= false then
         pcall(writeFileLine, line)

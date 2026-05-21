@@ -28,7 +28,7 @@ describe("suwayomi/downloads/active_jobs", function()
         progress_files = {}
 
         io.open = function(path, mode)
-            if tostring(path):match("%.suwayomi_dl_progress_") then
+            if tostring(path):match("%.suwayomi_progress_") then
                 if mode == "w" then
                     local chunks = {}
                     return {

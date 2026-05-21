@@ -21,7 +21,7 @@ function SubprocessJob.buildResultPath(prefix)
     local settings_dir = SuwayomiSettings.getSettingsDir and SuwayomiSettings:getSettingsDir() or "."
     SubprocessJob.result_counter = SubprocessJob.result_counter + 1
     return tostring(settings_dir or "."):gsub("/+$", "")
-        .. "/suwayomi_dl_"
+        .. "/suwayomi_"
         .. tostring(prefix or "subprocess")
         .. "_"
         .. tostring(SubprocessJob.result_counter)

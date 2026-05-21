@@ -1,6 +1,6 @@
 # Suwayomi Client for KOReader
 
-[![Test](https://github.com/LK4D4/suwayomi_dl.koplugin/actions/workflows/test.yml/badge.svg)](https://github.com/LK4D4/suwayomi_dl.koplugin/actions/workflows/test.yml)
+[![Test](https://github.com/LK4D4/suwayomi.koplugin/actions/workflows/test.yml/badge.svg)](https://github.com/LK4D4/suwayomi.koplugin/actions/workflows/test.yml)
 
 Browse a self-hosted [Suwayomi](https://github.com/Suwayomi/Suwayomi-Server) server from KOReader, install or update source extensions, download manga chapters as local CBZ files, and read them with KOReader's normal reader.
 
@@ -22,29 +22,29 @@ Downloaded chapters stay on the KOReader device. The plugin does not use or mana
 
 1. Install the [KOReader App Store plugin](https://github.com/omer-faruq/appstore.koplugin) if it is not already on your device.
 2. In KOReader, open **Tools** > **App Store**.
-3. Search for `suwayomi_dl.koplugin` or `LK4D4/suwayomi_dl.koplugin`.
+3. Search for `suwayomi.koplugin` or `LK4D4/suwayomi.koplugin`.
 4. Install the plugin.
 5. Restart KOReader.
 
 ### Manual Install
 
-1. Download `suwayomi_dl.koplugin.zip` from the [latest release](https://github.com/LK4D4/suwayomi_dl.koplugin/releases/latest).
+1. Download `suwayomi.koplugin.zip` from the [latest release](https://github.com/LK4D4/suwayomi.koplugin/releases/latest).
 2. Extract the zip.
-3. Copy the extracted `suwayomi_dl.koplugin` folder into KOReader's plugin directory.
+3. Copy the extracted `suwayomi.koplugin` folder into KOReader's plugin directory.
 4. Confirm the final path is exactly one plugin folder deep. KOReader discovers the plugin from that folder name:
 
 ```text
-<your-device-root>/koreader/plugins/suwayomi_dl.koplugin/
+<your-device-root>/koreader/plugins/suwayomi.koplugin/
 ```
 
-On Android, `<your-device-root>` is usually `/sdcard`. On Kobo or Kindle, use the device storage root that contains `koreader/`. On Linux desktop, the full path is usually `~/.config/koreader/plugins/suwayomi_dl.koplugin/`.
+On Android, `<your-device-root>` is usually `/sdcard`. On Kobo or Kindle, use the device storage root that contains `koreader/`. On Linux desktop, the full path is usually `~/.config/koreader/plugins/suwayomi.koplugin/`.
 
-Do not leave the files in a nested path such as `koreader/plugins/suwayomi_dl.koplugin/suwayomi_dl.koplugin/`; KOReader will not discover the plugin there.
+Do not leave the files in a nested path such as `koreader/plugins/suwayomi.koplugin/suwayomi.koplugin/`; KOReader will not discover the plugin there.
 
 5. Confirm the folder contains `_meta.lua`, `main.lua`, and `suwayomi/`.
 6. Restart KOReader.
 
-To update a manual install, replace the old `suwayomi_dl.koplugin` folder with the new release folder, then restart KOReader.
+To update a manual install, replace the old `suwayomi.koplugin` folder with the new release folder, then restart KOReader.
 
 ## First Run
 
@@ -84,7 +84,7 @@ This release focuses on KOReader-local reading. It does not edit source preferen
 
 | Problem | What to check |
 | --- | --- |
-| Plugin does not appear | Folder must be named `suwayomi_dl.koplugin`; restart KOReader after install. |
+| Plugin does not appear | Folder must be named `suwayomi.koplugin`; restart KOReader after install. |
 | Cannot connect | Check server URL from the device, Basic Auth credentials, and whether Suwayomi is running. |
 | Source is missing | Install or update the source from **Browse**; also check **Show NSFW sources** in Browse settings. |
 | Search times out | Try a source-specific Popular or Latest list, or retry with a narrower search term. |

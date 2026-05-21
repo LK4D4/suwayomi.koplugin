@@ -33,7 +33,7 @@ local ReadSyncController = require("suwayomi/readsync/controller")
 local _ = require("gettext")
 
 local SuwayomiPlugin = WidgetContainer:extend{
-    name = "suwayomi_dl",
+    name = "suwayomi",
     is_doc_only = false,
     selection_mode = false,
     max_batch_queue_chapters = 50,

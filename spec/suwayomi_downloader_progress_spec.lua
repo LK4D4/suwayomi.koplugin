@@ -113,7 +113,7 @@ describe("suwayomi/downloads/downloader progress writing", function()
         install_file_mock()
 
         downloader:writeProgress(
-            "/books/.suwayomi_dl_progress_m1_398.txt",
+            "/books/.suwayomi_progress_m1_398.txt",
             "downloading",
             1,
             3,
@@ -121,7 +121,7 @@ describe("suwayomi/downloads/downloader progress writing", function()
             "temporary\nstate=failed"
         )
 
-        local progress = progress_file.read("/books/.suwayomi_dl_progress_m1_398.txt")
+        local progress = progress_file.read("/books/.suwayomi_progress_m1_398.txt")
 
         assert.are.equal("downloading", progress.state)
         assert.are.equal("/books/Chapter state=failed path=x.cbz", progress.path)
