@@ -261,6 +261,28 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("Available (1)", menu.item_table[4].text)
     end)
 
+    it("lets callers reset extension refresh position explicitly", function()
+        local browse = require("suwayomi/ui/browse")
+        local menu = { title = "Suwayomi Extensions" }
+
+        browse.updateExtensionsMenu(menu, {
+            {
+                pkg_name = "pkg.orchid",
+                name = "Orchid Gate",
+                is_installed = true,
+            },
+            {
+                pkg_name = "pkg.quartz",
+                name = "Quartz Node",
+                is_installed = false,
+            },
+        }, function() end, {
+            itemnumber = 1,
+        })
+
+        assert.are.equal(1, menu.updated_options.itemnumber)
+    end)
+
     it("keeps installed and available section headers visible during extension search updates", function()
         local browse = require("suwayomi/ui/browse")
         local menu = { title = "Suwayomi Extensions" }

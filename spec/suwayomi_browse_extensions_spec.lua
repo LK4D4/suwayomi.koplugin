@@ -315,6 +315,75 @@ describe("suwayomi/browse/extensions", function()
         assert.is_true(ui_calls.updated_extensions_menu.options.show_empty_extension_sections)
     end)
 
+    it("keeps searched extension visible and focused after uninstall moves it to available", function()
+        local extensions = loadExtensions()
+        local controller = buildController(extensions)
+
+        controller:showFetchedExtensions({
+            ok = true,
+            extensions = {
+                { pkg_name = "pkg.orchid", name = "Orchid Gate", is_installed = true },
+                { pkg_name = "pkg.quartz", name = "Quartz Node", is_installed = true },
+            },
+        }, { credentials = { server_url = "https://suwayomi.example" } })
+
+        controller.title_menu_options.onSelect({ id = "search_extensions" })
+        ui_calls.extension_search_prompt.onSearch("quartz")
+
+        controller:finishExtensionWorker({
+            credentials = { server_url = "https://suwayomi.example" },
+            loading_message = { message = "Uninstalling extension..." },
+        }, {
+            ok = true,
+            action = "uninstall",
+            updated_extension = { pkg_name = "pkg.quartz", name = "Quartz Node", is_installed = false },
+            sources = {},
+            extensions = {
+                { pkg_name = "pkg.orchid", name = "Orchid Gate", is_installed = true },
+                { pkg_name = "pkg.quartz", name = "Quartz Node", is_installed = false },
+            },
+        })
+
+        assert.are.equal("quartz", controller.current_extension_search_query)
+        assert.are.equal("pkg.quartz", ui_calls.updated_extensions_menu.extensions[1].pkg_name)
+        assert.are.equal("pkg.quartz", ui_calls.updated_extensions_menu.options.focus_extension_pkg_name)
+        assert.is_nil(ui_calls.updated_extensions_menu.options.itemnumber)
+        assert.is_true(ui_calls.updated_extensions_menu.options.show_empty_extension_sections)
+    end)
+
+    it("does not jump to an uninstalled extension in the unfiltered list", function()
+        local extensions = loadExtensions()
+        local controller = buildController(extensions)
+
+        controller:showFetchedExtensions({
+            ok = true,
+            extensions = {
+                { pkg_name = "pkg.orchid", name = "Orchid Gate", is_installed = true },
+                { pkg_name = "pkg.quartz", name = "Quartz Node", is_installed = true },
+                { pkg_name = "pkg.fallback", name = "Fallback", is_installed = false },
+            },
+        }, { credentials = { server_url = "https://suwayomi.example" } })
+
+        controller:finishExtensionWorker({
+            credentials = { server_url = "https://suwayomi.example" },
+            loading_message = { message = "Uninstalling extension..." },
+        }, {
+            ok = true,
+            action = "uninstall",
+            updated_extension = { pkg_name = "pkg.quartz", name = "Quartz Node", is_installed = false },
+            sources = {},
+            extensions = {
+                { pkg_name = "pkg.orchid", name = "Orchid Gate", is_installed = true },
+                { pkg_name = "pkg.quartz", name = "Quartz Node", is_installed = false },
+                { pkg_name = "pkg.fallback", name = "Fallback", is_installed = false },
+            },
+        })
+
+        assert.is_nil(ui_calls.updated_extensions_menu.options.focus_extension_pkg_name)
+        assert.are.equal(1, ui_calls.updated_extensions_menu.options.itemnumber)
+        assert.is_nil(ui_calls.updated_extensions_menu.options.show_empty_extension_sections)
+    end)
+
     it("opens extension list fetches as a new menu", function()
         local extensions = loadExtensions()
         local started

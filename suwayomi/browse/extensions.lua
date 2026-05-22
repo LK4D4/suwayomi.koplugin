@@ -397,7 +397,11 @@ function Methods:showFetchedExtensions(result, options)
             end
         end
         menu_options.thumbnail_credentials = options.credentials
-        menu_options.focus_extension_pkg_name = options.updated_pkg_name
+        if query or options.action ~= "uninstall" then
+            menu_options.focus_extension_pkg_name = options.updated_pkg_name
+        elseif options.updated_pkg_name then
+            menu_options.itemnumber = 1
+        end
         if query then
             menu_options.empty_text = _("No matching extensions")
             menu_options.show_empty_extension_sections = true
