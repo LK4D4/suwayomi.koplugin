@@ -310,7 +310,7 @@ describe("suwayomi plugin", function()
         assert.is_nil(plugin.suwayomi_plugin_closing)
     end)
 
-    it("closes the whole plugin stack when the active plugin screen is closed", function()
+    it("untracks only the active plugin screen when its cross closes", function()
         local plugin = build_plugin()
         local original_close_calls = 0
         local library = {
@@ -333,9 +333,9 @@ describe("suwayomi plugin", function()
 
         assert.is_true(chapters:onClose())
 
-        assert.are.same({ chapters, library }, runtime.closed_widgets)
-        assert.are.equal(0, original_close_calls)
-        assert.is_false(plugin:isSuwayomiScreenActive(library))
+        assert.are.same({}, runtime.closed_widgets)
+        assert.are.equal(1, original_close_calls)
+        assert.is_true(plugin:isSuwayomiScreenActive(library))
         assert.is_false(plugin:isSuwayomiScreenActive(chapters))
     end)
 

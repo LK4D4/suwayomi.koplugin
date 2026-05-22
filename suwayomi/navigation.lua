@@ -70,20 +70,14 @@ function Navigator:_wrapCloseCallback(entry)
     if type(original_on_close) ~= "function" then
         return
     end
-    if entry.options and entry.options.close_current == false then
-        return
-    end
     entry.original_on_close = original_on_close
     widget.onClose = function(...)
         if navigator.closing_widgets[widget] then
             return original_on_close(...)
         end
 
-        if navigator:isCurrent(widget) and navigator.on_close_current then
-            local handled = navigator.on_close_current(entry.route_id, widget, entry.options)
-            if handled then
-                return true
-            end
+        if navigator:isCurrent(widget) then
+            navigator:pop(widget)
         end
         return original_on_close(...)
     end
@@ -160,13 +154,11 @@ function Navigator:contains(widget)
     return findEntryIndex(self.entries, widget) ~= nil
 end
 
-function Navigation.new(ui_manager, options)
-    options = options or {}
+function Navigation.new(ui_manager)
     return setmetatable({
         ui_manager = ui_manager,
         entries = {},
         closing_widgets = {},
-        on_close_current = options.onCloseCurrent,
     }, Navigator)
 end
 

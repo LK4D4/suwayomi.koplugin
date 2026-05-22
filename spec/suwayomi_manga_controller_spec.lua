@@ -283,8 +283,8 @@ local function installController(options)
     function plugin:pluralize(value, singular, plural)
         return value == 1 and singular or plural
     end
-    function plugin:trackSuwayomiScreen(route_id, widget)
-        table.insert(state.tracked_screens, { route_id = route_id, widget = widget })
+    function plugin:trackSuwayomiScreen(route_id, widget, screen_options)
+        table.insert(state.tracked_screens, { route_id = route_id, widget = widget, options = screen_options })
     end
     function plugin:showLibrary()
         state.opened_library = true
@@ -398,6 +398,7 @@ describe("suwayomi/manga/controller", function()
         assert.is_function(state.manga_information_options.onAction)
         assert.are.equal("manga-information", state.tracked_screens[1].route_id)
         assert.are.equal("manga-information", state.tracked_screens[1].widget.name)
+        assert.is_nil(state.tracked_screens[1].options)
 
         state.manga_information_options.onAction({ id = "open_chapters" })
 
