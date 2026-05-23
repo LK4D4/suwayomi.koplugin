@@ -293,6 +293,9 @@ describe("suwayomi plugin", function()
             cancelMangaNetworkRequests = function(self)
                 self.manga_cancel_saw_closing = self.suwayomi_plugin_closing == true
             end,
+            cancelPendingReadSync = function(self)
+                self.read_sync_cancel_saw_closing = self.suwayomi_plugin_closing == true
+            end,
             cancelSourceFetchWorker = function(self)
                 self.source_fetch_cancel_saw_closing = self.suwayomi_plugin_closing == true
             end,
@@ -318,6 +321,7 @@ describe("suwayomi plugin", function()
         assert.is_true(plugin.reader_return_cancel_saw_closing)
         assert.is_true(plugin.manga_cancel_saw_closing)
         assert.is_true(plugin.client.library_cancel_saw_closing)
+        assert.is_true(plugin.read_sync_cancel_saw_closing)
         assert.is_true(plugin.source_fetch_cancel_saw_closing)
         assert.is_true(plugin.extension_cancel_saw_closing)
         assert.is_true(close_callback_saw_closing)

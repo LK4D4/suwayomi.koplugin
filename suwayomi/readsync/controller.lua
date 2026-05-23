@@ -94,6 +94,9 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
             return SuwayomiReadSyncWorker:readResult(path)
         end,
         on_finish = function(finished_active, result)
+            if finished_active and finished_active.canceled then
+                return
+            end
             local synced, attempted = self:applyPendingReadSyncResult(finished_active, result)
             self:finishPendingReadSync(finished_active, synced, attempted)
         end,
@@ -112,6 +115,21 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
         return false, #batch
     end
     return true, #batch
+end
+
+function Methods:cancelPendingReadSync()
+    self.pending_read_sync_generation = (self.pending_read_sync_generation or 0) + 1
+    self.pending_read_sync_scheduled = nil
+    local active = self.pending_read_sync_active
+    if not active then
+        return false
+    end
+    active.canceled = true
+    self.pending_read_sync_active = nil
+    if SubprocessJob.cancel then
+        SubprocessJob.cancel(active)
+    end
+    return true
 end
 
 
@@ -209,12 +227,17 @@ function Methods:schedulePendingReadSync(credentials, delay_seconds)
     end
 
     self.pending_read_sync_scheduled = true
+    local scheduled_generation = self.pending_read_sync_generation or 0
     SuwayomiDebug.log({
         operation = "schedulePendingReadSync",
         event = "scheduled",
         delay_seconds = delay_seconds or self.read_sync_delay_seconds,
     })
     UIManager:scheduleIn(delay_seconds or self.read_sync_delay_seconds, function()
+        if scheduled_generation ~= (self.pending_read_sync_generation or 0) then
+            self.pending_read_sync_scheduled = false
+            return
+        end
         self.pending_read_sync_scheduled = false
         if self.pending_read_sync_active then
             return

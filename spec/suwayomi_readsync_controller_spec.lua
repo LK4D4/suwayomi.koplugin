@@ -372,6 +372,42 @@ describe("suwayomi/readsync/controller", function()
         assert.is_true(plugin:startPendingReadSyncWorker(nil, 1))
     end)
 
+    it("cancels active and scheduled read sync on plugin close without clearing pending ledger state", function()
+        local controller, state = installController()
+        local canceled = {}
+        package.loaded["suwayomi/subprocess/job"].cancel = function(active)
+            table.insert(canceled, active)
+            active.canceled = true
+        end
+        local plugin = buildPlugin(controller, {
+            ledger = {
+                ["m1:c1"] = {
+                    manga_id = "m1",
+                    chapter_id = "c1",
+                    read = true,
+                    pending_read_sync = true,
+                    pending_read_state = true,
+                },
+            },
+        })
+
+        assert.is_true(plugin:startPendingReadSyncWorker(nil, 1))
+        local active = plugin.pending_read_sync_active
+        plugin:schedulePendingReadSync(nil, 5)
+
+        assert.is_true(plugin:cancelPendingReadSync({ close = true }))
+
+        assert.are.same({ active }, canceled)
+        assert.is_nil(plugin.pending_read_sync_active)
+        assert.is_nil(plugin.pending_read_sync_scheduled)
+        assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
+
+        state.scheduled[#state.scheduled].callback()
+
+        assert.is_nil(plugin.pending_read_sync_active)
+        assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
+    end)
+
     it("batches pending work and backs off failed worker starts", function()
         local attempts = 0
         local controller, state = installController({

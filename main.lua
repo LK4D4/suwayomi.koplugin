@@ -163,6 +163,9 @@ function SuwayomiPlugin:closeSuwayomiPlugin()
         if self.cancelExtensionWorker then
             self:cancelExtensionWorker()
         end
+        if self.cancelPendingReadSync then
+            self:cancelPendingReadSync({ close = true })
+        end
         if self.suwayomi_navigation then
             self.suwayomi_navigation:closeAll()
         end
