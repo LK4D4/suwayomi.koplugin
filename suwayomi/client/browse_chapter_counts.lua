@@ -6,6 +6,7 @@
 -- External data: validated by the moved methods before UI rendering or worker use.
 
 local M = {}
+local CHAPTER_COUNT_TIMEOUT_ERROR = "Chapter count timed out; open manga to load chapters"
 
 local function getChapterCountCacheKey(manga)
     if type(manga) ~= "table" or manga.id == nil then
@@ -103,7 +104,7 @@ function SuwayomiClient:applyBrowseChapterCountResult(manga, result)
         manga.chapter_count_verified = true
         manga.chapter_count_error = nil
     else
-        manga.chapter_count_error = true
+        manga.chapter_count_error = result and result.error or true
     end
 end
 
@@ -163,7 +164,7 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
                         self:releaseBrowseChapterCountJob(state, timed_out_active)
                         self:applyBrowseChapterCountResult(timed_out_active.manga, {
                             ok = false,
-                            error = self:translate("Could not load chapters."),
+                            error = self:translate(CHAPTER_COUNT_TIMEOUT_ERROR),
                         })
                         if state.refresh then
                             state.refresh()

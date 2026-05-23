@@ -1923,7 +1923,10 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal("m1", started[1].manga_id)
         started[1].on_timeout(started[1])
 
-        assert.is_true(updated_manga[#updated_manga].first_error)
+        assert.are.equal(
+            "Chapter count timed out; open manga to load chapters",
+            updated_manga[#updated_manga].first_error
+        )
         assert.is_not_nil(started[2])
         assert.are.equal("m2", started[2].manga_id)
         assert.is_true(updated_manga[#updated_manga].second_loading)

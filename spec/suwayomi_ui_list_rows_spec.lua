@@ -54,6 +54,17 @@ describe("suwayomi/ui/list_rows", function()
         }))
     end)
 
+    it("shows chapter-count timeout guidance when browse count loading fails", function()
+        local rows = require("suwayomi/ui/list_rows")
+
+        assert.are.equal(
+            "Chapter count timed out; open manga to load chapters",
+            rows.getMangaMandatory({
+                chapter_count_error = "Chapter count timed out; open manga to load chapters",
+            })
+        )
+    end)
+
     it("uses source names as manga secondary row text", function()
         local rows = require("suwayomi/ui/list_rows")
 

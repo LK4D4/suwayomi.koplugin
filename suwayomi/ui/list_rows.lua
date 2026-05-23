@@ -49,7 +49,9 @@ function ListRows.getMangaMandatory(manga, options)
     end
     if type(manga) == "table" then
         local chapter_count
-        if manga.chapter_count_loading == true then
+        if type(manga.chapter_count_error) == "string" and manga.chapter_count_error ~= "" then
+            chapter_count = manga.chapter_count_error
+        elseif manga.chapter_count_loading == true then
             chapter_count = _("Checking chapters")
         elseif manga.chapter_count_verified == true and tonumber(manga.chapter_count) == 0 then
             chapter_count = "0 " .. _("chapters")
