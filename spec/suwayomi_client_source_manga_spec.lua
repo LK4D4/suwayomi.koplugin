@@ -1809,7 +1809,7 @@ describe("suwayomi/client source manga flows", function()
         })
         local first = { id = "m1", title = "Riverside Dust", chapter_count = 0 }
         local state = client:startBrowseChapterCountEnrichment(
-            { server_url = "https://random.example" },
+            { server_url = "https://suwayomi.example" },
             { first },
             function() end
         )
@@ -1934,6 +1934,43 @@ describe("suwayomi/client source manga flows", function()
         started[1].on_cleanup(started[1])
 
         assert.are.equal(2, #started)
+    end)
+
+    it("clears stale browse chapter count errors when retrying the same manga", function()
+        local subprocess_job, started = buildChapterCountSubprocessFake()
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            chapter_count_worker = {},
+            ffi_util = {},
+            ui_manager = {},
+            chapter_count_max_active = 1,
+            ui = {
+                updateMangaMenu = function() end,
+            },
+        })
+        local manga = { id = "m1", title = "Retry Count", chapter_count = 0 }
+        local state = client:startBrowseChapterCountEnrichment(
+            { server_url = "https://random.example" },
+            { manga },
+            function() end
+        )
+
+        started[1].on_timeout(started[1])
+
+        assert.are.equal(
+            "Chapter count timed out; open manga to load chapters",
+            manga.chapter_count_error
+        )
+        assert.is_nil(manga.chapter_count_loading)
+
+        manga.chapter_count = 0
+        manga.chapter_count_verified = nil
+        client:appendBrowseChapterCountManga(state, { manga })
+
+        assert.are.equal(2, #started)
+        assert.are.equal("m1", started[2].manga_id)
+        assert.is_true(manga.chapter_count_loading)
+        assert.is_nil(manga.chapter_count_error)
     end)
 
     it("cancels stale browse chapter counts when changing result pages", function()

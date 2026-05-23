@@ -119,6 +119,7 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
         if not self:applyBrowseChapterCountCache(manga, state.cache)
             and self:shouldFetchBrowseChapterCount(manga)
         then
+            manga.chapter_count_error = nil
             manga.chapter_count_loading = true
             if state.refresh then
                 state.refresh()
