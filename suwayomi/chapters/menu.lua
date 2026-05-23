@@ -109,8 +109,12 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
             end
             if metadata_finished or history_read then
                 item.is_read = true
+                if chapter.is_read ~= true then
+                    chapter.is_read = true
+                end
                 if item._suwayomi_is_read ~= true then
                     item.pending_read_sync = true
+                    chapter.pending_read_sync = true
                 end
             end
             if chapter_exists and item.is_read == true and not metadata_finished then

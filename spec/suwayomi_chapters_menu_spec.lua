@@ -645,4 +645,76 @@ describe("suwayomi/chapters/menu", function()
         assert.are.equal("c2", saved_entries[2].chapter.id)
         assert.are.equal("/downloads/Manga/Chapter 2.cbz", saved_entries[2].path)
     end)
+
+    it("propagates KOReader finished state to backing chapter rows", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        package.loaded["suwayomi/settings"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        local previous_settings_preload = package.preload["suwayomi/settings"]
+        local previous_downloader_preload = package.preload["suwayomi/downloads/downloader"]
+        package.preload["suwayomi/settings"] = function()
+            return {
+                loadDownloadDirectory = function()
+                    return "/downloads"
+                end,
+            }
+        end
+        package.preload["suwayomi/downloads/downloader"] = function()
+            return {
+                getTargetPath = function(_, download_directory, _, chapter)
+                    return nil, download_directory .. "/Manga/" .. chapter.name .. ".cbz"
+                end,
+                chapterExists = function()
+                    return true
+                end,
+            }
+        end
+
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local plugin = {
+            loadKoreaderHistoryPaths = function()
+                return {}
+            end,
+            isChapterPathFinishedInKoreader = function(_, path)
+                return path == "/downloads/Manga/Chapter 1.cbz"
+            end,
+            setKoreaderChapterReadState = function() end,
+            upsertChapterLedgerEntry = function() end,
+            getChapterDownloadStatus = function()
+                return nil
+            end,
+            isChapterSelected = function()
+                return false
+            end,
+            getDownloadQueue = function()
+                return {
+                    formatChapterMenuStatus = function(_, chapter, status)
+                        if status and status.state == "downloaded" then
+                            return chapter.is_read == true and "Read · Downloaded" or "Downloaded"
+                        end
+                        return status and status.state or nil
+                    end,
+                }
+            end,
+        }
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+        local chapters = {
+            { id = "c1", name = "Chapter 1", is_read = false, _suwayomi_is_read = false },
+            { id = "c2", name = "Chapter 2", is_read = false, _suwayomi_is_read = false },
+        }
+
+        local items = plugin:buildChapterMenuItems({ id = "m1" }, chapters)
+        package.preload["suwayomi/settings"] = previous_settings_preload
+        package.preload["suwayomi/downloads/downloader"] = previous_downloader_preload
+        package.loaded["suwayomi/settings"] = nil
+        package.loaded["suwayomi/downloads/downloader"] = nil
+
+        assert.is_true(items[1].is_read)
+        assert.is_true(chapters[1].is_read)
+        assert.is_true(chapters[1].pending_read_sync)
+        assert.is_false(chapters[2].is_read)
+    end)
 end)

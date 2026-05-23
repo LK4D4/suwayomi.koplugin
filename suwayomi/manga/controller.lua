@@ -366,6 +366,9 @@ function Methods:showChapterResultForManga(manga, result, options)
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("chapters", chapter_menu)
     end
+    if self.applyMangaKeepNextUnreadDownloadsPolicy then
+        self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
+    end
     return true
 end
 
