@@ -157,6 +157,12 @@ function SuwayomiPlugin:closeSuwayomiPlugin()
         if self.client and self.client.cancelLibraryNetworkRequests then
             self.client:cancelLibraryNetworkRequests()
         end
+        if self.cancelSourceFetchWorker then
+            self:cancelSourceFetchWorker()
+        end
+        if self.cancelExtensionWorker then
+            self:cancelExtensionWorker()
+        end
         if self.suwayomi_navigation then
             self.suwayomi_navigation:closeAll()
         end

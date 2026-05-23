@@ -135,8 +135,25 @@ function Methods:startSourceFetchWorker(credentials, options)
     return active ~= nil
 end
 
+function Methods:cancelSourceFetchWorker()
+    local active = self.source_fetch_active
+    if not active then
+        return false
+    end
+    active.canceled = true
+    self.source_fetch_active = nil
+    self:closeLoadingMessage(active.loading_message)
+    if SubprocessJob.cancel then
+        SubprocessJob.cancel(active)
+    end
+    return true
+end
+
 
 function Methods:finishSourceFetch(active, result)
+    if active and active.canceled then
+        return false
+    end
     self.source_fetch_active = nil
     self:closeLoadingMessage(active and active.loading_message)
     if not credentialsMatch(active and active.credentials, SuwayomiSettings:load()) then

@@ -83,22 +83,24 @@ local function loadExtensions(options)
     return require("suwayomi/browse/extensions")
 end
 
-local function loadExtensionsWithSubprocessStub(onStart, options)
+local function loadExtensionsWithSubprocessStub(onStart, options, subprocess_overrides)
     resetModules()
     stubDependencies(options)
+    subprocess_overrides = subprocess_overrides or {}
     package.preload["suwayomi/subprocess/job"] = function()
         return {
-            buildResultPath = function()
+            buildResultPath = subprocess_overrides.buildResultPath or function()
                 return "/settings/extensions.json"
             end,
-            start = function(start_options)
+            start = subprocess_overrides.start or function(start_options)
                 if onStart then
                     onStart(start_options)
                 end
                 return start_options.active
             end,
-            schedulePoll = function() end,
-            poll = function() end,
+            cancel = subprocess_overrides.cancel,
+            schedulePoll = subprocess_overrides.schedulePoll or function() end,
+            poll = subprocess_overrides.poll or function() end,
         }
     end
     return require("suwayomi/browse/extensions")
@@ -437,6 +439,37 @@ describe("suwayomi/browse/extensions", function()
         assert.is_true(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
             action = "fetch",
         }))
+    end)
+
+    it("cancels extension workers and ignores late completions after plugin close", function()
+        local started_options
+        local canceled = {}
+        local controller = buildController(loadExtensionsWithSubprocessStub(function(options)
+            started_options = options
+        end, nil, {
+            cancel = function(active)
+                table.insert(canceled, active)
+                active.canceled = true
+            end,
+        }))
+        local rendered = false
+        controller.showFetchedExtensions = function()
+            rendered = true
+        end
+
+        assert.is_true(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, { action = "fetch" }))
+        assert.is_true(controller:cancelExtensionWorker())
+        assert.are.equal(1, #canceled)
+        assert.is_nil(controller.extension_worker_active)
+
+        controller:finishExtensionWorker(started_options.active, {
+            ok = true,
+            extensions = {
+                { pkg_name = "pkg.late", name = "Late Extension" },
+            },
+        })
+
+        assert.is_false(rendered)
     end)
 
     it("drops stale extension worker results after credentials change", function()
