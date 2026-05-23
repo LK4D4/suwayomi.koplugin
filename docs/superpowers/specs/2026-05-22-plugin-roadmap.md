@@ -49,7 +49,12 @@ The current README names these missing areas:
 
 Goal: make the existing plugin hard to wedge before adding larger parity work.
 
-Candidate work:
+Status: Implemented. Next implementors should treat Priority 1 as complete
+unless device QA or regressions reopen a specific item. See the reusable
+checklist in `docs/qa/stability-recovery-golden-flow.md` and the coverage map
+in `docs/superpowers/audits/2026-05-23-stability-recovery.md`.
+
+Completed work:
 
 - Add a manual golden-flow QA checklist for:
   - setup and connection test
