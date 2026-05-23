@@ -154,6 +154,9 @@ function SuwayomiPlugin:closeSuwayomiPlugin()
         if self.cancelMangaNetworkRequests then
             self:cancelMangaNetworkRequests()
         end
+        if self.client and self.client.cancelLibraryNetworkRequests then
+            self.client:cancelLibraryNetworkRequests()
+        end
         if self.suwayomi_navigation then
             self.suwayomi_navigation:closeAll()
         end

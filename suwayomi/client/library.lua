@@ -94,6 +94,22 @@ function SuwayomiClient:startLibraryNetworkRequest(credentials, request, loading
     return true
 end
 
+function SuwayomiClient:cancelLibraryNetworkRequests()
+    local active_requests = self.active_library_network_requests
+    if not active_requests then
+        return
+    end
+
+    local request_job = self:getNetworkRequestJob()
+    for slot_key, request_token in pairs(active_requests) do
+        active_requests[slot_key] = nil
+        if request_token.active and request_job.cancel then
+            request_job.cancel(request_token.active)
+        end
+    end
+    self.active_library_network_requests = nil
+end
+
 function SuwayomiClient:showLibraryMangaResult(category, credentials, result)
     if not result then
         return

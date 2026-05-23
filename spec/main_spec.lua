@@ -300,12 +300,18 @@ describe("suwayomi plugin", function()
                 close_callback_saw_closing = plugin.suwayomi_plugin_closing == true
             end,
         }
+        plugin.client = {
+            cancelLibraryNetworkRequests = function(self)
+                self.library_cancel_saw_closing = plugin.suwayomi_plugin_closing == true
+            end,
+        }
 
         plugin:trackSuwayomiScreen("chapters", chapter_menu)
         plugin:closeSuwayomiPlugin()
 
         assert.is_true(plugin.reader_return_cancel_saw_closing)
         assert.is_true(plugin.manga_cancel_saw_closing)
+        assert.is_true(plugin.client.library_cancel_saw_closing)
         assert.is_true(close_callback_saw_closing)
         assert.is_nil(plugin.suwayomi_plugin_closing)
     end)

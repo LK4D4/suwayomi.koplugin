@@ -491,4 +491,50 @@ describe("suwayomi/client library flows", function()
 
         assert.are.equal("New Manga", shown_manga[1].title)
     end)
+
+    it("cancels active library requests and ignores late completions", function()
+        local requests = {}
+        local canceled = {}
+        local shown_manga
+        local client = newClient({
+            network_request_job = {
+                start = function(options)
+                    table.insert(requests, options)
+                    return {
+                        pid = #requests,
+                        on_cancel = options.on_cancel,
+                    }
+                end,
+                cancel = function(active)
+                    table.insert(canceled, active)
+                    if active.on_cancel then
+                        active.on_cancel()
+                    end
+                end,
+            },
+            ui = {
+                showLibraryMangaMenu = function(manga)
+                    shown_manga = manga
+                    return { name = "library-menu" }
+                end,
+            },
+        })
+
+        assert.is_true(client:showLibraryManga(nil))
+        assert.are.equal(1, #requests)
+
+        client:cancelLibraryNetworkRequests()
+
+        assert.are.equal(1, #canceled)
+        assert.is_nil(client.active_library_network_requests)
+
+        requests[1].on_finish({
+            ok = true,
+            manga = {
+                { id = "late", title = "Late Manga" },
+            },
+        })
+
+        assert.is_nil(shown_manga)
+    end)
 end)
