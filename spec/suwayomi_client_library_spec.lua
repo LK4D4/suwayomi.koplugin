@@ -441,6 +441,27 @@ describe("suwayomi/client library flows", function()
         assert.are.equal("This category has no manga.", state.shown_messages[#state.shown_messages])
     end)
 
+    it("uses action-aware timeout feedback for library loads", function()
+        local requests = {}
+        local client = newClient({
+            network_request_job = {
+                start = function(options)
+                    table.insert(requests, options)
+                    return { pid = #requests }
+                end,
+                cancel = function() end,
+            },
+            ui = {},
+        })
+
+        assert.is_true(client:showLibrary())
+
+        assert.are.equal(
+            "Library loading timed out. Check your connection, then open Library again.",
+            requests[1].timeout_message
+        )
+    end)
+
     it("ignores stale library manga loads when a newer category wins", function()
         local requests = {}
         local canceled = {}

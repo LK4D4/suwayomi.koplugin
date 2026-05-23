@@ -47,6 +47,10 @@ function SuwayomiClient:buildLibraryCategoryChoices(categories)
     return choices
 end
 
+local function libraryTimeoutMessage(client)
+    return client:translate("Library loading timed out. Check your connection, then open Library again.")
+end
+
 function SuwayomiClient:startLibraryNetworkRequest(credentials, request, loading_message, on_finish)
     local active_requests = self.active_library_network_requests or {}
     self.active_library_network_requests = active_requests
@@ -66,7 +70,7 @@ function SuwayomiClient:startLibraryNetworkRequest(credentials, request, loading
         loading_message = loading_message,
         result_prefix = "library_request",
         timeout_seconds = self:getNetworkRequestTimeoutSeconds(),
-        timeout_message = self:translate("Could not load library."),
+        timeout_message = libraryTimeoutMessage(self),
         on_cancel = function()
             if active_requests[slot_key] == request_token then
                 active_requests[slot_key] = nil
