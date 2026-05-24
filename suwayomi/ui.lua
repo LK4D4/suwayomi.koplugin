@@ -10,7 +10,7 @@
 local ButtonDialog = require("ui/widget/buttondialog")
 local ConfirmBox = require("ui/widget/confirmbox")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 
 local BrowseUI = require("suwayomi/ui/browse")
 local ChoiceDialogs = require("suwayomi/ui/choice_dialogs")
@@ -66,7 +66,7 @@ end
 function SuwayomiUI.showSettingsMenu(items, options)
     options = options or {}
     local menu = getListMenu().show({
-        title = _("Suwayomi Settings"),
+        title = I18n.t("Suwayomi Settings"),
         title_bar_left_icon = options.title_bar_left_icon,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
         on_title_bar_left_hold = options.on_title_bar_left_hold,
@@ -94,7 +94,7 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
     end
 
     local menu_options = {
-        title = options.title or _("Suwayomi Chapters"),
+        title = options.title or I18n.t("Suwayomi Chapters"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback),
         fixed_item_heights = true,
@@ -162,7 +162,7 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
     end
 
     dialog = ButtonDialog:new{
-        title = options.title or _("Suwayomi"),
+        title = options.title or I18n.t("Suwayomi"),
         buttons = buttons,
     }
     UIManager:show(dialog)
@@ -204,7 +204,7 @@ local function buildBackActionButton(options, dialogProvider, UIManager)
     end
     return {
         id = "back",
-        text = "< " .. _("Back"),
+        text = "< " .. I18n.t("Back"),
         callback = function()
             local function goBack()
                 options.on_back()
@@ -283,7 +283,7 @@ function SuwayomiUI.showActionMenu(options, onSelectCallback)
     options = options or {}
 
     dialog = ButtonDialog:new{
-        title = options.title or _("Actions"),
+        title = options.title or I18n.t("Actions"),
         buttons = buildActionMenuButtons(options, function()
             return dialog
         end, UIManager, onSelectCallback),
@@ -296,7 +296,7 @@ end
 
 function SuwayomiUI.showChapterActionsMenu(options, onSelectCallback)
     options = options or {}
-    options.title = options.title or _("Chapter actions")
+    options.title = options.title or I18n.t("Chapter actions")
     options.vertical = true
     options.destructive_actions_at_bottom = true
     return SuwayomiUI.showActionMenu(options, onSelectCallback)
@@ -304,7 +304,7 @@ end
 
 function SuwayomiUI.showMangaActionsMenu(options, onSelectCallback)
     options = options or {}
-    options.title = options.title or _("Manga actions")
+    options.title = options.title or I18n.t("Manga actions")
     options.vertical = true
     options.destructive_actions_at_bottom = true
     return SuwayomiUI.showActionMenu(options, onSelectCallback)
@@ -374,7 +374,7 @@ function SuwayomiUI.buildLanguageMenuTable(options, onToggleCallback)
 
     if options.show_done ~= false then
         table.insert(menu_table, {
-            text = _("Done"),
+            text = I18n.t("Done"),
             callback = function()
                 if options.onClose then
                     options.onClose()
@@ -410,7 +410,7 @@ function SuwayomiUI.showLanguageMenu(options)
     end
 
     return SuwayomiUI.showChecklistDialog({
-        title = options.title or _("Suwayomi source languages"),
+        title = options.title or I18n.t("Suwayomi source languages"),
         choices = choices,
         anchor = options.anchor,
         isSelected = function(_, choice)
@@ -431,9 +431,9 @@ end
 
 local function buildLibraryCategoryPickerBehaviorChoices(choices)
     local labels = {
-        automatic = _("Automatic"),
-        always = _("Always ask"),
-        never = _("Never ask"),
+        automatic = I18n.t("Automatic"),
+        always = I18n.t("Always ask"),
+        never = I18n.t("Never ask"),
     }
 
     local dialog_choices = {}
@@ -449,12 +449,12 @@ end
 
 local function buildDeleteFinishedWhileReadingChoices(choices)
     local labels = {
-        [0] = _("Disabled"),
-        [1] = _("Last read chapter"),
-        [2] = _("Second to last read chapter"),
-        [3] = _("Third to last read chapter"),
-        [4] = _("Fourth to last read chapter"),
-        [5] = _("Fifth to last read chapter"),
+        [0] = I18n.t("Disabled"),
+        [1] = I18n.t("Last read chapter"),
+        [2] = I18n.t("Second to last read chapter"),
+        [3] = I18n.t("Third to last read chapter"),
+        [4] = I18n.t("Fourth to last read chapter"),
+        [5] = I18n.t("Fifth to last read chapter"),
     }
 
     local dialog_choices = {}
@@ -483,7 +483,7 @@ end
 function SuwayomiUI.showParallelDownloadsMenu(options)
     options = options or {}
     return ChoiceDialogs.showChoiceDialog({
-        title = _("Parallel chapter downloads"),
+        title = I18n.t("Parallel chapter downloads"),
         current = tonumber(options.current) or 2,
         choices = buildParallelDownloadChoices(options.choices),
         onSelect = options.onSelect,
@@ -495,7 +495,7 @@ end
 function SuwayomiUI.showLibraryCategoryPickerBehaviorMenu(options)
     options = options or {}
     return ChoiceDialogs.showChoiceDialog({
-        title = _("Library category picker"),
+        title = I18n.t("Library category picker"),
         current = options.current or "automatic",
         choices = buildLibraryCategoryPickerBehaviorChoices(options.choices),
         onSelect = options.onSelect,
@@ -507,7 +507,7 @@ end
 function SuwayomiUI.showDeleteFinishedWhileReadingMenu(options)
     options = options or {}
     return ChoiceDialogs.showChoiceDialog({
-        title = _("Delete finished chapters"),
+        title = I18n.t("Delete finished chapters"),
         current = tonumber(options.current) or 0,
         choices = buildDeleteFinishedWhileReadingChoices(options.choices),
         onSelect = options.onSelect,
@@ -526,18 +526,18 @@ function SuwayomiUI.showLoginDialog(options)
     local dialog
 
     dialog = MultiInputDialog:new{
-        title = _("Suwayomi login"),
+        title = I18n.t("Suwayomi login"),
         fields = {
             {
-                hint = _("Server URL"),
+                hint = I18n.t("Server URL"),
                 text = credentials.server_url or "",
             },
             {
-                hint = _("Username"),
+                hint = I18n.t("Username"),
                 text = credentials.username or "",
             },
             {
-                hint = _("Password"),
+                hint = I18n.t("Password"),
                 text = credentials.password or "",
                 text_type = "password",
             },
@@ -545,14 +545,14 @@ function SuwayomiUI.showLoginDialog(options)
         buttons = {
             {
                 {
-                    text = _("Cancel"),
+                    text = I18n.t("Cancel"),
                     id = "close",
                     callback = function()
                         UIManager:close(dialog)
                     end,
                 },
                 {
-                    text = _("Save"),
+                    text = I18n.t("Save"),
                     is_enter_default = true,
                     callback = function()
                         local fields = dialog:getFields()
@@ -587,12 +587,12 @@ end
 
 local function formatOnboardingConnectionTitle(status)
     local suffixes = {
-        testing = _("testing..."),
-        passed = _("tested"),
-        failed = _("failed"),
-        untested = _("not tested"),
+        testing = I18n.t("testing..."),
+        passed = I18n.t("tested"),
+        failed = I18n.t("failed"),
+        untested = I18n.t("not tested"),
     }
-    return _("Suwayomi setup: connection") .. " (" .. (suffixes[status] or suffixes.untested) .. ")"
+    return I18n.t("Suwayomi setup: connection") .. " (" .. (suffixes[status] or suffixes.untested) .. ")"
 end
 
 function SuwayomiUI.updateOnboardingConnectionDialogStatus(dialog, status)
@@ -641,15 +641,15 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
         title = formatOnboardingConnectionTitle(options.connection_status),
         fields = {
             {
-                hint = _("Server URL"),
+                hint = I18n.t("Server URL"),
                 text = credentials.server_url or "",
             },
             {
-                hint = _("Username"),
+                hint = I18n.t("Username"),
                 text = credentials.username or "",
             },
             {
-                hint = _("Password"),
+                hint = I18n.t("Password"),
                 text = credentials.password or "",
                 text_type = "password",
             },
@@ -657,7 +657,7 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
         buttons = {
             {
                 {
-                    text = _("Cancel"),
+                    text = I18n.t("Cancel"),
                     id = "close",
                     callback = function()
                         runClose()
@@ -665,7 +665,7 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
                     end,
                 },
                 {
-                    text = _("Test connection"),
+                    text = I18n.t("Test connection"),
                     callback = function()
                         if options.onTestConnection then
                             options.onTestConnection(getCredentialsFromDialog(dialog))
@@ -675,7 +675,7 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
             },
             {
                 {
-                    text = _("Continue"),
+                    text = I18n.t("Continue"),
                     id = "continue",
                     enabled = canContinue(),
                     enabled_func = canContinue,

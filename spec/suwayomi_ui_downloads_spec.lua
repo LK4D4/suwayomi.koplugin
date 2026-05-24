@@ -11,6 +11,7 @@ describe("suwayomi/ui/downloads", function()
         updated_dialog = nil
 
         package.loaded["suwayomi/ui/downloads"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
         package.loaded.gettext = nil
@@ -76,6 +77,7 @@ describe("suwayomi/ui/downloads", function()
     end)
 
     after_each(function()
+        package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = nil
         package.preload["ui/widget/menu"] = nil
         package.preload["ui/widget/titlebar"] = nil
@@ -149,6 +151,32 @@ describe("suwayomi/ui/downloads", function()
         assert.is_false(rows[2].select_enabled)
         assert.is_false(rows[3].select_enabled)
         assert.is_false(rows[4].select_enabled)
+    end)
+
+    it("routes empty-state labels and queue count fragments through i18n", function()
+        package.preload.gettext = function()
+            return function(text)
+                return "tx:" .. text
+            end
+        end
+        package.loaded.gettext = nil
+        package.loaded["suwayomi/i18n"] = nil
+        package.loaded["suwayomi/ui/downloads"] = nil
+
+        local downloads = require("suwayomi/ui/downloads")
+
+        local rows = downloads.buildDownloadsMenuTable({
+            active = {},
+            queued = {},
+            failed = {},
+        }, {}, {})
+
+        assert.are.equal("tx:Download folder", rows[1].text)
+        assert.are.equal("tx:not set", rows[1].subtitle)
+        assert.are.equal("tx:Queue", rows[2].text)
+        assert.are.equal("tx:0 active, tx:0 queued, tx:0 failed", rows[2].subtitle)
+        assert.are.equal("tx:No downloads queued.", rows[3].text)
+        assert.are.equal("tx:Set a download folder in Settings > Downloads.", rows[4].text)
     end)
 
     it("shows downloads menu and passes the native menu to row callbacks", function()

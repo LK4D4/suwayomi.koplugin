@@ -25,6 +25,7 @@ describe("suwayomi/ui", function()
         }
 
         package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/ui/browse"] = nil
         package.loaded["suwayomi/ui/directory"] = nil
         package.loaded["suwayomi/ui/downloads"] = nil
@@ -76,6 +77,7 @@ describe("suwayomi/ui", function()
                 return text
             end
         end
+        package.preload["suwayomi/i18n"] = nil
 
         package.preload["ui/widget/menu"] = function()
             return {
@@ -536,7 +538,9 @@ describe("suwayomi/ui", function()
     end)
 
     after_each(function()
+        package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = nil
+        package.preload["suwayomi/i18n"] = nil
         package.preload["ui/widget/menu"] = nil
         package.preload["ui/widget/buttondialog"] = nil
         package.preload["ui/widget/confirmbox"] = nil
@@ -1381,6 +1385,29 @@ describe("suwayomi/ui", function()
         shown_dialog.close_callback()
 
         assert.is_true(closed)
+    end)
+
+    it("routes the default action menu title through i18n", function()
+        package.preload["suwayomi/i18n"] = function()
+            return {
+                t = function(text)
+                    return "tx:" .. text
+                end,
+            }
+        end
+        package.loaded.gettext = nil
+        package.loaded["suwayomi/i18n"] = nil
+        package.loaded["suwayomi/ui"] = nil
+
+        local ui = require("suwayomi/ui")
+
+        ui.showActionMenu({
+            actions = {
+                { id = "home", text = "Suwayomi home" },
+            },
+        })
+
+        assert.are.equal("tx:Actions", shown_dialog.title)
     end)
 
     it("honors explicit action menu columns", function()

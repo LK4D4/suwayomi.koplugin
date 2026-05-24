@@ -3,11 +3,12 @@
 -- Responsibility: format active, queued, and failed download rows and
 -- wire row callbacks to the downloads controller.
 -- Owned state: none.
--- Dependencies: shared list menu widget, gettext, and shared menu utilities.
+-- Dependencies: shared list menu widget, plugin i18n facade, and shared menu
+-- utilities.
 -- External data: queue snapshots are display-only here; controller actions own
 -- retries, cancellation, deletion, and navigation.
 
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local DownloadsUI = {}
@@ -53,7 +54,7 @@ end
 local function buildMenuOptions(snapshot, callbacks, options)
     options = options or {}
     return {
-        title = options.title or _("Suwayomi Downloads"),
+        title = options.title or I18n.t("Suwayomi Downloads"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options),
         close_callback = options.close_callback,
@@ -69,29 +70,29 @@ local function appendEmptyStateRows(menu_table, snapshot, options)
     local folder = options.download_directory_summary
     local has_folder = folder and folder ~= ""
     if not has_folder then
-        folder = _("not set")
+        folder = I18n.t("not set")
     end
 
     table.insert(menu_table, {
-        text = _("Download folder"),
+        text = I18n.t("Download folder"),
         subtitle = folder,
         select_enabled = false,
     })
     table.insert(menu_table, {
-        text = _("Queue"),
-        subtitle = tostring(active_count) .. " active, "
-            .. tostring(queued_count) .. " queued, "
-            .. tostring(failed_count) .. " failed",
+        text = I18n.t("Queue"),
+        subtitle = I18n.count(active_count, "%1 active", "%1 active")
+            .. ", " .. I18n.count(queued_count, "%1 queued", "%1 queued")
+            .. ", " .. I18n.count(failed_count, "%1 failed", "%1 failed"),
         select_enabled = false,
     })
     table.insert(menu_table, {
-        text = _("No downloads queued."),
+        text = I18n.t("No downloads queued."),
         select_enabled = false,
     })
     table.insert(menu_table, {
         text = has_folder
-            and string.format(_("Downloaded chapters are in %s."), folder)
-            or _("Set a download folder in Settings > Downloads."),
+            and I18n.f("Downloaded chapters are in %1.", folder)
+            or I18n.t("Set a download folder in Settings > Downloads."),
         select_enabled = false,
     })
 end
@@ -109,7 +110,9 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
 
     for _, job in ipairs(snapshot.active or {}) do
         local progress = formatDownloadProgress(job)
-        local prefix = progress ~= "" and ("Downloading " .. progress) or "Downloading"
+        local prefix = progress ~= ""
+            and I18n.f("Downloading %1", progress)
+            or I18n.t("Downloading")
         table.insert(menu_table, {
             text = formatDownloadJobLabel(job),
             mandatory = prefix,
@@ -119,7 +122,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
         })
     end
 
-    local queued_label = _("Queued")
+    local queued_label = I18n.t("Queued")
     for _, job in ipairs(snapshot.queued or {}) do
         table.insert(menu_table, {
             text = formatDownloadJobLabel(job),
@@ -132,7 +135,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
         })
     end
 
-    local failed_label = _("Failed")
+    local failed_label = I18n.t("Failed")
     for _, job in ipairs(snapshot.failed or {}) do
         table.insert(menu_table, {
             text = formatDownloadJobLabel(job),
@@ -150,7 +153,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
 
     if #(snapshot.failed or {}) > 0 then
         table.insert(menu_table, {
-            text = _("Clear failed"),
+            text = I18n.t("Clear failed"),
             callback = function(menu)
                 if callbacks.onClearFailed then
                     callbacks.onClearFailed(menu)

@@ -2,12 +2,12 @@
 --
 -- Responsibility: build small KOReader ButtonDialog-based option surfaces.
 -- Owned state: none; callbacks own persistence and parent refresh behavior.
--- Dependencies: KOReader ButtonDialog/UIManager and gettext.
+-- Dependencies: KOReader ButtonDialog/UIManager and plugin i18n facade.
 -- External data: labels and values are caller-provided display data.
 
 local ButtonDialog = require("ui/widget/buttondialog")
 local UIManager = require("ui/uimanager")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 
 local ChoiceDialogs = {}
 
@@ -73,7 +73,7 @@ function ChoiceDialogs.showChoiceDialog(options)
     end
 
     dialog = ButtonDialog:new{
-        title = options.title or _("Choose"),
+        title = options.title or I18n.t("Choose"),
         buttons = buttons,
         anchor = options.anchor,
         close_callback = options.close_callback,
@@ -111,7 +111,7 @@ function ChoiceDialogs.showChecklistDialog(options)
 
     table.insert(buttons, {
         {
-            text = _("Done"),
+            text = I18n.t("Done"),
             callback = function()
                 closeThen(function()
                     return dialog
@@ -121,7 +121,7 @@ function ChoiceDialogs.showChecklistDialog(options)
     })
 
     dialog = ButtonDialog:new{
-        title = options.title or _("Choose"),
+        title = options.title or I18n.t("Choose"),
         buttons = buttons,
         anchor = options.anchor,
         close_callback = options.close_callback,
