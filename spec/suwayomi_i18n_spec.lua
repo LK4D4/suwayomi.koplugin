@@ -3,6 +3,8 @@ package.path = "?.lua;" .. package.path
 describe("suwayomi/i18n", function()
     local loader_list_name = rawget(package, "searchers") and "searchers" or "loaders"
     local injected_loader_count = 0
+    local function_metatable
+    local function_metatable_saved = false
 
     before_each(function()
         package.loaded["suwayomi/i18n"] = nil
@@ -14,6 +16,11 @@ describe("suwayomi/i18n", function()
         package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = nil
         package.preload["ffi/util"] = nil
+        if function_metatable_saved then
+            debug.setmetatable(function() end, function_metatable)
+            function_metatable = nil
+            function_metatable_saved = false
+        end
         local loaders = package[loader_list_name]
         for _ = 1, injected_loader_count do
             table.remove(loaders, 1)
@@ -33,6 +40,10 @@ describe("suwayomi/i18n", function()
         package.preload.gettext = function()
             local gettext = function(text)
                 return prefix .. tostring(text)
+            end
+            if not function_metatable_saved then
+                function_metatable = debug.getmetatable(gettext)
+                function_metatable_saved = true
             end
             debug.setmetatable(gettext, {
                 __index = {
@@ -118,6 +129,15 @@ describe("suwayomi/i18n", function()
 
         assert.are.equal("np:%1 chapters", i18n.n("%1 chapter", "%1 chapters", 2))
         assert.are.equal("np:2 chapters", i18n.count(2, "%1 chapter", "%1 chapters"))
+    end)
+
+    it("does not leak native plural helper into later gettext stubs", function()
+        installGettext("tx:")
+        installTemplate()
+
+        local i18n = require("suwayomi/i18n")
+
+        assert.are.equal("tx:3 chapters", i18n.count(3, "%1 chapter", "%1 chapters"))
     end)
 
     it("joins non-empty labels with a translated separator", function()
