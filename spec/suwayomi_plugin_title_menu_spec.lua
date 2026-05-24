@@ -32,6 +32,8 @@ describe("suwayomi/plugin/title_menu", function()
     after_each(function()
         package.preload.gettext = nil
         package.preload["suwayomi/ui"] = nil
+        package.preload["suwayomi/i18n"] = nil
+        package.loaded["suwayomi/i18n"] = nil
     end)
 
     it("exports title menu methods", function()
@@ -57,6 +59,38 @@ describe("suwayomi/plugin/title_menu", function()
         assert.are.equal("home", actions[1].id)
         assert.are.equal("Suwayomi home", actions[1].text)
         assert.are.equal("refresh", actions[2].id)
+    end)
+
+    it("routes title-bar labels through i18n", function()
+        package.preload.gettext = function()
+            return function(text)
+                return text
+            end
+        end
+        package.preload["suwayomi/i18n"] = function()
+            return {
+                t = function(text)
+                    return "tx:" .. text
+                end,
+            }
+        end
+        package.loaded["suwayomi/plugin/title_menu"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local controller = require("suwayomi/plugin/title_menu")
+        local plugin = {}
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        local actions = plugin:buildTitleBarActions()
+
+        assert.are.equal("tx:Suwayomi home", actions[1].text)
+    end)
+
+    it("cleans marker i18n stubs between tests", function()
+        assert.is_nil(package.preload["suwayomi/i18n"])
+        assert.is_nil(package.loaded["suwayomi/i18n"])
     end)
 
     it("opens title actions from a native burger callback and delegates screen actions", function()

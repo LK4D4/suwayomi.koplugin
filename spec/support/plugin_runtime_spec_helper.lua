@@ -32,6 +32,7 @@ local MODULES_TO_CLEAR = {
     "suwayomi/navigation",
     "suwayomi/settings",
     "suwayomi/debug",
+    "suwayomi/i18n",
     "suwayomi/plugin/home",
     "suwayomi/plugin/settings_controller",
     "suwayomi/reader_return",

@@ -2,7 +2,7 @@
 --
 -- Responsibility: Owns settings menu orchestration and settings dialogs.
 -- Owned state: Accepts persisted settings values and user-selected filesystem paths; values stay normalized through suwayomi/settings.lua.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
@@ -10,9 +10,8 @@ local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local OnboardingConnectionWorker = require("suwayomi/plugin/onboarding_connection_worker")
 local SubprocessJob = require("suwayomi/subprocess/job")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
 
 local SettingsController = {}
 SettingsController.__index = SettingsController
@@ -44,7 +43,7 @@ function Methods:showSettings()
             end,
         })
     end
-    self:showMessage(_("Settings are unavailable."))
+    self:showMessage(I18n.t("Settings are unavailable."))
 end
 
 
@@ -62,7 +61,7 @@ function Methods:showLoginDialog(touchmenu_instance)
             SuwayomiSettings:save(credentials)
             self:refreshSettingsMenu(touchmenu_instance)
             UIManager:nextTick(function()
-                self:showMessage(_("Suwayomi login settings saved."))
+                self:showMessage(I18n.t("Suwayomi login settings saved."))
             end)
         end,
     })
@@ -116,7 +115,7 @@ end
 function Methods:startOnboardingConnectionTest(credentials, options)
     options = options or {}
     if self.onboarding_connection_test_active then
-        self:showMessage(_("Connection test already running."))
+        self:showMessage(I18n.t("Connection test already running."))
         return false
     end
 
@@ -128,7 +127,7 @@ function Methods:startOnboardingConnectionTest(credentials, options)
     local active = {
         credentials = credentials,
         result_path = self:getOnboardingConnectionResultPath(),
-        loading_message = self:showLoadingMessage(_("Testing Suwayomi connection...")),
+        loading_message = self:showLoadingMessage(I18n.t("Testing Suwayomi connection...")),
         show_continue_message = options.show_continue_message ~= false,
         update_dialog = update_dialog,
     }
@@ -153,7 +152,7 @@ function Methods:startOnboardingConnectionTest(credentials, options)
             if timed_out_active and timed_out_active.update_dialog ~= false then
                 SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
             end
-            self:showMessage(_("Suwayomi connection test timed out."))
+            self:showMessage(I18n.t("Suwayomi connection test timed out."))
             if timed_out_active then
                 timed_out_active.canceled = true
             end
@@ -164,7 +163,7 @@ function Methods:startOnboardingConnectionTest(credentials, options)
             if active.update_dialog then
                 SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
             end
-            self:showMessage(T(_("Could not start connection test: %1"), err or _("unknown error")))
+            self:showMessage(I18n.f("Could not start connection test: %1", err or I18n.t("unknown error")))
         end,
     })
     self.onboarding_connection_test_active = active and not active.cleaned and active or nil
@@ -183,18 +182,18 @@ function Methods:finishOnboardingConnectionTest(active, result)
         if active and active.update_dialog ~= false then
             SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "passed")
         end
-        local message = result.message or _("Connection test passed.")
+        local message = result.message or I18n.t("Connection test passed.")
         if active and active.show_continue_message == false then
             self:showMessage(message)
         else
-            self:showMessage(message .. " " .. _("You can continue."))
+            self:showMessage(message .. " " .. I18n.t("You can continue."))
         end
         return
     end
     if active and active.update_dialog ~= false then
         SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
     end
-    self:showMessage((result and result.error) or _("Could not connect to Suwayomi."))
+    self:showMessage((result and result.error) or I18n.t("Could not connect to Suwayomi."))
 end
 
 
@@ -230,7 +229,7 @@ function Methods:finishOnboardingSetup()
         end)
         return
     end
-    self:showMessage(_("Suwayomi setup complete."))
+    self:showMessage(I18n.t("Suwayomi setup complete."))
 end
 
 
@@ -263,7 +262,7 @@ function Methods:showOnboardingConnectionStep(options)
         onContinue = function(credentials)
             if not self:hasOnboardingConnectionTestPassed(credentials) then
                 SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "untested")
-                self:showMessage(_("Test connection before continuing."))
+                self:showMessage(I18n.t("Test connection before continuing."))
                 return false
             end
 
@@ -317,13 +316,13 @@ end
 
 
 function Methods:getBrowseSettingSummary(key)
-    return self:loadBrowseSettings()[key] and _("yes") or _("no")
+    return self:loadBrowseSettings()[key] and I18n.t("yes") or I18n.t("no")
 end
 
 
 function Methods:toggleBrowseSetting(key, touchmenu_instance)
     if not SuwayomiSettings.saveBrowseSettings then
-        self:showMessage(_("Browse settings are unavailable."))
+        self:showMessage(I18n.t("Browse settings are unavailable."))
         return
     end
     local browse_settings = self:loadBrowseSettings()
@@ -375,7 +374,7 @@ end
 function Methods:getDeleteChaptersSettingSummary(key)
     local settings = self:loadDeleteChaptersSettings()
     if key == "delete_after_mark_read" then
-        return settings.delete_after_mark_read and _("yes") or _("no")
+        return settings.delete_after_mark_read and I18n.t("yes") or I18n.t("no")
     end
     if key == "delete_finished_while_reading" then
         return self:getDeleteFinishedWhileReadingLabel(settings.delete_finished_while_reading)
@@ -385,19 +384,19 @@ end
 
 function Methods:getDeleteFinishedWhileReadingLabel(value)
     local labels = {
-        [0] = _("Disabled"),
-        [1] = _("Last read chapter"),
-        [2] = _("Second to last read chapter"),
-        [3] = _("Third to last read chapter"),
-        [4] = _("Fourth to last read chapter"),
-        [5] = _("Fifth to last read chapter"),
+        [0] = I18n.t("Disabled"),
+        [1] = I18n.t("Last read chapter"),
+        [2] = I18n.t("Second to last read chapter"),
+        [3] = I18n.t("Third to last read chapter"),
+        [4] = I18n.t("Fourth to last read chapter"),
+        [5] = I18n.t("Fifth to last read chapter"),
     }
     return labels[tonumber(value) or 0] or labels[0]
 end
 
 function Methods:toggleDeleteAfterMarkRead(touchmenu_instance)
     if not SuwayomiSettings.saveDeleteChaptersSettings then
-        self:showMessage(_("Delete chapter settings are unavailable."))
+        self:showMessage(I18n.t("Delete chapter settings are unavailable."))
         return
     end
     local settings = self:loadDeleteChaptersSettings()
@@ -408,7 +407,7 @@ end
 
 function Methods:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
     if not SuwayomiSettings.saveDeleteChaptersSettings then
-        self:showMessage(_("Delete chapter settings are unavailable."))
+        self:showMessage(I18n.t("Delete chapter settings are unavailable."))
         return
     end
 
@@ -440,7 +439,7 @@ function Methods:showLibraryCategoryPickerBehaviorDialog(touchmenu_instance)
     if not SuwayomiSettings.loadLibraryCategoryPickerBehavior
         or not SuwayomiSettings.saveLibraryCategoryPickerBehavior
     then
-        self:showMessage(_("Library category picker settings are unavailable."))
+        self:showMessage(I18n.t("Library category picker settings are unavailable."))
         return
     end
 
@@ -461,24 +460,24 @@ end
 function Methods:buildSettingsMenu()
     return {
         {
-            text = _("Setup wizard"),
+            text = I18n.t("Setup wizard"),
             keep_menu_open = true,
             callback = function()
                 self:showOnboardingSetup({ first_run = false })
             end,
         },
         {
-            text = _("Connection"),
+            text = I18n.t("Connection"),
             sub_item_table = {
                 {
-                    text = _("Login information"),
+                    text = I18n.t("Login information"),
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:showLoginDialog(touchmenu_instance)
                     end,
                 },
                 {
-                    text = _("Test connection"),
+                    text = I18n.t("Test connection"),
                     keep_menu_open = true,
                     callback = function()
                         self:startSettingsConnectionTest()
@@ -487,11 +486,11 @@ function Methods:buildSettingsMenu()
             },
         },
         {
-            text = _("Library"),
+            text = I18n.t("Library"),
             sub_item_table = {
                 {
                     text_func = function()
-                        return T(_("Category picker: %1"), self:getLibraryCategoryPickerBehaviorSummary())
+                        return I18n.f("Category picker: %1", self:getLibraryCategoryPickerBehaviorSummary())
                     end,
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
@@ -501,11 +500,11 @@ function Methods:buildSettingsMenu()
             },
         },
         {
-            text = _("Browse"),
+            text = I18n.t("Browse"),
             sub_item_table = {
                 {
                     text_func = function()
-                        return T(_("Show NSFW sources: %1"), self:getBrowseSettingSummary("show_nsfw_sources"))
+                        return I18n.f("Show NSFW sources: %1", self:getBrowseSettingSummary("show_nsfw_sources"))
                     end,
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
@@ -514,8 +513,8 @@ function Methods:buildSettingsMenu()
                 },
                 {
                     text_func = function()
-                        return T(
-                            _("Hide in-library results: %1"),
+                        return I18n.f(
+                            "Hide in-library results: %1",
                             self:getBrowseSettingSummary("hide_in_library_results")
                         )
                     end,
@@ -527,11 +526,11 @@ function Methods:buildSettingsMenu()
             },
         },
         {
-            text = _("Downloads"),
+            text = I18n.t("Downloads"),
             sub_item_table = {
                 {
                     text_func = function()
-                        return T(_("Download directory: %1"), self:getDownloadDirectorySummary())
+                        return I18n.f("Download directory: %1", self:getDownloadDirectorySummary())
                     end,
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
@@ -540,8 +539,8 @@ function Methods:buildSettingsMenu()
                 },
                 {
                     text_func = function()
-                        return T(
-                            _("Parallel downloads: %1"),
+                        return I18n.f(
+                            "Parallel downloads: %1",
                             SuwayomiSettings:loadMaxParallelChapterDownloads()
                         )
                     end,
@@ -552,8 +551,8 @@ function Methods:buildSettingsMenu()
                 },
                 {
                     text_func = function()
-                        return T(
-                            _("Delete after manual mark-read: %1"),
+                        return I18n.f(
+                            "Delete after manual mark-read: %1",
                             self:getDeleteChaptersSettingSummary("delete_after_mark_read")
                         )
                     end,
@@ -564,8 +563,8 @@ function Methods:buildSettingsMenu()
                 },
                 {
                     text_func = function()
-                        return T(
-                            _("Delete while reading: %1"),
+                        return I18n.f(
+                            "Delete while reading: %1",
                             self:getDeleteChaptersSettingSummary("delete_finished_while_reading")
                         )
                     end,

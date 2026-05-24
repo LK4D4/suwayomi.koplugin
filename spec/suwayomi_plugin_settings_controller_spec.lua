@@ -5,6 +5,7 @@ local helper = require("spec/support/controller_module_spec_helper")
 local modules_to_clear = {
     "ffi/util",
     "gettext",
+    "suwayomi/i18n",
     "ui/uimanager",
     "suwayomi/subprocess/job",
     "suwayomi/plugin/onboarding_connection_worker",
@@ -18,6 +19,24 @@ local function clearModules()
         package.loaded[name] = nil
         package.preload[name] = nil
     end
+end
+
+local function installMarkerI18n()
+    package.preload["suwayomi/i18n"] = function()
+        return {
+            t = function(text)
+                return "tx:" .. text
+            end,
+            f = function(text, ...)
+                local result = "tx:" .. text
+                for index, value in ipairs({...}) do
+                    result = result:gsub("%%" .. index, tostring(value))
+                end
+                return result
+            end,
+        }
+    end
+    package.loaded["suwayomi/i18n"] = nil
 end
 
 local function installController(options)
@@ -43,7 +62,7 @@ local function installController(options)
     }
 
     package.preload.gettext = function()
-        return function(text)
+        return options.gettext or function(text)
             return text
         end
     end
@@ -252,6 +271,11 @@ local function installController(options)
 end
 
 describe("suwayomi/plugin/settings_controller", function()
+    after_each(function()
+        package.preload["suwayomi/i18n"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+    end)
+
     after_each(clearModules)
 
     local function findMenuItem(items, text)
@@ -363,6 +387,119 @@ describe("suwayomi/plugin/settings_controller", function()
 
         downloads_menu.sub_item_table[4].callback(state.touchmenu)
         assert.are.same({ 0, 1, 2, 3, 4, 5 }, state.delete_finished_menu_options.choices)
+    end)
+
+    it("routes settings menu labels through i18n", function()
+        local plugin = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        local menu = plugin:buildSettingsMenu()
+
+        assert.are.equal("tx:Setup wizard", menu[1].text)
+        assert.are.equal("tx:Connection", menu[2].text)
+        assert.are.equal("tx:Category picker: automatic", menu[3].sub_item_table[1].text_func())
+    end)
+
+    it("routes nested browse yes-no summaries through i18n", function()
+        local plugin = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        local browse_items = findMenuItem(plugin:buildSettingsMenu(), "tx:Browse").sub_item_table
+
+        assert.are.equal("tx:Show NSFW sources: tx:no", browse_items[1].text_func())
+        assert.are.equal("tx:Hide in-library results: tx:no", browse_items[2].text_func())
+    end)
+
+    it("keeps subprocess start errors raw while translating fixed startup text", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:startOnboardingConnectionTest({ server_url = "https://suwayomi.example" })
+        state.started_connection_job.on_error("boom")
+
+        assert.are.equal("tx:Could not start connection test: boom", state.messages[#state.messages])
+    end)
+
+    it("translates unknown-error fallback for subprocess startup errors", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:startOnboardingConnectionTest({ server_url = "https://suwayomi.example" })
+        state.started_connection_job.on_error(nil)
+
+        assert.are.equal("tx:Could not start connection test: tx:unknown error", state.messages[#state.messages])
+    end)
+
+    it("keeps onboarding failure results raw while translating fallback failure text", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+        }, {
+            ok = false,
+            error = "boom",
+        })
+        assert.are.equal("boom", state.messages[#state.messages])
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+        }, {
+            ok = false,
+        })
+        assert.are.equal("tx:Could not connect to Suwayomi.", state.messages[#state.messages])
     end)
 
     it("waits for timed-out onboarding connection workers to finish before cleanup", function()

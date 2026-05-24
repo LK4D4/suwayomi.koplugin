@@ -99,6 +99,7 @@ end
 local function assertControllerModule(module_name, expected_methods)
     stubControllerDependencies()
     package.loaded[module_name] = nil
+    package.loaded["suwayomi/i18n"] = nil
 
     local module = require(module_name)
     assert(type(module) == "table")

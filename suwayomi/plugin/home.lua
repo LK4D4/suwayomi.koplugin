@@ -2,13 +2,13 @@
 --
 -- Responsibility: Owns the plugin home dialog, main-menu entry, and generic KOReader message/loading helpers.
 -- Owned state: Plugin UI state only; it does not own persisted settings or network state.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
 local SuwayomiUI = require("suwayomi/ui")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 
 local HomeController = {}
 HomeController.__index = HomeController
@@ -56,7 +56,7 @@ function Methods:buildHomeActions()
     return {
         {
             id = "library",
-            text = _("Library"),
+            text = I18n.t("Library"),
             callback = function()
                 return self:showTopLevelScreen("library", function()
                     return self:showLibrary()
@@ -65,7 +65,7 @@ function Methods:buildHomeActions()
         },
         {
             id = "browse",
-            text = _("Browse"),
+            text = I18n.t("Browse"),
             callback = function()
                 return self:showTopLevelScreen("browse", function()
                     return self:browseSuwayomi()
@@ -74,7 +74,7 @@ function Methods:buildHomeActions()
         },
         {
             id = "downloads",
-            text = _("Downloads"),
+            text = I18n.t("Downloads"),
             callback = function()
                 return self:showTopLevelScreen("downloads", function()
                     return self:showDownloads()
@@ -83,14 +83,14 @@ function Methods:buildHomeActions()
         },
         {
             id = "sync",
-            text = _("Sync"),
+            text = I18n.t("Sync"),
             callback = function()
                 self:syncReadStateNow()
             end,
         },
         {
             id = "settings",
-            text = _("Settings"),
+            text = I18n.t("Settings"),
             callback = function()
                 return self:showTopLevelScreen("settings", function()
                     return self:showSettings()
@@ -99,7 +99,7 @@ function Methods:buildHomeActions()
         },
         {
             id = "close",
-            text = _("Close plugin"),
+            text = I18n.t("Close plugin"),
             close_before_select = false,
             callback = function()
                 if self.closeSuwayomiPlugin then
@@ -205,7 +205,7 @@ end
 
 
 function Methods:onSuwayomiAction()
-    self:showNotImplemented(_("Open Search > Suwayomi to access the plugin menu."))
+    self:showNotImplemented(I18n.t("Open Search > Suwayomi to access the plugin menu."))
 end
 
 
@@ -215,7 +215,7 @@ function Methods:addToMainMenu(menu_items)
         if context then
             ensureReaderReturnMenuOrder()
             menu_items[READER_RETURN_MENU_ID] = {
-                text = _("Go to Suwayomi"),
+                text = I18n.t("Go to Suwayomi"),
                 sorting_hint = "main",
                 callback = function()
                     self:returnToSuwayomiChapters()
@@ -226,7 +226,7 @@ function Methods:addToMainMenu(menu_items)
     end
 
     menu_items.suwayomi = {
-        text = _("Suwayomi"),
+        text = I18n.t("Suwayomi"),
         sorting_hint = "search",
         callback = function(menu)
             self:closeMenu(menu)
