@@ -4,7 +4,10 @@ describe("suwayomi/downloads/status_formatter", function()
     local formatter
 
     before_each(function()
+        package.loaded["gettext"] = nil
+        package.loaded["ffi/util"] = nil
         package.loaded["suwayomi/downloads/status_formatter"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = function()
             return function(text)
                 return text
@@ -24,7 +27,10 @@ describe("suwayomi/downloads/status_formatter", function()
     end)
 
     after_each(function()
+        package.loaded["gettext"] = nil
+        package.loaded["ffi/util"] = nil
         package.loaded["suwayomi/downloads/status_formatter"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = nil
         package.preload["ffi/util"] = nil
     end)
@@ -49,6 +55,34 @@ describe("suwayomi/downloads/status_formatter", function()
             { id = "400", name = "Official_Vol. 1 Ch. 3" },
             { state = "downloading", current = 2, total = 26 }
         ))
+    end)
+
+    it("routes status labels and templates through i18n", function()
+        package.preload.gettext = function()
+            return function(text)
+                return "tx:" .. text
+            end
+        end
+        package.loaded["gettext"] = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded["suwayomi/downloads/status_formatter"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        formatter = require("suwayomi/downloads/status_formatter")
+
+        assert.are.equal("tx:Downloading 2/26", formatter.formatChapterMenuStatus(
+            { id = "400", name = "Official_Vol. 1 Ch. 3" },
+            { state = "downloading", current = 2, total = 26 }
+        ))
+        assert.are.equal(
+            "tx:Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\"tx: (Ch. 1.5): network timeout",
+            formatter.formatFailureMessage(
+                { id = "m1", title = "Sousou no Frieren" },
+                { id = "398", name = "Official_Vol. 1 Ch. 1", chapter_number = 1.5 },
+                "network timeout",
+                "m1:398"
+            )
+        )
     end)
 
     it("formats downloading progress and shortens long titles without changing text", function()

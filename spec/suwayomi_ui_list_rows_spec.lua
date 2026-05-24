@@ -1,6 +1,10 @@
 describe("suwayomi/ui/list_rows", function()
     before_each(function()
+        package.preload["ffi/util"] = nil
+        package.loaded["ffi/util"] = nil
+        package.loaded["gettext"] = nil
         package.loaded["suwayomi/ui/list_rows"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/source_languages"] = nil
         package.preload["gettext"] = function()
             return function(text) return text end
@@ -8,8 +12,12 @@ describe("suwayomi/ui/list_rows", function()
     end)
 
     after_each(function()
+        package.preload["ffi/util"] = nil
+        package.loaded["ffi/util"] = nil
         package.preload["gettext"] = nil
+        package.loaded["gettext"] = nil
         package.loaded["suwayomi/ui/list_rows"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/source_languages"] = nil
     end)
 
@@ -46,11 +54,71 @@ describe("suwayomi/ui/list_rows", function()
             chapter_count = 0,
             chapter_count_verified = true,
         }))
-        assert.are.equal("In Library · 12 chapters", rows.getMangaMandatory({
+        assert.are.equal("In Library | 12 chapters", rows.getMangaMandatory({
             in_library = true,
             chapter_count = 12,
         }, {
             show_in_library = true,
+        }))
+    end)
+
+    it("routes built-in row labels through i18n without translating server data", function()
+        package.preload["gettext"] = function()
+            return function(text)
+                return "tx:" .. text
+            end
+        end
+        package.loaded["gettext"] = nil
+        package.loaded["suwayomi/ui/list_rows"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local rows = require("suwayomi/ui/list_rows")
+
+        assert.are.equal("tx:In Librarytx: | tx:12 chapters", rows.getMangaMandatory({
+            in_library = true,
+            chapter_count = 12,
+        }, {
+            show_in_library = true,
+        }))
+        assert.are.equal("MangaDex", rows.getSourceTitle({ name = "MangaDex" }))
+        assert.are.equal("tx:Not installed\n18+tx: · v1.4.0", rows.getExtensionMandatory({
+            is_installed = false,
+            is_nsfw = true,
+            version_name = "1.4.0",
+        }))
+        assert.are.equal("tx:1 result", rows.getGlobalSearchSummaryMandatory({
+            status = "ok",
+            result_count = 1,
+        }))
+    end)
+
+    it("can override paged global search result formatting within one test", function()
+        package.preload["ffi/util"] = function()
+            return {
+                template = function(_, value)
+                    return "seed:" .. tostring(value)
+                end,
+            }
+        end
+        package.loaded["suwayomi/ui/list_rows"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local rows = require("suwayomi/ui/list_rows")
+
+        assert.are.equal("seed:1+", rows.getGlobalSearchSummaryMandatory({
+            status = "ok",
+            result_count = 1,
+            has_next_page = true,
+        }))
+    end)
+
+    it("shows paged global search counts as visible plural results text", function()
+        local rows = require("suwayomi/ui/list_rows")
+
+        assert.are.equal("1+ results", rows.getGlobalSearchSummaryMandatory({
+            status = "ok",
+            result_count = 1,
+            has_next_page = true,
         }))
     end)
 

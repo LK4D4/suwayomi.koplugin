@@ -3,12 +3,11 @@
 -- Responsibility: build compact read/download labels used in chapter menus
 -- and produce user-facing failure labels.
 -- Owned state: none.
--- Injected dependencies: KOReader gettext/template helpers only.
+-- Injected dependencies: shared i18n facade only.
 -- External data: manga/chapter/status tables from Suwayomi and persisted queue
 -- state; values are converted defensively before formatting.
 
-local _ = require("gettext")
-local T = require("ffi/util").template
+local I18n = require("suwayomi/i18n")
 
 local StatusFormatter = {}
 
@@ -57,7 +56,7 @@ function StatusFormatter.joinChapterStatusSymbols(symbols)
     if not symbols or #symbols == 0 then
         return nil
     end
-    return table.concat(symbols, _(" · "))
+    return I18n.join(symbols, " · ")
 end
 
 function StatusFormatter.formatChapterStatusSymbols(chapter, symbols, max_title_chars)
@@ -76,36 +75,36 @@ end
 function StatusFormatter.buildChapterStatusSymbols(chapter, status)
     local symbols = {}
     if chapter and chapter.is_read == true then
-        table.insert(symbols, _("Read"))
+        table.insert(symbols, I18n.t("Read"))
     end
 
     if not status then
         return symbols
     end
     if status.state == "queued" then
-        table.insert(symbols, _("Queued"))
+        table.insert(symbols, I18n.t("Queued"))
         return symbols
     end
     if status.state == "downloading" then
         if status.total and status.total > 0 and status.current then
-            table.insert(symbols, T(_("Downloading %1/%2"), status.current, status.total))
+            table.insert(symbols, I18n.f("Downloading %1/%2", status.current, status.total))
             return symbols
         end
-        table.insert(symbols, _("Downloading"))
+        table.insert(symbols, I18n.t("Downloading"))
         return symbols
     end
     if status.state == "downloaded" or status.state == "skipped" then
-        table.insert(symbols, _("Downloaded"))
+        table.insert(symbols, I18n.t("Downloaded"))
         return symbols
     end
     if status.state == "read" then
         if #symbols == 0 then
-            table.insert(symbols, _("Read"))
+            table.insert(symbols, I18n.t("Read"))
         end
         return symbols
     end
     if status.state == "failed" then
-        table.insert(symbols, _("Failed"))
+        table.insert(symbols, I18n.t("Failed"))
         return symbols
     end
     return symbols
@@ -147,17 +146,17 @@ function StatusFormatter.formatFailureMessage(manga, chapter, detail, fallback_k
 
     local chapter_suffix = ""
     if chapter and chapter.chapter_number ~= nil and tostring(chapter.chapter_number) ~= "" then
-        chapter_suffix = T(_(" (Ch. %1)"), StatusFormatter.formatChapterNumber(chapter.chapter_number))
+        chapter_suffix = I18n.f(" (Ch. %1)", StatusFormatter.formatChapterNumber(chapter.chapter_number))
     elseif chapter and chapter.id and chapter.id ~= "" then
-        chapter_suffix = T(_(" (Suwayomi id %1)"), chapter.id)
+        chapter_suffix = I18n.f(" (Suwayomi id %1)", chapter.id)
     end
 
     local failure_detail = tostring(detail or "")
     if failure_detail == "" then
-        failure_detail = _("Chapter download failed.")
+        failure_detail = I18n.t("Chapter download failed.")
     end
 
-    return T(_("Could not download \"%1\"%2: %3"), label, chapter_suffix, failure_detail)
+    return I18n.f("Could not download \"%1\"%2: %3", label, chapter_suffix, failure_detail)
 end
 
 return StatusFormatter

@@ -3,11 +3,11 @@
 -- Responsibility: convert source, manga, chapter, search summary, category, and
 -- download-adjacent tables into KOReader Menu row tables for content screens.
 -- Owned state: none.
--- Dependencies: gettext and source language label helpers.
+-- Dependencies: shared i18n facade and source language label helpers.
 -- External data: manga and source tables come from API/client layers and are
 -- treated as optional-field records.
 
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 local SourceLanguages = require("suwayomi/source_languages")
 
 local ListRows = {}
@@ -22,10 +22,7 @@ local function formatChapterCount(count)
     if count == 0 then
         return nil
     end
-    if count == 1 then
-        return "1 " .. _("chapter")
-    end
-    return tostring(count) .. " " .. _("chapters")
+    return I18n.count(count, "%1 chapter", "%1 chapters")
 end
 
 function ListRows.getMangaTitle(manga)
@@ -45,16 +42,16 @@ function ListRows.getMangaMandatory(manga, options)
     options = options or {}
     local labels = {}
     if options.show_in_library == true and type(manga) == "table" and manga.in_library == true then
-        table.insert(labels, _("In Library"))
+        table.insert(labels, I18n.t("In Library"))
     end
     if type(manga) == "table" then
         local chapter_count
         if type(manga.chapter_count_error) == "string" and manga.chapter_count_error ~= "" then
             chapter_count = manga.chapter_count_error
         elseif manga.chapter_count_loading == true then
-            chapter_count = _("Checking chapters")
+            chapter_count = I18n.t("Checking chapters")
         elseif manga.chapter_count_verified == true and tonumber(manga.chapter_count) == 0 then
-            chapter_count = "0 " .. _("chapters")
+            chapter_count = I18n.count(0, "%1 chapter", "%1 chapters")
         else
             chapter_count = formatChapterCount(manga.chapter_count)
         end
@@ -65,7 +62,7 @@ function ListRows.getMangaMandatory(manga, options)
     if #labels == 0 then
         return nil
     end
-    return table.concat(labels, _(" · "))
+    return I18n.join(labels, " | ")
 end
 
 function ListRows.getMangaSubtitle(manga)
@@ -190,13 +187,13 @@ function ListRows.getExtensionMandatory(extension)
     end
     local status
     if extension.has_update == true then
-        status = _("Update available")
+        status = I18n.t("Update available")
     elseif extension.is_installed ~= true then
-        status = _("Not installed")
+        status = I18n.t("Not installed")
     elseif extension.is_obsolete == true then
-        status = _("Obsolete")
+        status = I18n.t("Obsolete")
     else
-        status = _("Installed")
+        status = I18n.t("Installed")
     end
     local markers = {}
     if extension.is_nsfw == true then
@@ -208,7 +205,7 @@ function ListRows.getExtensionMandatory(extension)
     if #markers == 0 then
         return status
     end
-    return status .. "\n" .. table.concat(markers, _(" · "))
+    return status .. "\n" .. I18n.join(markers, " · ")
 end
 
 function ListRows.buildExtensionRow(extension, options)
@@ -270,9 +267,9 @@ function ListRows.buildExtensionMenuTable(extensions, options)
         end
     end
 
-    appendSection(_("Updates"), updates)
-    appendSection(_("Installed"), installed, show_empty_sections)
-    appendSection(_("Available"), available, show_empty_sections)
+    appendSection(I18n.t("Updates"), updates)
+    appendSection(I18n.t("Installed"), installed, show_empty_sections)
+    appendSection(I18n.t("Available"), available, show_empty_sections)
 
     if #menu_table == 0 and options.empty_text then
         table.insert(menu_table, {
@@ -290,27 +287,27 @@ local function formatResultCount(summary)
         count = tonumber(summary.result_count) or #(summary.manga or {})
     end
     local suffix = type(summary) == "table" and summary.has_next_page and "+" or ""
-    if count == 1 and suffix == "" then
-        return _("1 result")
+    if suffix == "" then
+        return I18n.count(count, "%1 result", "%1 results")
     end
-    return tostring(count) .. suffix .. " " .. _("results")
+    return I18n.f("%1 results", tostring(count) .. suffix)
 end
 
 function ListRows.getGlobalSearchSummaryMandatory(summary)
     if not summary or summary.status == "empty" then
-        return _("No results")
+        return I18n.t("No results")
     end
     if summary.status == "searching" then
-        return _("searching")
+        return I18n.t("searching")
     end
     if summary.status == "timed_out" then
-        return _("timed out")
+        return I18n.t("timed out")
     end
     if summary.status == "canceled" then
-        return _("canceled")
+        return I18n.t("canceled")
     end
     if summary.status == "error" then
-        return _("Error")
+        return I18n.t("Error")
     end
     return formatResultCount(summary)
 end
@@ -331,13 +328,13 @@ function ListRows.buildGlobalSearchSummaryRow(summary, options)
         show_language = true,
     })
     if row.text == "" then
-        row.text = _("Source")
+        row.text = I18n.t("Source")
     end
     row.subtitle = summary and summary.status == "error"
-        and tostring(summary.error or _("Unknown error"))
+        and tostring(summary.error or I18n.t("Unknown error"))
         or row.subtitle
     if options.on_retry and isGlobalSearchSummaryRetryable(summary) then
-        row.mandatory = _("Retry")
+        row.mandatory = I18n.t("Retry")
     else
         row.mandatory = ListRows.getGlobalSearchSummaryMandatory(summary)
     end
@@ -374,7 +371,7 @@ function ListRows.getLibraryCategoryMandatory(category)
     if type(category) ~= "table" or category.manga_count == nil then
         return nil
     end
-    return tostring(category.manga_count) .. " " .. _("manga")
+    return I18n.count(category.manga_count, "%1 manga", "%1 manga")
 end
 
 function ListRows.buildLibraryCategoryRow(category, options)
