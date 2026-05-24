@@ -1410,6 +1410,34 @@ describe("suwayomi/ui", function()
         assert.are.equal("tx:Actions", shown_dialog.title)
     end)
 
+    it("routes shared menu default labels through i18n", function()
+        package.preload["suwayomi/i18n"] = function()
+            return {
+                t = function(text)
+                    return "tx:" .. text
+                end,
+            }
+        end
+        package.loaded["suwayomi/i18n"] = nil
+        package.loaded["suwayomi/ui"] = nil
+
+        local ui = require("suwayomi/ui")
+
+        ui.showSettingsMenu({})
+        assert.are.equal("tx:Suwayomi Settings", shown_dialog.title)
+
+        ui.showChapterMenu({})
+        assert.are.equal("tx:Suwayomi Chapters", shown_dialog.title)
+
+        ui.showLibraryCategoryPickerBehaviorMenu({
+            current = "always",
+            choices = { "automatic", "always", "never" },
+        })
+        assert.are.equal("tx:Library category picker", shown_dialog.title)
+        assert.are.equal("tx:Automatic", shown_dialog.buttons[1][1].text)
+        assert.are.equal("tx:Always ask", shown_dialog.buttons[2][1].text)
+    end)
+
     it("honors explicit action menu columns", function()
         local ui = require("suwayomi/ui")
 

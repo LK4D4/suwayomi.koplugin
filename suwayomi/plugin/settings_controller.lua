@@ -26,6 +26,15 @@ end
 
 local Methods = {}
 
+local function formatLibraryCategoryPickerBehavior(behavior)
+    local labels = {
+        automatic = I18n.t("Automatic"),
+        always = I18n.t("Always ask"),
+        never = I18n.t("Never ask"),
+    }
+    return labels[behavior] or tostring(behavior or "")
+end
+
 function Methods:showLibrarySettings(touchmenu_instance)
     return self:showLibraryCategoryPickerBehaviorDialog(touchmenu_instance)
 end
@@ -428,10 +437,11 @@ end
 
 
 function Methods:getLibraryCategoryPickerBehaviorSummary()
+    local behavior = "automatic"
     if SuwayomiSettings.loadLibraryCategoryPickerBehavior then
-        return SuwayomiSettings:loadLibraryCategoryPickerBehavior()
+        behavior = SuwayomiSettings:loadLibraryCategoryPickerBehavior()
     end
-    return "automatic"
+    return formatLibraryCategoryPickerBehavior(behavior)
 end
 
 

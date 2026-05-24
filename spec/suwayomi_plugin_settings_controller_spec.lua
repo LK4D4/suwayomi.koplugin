@@ -407,7 +407,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         assert.are.equal("tx:Setup wizard", menu[1].text)
         assert.are.equal("tx:Connection", menu[2].text)
-        assert.are.equal("tx:Category picker: automatic", menu[3].sub_item_table[1].text_func())
+        assert.are.equal("tx:Category picker: tx:Automatic", menu[3].sub_item_table[1].text_func())
     end)
 
     it("routes nested browse yes-no summaries through i18n", function()
@@ -905,7 +905,7 @@ describe("suwayomi/plugin/settings_controller", function()
         local plugin, state = installController()
         local library_item = findMenuItem(plugin:buildSettingsMenu(), "Library").sub_item_table[1]
 
-        assert.are.equal("Category picker: automatic", library_item.text_func())
+        assert.are.equal("Category picker: Automatic", library_item.text_func())
         library_item.callback(state.touchmenu)
         assert.are.same({ "automatic", "always", "never" }, state.category_menu_options.choices)
         state.category_menu_options.onSelect("always")
@@ -917,7 +917,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         local unavailable_plugin, unavailable_state = installController({ no_category_persistence = true })
         local unavailable_item = findMenuItem(unavailable_plugin:buildSettingsMenu(), "Library").sub_item_table[1]
-        assert.are.equal("Category picker: automatic", unavailable_item.text_func())
+        assert.are.equal("Category picker: Automatic", unavailable_item.text_func())
         unavailable_item.callback(unavailable_state.touchmenu)
         assert.are.equal("Library category picker settings are unavailable.", unavailable_state.messages[#unavailable_state.messages])
     end)
