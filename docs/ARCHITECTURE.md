@@ -104,6 +104,7 @@ Shared support:
 - `suwayomi/settings.lua`: KOReader settings persistence.
 - `suwayomi/paths.lua`: source-scoped download path layout and path segment sanitization.
 - `suwayomi/debug.lua`: opt-in redacted debug logging.
+- `suwayomi/i18n.lua`: plugin-owned wrapper around KOReader gettext and template formatting for runtime UI strings. It intentionally does not choose locale, persist language settings, or translate server-provided manga/source/chapter data.
 - `suwayomi/subprocess/job.lua`: shared helper for one-shot subprocess jobs that exchange compact JSON result files. Callers provide the worker body, result parser, poll/timeout values, and finish/error/cancel callbacks; the helper owns atomic `.tmp` writes, result path allocation, polling, timeout/cancel termination, child reaping, and result-file cleanup.
 
 Long-running subprocess patterns are intentionally split by shape: one-shot JSON result workers use `suwayomi/subprocess/job.lua`, while active downloads stay in `suwayomi/downloads/active_jobs.lua` because they require progress files, persisted queue state, and replacement scheduling.
@@ -131,6 +132,7 @@ common changes and the specs that usually cover them.
 | Download directory selection or source-scoped path layout | `suwayomi/downloads/directory.lua`, `suwayomi/paths.lua` | directory/path specs |
 | Read-sync ledger, KOReader sidecar/history handling, worker polling, or reconciliation | `suwayomi/readsync/ledger.lua`, `suwayomi/readsync/koreader_metadata.lua`, `suwayomi/readsync/worker.lua`, `suwayomi/readsync/controller.lua` | read-sync specs |
 | Settings persistence, source filter drafts, debug logging, or redaction | `suwayomi/settings.lua`, `suwayomi/debug.lua` | settings/debug specs |
+| Plugin UI text, translation helpers, or shared i18n formatting | `suwayomi/i18n.lua`, then the specific UI/controller module that owns the string | `spec/suwayomi_i18n_spec.lua`, plus the owning module spec |
 | Runtime packaging or Android manual push payload | plugin root `_meta.lua`, `main.lua`, `README.md`, `suwayomi/`, plus `AGENTS.md` packaging notes | release/manual QA checks |
 
 ## Data And Packaging Boundaries
@@ -163,6 +165,7 @@ Coverage is organized around runtime boundaries:
 - API specs cover the facade plus query/parser/transport submodules without live Suwayomi calls.
 - Client specs are split by flow: `spec/suwayomi_client_source_manga_spec.lua`, `spec/suwayomi_client_global_search_spec.lua`, `spec/suwayomi_client_library_spec.lua`, and the small facade-focused `spec/suwayomi_client_spec.lua`.
 - UI specs cover menu table construction and KOReader dialog/menu helper behavior with stubbed widgets.
+- I18n specs stub KOReader `gettext` and `ffi/util.template` directly. Module specs that assert visible built-in labels should clear `suwayomi/i18n` from `package.loaded` before requiring the module under test so each spec controls the active gettext stub.
 - Queue/download specs cover persisted jobs, active worker scheduling, progress files, status text, and one-chapter CBZ behavior without real network or real subprocess timing.
 - Controller specs exercise plugin-bound methods with KOReader/runtime stubs rather than requiring real KOReader.
 - Read-sync specs isolate ledger, metadata/history handling, worker behavior, and controller polling/retry flows.
