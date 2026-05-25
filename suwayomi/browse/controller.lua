@@ -2,7 +2,7 @@
 --
 -- Responsibility: Composes source catalog methods, owns source fetch worker polling, and coordinates Browse entry flow.
 -- Owned state: Accepts source data from Suwayomi API and worker result files, so boundary code validates table shapes before rendering.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
@@ -12,9 +12,8 @@ local SuwayomiSourceFetchWorker = require("suwayomi/browse/source_fetch_worker")
 local SubprocessJob = require("suwayomi/subprocess/job")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiDebug = require("suwayomi/debug")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
 
 local BrowseController = {}
 BrowseController.__index = BrowseController
@@ -90,7 +89,7 @@ function Methods:startSourceFetchWorker(credentials, options)
         options = options,
         result_path = result_path,
         loading_message = not options.silent
-            and self:showLoadingMessage(options.loading_message or _("Loading sources..."))
+            and self:showLoadingMessage(options.loading_message or I18n.t("Loading sources..."))
             or nil,
     }
 
@@ -115,7 +114,7 @@ function Methods:startSourceFetchWorker(credentials, options)
             end
             self:closeLoadingMessage(timed_out_active and timed_out_active.loading_message)
             if not options.silent then
-                self:showMessage(_("Source loading timed out."))
+                self:showMessage(I18n.t("Source loading timed out."))
             end
         end,
         on_cleanup = function(cleaned_active)
@@ -127,7 +126,7 @@ function Methods:startSourceFetchWorker(credentials, options)
             self.source_fetch_active = nil
             self:closeLoadingMessage(active.loading_message)
             if not options.silent then
-                self:showMessage(T(_("Could not start source loading: %1"), err or _("unknown error")))
+                self:showMessage(I18n.f("Could not start source loading: %1", err or I18n.t("unknown error")))
             end
         end,
     })
@@ -173,7 +172,7 @@ function Methods:browseSuwayomi()
     return SuwayomiDebug.time("browseSuwayomi", function()
         local credentials = SuwayomiSettings:load()
         if credentials.server_url == "" then
-            self:showMessage(_("Set up your Suwayomi server login first."))
+            self:showMessage(I18n.t("Set up your Suwayomi server login first."))
             if self.showOnboardingSetup then
                 self:showOnboardingSetup({ first_run = true })
             end

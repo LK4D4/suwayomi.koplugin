@@ -8,6 +8,7 @@ local function clearModules()
         "suwayomi/browse/source_catalog",
         "suwayomi/browse/extensions",
         "suwayomi/browse/source_fetch_worker",
+        "suwayomi/i18n",
         "suwayomi/subprocess/job",
         "suwayomi/settings",
         "suwayomi/debug",
@@ -20,10 +21,27 @@ local function clearModules()
     end
 end
 
+local function installMarkerI18n()
+    package.preload["suwayomi/i18n"] = function()
+        return {
+            t = function(text)
+                return "tx:" .. text
+            end,
+            f = function(text, ...)
+                local args = { ... }
+                return "tx:" .. (text:gsub("%%(%d+)", function(index)
+                    return tostring(args[tonumber(index)])
+                end))
+            end,
+        }
+    end
+end
+
 local function installControllerWithSourceFetchStub(config)
     config = config or {}
     clearModules()
     helper.stubControllerDependencies()
+    installMarkerI18n()
     local started_options
     local scheduled_callback
     package.preload["ui/uimanager"] = function()
@@ -129,8 +147,44 @@ describe("suwayomi/browse/controller", function()
 
         assert.is_nil(controller.source_fetch_active)
         assert.are.equal("Loading sources...", controller.closed_loading.message)
-        assert.are.same({ "Source loading timed out." }, controller.messages)
+        assert.are.same({ "tx:Source loading timed out." }, controller.messages)
         assert.is_true(controller:startSourceFetchWorker({ server_url = "https://suwayomi.example" }))
+    end)
+
+    it("translates source fetch loading, timeout, and startup errors", function()
+        local controller_module, get_started_options = installControllerWithSourceFetchStub()
+        local controller = buildController(controller_module)
+
+        assert.is_true(controller:startSourceFetchWorker({ server_url = "https://suwayomi.example" }))
+        local started_options = get_started_options()
+
+        assert.are.equal("tx:Loading sources...", started_options.active.loading_message.message)
+
+        started_options.on_timeout(started_options.active)
+        assert.are.same({ "tx:Source loading timed out." }, controller.messages)
+
+        controller.messages = {}
+        package.loaded["suwayomi/browse/controller"] = nil
+        package.loaded["suwayomi/subprocess/job"] = nil
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                buildResultPath = function()
+                    return "/settings/source_fetch.json"
+                end,
+                start = function(options)
+                    options.on_error("spawn failed")
+                    return nil
+                end,
+                schedulePoll = function() end,
+                poll = function() end,
+            }
+        end
+
+        controller_module = require("suwayomi/browse/controller")
+        controller = buildController(controller_module)
+
+        assert.is_false(controller:startSourceFetchWorker({ server_url = "https://suwayomi.example" }))
+        assert.are.same({ "tx:Could not start source loading: spawn failed" }, controller.messages)
     end)
 
     it("keeps silent source fetch timeout cleanup quiet", function()
@@ -287,12 +341,14 @@ describe("suwayomi/browse/controller", function()
         helper.stubControllerDependencies()
         for _, name in ipairs({
             "suwayomi/browse/controller",
+            "suwayomi/i18n",
             "suwayomi/settings",
             "suwayomi/debug",
         }) do
             package.loaded[name] = nil
             package.preload[name] = nil
         end
+        installMarkerI18n()
         package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
@@ -334,7 +390,64 @@ describe("suwayomi/browse/controller", function()
 
         plugin:browseSuwayomi()
 
-        assert.are.equal("Set up your Suwayomi server login first.", plugin.messages[#plugin.messages])
+        assert.are.equal("tx:Set up your Suwayomi server login first.", plugin.messages[#plugin.messages])
+        assert.is_true(plugin.setup_options.first_run)
+    end)
+
+    it("translates missing setup message before Browse opens onboarding", function()
+        helper.stubControllerDependencies()
+        for _, name in ipairs({
+            "suwayomi/browse/controller",
+            "suwayomi/i18n",
+            "suwayomi/settings",
+            "suwayomi/debug",
+        }) do
+            package.loaded[name] = nil
+            package.preload[name] = nil
+        end
+        installMarkerI18n()
+        package.preload["suwayomi/settings"] = function()
+            return {
+                load = function()
+                    return { server_url = "" }
+                end,
+            }
+        end
+        package.preload["suwayomi/debug"] = function()
+            return {
+                time = function(_, callback)
+                    return callback()
+                end,
+            }
+        end
+
+        local controller = require("suwayomi/browse/controller")
+        local plugin = {
+            messages = {},
+            setup_options = nil,
+            showMessage = function(self, message)
+                table.insert(self.messages, message)
+            end,
+            showOnboardingSetup = function(self, options)
+                self.setup_options = options
+            end,
+            schedulePendingReadSync = function()
+                error("unexpected sync")
+            end,
+            loadSourceCache = function()
+                error("unexpected cache")
+            end,
+            startSourceFetchWorker = function()
+                error("unexpected worker")
+            end,
+        }
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:browseSuwayomi()
+
+        assert.are.equal("tx:Set up your Suwayomi server login first.", plugin.messages[#plugin.messages])
         assert.is_true(plugin.setup_options.first_run)
     end)
 end)
