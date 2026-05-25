@@ -13,6 +13,7 @@ describe("suwayomi/ui/browse", function()
         events = {}
 
         package.loaded["suwayomi/ui/browse"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/ui"] = nil
         package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
@@ -26,9 +27,43 @@ describe("suwayomi/ui/browse", function()
         package.loaded["suwayomi/ui/downloads"] = nil
         package.loaded["suwayomi/ui/manga_menu"] = nil
 
+        package.preload["suwayomi/i18n"] = function()
+            return {
+                t = function(text)
+                    return "tx:" .. tostring(text)
+                end,
+                f = function(text, ...)
+                    local values = { ... }
+                    return ("tx:" .. tostring(text):gsub("%%(%d+)", function(index)
+                        return tostring(values[tonumber(index)] or "")
+                    end))
+                end,
+                c = function(context, text)
+                    return "ctx:" .. tostring(context) .. ":" .. tostring(text)
+                end,
+                cf = function(context, text, ...)
+                    local values = { ... }
+                    return ("ctx:" .. tostring(context) .. ":" .. tostring(text):gsub("%%(%d+)", function(index)
+                        return tostring(values[tonumber(index)] or "")
+                    end))
+                end,
+                count = function(count, singular, plural)
+                    local text = tonumber(count) == 1 and singular or plural
+                    return ("tx:" .. tostring(text):gsub("%%1", tostring(count)))
+                end,
+                join = function(items, separator)
+                    local parts = {}
+                    for index, value in ipairs(items or {}) do
+                        parts[index] = tostring(value or "")
+                    end
+                    return table.concat(parts, tostring(separator or ""))
+                end,
+            }
+        end
+
         package.preload.gettext = function()
             return function(text)
-                return text
+                return tostring(text or "")
             end
         end
 
@@ -117,6 +152,7 @@ describe("suwayomi/ui/browse", function()
     end)
 
     after_each(function()
+        package.preload["suwayomi/i18n"] = nil
         package.preload.gettext = nil
         package.preload["ui/widget/menu"] = nil
         package.preload["ui/widget/buttondialog"] = nil
@@ -143,7 +179,7 @@ describe("suwayomi/ui/browse", function()
             thumbnail_credentials = { server_url = "http://127.0.0.1:4567" },
         })
 
-        assert.are.equal("Suwayomi Sources", shown_dialog.title)
+        assert.are.equal("tx:Suwayomi Sources", shown_dialog.title)
         assert.are.equal("list_menu", shown_dialog.renderer)
         assert.is_true(shown_dialog.fixed_item_heights)
         assert.are.equal("MangaDex", shown_dialog.item_table[1].text)
@@ -211,17 +247,17 @@ describe("suwayomi/ui/browse", function()
             title_bar_left_icon = "appbar.menu",
         })
 
-        assert.are.equal("Suwayomi Extensions", shown_dialog.title)
+        assert.are.equal("tx:Suwayomi Extensions", shown_dialog.title)
         assert.are.equal("list_menu", shown_dialog.renderer)
         assert.is_true(shown_dialog.fixed_item_heights)
         assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
-        assert.are.equal("Updates (1)", shown_dialog.item_table[1].text)
+        assert.are.equal("tx:Updates (1)", shown_dialog.item_table[1].text)
         assert.is_false(shown_dialog.item_table[1].select_enabled)
-        assert.are.equal("Update available\nv1.2.0", shown_dialog.item_table[2].mandatory)
-        assert.are.equal("Available (1)", shown_dialog.item_table[3].text)
+        assert.are.equal("tx:Update available\nv1.2.0", shown_dialog.item_table[2].mandatory)
+        assert.are.equal("tx:Available (1)", shown_dialog.item_table[3].text)
         assert.are.equal("MangaDex", shown_dialog.item_table[4].text)
         assert.are.equal("All", shown_dialog.item_table[4].subtitle)
-        assert.are.equal("Not installed\n18+ · v1.4.0", shown_dialog.item_table[4].mandatory)
+        assert.are.equal("tx:Not installed\n18+ · v1.4.0", shown_dialog.item_table[4].mandatory)
         assert.are.equal("/icons/md.png", shown_dialog.item_table[4].thumbnail_url)
 
         shown_dialog.item_table[4].callback()
@@ -255,10 +291,10 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.are.equal(3, menu.updated_options.itemnumber)
-        assert.are.equal("Installed (2)", menu.item_table[1].text)
+        assert.are.equal("tx:Installed (2)", menu.item_table[1].text)
         assert.are.equal("Orchid Gate", menu.item_table[2].text)
         assert.are.equal("Quartz Node", menu.item_table[3].text)
-        assert.are.equal("Available (1)", menu.item_table[4].text)
+        assert.are.equal("tx:Available (1)", menu.item_table[4].text)
     end)
 
     it("lets callers reset extension refresh position explicitly", function()
@@ -297,9 +333,9 @@ describe("suwayomi/ui/browse", function()
             show_empty_extension_sections = true,
         })
 
-        assert.are.equal("Installed (1)", menu.item_table[1].text)
+        assert.are.equal("tx:Installed (1)", menu.item_table[1].text)
         assert.are.equal("Quartz Node", menu.item_table[2].text)
-        assert.are.equal("Available (0)", menu.item_table[3].text)
+        assert.are.equal("tx:Available (0)", menu.item_table[3].text)
     end)
 
     it("shows extension actions through the shared action dialog", function()
@@ -329,7 +365,7 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal(anchor, shown_dialog.anchor)
         shown_dialog.close_callback()
         assert.is_true(closed)
-        assert.are.equal("Install", shown_dialog.buttons[1][1].text)
+        assert.are.equal("ctx:extension action:Install", shown_dialog.buttons[1][1].text)
         assert.are.equal("install", shown_dialog.buttons[1][1].id)
         shown_dialog.buttons[1][1].callback()
 
@@ -342,11 +378,11 @@ describe("suwayomi/ui/browse", function()
             table.insert(actions, action)
         end)
         assert.is_true(shown_dialog.is_button_dialog)
-        assert.are.equal("Update", shown_dialog.buttons[1][1].text)
+        assert.are.equal("ctx:extension action:Update", shown_dialog.buttons[1][1].text)
         assert.are.equal("update", shown_dialog.buttons[1][1].id)
         shown_dialog.buttons[1][1].callback()
         assert.are.same({}, shown_dialog.buttons[2])
-        assert.are.equal("Uninstall", shown_dialog.buttons[3][1].text)
+        assert.are.equal("ctx:extension action:Uninstall", shown_dialog.buttons[3][1].text)
         assert.are.equal("uninstall", shown_dialog.buttons[3][1].id)
         assert.is_true(shown_dialog.buttons[3][1].destructive)
         shown_dialog.buttons[3][1].callback()
@@ -360,7 +396,7 @@ describe("suwayomi/ui/browse", function()
             table.insert(actions, action)
         end)
         assert.is_true(shown_dialog.is_button_dialog)
-        assert.are.equal("Uninstall", shown_dialog.buttons[1][1].text)
+        assert.are.equal("ctx:extension action:Uninstall", shown_dialog.buttons[1][1].text)
         assert.are.equal("uninstall", shown_dialog.buttons[1][1].id)
         assert.is_true(shown_dialog.buttons[1][1].destructive)
         shown_dialog.buttons[1][1].callback()
@@ -369,7 +405,7 @@ describe("suwayomi/ui/browse", function()
             table.insert(actions, action)
         end)
         assert.is_true(shown_dialog.is_button_dialog)
-        assert.are.equal("No actions available", shown_dialog.buttons[1][1].text)
+        assert.are.equal("tx:No actions available", shown_dialog.buttons[1][1].text)
         shown_dialog.buttons[1][1].callback()
 
         assert.are.same({ "install", "update", "uninstall", "uninstall" }, actions)
@@ -399,13 +435,13 @@ describe("suwayomi/ui/browse", function()
 
         assert.is_true(shown_dialog.is_button_dialog)
         assert.are.equal("MangaDex", shown_dialog.title)
-        assert.are.equal("< Back", shown_dialog.buttons[1][1].text)
+        assert.are.equal("< tx:Back", shown_dialog.buttons[1][1].text)
         assert.are.same({}, shown_dialog.buttons[2])
-        assert.are.equal("Popular", shown_dialog.buttons[3][1].text)
+        assert.are.equal("ctx:source mode:Popular", shown_dialog.buttons[3][1].text)
         assert.are.equal("POPULAR", shown_dialog.buttons[3][1].id)
-        assert.are.equal("Search", shown_dialog.buttons[3][2].text)
+        assert.are.equal("ctx:source mode:Search", shown_dialog.buttons[3][2].text)
         assert.are.equal("SEARCH", shown_dialog.buttons[3][2].id)
-        assert.are.equal("Source filters", shown_dialog.buttons[4][1].text)
+        assert.are.equal("tx:Source filters", shown_dialog.buttons[4][1].text)
         assert.are.equal("FILTERS", shown_dialog.buttons[4][1].id)
 
         shown_dialog.close_callback()
@@ -482,33 +518,33 @@ describe("suwayomi/ui/browse", function()
             end,
         })
 
-        assert.are.equal("Random Source filters", shown_dialog.title)
+        assert.are.equal("tx:Random Source filters", shown_dialog.title)
         assert.are.equal("Genres", shown_dialog.item_table[1].text)
         assert.is_false(shown_dialog.item_table[1].select_enabled)
         assert.are.equal("Completed", shown_dialog.item_table[2].text)
-        assert.are.equal("On", shown_dialog.item_table[2].mandatory)
+        assert.are.equal("ctx:source filter state:On", shown_dialog.item_table[2].mandatory)
         assert.are.equal("Licensed", shown_dialog.item_table[3].text)
-        assert.are.equal("Any", shown_dialog.item_table[3].mandatory)
+        assert.are.equal("ctx:source filter tri-state:Any", shown_dialog.item_table[3].mandatory)
         assert.are.equal("Length", shown_dialog.item_table[4].text)
         assert.are.equal("Any", shown_dialog.item_table[4].mandatory)
         assert.are.equal("Author", shown_dialog.item_table[5].text)
         assert.are.equal("", shown_dialog.item_table[5].mandatory)
         assert.are.equal("Sort by", shown_dialog.item_table[6].text)
-        assert.are.equal("Name - Ascending", shown_dialog.item_table[6].mandatory)
+        assert.are.equal("Name - ctx:source filter sort direction:Ascending", shown_dialog.item_table[6].mandatory)
         assert.is_nil(shown_dialog.item_table[6].sub_item_table)
         assert.are.equal("Small group", shown_dialog.item_table[7].text)
-        assert.are.equal("Any", shown_dialog.item_table[7].mandatory)
+        assert.are.equal("ctx:source filter tri-state:Any", shown_dialog.item_table[7].mandatory)
         assert.is_nil(shown_dialog.item_table[7].sub_item_table)
         assert.are.equal("Large group", shown_dialog.item_table[8].text)
         assert.are.equal("One", shown_dialog.item_table[8].sub_item_table[1].text)
         assert.are.equal("Complex group", shown_dialog.item_table[9].text)
         assert.are.equal("Publisher", shown_dialog.item_table[9].sub_item_table[1].text)
         assert.are.equal("Mystery", shown_dialog.item_table[10].text)
-        assert.are.equal("Unsupported", shown_dialog.item_table[10].mandatory)
+        assert.are.equal("tx:Unsupported", shown_dialog.item_table[10].mandatory)
         assert.is_false(shown_dialog.item_table[10].select_enabled)
-        assert.are.equal("Apply filters", shown_dialog.item_table[11].text)
-        assert.are.equal("Reset filters", shown_dialog.item_table[12].text)
-        assert.are.equal("Search text", shown_dialog.item_table[13].text)
+        assert.are.equal("tx:Apply filters", shown_dialog.item_table[11].text)
+        assert.are.equal("tx:Reset filters", shown_dialog.item_table[12].text)
+        assert.are.equal("tx:Search text", shown_dialog.item_table[13].text)
 
         local editor = shown_dialog
         shown_dialog.item_table[2].callback()
@@ -532,23 +568,23 @@ describe("suwayomi/ui/browse", function()
         assert.truthy(shown_dialog.buttons[1][1].text:match("Name"))
         assert.truthy(shown_dialog.buttons[3][1].text:match("Ascending"))
         shown_dialog.buttons[2][1].callback()
-        assert.are.equal("Updated - Ascending", editor.item_table[6].mandatory)
+        assert.are.equal("Updated - ctx:source filter sort direction:Ascending", editor.item_table[6].mandatory)
         editor.item_table[6].callback()
         shown_dialog.buttons[4][1].callback()
-        assert.are.equal("Updated - Descending", editor.item_table[6].mandatory)
+        assert.are.equal("Updated - ctx:source filter sort direction:Descending", editor.item_table[6].mandatory)
         editor.item_table[7].callback()
         assert.are.equal("Small group", shown_dialog.title)
         assert.are.equal("Awarded", shown_dialog.buttons[1][1].text)
         assert.is_false(shown_dialog.buttons[1][1].checked_func())
         assert.are.equal("Licensed", shown_dialog.buttons[2][1].text)
         assert.is_false(shown_dialog.buttons[2][1].checked_func())
-        assert.are.equal("Done", shown_dialog.buttons[3][1].text)
+        assert.are.equal("tx:Done", shown_dialog.buttons[3][1].text)
         shown_dialog.buttons[1][1].callback()
-        assert.are.equal("1 selected", editor.item_table[7].mandatory)
+        assert.are.equal("tx:1 selected", editor.item_table[7].mandatory)
         assert.is_true(shown_dialog.buttons[1][1].checked_func())
         assert.is_false(shown_dialog.buttons[2][1].checked_func())
         shown_dialog.buttons[2][1].callback()
-        assert.are.equal("2 selected", editor.item_table[7].mandatory)
+        assert.are.equal("tx:2 selected", editor.item_table[7].mandatory)
         assert.is_true(shown_dialog.buttons[2][1].checked_func())
         shown_dialog.buttons[3][1].callback()
         editor.item_table[11].callback()
@@ -590,8 +626,42 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.are.equal("Completed", shown_dialog.item_table[1].text)
-        assert.are.equal("Off", shown_dialog.item_table[1].mandatory)
-        assert.are.equal("Apply filters", shown_dialog.item_table[2].text)
+        assert.are.equal("ctx:source filter state:Off", shown_dialog.item_table[1].mandatory)
+        assert.are.equal("tx:Apply filters", shown_dialog.item_table[2].text)
+    end)
+
+    it("translates source-filter chrome while keeping server filter labels and values raw", function()
+        local browse = require("suwayomi/ui/browse")
+
+        browse.showSourceFilterEditor({
+            id = "s1",
+            name = "Random Source",
+        }, {
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+            { type = "TriStateFilter", name = "Licensed", default = "IGNORE" },
+            { type = "SelectFilter", name = "Length", values = { "Any", "Long" }, default = 0 },
+            {
+                type = "GroupFilter",
+                name = "Small group",
+                filters = {
+                    { type = "CheckBoxFilter", name = "Awarded", default = false },
+                    { type = "CheckBoxFilter", name = "Licensed", default = false },
+                },
+            },
+        })
+
+        assert.are.equal("tx:Random Source filters", shown_dialog.title)
+        assert.are.equal("Completed", shown_dialog.item_table[1].text)
+        assert.are.equal("ctx:source filter state:Off", shown_dialog.item_table[1].mandatory)
+        assert.are.equal("Licensed", shown_dialog.item_table[2].text)
+        assert.are.equal("ctx:source filter tri-state:Any", shown_dialog.item_table[2].mandatory)
+        assert.are.equal("Length", shown_dialog.item_table[3].text)
+        assert.are.equal("Any", shown_dialog.item_table[3].mandatory)
+        assert.are.equal("Small group", shown_dialog.item_table[4].text)
+        assert.are.equal("ctx:source filter tri-state:Any", shown_dialog.item_table[4].mandatory)
+        assert.are.equal("tx:Apply filters", shown_dialog.item_table[5].text)
+        assert.are.equal("tx:Reset filters", shown_dialog.item_table[6].text)
+        assert.are.equal("tx:Search text", shown_dialog.item_table[7].text)
     end)
 
     it("omits source filter fallback action rows when title callbacks are present", function()
@@ -690,7 +760,7 @@ describe("suwayomi/ui/browse", function()
         editor.item_table[1].callback(editor)
         shown_dialog.buttons[2][1].callback()
 
-        assert.are.equal("Updated - Ascending", editor.item_table[1].mandatory)
+        assert.are.equal("Updated - ctx:source filter sort direction:Ascending", editor.item_table[1].mandatory)
         assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
     end)
 
@@ -712,7 +782,7 @@ describe("suwayomi/ui/browse", function()
 
         editor.item_table[1].callback(editor)
 
-        assert.are.equal("On", editor.item_table[1].mandatory)
+        assert.are.equal("ctx:source filter state:On", editor.item_table[1].mandatory)
         assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
     end)
 
@@ -732,18 +802,18 @@ describe("suwayomi/ui/browse", function()
             table.insert(refreshes, { select_number = select_number, no_recalculate_dimen = no_recalculate_dimen })
         end
 
-        assert.are.equal("Any", editor.item_table[1].mandatory)
+        assert.are.equal("ctx:source filter tri-state:Any", editor.item_table[1].mandatory)
         editor.item_table[1].callback(editor)
 
         assert.are.equal("Licensed", shown_dialog.title)
-        assert.are.equal("Any", shown_dialog.buttons[1][1].text)
+        assert.are.equal("ctx:source filter tri-state:Any", shown_dialog.buttons[1][1].text)
         assert.is_true(shown_dialog.buttons[1][1].checked_func())
-        assert.are.equal("Include", shown_dialog.buttons[2][1].text)
-        assert.are.equal("Exclude", shown_dialog.buttons[3][1].text)
+        assert.are.equal("ctx:source filter tri-state:Include", shown_dialog.buttons[2][1].text)
+        assert.are.equal("ctx:source filter tri-state:Exclude", shown_dialog.buttons[3][1].text)
 
         shown_dialog.buttons[2][1].callback()
 
-        assert.are.equal("Include", editor.item_table[1].mandatory)
+        assert.are.equal("ctx:source filter tri-state:Include", editor.item_table[1].mandatory)
         assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
     end)
 
@@ -813,18 +883,18 @@ describe("suwayomi/ui/browse", function()
 
         assert.is_nil(editor.item_table[1].sub_item_table)
         assert.are.equal("One", editor.item_table[2].sub_item_table[1].text)
-        assert.are.equal("Any", editor.item_table[1].mandatory)
+        assert.are.equal("ctx:source filter tri-state:Any", editor.item_table[1].mandatory)
 
         editor.item_table[1].callback(editor)
         shown_dialog.buttons[1][1].callback()
 
-        assert.are.equal("1 selected", editor.item_table[1].mandatory)
+        assert.are.equal("tx:1 selected", editor.item_table[1].mandatory)
         assert.is_true(shown_dialog.buttons[1][1].checked_func())
         assert.are.same({ { select_number = nil, no_recalculate_dimen = true } }, refreshes)
 
         shown_dialog.buttons[1][1].callback()
 
-        assert.are.equal("Any", editor.item_table[1].mandatory)
+        assert.are.equal("ctx:source filter tri-state:Any", editor.item_table[1].mandatory)
         assert.are.same({
             { select_number = nil, no_recalculate_dimen = true },
             { select_number = nil, no_recalculate_dimen = true },
@@ -846,9 +916,9 @@ describe("suwayomi/ui/browse", function()
         end)
 
         assert.is_true(shown_dialog.is_button_dialog)
-        assert.are.equal("Popular", shown_dialog.buttons[1][1].text)
-        assert.are.equal("Latest", shown_dialog.buttons[1][2].text)
-        assert.are.equal("Search", shown_dialog.buttons[2][1].text)
+        assert.are.equal("ctx:source mode:Popular", shown_dialog.buttons[1][1].text)
+        assert.are.equal("ctx:source mode:Latest", shown_dialog.buttons[1][2].text)
+        assert.are.equal("ctx:source mode:Search", shown_dialog.buttons[2][1].text)
         shown_dialog.buttons[1][2].callback()
         assert.are.equal("LATEST", selected_mode)
 
@@ -859,7 +929,7 @@ describe("suwayomi/ui/browse", function()
             searched_query = query
         end)
 
-        assert.are.equal("Search MangaDex", shown_dialog.title)
+        assert.are.equal("tx:Search MangaDex", shown_dialog.title)
         shown_dialog.getFields = function()
             return { " frieren " }
         end
@@ -870,7 +940,7 @@ describe("suwayomi/ui/browse", function()
         browse.showGlobalSearchPrompt(function(query)
             global_query = query
         end)
-        assert.are.equal("Global search", shown_dialog.title)
+        assert.are.equal("tx:Global search", shown_dialog.title)
         shown_dialog.getFields = function()
             return { "dandadan" }
         end
@@ -880,7 +950,7 @@ describe("suwayomi/ui/browse", function()
         browse.showExtensionSearchPrompt("akuma", function(query)
             extension_query = query
         end)
-        assert.are.equal("Search extensions", shown_dialog.title)
+        assert.are.equal("tx:Search extensions", shown_dialog.title)
         assert.are.equal("akuma", shown_dialog.fields[1].text)
         shown_dialog.getFields = function()
             return { "buon dua" }
@@ -901,6 +971,29 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("", extension_query)
     end)
 
+    it("translates source search prompt chrome while keeping source name raw", function()
+        local browse = require("suwayomi/ui/browse")
+        local searched
+
+        browse.showSourceSearchPrompt({
+            id = "s1",
+            name = "MangaDex",
+        }, function(query)
+            searched = query
+        end, {
+            query = "isekai",
+        })
+
+        assert.are.equal("tx:Search MangaDex", shown_dialog.title)
+        assert.are.equal("tx:Search query", shown_dialog.fields[1].hint)
+        assert.are.equal("isekai", shown_dialog.fields[1].text)
+        assert.are.equal("tx:Cancel", shown_dialog.buttons[1][1].text)
+        assert.are.equal("ctx:source action:Search", shown_dialog.buttons[1][2].text)
+
+        shown_dialog.buttons[1][2].callback()
+        assert.are.equal("frieren", searched)
+    end)
+
     it("does not render title menu callbacks as action rows in source mode menus", function()
         local browse = require("suwayomi/ui/browse")
 
@@ -918,9 +1011,9 @@ describe("suwayomi/ui/browse", function()
         })
 
         assert.is_true(shown_dialog.is_button_dialog)
-        assert.are.equal("Popular", shown_dialog.buttons[1][1].text)
+        assert.are.equal("ctx:source mode:Popular", shown_dialog.buttons[1][1].text)
         assert.are.equal("POPULAR", shown_dialog.buttons[1][1].id)
-        assert.are.equal("Latest", shown_dialog.buttons[1][2].text)
+        assert.are.equal("ctx:source mode:Latest", shown_dialog.buttons[1][2].text)
         assert.are.equal("LATEST", shown_dialog.buttons[1][2].id)
     end)
 
@@ -962,20 +1055,20 @@ describe("suwayomi/ui/browse", function()
             table.insert(selected, summary)
         end)
 
-        assert.are.equal("Global search", shown_dialog.title)
+        assert.are.equal("tx:Global search", shown_dialog.title)
         assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal("MangaDex", shown_dialog.item_table[1].text)
-        assert.are.equal("1 result", shown_dialog.item_table[1].mandatory)
+        assert.are.equal("tx:1 result", shown_dialog.item_table[1].mandatory)
         assert.are.equal("More Source", shown_dialog.item_table[2].text)
-        assert.are.equal("2+ results", shown_dialog.item_table[2].mandatory)
+        assert.are.equal("tx:2+ results", shown_dialog.item_table[2].mandatory)
         assert.are.equal("Searching Source", shown_dialog.item_table[3].text)
-        assert.are.equal("searching", shown_dialog.item_table[3].mandatory)
+        assert.are.equal("tx:searching", shown_dialog.item_table[3].mandatory)
         assert.are.equal("Slow Source", shown_dialog.item_table[4].text)
-        assert.are.equal("timed out", shown_dialog.item_table[4].mandatory)
+        assert.are.equal("tx:timed out", shown_dialog.item_table[4].mandatory)
         assert.are.equal("ComicK", shown_dialog.item_table[5].text)
-        assert.are.equal("No results", shown_dialog.item_table[5].mandatory)
+        assert.are.equal("tx:No results", shown_dialog.item_table[5].mandatory)
         assert.are.equal("Some Source", shown_dialog.item_table[6].text)
-        assert.are.equal("Error", shown_dialog.item_table[6].mandatory)
+        assert.are.equal("tx:Error", shown_dialog.item_table[6].mandatory)
         assert.are.equal("Timed out", shown_dialog.item_table[6].subtitle)
 
         shown_dialog.item_table[1].callback()
@@ -1007,7 +1100,7 @@ describe("suwayomi/ui/browse", function()
 
         assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal("Local source", shown_dialog.item_table[1].text)
-        assert.are.equal("searching", shown_dialog.item_table[1].mandatory)
+        assert.are.equal("tx:searching", shown_dialog.item_table[1].mandatory)
 
         browse.updateGlobalSearchResultsMenu(shown_dialog, {
             { source = { id = "s1", name = "Local source" }, status = "ok", result_count = 1 },
@@ -1021,7 +1114,7 @@ describe("suwayomi/ui/browse", function()
 
         assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal("Local source", shown_dialog.item_table[1].text)
-        assert.are.equal("1 result", shown_dialog.item_table[1].mandatory)
+        assert.are.equal("tx:1 result", shown_dialog.item_table[1].mandatory)
         shown_dialog.item_table[1].callback()
 
         assert.is_false(canceled)
@@ -1084,14 +1177,14 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("list_menu", shown_dialog.renderer)
         assert.is_true(shown_dialog.fixed_item_heights)
         assert.are.equal(on_page_changed, shown_dialog.on_page_changed)
-        assert.are.equal("Previous page", shown_dialog.item_table[1].text)
+        assert.are.equal("tx:Previous page", shown_dialog.item_table[1].text)
         assert.are.equal("Already Added", shown_dialog.item_table[2].text)
-        assert.are.equal("In Library", shown_dialog.item_table[2].mandatory)
+        assert.are.equal("tx:In Library", shown_dialog.item_table[2].mandatory)
         assert.are.equal("New Find", shown_dialog.item_table[3].text)
         assert.is_nil(shown_dialog.item_table[3].mandatory)
         assert.are.equal("Unknown State", shown_dialog.item_table[4].text)
         assert.is_nil(shown_dialog.item_table[4].mandatory)
-        assert.are.equal("Next page", shown_dialog.item_table[5].text)
+        assert.are.equal("tx:Next page", shown_dialog.item_table[5].text)
 
         shown_dialog.item_table[1].callback()
         shown_dialog.item_table[2].callback()
@@ -1157,10 +1250,10 @@ describe("suwayomi/ui/browse", function()
             selected_category = category
         end)
 
-        assert.are.equal("Suwayomi Library", shown_dialog.title)
+        assert.are.equal("tx:Suwayomi Library", shown_dialog.title)
         assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal("Default", shown_dialog.item_table[1].text)
-        assert.are.equal("2 manga", shown_dialog.item_table[1].mandatory)
+        assert.are.equal("tx:2 manga", shown_dialog.item_table[1].mandatory)
         assert.are.equal("Favorites", shown_dialog.item_table[2].text)
         shown_dialog.item_table[1].callback()
         assert.are.same({ id = 0, name = "Default", manga_count = 2 }, selected_category)
@@ -1171,7 +1264,7 @@ describe("suwayomi/ui/browse", function()
             selected_manga = manga
         end)
 
-        assert.are.equal("Suwayomi Library", shown_dialog.title)
+        assert.are.equal("tx:Suwayomi Library", shown_dialog.title)
         assert.are.equal("list_menu", shown_dialog.renderer)
         assert.are.equal("Sousou no Frieren", shown_dialog.item_table[1].text)
         assert.is_nil(shown_dialog.item_table[1].mandatory)

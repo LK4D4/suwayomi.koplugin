@@ -3,12 +3,13 @@
 -- Responsibility: build source, search, browse manga, and library category menus
 -- while preserving controller-owned callbacks.
 -- Owned state: none; menu refresh helpers mutate existing KOReader menu widgets.
--- Dependencies: KOReader Menu/MultiInputDialog, gettext, and shared menu utils.
+-- Dependencies: KOReader Menu/MultiInputDialog, plugin i18n facade, and shared
+-- menu utils.
 -- External data: source and manga rows come from API/cache layers and are only
 -- formatted for display here.
 
 local MultiInputDialog = require("ui/widget/multiinputdialog")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 local ListRows = require("suwayomi/ui/list_rows")
 
 local BrowseUI = {}
@@ -41,7 +42,7 @@ function BrowseUI.showSourcesMenu(sources, onSelectCallback, options)
     end
 
     return getListMenu().show{
-        title = _("Suwayomi Sources"),
+        title = I18n.t("Suwayomi Sources"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         fixed_item_heights = options.fixed_item_heights ~= false,
         item_table = ListRows.buildSourceMenuTable(sources, {
@@ -63,7 +64,7 @@ function BrowseUI.showExtensionsMenu(extensions, onSelectCallback, options)
         show_empty_sections = options.show_empty_extension_sections,
     })
     return getListMenu().show{
-        title = options.title or _("Suwayomi Extensions"),
+        title = options.title or I18n.t("Suwayomi Extensions"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         fixed_item_heights = options.fixed_item_heights ~= false,
         item_table = item_table,
@@ -84,7 +85,7 @@ function BrowseUI.updateExtensionsMenu(menu, extensions, onSelectCallback, optio
         show_empty_sections = options.show_empty_extension_sections,
     })
     return getListMenu().update(menu, {
-        title = options.title or _("Suwayomi Extensions"),
+        title = options.title or I18n.t("Suwayomi Extensions"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = item_table,
         itemnumber = options.itemnumber or findExtensionItemNumber(item_table, options.focus_extension_pkg_name),
@@ -109,16 +110,16 @@ function BrowseUI.showExtensionActionMenu(extension, onSelectCallback, options)
     end
 
     if type(extension) == "table" and extension.is_installed ~= true then
-        addAction("install", _("Install"))
+        addAction("install", I18n.c("extension action", "Install"))
     elseif type(extension) == "table" and extension.has_update == true then
-        addAction("update", _("Update"))
+        addAction("update", I18n.c("extension action", "Update"))
     end
     if type(extension) == "table" and extension.is_installed == true then
-        addAction("uninstall", _("Uninstall"), true)
+        addAction("uninstall", I18n.c("extension action", "Uninstall"), true)
     end
 
     if #actions == 0 then
-        table.insert(actions, { text = _("No actions available") })
+        table.insert(actions, { text = I18n.t("No actions available") })
     end
 
     return require("suwayomi/ui").showActionMenu({
@@ -140,29 +141,29 @@ function BrowseUI.showSourceModeMenu(source, onSelectCallback, options)
     local actions = {
         {
             id = "POPULAR",
-            text = _("Popular"),
+            text = I18n.c("source mode", "Popular"),
         },
     }
 
     if not source or source.supports_latest ~= false then
         table.insert(actions, {
             id = "LATEST",
-            text = _("Latest"),
+            text = I18n.c("source mode", "Latest"),
         })
     end
 
     table.insert(actions, {
         id = "SEARCH",
-        text = _("Search"),
+        text = I18n.c("source mode", "Search"),
     })
 
     table.insert(actions, {
         id = "FILTERS",
-        text = _("Source filters"),
+        text = I18n.t("Source filters"),
     })
 
     return require("suwayomi/ui").showActionMenu({
-        title = source and (source.name or source.display_name or source.displayName) or _("Suwayomi Source"),
+        title = source and (source.name or source.display_name or source.displayName) or I18n.t("Suwayomi Source"),
         actions = actions,
         columns = 2,
         anchor = options.anchor,
@@ -182,24 +183,24 @@ function BrowseUI.showSourceSearchPrompt(source, onSearchCallback, options)
     local UIManager = require("ui/uimanager")
     local dialog
     dialog = MultiInputDialog:new{
-        title = _("Search ") .. (source and (source.name or source.display_name or source.displayName) or _("source")),
+        title = I18n.f("Search %1", source and (source.name or source.display_name or source.displayName) or I18n.t("source")),
         fields = {
             {
-                hint = _("Search query"),
+                hint = I18n.t("Search query"),
                 text = options.query or "",
             },
         },
         buttons = {
             {
                 {
-                    text = _("Cancel"),
+                    text = I18n.t("Cancel"),
                     id = "close",
                     callback = function()
                         UIManager:close(dialog)
                     end,
                 },
                 {
-                    text = _("Search"),
+                    text = I18n.c("source action", "Search"),
                     is_enter_default = true,
                     callback = function()
                         local fields = dialog:getFields()
@@ -301,7 +302,7 @@ local function getDraftState(draft, position, state_type, default, group_positio
 end
 
 local function stateText(value)
-    return value and _("On") or _("Off")
+    return value and I18n.c("source filter state", "On") or I18n.c("source filter state", "Off")
 end
 
 local function sortStateText(filter, state)
@@ -309,25 +310,27 @@ local function sortStateText(filter, state)
     state = type(state) == "table" and state or {}
     local index = tonumber(state.index) or 0
     local label = values[index + 1] or tostring(index)
-    local direction = state.ascending == false and _("Descending") or _("Ascending")
+    local direction = state.ascending == false
+        and I18n.c("source filter sort direction", "Descending")
+        or I18n.c("source filter sort direction", "Ascending")
     return label .. " - " .. direction
 end
 
 local function triStateText(value)
     value = tostring(value or "IGNORE")
     if value == "INCLUDE" then
-        return _("Include")
+        return I18n.c("source filter tri-state", "Include")
     elseif value == "EXCLUDE" then
-        return _("Exclude")
+        return I18n.c("source filter tri-state", "Exclude")
     end
-    return _("Any")
+    return I18n.c("source filter tri-state", "Any")
 end
 
 local function triStateChoices()
     return {
-        { value = "IGNORE", text = _("Any") },
-        { value = "INCLUDE", text = _("Include") },
-        { value = "EXCLUDE", text = _("Exclude") },
+        { value = "IGNORE", text = I18n.c("source filter tri-state", "Any") },
+        { value = "INCLUDE", text = I18n.c("source filter tri-state", "Include") },
+        { value = "EXCLUDE", text = I18n.c("source filter tri-state", "Exclude") },
     }
 end
 
@@ -367,35 +370,33 @@ local function groupStateText(filter, draft, group_position)
         end
     end
     if active_count == 0 then
-        return _("Any")
-    elseif active_count == 1 then
-        return _("1 selected")
+        return I18n.c("source filter tri-state", "Any")
     end
-    return tostring(active_count) .. _(" selected")
+    return I18n.count(active_count, "1 selected", "%1 selected")
 end
 
 local function showTextFilterDialog(filter, current, onSave)
     local UIManager = require("ui/uimanager")
     local dialog
     dialog = MultiInputDialog:new{
-        title = filter.name or _("Text filter"),
+        title = filter.name or I18n.t("Text filter"),
         fields = {
             {
-                hint = filter.name or _("Text"),
+                hint = filter.name or I18n.t("Text"),
                 text = current or "",
             },
         },
         buttons = {
             {
                 {
-                    text = _("Cancel"),
+                    text = I18n.t("Cancel"),
                     id = "close",
                     callback = function()
                         UIManager:close(dialog)
                     end,
                 },
                 {
-                    text = _("Save"),
+                    text = I18n.t("Save"),
                     is_enter_default = true,
                     callback = function()
                         local fields = dialog:getFields()
@@ -584,11 +585,13 @@ local function buildSourceFilterRows(filters, draft, context)
                 end
                 table.insert(actions, {
                     id = "ascending",
-                    text = (current.ascending ~= false and "* " or "") .. _("Ascending"),
+                    text = (current.ascending ~= false and "* " or "")
+                        .. I18n.c("source filter sort direction", "Ascending"),
                 })
                 table.insert(actions, {
                     id = "descending",
-                    text = (current.ascending == false and "* " or "") .. _("Descending"),
+                    text = (current.ascending == false and "* " or "")
+                        .. I18n.c("source filter sort direction", "Descending"),
                 })
                 return getUI().showActionMenu({
                     title = filter.name or "",
@@ -674,7 +677,7 @@ local function buildSourceFilterRows(filters, draft, context)
         else
             table.insert(rows, {
                 text = filter.name or filter_type,
-                mandatory = _("Unsupported"),
+                mandatory = I18n.t("Unsupported"),
                 select_enabled = false,
             })
         end
@@ -685,13 +688,14 @@ end
 function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
     options = options or {}
     draft = copyDraft(draft)
-    local title = (source and (source.name or source.display_name or source.displayName) or _("Source")) .. _(" filters")
+    local source_name = source and (source.name or source.display_name or source.displayName) or I18n.t("Source")
+    local title = I18n.f("%1 filters", source_name)
     local title_options = options.title_options or {}
     local menu_options = {
         actions = {
-            { id = "apply_source_filters", text = _("Apply filters") },
-            { id = "reset_source_filters", text = _("Reset filters") },
-            { id = "source_filter_search_text", text = _("Search text") },
+            { id = "apply_source_filters", text = I18n.t("Apply filters") },
+            { id = "reset_source_filters", text = I18n.t("Reset filters") },
+            { id = "source_filter_search_text", text = I18n.t("Search text") },
         },
         onSelect = function(action)
             local action_id = action and action.id
@@ -731,7 +735,7 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
     })
     if not hasSourceFilterTitleActions(title_options) then
         table.insert(show_options.item_table, {
-            text = _("Apply filters"),
+            text = I18n.t("Apply filters"),
             callback = function()
                 if options.on_apply then
                     return options.on_apply(copyDraft(draft))
@@ -739,7 +743,7 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
             end,
         })
         table.insert(show_options.item_table, {
-            text = _("Reset filters"),
+            text = I18n.t("Reset filters"),
             callback = function()
                 if options.on_reset then
                     return options.on_reset()
@@ -747,7 +751,7 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
             end,
         })
         table.insert(show_options.item_table, {
-            text = _("Search text"),
+            text = I18n.t("Search text"),
             callback = function()
                 if options.on_search_text then
                     return options.on_search_text(copyDraft(draft))
@@ -780,24 +784,24 @@ function BrowseUI.showExtensionSearchPrompt(currentQuery, onSearchCallback)
         end
     end
     dialog = MultiInputDialog:new{
-        title = _("Search extensions"),
+        title = I18n.t("Search extensions"),
         fields = {
             {
-                hint = _("Extension name, language, or package"),
+                hint = I18n.t("Extension name, language, or package"),
                 text = currentQuery or "",
             },
         },
         buttons = {
             {
                 {
-                    text = _("Cancel"),
+                    text = I18n.t("Cancel"),
                     id = "close",
                     callback = function()
                         finish("")
                     end,
                 },
                 {
-                    text = _("Search"),
+                    text = I18n.c("extension action", "Search"),
                     is_enter_default = true,
                     callback = function()
                         local fields = dialog:getFields()
@@ -822,24 +826,24 @@ function BrowseUI.showGlobalSearchPrompt(onSearchCallback)
     local UIManager = require("ui/uimanager")
     local dialog
     dialog = MultiInputDialog:new{
-        title = _("Global search"),
+        title = I18n.t("Global search"),
         fields = {
             {
-                hint = _("Search query"),
+                hint = I18n.t("Search query"),
                 text = "",
             },
         },
         buttons = {
             {
                 {
-                    text = _("Cancel"),
+                    text = I18n.t("Cancel"),
                     id = "close",
                     callback = function()
                         UIManager:close(dialog)
                     end,
                 },
                 {
-                    text = _("Search"),
+                    text = I18n.c("source action", "Search"),
                     is_enter_default = true,
                     callback = function()
                         local fields = dialog:getFields()
@@ -863,7 +867,7 @@ function BrowseUI.updateSourcesMenu(menu, sources, onSelectCallback, options)
     end
 
     return getListMenu().update(menu, {
-        title = _("Suwayomi Sources"),
+        title = I18n.t("Suwayomi Sources"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = ListRows.buildSourceMenuTable(sources, {
             show_language = true,
@@ -879,7 +883,7 @@ end
 function BrowseUI.showGlobalSearchResultsMenu(summaries, onSelectCallback, options)
     options = options or {}
     return getListMenu().show{
-        title = _("Global search"),
+        title = I18n.t("Global search"),
         title_bar_left_icon = options and options.title_bar_left_icon,
         item_table = ListRows.buildGlobalSearchSummaryMenuTable(summaries, {
             on_select = onSelectCallback,
@@ -899,7 +903,7 @@ function BrowseUI.updateGlobalSearchResultsMenu(menu, summaries, onSelectCallbac
 
     options = options or {}
     return getListMenu().update(menu, {
-        title = _("Global search"),
+        title = I18n.t("Global search"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = ListRows.buildGlobalSearchSummaryMenuTable(summaries, {
             on_select = onSelectCallback,
@@ -917,7 +921,7 @@ local function buildMangaMenuTable(manga_list, onSelectCallback, options)
     local menu_table = {}
     if options.on_previous_page then
         table.insert(menu_table, {
-            text = _("Previous page"),
+            text = I18n.t("Previous page"),
             callback = options.on_previous_page,
         })
     end
@@ -933,7 +937,7 @@ local function buildMangaMenuTable(manga_list, onSelectCallback, options)
     end
     if options.on_next_page then
         table.insert(menu_table, {
-            text = _("Next page"),
+            text = I18n.t("Next page"),
             callback = options.on_next_page,
         })
     end
@@ -944,7 +948,7 @@ function BrowseUI.showMangaMenu(manga_list, onSelectCallback, options)
     options = options or {}
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
     return getListMenu().show{
-        title = options.title or _("Suwayomi Manga"),
+        title = options.title or I18n.t("Suwayomi Manga"),
         title_bar_left_icon = options.title_bar_left_icon,
         fixed_item_heights = options.fixed_item_heights ~= false,
         item_table = menu_table,
@@ -978,7 +982,7 @@ end
 function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
     options = options or {}
     return getListMenu().show{
-        title = _("Suwayomi Library"),
+        title = I18n.t("Suwayomi Library"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = ListRows.buildLibraryCategoryMenuTable(categories, {
             on_select = onSelectCallback,
@@ -999,7 +1003,7 @@ end
 function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
     options = options or {}
     return getListMenu().show{
-        title = _("Suwayomi Library"),
+        title = I18n.t("Suwayomi Library"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
         close_callback = options.close_callback,
@@ -1016,7 +1020,7 @@ function BrowseUI.updateLibraryMangaMenu(menu, manga_list, onSelectCallback, opt
 
     options = options or {}
     return getListMenu().update(menu, {
-        title = _("Suwayomi Library"),
+        title = I18n.t("Suwayomi Library"),
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
         close_callback = options.close_callback,
