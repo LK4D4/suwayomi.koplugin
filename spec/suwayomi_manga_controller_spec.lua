@@ -1,6 +1,7 @@
 package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/controller_module_spec_helper")
+local Marker = require("spec/support/i18n_marker")
 
 local modules_to_clear = {
     "ffi/util",
@@ -316,7 +317,10 @@ local function hasAction(actions, action_id)
 end
 
 describe("suwayomi/manga/controller", function()
-    after_each(clearModules)
+    after_each(function()
+        clearModules()
+        Marker.uninstall()
+    end)
 
     it("exports manga/library action methods", function()
         helper.assertControllerModule("suwayomi/manga/controller", {
@@ -454,6 +458,23 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("Open next unread", state.manga_information_options.actions[2].text)
     end)
 
+    it("routes manga information action labels through i18n", function()
+        Marker.install()
+        package.loaded["suwayomi/manga/controller"] = nil
+        package.loaded["suwayomi/manga/action_menu"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local plugin = installController()
+        local actions = plugin:getMangaInformationActions({
+            id = "m1",
+            title = "Frieren",
+            in_library = false,
+        })
+
+        assert.are.equal("tx:Open chapters", actions[1].text)
+        assert.are.equal("tx:Add to library", actions[2].text)
+    end)
+
     it("builds first-unread action from visible scanlator-filtered chapters only", function()
         local plugin, state = installController()
         local manga = { id = "m1", title = "Frieren" }
@@ -566,6 +587,31 @@ describe("suwayomi/manga/controller", function()
 
         assert.is_true(hasAction(state.manga_information_options.actions, "add_to_library"))
         assert.is_false(hasAction(state.manga_information_options.actions, "remove_from_library"))
+    end)
+
+    it("translates manga controller messages while keeping raw API errors", function()
+        Marker.install()
+        package.loaded["suwayomi/manga/controller"] = nil
+        package.loaded["suwayomi/manga/action_menu"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local plugin, state = installController({
+            defer_network_finish = true,
+            library_update_ok = false,
+        })
+        local manga = { id = "m1", title = "Frieren", in_library = false }
+
+        assert.is_true(plugin:setMangaLibraryState(manga, true))
+        assert.are.equal("tx:Adding to library...", state.network_requests[1].loading_message)
+
+        state.network_requests[1].on_finish({
+            ok = false,
+            error = "HTTP 500 from Suwayomi",
+        })
+        assert.are.equal("HTTP 500 from Suwayomi", state.messages[#state.messages])
+
+        assert.is_false(plugin:startMangaNetworkRequest(nil, {}, nil, nil, nil, "missing"))
+        assert.are.equal("tx:This manga cannot be loaded right now.", state.messages[#state.messages])
     end)
 
     it("opens first unread and downloads the next unread chapter from manga actions", function()
@@ -1012,6 +1058,60 @@ describe("suwayomi/manga/controller", function()
 
         assert.is_true(plugin:performMangaAction(manga, "delete_read_downloaded"))
         assert.is_true(state.confirm_delete_read)
+    end)
+
+    it("translates manga bulk download confirmations", function()
+        Marker.install()
+        package.loaded["suwayomi/manga/controller"] = nil
+        package.loaded["suwayomi/manga/action_menu"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local plugin, state = installController({
+            context_chapters = {
+                { id = "c1", name = "Ch. 1", is_read = true },
+                { id = "c2", name = "Ch. 2", is_read = false },
+                { id = "c3", name = "Ch. 3", is_read = false },
+            },
+        })
+        local manga = { id = "m1", title = "Frieren" }
+        function plugin:getUnreadChaptersForManga()
+            local unread = {}
+            for _, chapter in ipairs(self.current_chapter_context.chapters or {}) do
+                if chapter.is_read ~= true then
+                    table.insert(unread, chapter)
+                end
+            end
+            return unread
+        end
+
+        assert.is_true(plugin:confirmDownloadAllUnreadChaptersForManga(manga))
+
+        assert.are.equal("tx:Queue downloads for all 2 unread chapters?", state.bulk_confirmation.text)
+        assert.are.equal("tx:Queue", state.bulk_confirmation.ok_text)
+    end)
+
+    it("translates keep-next unread confirmation text with multiple placeholders", function()
+        Marker.install()
+        package.loaded["suwayomi/manga/controller"] = nil
+        package.loaded["suwayomi/manga/action_menu"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local plugin, state = installController()
+        local manga = { id = "m1", title = "Frieren" }
+        plugin.current_chapter_context = {
+            manga = manga,
+            chapters = {
+                { id = "c1", name = "Ch. 1", is_read = false },
+                { id = "c2", name = "Ch. 2", is_read = false },
+            },
+        }
+
+        assert.is_true(plugin:confirmKeepNextUnreadChaptersDownloaded(5))
+        assert.are.equal(
+            "tx:Queue 2 missing downloads to keep the next 5 unread chapters available?",
+            state.bulk_confirmation.text
+        )
+        assert.are.equal("tx:Queue", state.bulk_confirmation.ok_text)
     end)
 
     it("clears a per-manga keep-next policy without loading chapters", function()

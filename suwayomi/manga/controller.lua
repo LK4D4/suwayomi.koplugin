@@ -2,7 +2,7 @@
 --
 -- Responsibility: Owns manga-level actions, library add/remove, chapter refresh, and first-unread selection.
 -- Owned state: Coordinates API/client calls but leaves chapter row/menu state to chapter modules.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local SuwayomiSettings = require("suwayomi/settings")
@@ -10,9 +10,7 @@ local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
 local NetworkRequestJob = require("suwayomi/network/request_job")
 local MangaActionMenu = require("suwayomi/manga/action_menu")
-local _ = require("gettext")
-local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
+local I18n = require("suwayomi/i18n")
 
 local MangaController = {}
 MangaController.__index = MangaController
@@ -110,7 +108,7 @@ end
 
 function Methods:startMangaNetworkRequest(manga, request, loading_message, on_finish, timeout_message, slot_key)
     if not manga or not manga.id then
-        self:showMessage(_("This manga cannot be loaded right now."))
+        self:showMessage(I18n.t("This manga cannot be loaded right now."))
         return false
     end
 
@@ -136,7 +134,7 @@ function Methods:startMangaNetworkRequest(manga, request, loading_message, on_fi
         loading_message = loading_message,
         result_prefix = "manga_request",
         timeout_seconds = self.manga_network_timeout_seconds or 30,
-        timeout_message = timeout_message or _("Could not load chapters."),
+        timeout_message = timeout_message or I18n.t("Could not load chapters."),
         on_cancel = function()
             if active_requests[slot_key] == request_token then
                 active_requests[slot_key] = nil
@@ -187,11 +185,11 @@ function Methods:handleRefreshMangaResult(manga, result, options)
         return false
     end
     if not result.ok then
-        self:showMessage(_(result.error))
+        self:showMessage(result.error)
         return false
     end
     if type(result.chapters) ~= "table" then
-        self:showMessage(_("Suwayomi server did not refresh manga."))
+        self:showMessage(I18n.t("Suwayomi server did not refresh manga."))
         return false
     end
 
@@ -211,11 +209,11 @@ function Methods:handleChapterContextResult(manga, result, on_ready)
         return false
     end
     if not result.ok then
-        self:showMessage(_(result.error))
+        self:showMessage(result.error)
         return false
     end
     if type(result.chapters) ~= "table" or #result.chapters == 0 then
-        self:showMessage(_("This manga has no chapters."))
+        self:showMessage(I18n.t("This manga has no chapters."))
         return false
     end
 
@@ -232,13 +230,15 @@ end
 
 function Methods:startLoadMangaChapterContext(manga, on_ready)
     local action = self:isMangaUninitialized(manga) and "refresh_manga" or "fetch_chapters_for_manga"
-    local message = action == "refresh_manga" and _("Refreshing chapters...") or _("Loading chapters...")
+    local message = action == "refresh_manga"
+        and I18n.t("Refreshing chapters...")
+        or I18n.t("Loading chapters...")
     return self:startMangaNetworkRequest(manga, {
         action = action,
         manga_id = manga and manga.id,
     }, message, function(result)
         self:handleChapterContextResult(manga, result, on_ready)
-    end, _("Could not load chapters."), "chapter_context")
+    end, I18n.t("Could not load chapters."), "chapter_context")
 end
 
 function Methods:withMangaChapterContext(manga, on_ready, options)
@@ -256,7 +256,7 @@ function Methods:withMangaChapterContext(manga, on_ready, options)
         return true
     end
     if not manga or not manga.id then
-        self:showMessage(_("This manga has no chapters loaded."))
+        self:showMessage(I18n.t("This manga has no chapters loaded."))
         return false
     end
     return self:startLoadMangaChapterContext(manga, on_ready)
@@ -266,18 +266,18 @@ function Methods:startRefreshMangaForChapters(manga, options)
     return self:startMangaNetworkRequest(manga, {
         action = "refresh_manga",
         manga_id = manga and manga.id,
-    }, _("Refreshing chapters..."), function(result)
+    }, I18n.t("Refreshing chapters..."), function(result)
         self:handleRefreshMangaResult(manga, result, options)
-    end, _("Could not load chapters."), "chapter_menu")
+    end, I18n.t("Could not load chapters."), "chapter_menu")
 end
 
 function Methods:startFetchChaptersForManga(manga, options)
     return self:startMangaNetworkRequest(manga, {
         action = "fetch_chapters_for_manga",
         manga_id = manga and manga.id,
-    }, _("Loading chapters..."), function(result)
+    }, I18n.t("Loading chapters..."), function(result)
         self:showChapterResultForManga(manga, result, options)
-    end, _("Could not load chapters."), "chapter_menu")
+    end, I18n.t("Could not load chapters."), "chapter_menu")
 end
 
 function Methods:buildReaderReturnCloseTarget(_, manga)
@@ -316,7 +316,7 @@ function Methods:showChapterResultForManga(manga, result, options)
         return
     end
     if not result.ok then
-        self:showMessage(_(result.error))
+        self:showMessage(result.error)
         return
     end
 
@@ -327,7 +327,7 @@ function Methods:showChapterResultForManga(manga, result, options)
         chapter_count = #(result.chapters or {}),
     })
     if not result.chapters or #result.chapters == 0 then
-        self:showMessage(_("This manga has no chapters."))
+        self:showMessage(I18n.t("This manga has no chapters."))
         return
     end
 
@@ -399,16 +399,16 @@ end
 
 function Methods:getMangaInformationActions(manga)
     local actions = {
-        { id = "open_chapters", text = _("Open chapters") },
+        { id = "open_chapters", text = I18n.t("Open chapters") },
     }
     if MangaActionMenu.canOpenFirstUnread(self, manga) then
-        table.insert(actions, { id = "open_first_unread", text = _("Open next unread") })
+        table.insert(actions, { id = "open_first_unread", text = I18n.t("Open next unread") })
     end
     if manga and manga.id then
         if manga.in_library == true then
-            table.insert(actions, { id = "remove_from_library", text = _("Remove from library"), destructive = true })
+            table.insert(actions, { id = "remove_from_library", text = I18n.t("Remove from library"), destructive = true })
         else
-            table.insert(actions, { id = "add_to_library", text = _("Add to library") })
+            table.insert(actions, { id = "add_to_library", text = I18n.t("Add to library") })
         end
     end
     return actions
@@ -429,7 +429,7 @@ function Methods:showMangaActions(manga, options)
     end
 
     local menu = SuwayomiUI.showMangaActionsMenu({
-        title = manga and (manga.title or tostring(manga.id)) or _("Manga actions"),
+        title = manga and (manga.title or tostring(manga.id)) or I18n.t("Manga actions"),
         actions = self:getMangaActions(manga),
     }, function(action)
         if action then
@@ -463,11 +463,13 @@ end
 function Methods:setMangaLibraryState(manga, in_library, options)
     options = options or {}
     if not manga or not manga.id then
-        self:showMessage(_("This manga cannot be updated right now."))
+        self:showMessage(I18n.t("This manga cannot be updated right now."))
         return false
     end
 
-    local loading_message = in_library and _("Adding to library...") or _("Removing from library...")
+    local loading_message = in_library
+        and I18n.t("Adding to library...")
+        or I18n.t("Removing from library...")
     local result
     result = self:startMangaNetworkRequest(manga, {
         action = "update_manga_library_state",
@@ -478,7 +480,7 @@ function Methods:setMangaLibraryState(manga, in_library, options)
             return
         end
         if not response.ok then
-            self:showMessage(_(response.error))
+            self:showMessage(response.error)
             return
         end
 
@@ -489,7 +491,7 @@ function Methods:setMangaLibraryState(manga, in_library, options)
         if options.refresh_action_menu_after_library_update then
             self:showMangaActions(manga, options)
         end
-    end, _("Could not update library."), "library_state:" .. tostring(manga.id))
+    end, I18n.t("Could not update library."), "library_state:" .. tostring(manga.id))
     if not result then
         return false
     end
@@ -505,7 +507,7 @@ end
 function Methods:confirmRemoveMangaFromLibrary(manga, options)
     options = options or {}
     if not manga or not manga.id then
-        self:showMessage(_("This manga cannot be updated right now."))
+        self:showMessage(I18n.t("This manga cannot be updated right now."))
         return false
     end
 
@@ -514,10 +516,10 @@ function Methods:confirmRemoveMangaFromLibrary(manga, options)
     end
     if SuwayomiUI.showConfirm then
         SuwayomiUI.showConfirm({
-            text = T(_("Remove %1 from your Suwayomi library?"), manga.title or tostring(manga.id)),
-            ok_text = _("Remove"),
+            text = I18n.f("Remove %1 from your Suwayomi library?", manga.title or tostring(manga.id)),
+            ok_text = I18n.t("Remove"),
             ok_callback = callback,
-            cancel_text = _("Cancel"),
+            cancel_text = I18n.t("Cancel"),
         })
     else
         callback()
@@ -528,7 +530,7 @@ end
 
 function Methods:refreshMangaChapters(manga, options)
     if not manga or not manga.id then
-        self:showMessage(_("This manga cannot be refreshed right now."))
+        self:showMessage(I18n.t("This manga cannot be refreshed right now."))
         return false
     end
 
@@ -547,7 +549,7 @@ function Methods:showBulkDownloadMangaActions(manga, options)
         return false
     end
     local menu = SuwayomiUI.showMangaActionsMenu({
-        title = _("Bulk downloads"),
+        title = I18n.t("Bulk downloads"),
         actions = MangaActionMenu.buildBulkDownloadActions(),
         on_back = function()
             self:showMangaActions(manga, options)
@@ -570,7 +572,7 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
         return false
     end
     local menu = SuwayomiUI.showMangaActionsMenu({
-        title = _("Download ahead"),
+        title = I18n.t("Download ahead"),
         actions = MangaActionMenu.buildKeepDownloadedActions(),
         on_back = function()
             self:showMangaActions(manga, options)
@@ -687,17 +689,18 @@ function Methods:downloadNextUnreadChaptersForManga(manga, limit, confirm)
     local function queue(download_directory)
         local chapters = self:getNextUnreadChaptersForDownload(manga, limit)
         if #chapters == 0 then
-            self:showMessage(_("No unread chapters available to download."))
+            self:showMessage(I18n.t("No unread chapters available to download."))
             return 0
         end
 
         if confirm then
             return self:showBulkActionConfirmation(
-                T(
-                    self:pluralize(#chapters, _("Queue %1 unread chapter download?"), _("Queue %1 unread chapter downloads?")),
-                    #chapters
+                I18n.count(
+                    #chapters,
+                    "Queue %1 unread chapter download?",
+                    "Queue %1 unread chapter downloads?"
                 ),
-                _("Queue"),
+                I18n.t("Queue"),
                 function()
                     self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
                 end
@@ -725,16 +728,17 @@ function Methods:confirmDownloadAllUnreadChaptersForManga(manga)
     local function queue(download_directory)
         local chapters = self:getUnreadChaptersForManga(manga)
         if #chapters == 0 then
-            self:showMessage(_("No unread chapters available to download."))
+            self:showMessage(I18n.t("No unread chapters available to download."))
             return 0
         end
 
         return self:showBulkActionConfirmation(
-            T(
-                self:pluralize(#chapters, _("Queue downloads for all %1 unread chapter?"), _("Queue downloads for all %1 unread chapters?")),
-                #chapters
+            I18n.count(
+                #chapters,
+                "Queue downloads for all %1 unread chapter?",
+                "Queue downloads for all %1 unread chapters?"
             ),
-            _("Queue"),
+            I18n.t("Queue"),
             function()
                 self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
             end
@@ -759,16 +763,17 @@ function Methods:confirmDownloadAllChaptersForManga(manga)
     local function queue(download_directory)
         local chapters = self:getAllChaptersForManga(manga)
         if #chapters == 0 then
-            self:showMessage(_("This manga has no chapters."))
+            self:showMessage(I18n.t("This manga has no chapters."))
             return 0
         end
 
         return self:showBulkActionConfirmation(
-            T(
-                self:pluralize(#chapters, _("Queue downloads for all %1 chapter?"), _("Queue downloads for all %1 chapters?")),
-                #chapters
+            I18n.count(
+                #chapters,
+                "Queue downloads for all %1 chapter?",
+                "Queue downloads for all %1 chapters?"
             ),
-            _("Queue"),
+            I18n.t("Queue"),
             function()
                 self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
             end
@@ -810,21 +815,19 @@ function Methods:confirmKeepNextUnreadChaptersDownloaded(limit)
     local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
     if #chapters == 0 then
         SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
-        self:showMessage(_("Download-ahead buffer is already downloaded or queued."))
+        self:showMessage(I18n.t("Download-ahead buffer is already downloaded or queued."))
         return 0
     end
 
     return self:showBulkActionConfirmation(
-        T(
-            self:pluralize(
-                #chapters,
-                _("Queue %1 missing download to keep the next %2 unread chapters available?"),
-                _("Queue %1 missing downloads to keep the next %2 unread chapters available?")
-            ),
+        I18n.nf(
+            #chapters,
+            "Queue %1 missing download to keep the next %2 unread chapters available?",
+            "Queue %1 missing downloads to keep the next %2 unread chapters available?",
             #chapters,
             requested_limit
         ),
-        _("Queue"),
+        I18n.t("Queue"),
         function()
             SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
             self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
@@ -843,16 +846,14 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
         local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
         if requested_limit >= 50 and #chapters > 0 then
             return self:showBulkActionConfirmation(
-                T(
-                    self:pluralize(
-                        #chapters,
-                        _("Queue %1 missing download to keep the next %2 unread chapters available?"),
-                        _("Queue %1 missing downloads to keep the next %2 unread chapters available?")
-                    ),
+                I18n.nf(
+                    #chapters,
+                    "Queue %1 missing download to keep the next %2 unread chapters available?",
+                    "Queue %1 missing downloads to keep the next %2 unread chapters available?",
                     #chapters,
                     requested_limit
                 ),
-                _("Queue"),
+                I18n.t("Queue"),
                 function()
                     SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
                     self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
@@ -862,7 +863,7 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
 
         SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
         if #chapters == 0 then
-            self:showMessage(_("Download-ahead buffer is already downloaded or queued."))
+            self:showMessage(I18n.t("Download-ahead buffer is already downloaded or queued."))
             return 0
         end
 
