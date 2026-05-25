@@ -62,7 +62,7 @@ function ListRows.getMangaMandatory(manga, options)
     if #labels == 0 then
         return nil
     end
-    return I18n.join(labels, " | ")
+    return I18n.join(labels, " · ")
 end
 
 function ListRows.getMangaSubtitle(manga)

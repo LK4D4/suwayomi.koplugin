@@ -80,9 +80,8 @@ local function appendEmptyStateRows(menu_table, snapshot, options)
     })
     table.insert(menu_table, {
         text = I18n.t("Queue"),
-        subtitle = I18n.count(active_count, "%1 active", "%1 active")
-            .. ", " .. I18n.count(queued_count, "%1 queued", "%1 queued")
-            .. ", " .. I18n.count(failed_count, "%1 failed", "%1 failed"),
+        -- Translators: %1 active downloads, %2 queued downloads, %3 failed downloads.
+        subtitle = I18n.f("%1 active, %2 queued, %3 failed", active_count, queued_count, failed_count),
         select_enabled = false,
     })
     table.insert(menu_table, {

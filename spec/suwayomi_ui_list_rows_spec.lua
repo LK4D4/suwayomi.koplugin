@@ -54,7 +54,7 @@ describe("suwayomi/ui/list_rows", function()
             chapter_count = 0,
             chapter_count_verified = true,
         }))
-        assert.are.equal("In Library | 12 chapters", rows.getMangaMandatory({
+        assert.are.equal("In Library · 12 chapters", rows.getMangaMandatory({
             in_library = true,
             chapter_count = 12,
         }, {
@@ -74,7 +74,7 @@ describe("suwayomi/ui/list_rows", function()
 
         local rows = require("suwayomi/ui/list_rows")
 
-        assert.are.equal("tx:In Librarytx: | tx:12 chapters", rows.getMangaMandatory({
+        assert.are.equal("tx:In Librarytx: · tx:12 chapters", rows.getMangaMandatory({
             in_library = true,
             chapter_count = 12,
         }, {
