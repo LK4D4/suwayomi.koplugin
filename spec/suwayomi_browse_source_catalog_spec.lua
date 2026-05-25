@@ -12,6 +12,7 @@ local debug_logs
 local function resetModules()
     for _, name in ipairs({
         "suwayomi/browse/source_catalog",
+        "suwayomi/i18n",
         "suwayomi/source_languages",
         "suwayomi/settings",
         "suwayomi/ui",
@@ -23,8 +24,25 @@ local function resetModules()
     end
 end
 
+local function installMarkerI18n()
+    package.preload["suwayomi/i18n"] = function()
+        return {
+            t = function(text)
+                return "tx:" .. tostring(text)
+            end,
+            f = function(text, ...)
+                local values = { ... }
+                return ("tx:" .. tostring(text)):gsub("%%(%d+)", function(index)
+                    return tostring(values[tonumber(index)] or "")
+                end)
+            end,
+        }
+    end
+end
+
 local function stubDependencies()
     helper.stubControllerDependencies()
+    installMarkerI18n()
     settings_calls = {}
     ui_calls = {}
     next_tick_callbacks = {}
@@ -254,7 +272,7 @@ describe("suwayomi/browse/source_catalog", function()
         local source_menu = controller.current_sources_menu
 
         controller.title_menu_options.onSelect({ id = "source_language_filter" }, nil, { anchor = "anchor" })
-        assert.are.equal("Source languages", ui_calls.language_menu.options.title)
+        assert.are.equal("tx:Source languages", ui_calls.language_menu.options.title)
         assert.are.same(source_menu, controller.current_sources_menu)
         assert.are.same({
             { code = "en", label = "English", enabled = true },
@@ -430,7 +448,7 @@ describe("suwayomi/browse/source_catalog", function()
 
         assert.are.equal(0, #ui_calls.shown.sources)
         assert.are.equal("source_language_filter", controller.title_menu_options.actions[2].id)
-        assert.are.equal("Source languages: English", controller.title_menu_options.actions[2].text)
+        assert.are.equal("tx:Source languages: English", controller.title_menu_options.actions[2].text)
 
         controller.title_menu_options.onSelect({ id = "source_language_filter" })
         ui_calls.language_menu.options.onToggle("es", true)
@@ -462,7 +480,63 @@ describe("suwayomi/browse/source_catalog", function()
         controller:showFetchedSources({ ok = false, error = "boom" })
         controller:showFetchedSources({ ok = false, error = "quiet" }, { silent = true })
 
-        assert.are.same({ "Could not load Suwayomi sources.", "boom" }, controller.messages)
+        assert.are.same({ "tx:Could not load Suwayomi sources.", "boom" }, controller.messages)
+    end)
+
+    it("keeps language labels raw while translating language menu chrome", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        controller:showFetchedSources({
+            ok = true,
+            sources = {
+                { id = "english", lang = "en" },
+                { id = "spanish", lang = "es" },
+            },
+        }, { credentials = { server_url = "https://suwayomi.example" } })
+
+        controller.title_menu_options.onSelect({ id = "source_language_filter" })
+
+        assert.are.equal("tx:Source languages", ui_calls.language_menu.options.title)
+        assert.are.same({
+            { code = "en", label = "English", enabled = true },
+            { code = "es", label = "Español", enabled = false },
+        }, ui_calls.language_menu.options.languages)
+    end)
+
+    it("translates title-bar actions while keeping source names raw", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        controller:showSourceList({
+            { id = "mangadex", name = "MangaDex", lang = "en" },
+        }, {
+            credentials = { server_url = "https://suwayomi.example" },
+        })
+
+        assert.are.equal("tx:Suwayomi Sources", controller.title_menu_options.title)
+        assert.are.equal("tx:Global search", controller.title_menu_options.actions[1].text)
+        assert.are.equal("tx:Source languages: English", controller.title_menu_options.actions[2].text)
+        assert.are.equal("tx:Extensions", controller.title_menu_options.actions[3].text)
+        assert.are.equal("MangaDex", ui_calls.shown.sources[1].name)
+    end)
+
+    it("translates source load failure fallback and empty-language feedback", function()
+        local catalog = loadCatalog()
+        local controller = buildController(catalog)
+
+        controller:showFetchedSources(nil)
+        controller:showFetchedSources({ ok = false })
+        controller:showFetchedSources({
+            ok = true,
+            sources = {},
+        })
+
+        assert.are.same({
+            "tx:Could not load Suwayomi sources.",
+            "tx:Could not load Suwayomi sources.",
+            "tx:No Suwayomi sources match the selected languages.",
+        }, controller.messages)
     end)
 
     it("renders cached sources with a new menu when any source survives filtering", function()
@@ -512,10 +586,12 @@ describe("suwayomi/browse/source_catalog", function()
         local manga_result = controller:showMangaForSource({ id = "english" })
 
         assert.are.same(controller.current_sources_menu, menu)
-        assert.are.equal("Suwayomi Sources", controller.title_menu_options.title)
+        assert.are.equal("tx:Suwayomi Sources", controller.title_menu_options.title)
         assert.are.equal("global_search", controller.title_menu_options.actions[1].id)
         assert.are.equal("source_language_filter", controller.title_menu_options.actions[2].id)
-        assert.are.equal("Source languages: English", controller.title_menu_options.actions[2].text)
+        assert.are.equal("tx:Global search", controller.title_menu_options.actions[1].text)
+        assert.are.equal("tx:Source languages: English", controller.title_menu_options.actions[2].text)
+        assert.are.equal("tx:Extensions", controller.title_menu_options.actions[3].text)
         assert.are.equal("appbar.menu", ui_calls.updated.options.title_bar_left_icon)
         assert.are.same({ server_url = "https://suwayomi.example" }, ui_calls.updated.options.thumbnail_credentials)
         assert.is_nil(ui_calls.updated.options.on_global_search)

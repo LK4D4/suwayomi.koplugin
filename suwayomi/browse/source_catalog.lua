@@ -2,7 +2,7 @@
 --
 -- Responsibility: Owns Browse source filtering, source cache IO, and source list rendering.
 -- Owned state: Reuses plugin-bound controller state such as current_sources_menu.
--- Dependencies: KOReader UI helpers, Suwayomi settings/debug modules, and gettext are resolved when methods run so tests can swap runtime stubs.
+-- Dependencies: KOReader UI helpers, Suwayomi settings/debug modules, and the plugin i18n facade are resolved when methods run so tests can swap runtime stubs.
 -- External data: API responses, cached source tables, and settings values are treated as untrusted until filtered locally.
 
 local SourceCatalog = {}
@@ -27,8 +27,16 @@ local function getUIManager()
     return require("ui/uimanager")
 end
 
-local function _(text)
-    return require("gettext")(text)
+local function getI18n()
+    return require("suwayomi/i18n")
+end
+
+local function tr(text)
+    return getI18n().t(text)
+end
+
+local function fmt(text, ...)
+    return getI18n().f(text, ...)
 end
 
 local function nextTick(callback)
@@ -109,7 +117,7 @@ function Methods:getSourceLanguageFilterSummary()
     table.sort(selected_labels, function(left, right)
         return left:lower() < right:lower()
     end)
-    return #selected_labels > 0 and table.concat(selected_labels, ", ") or _("none")
+    return #selected_labels > 0 and table.concat(selected_labels, ", ") or tr("none")
 end
 
 
@@ -213,7 +221,7 @@ function Methods:showSourceLanguageFilterActions(choices, menu_context)
     local function refreshLanguageMenu()
         if SuwayomiUI.updateLanguageMenu then
             SuwayomiUI.updateLanguageMenu(language_menu, {
-                title = _("Source languages"),
+                title = tr("Source languages"),
                 show_done = false,
                 languages = self:getSourceLanguageFilterChoices(self.current_source_list_sources),
                 anchor = menu_context and menu_context.anchor,
@@ -224,7 +232,7 @@ function Methods:showSourceLanguageFilterActions(choices, menu_context)
         end
     end
     language_menu = SuwayomiUI.showLanguageMenu({
-        title = _("Source languages"),
+        title = tr("Source languages"),
         show_done = false,
         languages = choices or {},
         anchor = menu_context and menu_context.anchor,
@@ -272,23 +280,23 @@ function Methods:showSourceList(sources, options)
             return self:getClient():showGlobalSearch(sources)
         end
         local actions = {
-            { id = "global_search", text = _("Global search") },
+            { id = "global_search", text = tr("Global search") },
         }
         if #source_language_choices > 0 then
             table.insert(actions, {
                 id = "source_language_filter",
-                text = _("Source languages: ") .. self:getSourceLanguageFilterSummary(),
+                text = fmt("Source languages: %1", self:getSourceLanguageFilterSummary()),
                 submenu = true,
             })
         end
         table.insert(actions, {
             id = "extensions",
-            text = _("Extensions"),
+            text = tr("Extensions"),
             submenu = true,
         })
         if self.getTitleBarMenuOptions then
             menu_options = self:getTitleBarMenuOptions({
-                title = _("Suwayomi Sources"),
+                title = tr("Suwayomi Sources"),
                 actions = actions,
                 onSelect = function(action, _, menu_context)
                     if action and action.id == "global_search" then
@@ -338,13 +346,13 @@ function Methods:showFetchedSources(result, options)
     options = options or {}
     if not result then
         if not options.silent then
-            self:showMessage(_("Could not load Suwayomi sources."))
+            self:showMessage(tr("Could not load Suwayomi sources."))
         end
         return
     end
     if not result.ok then
         if not options.silent then
-            self:showMessage(_(result.error or "Could not load Suwayomi sources."))
+            self:showMessage(result.error or tr("Could not load Suwayomi sources."))
         end
         return
     end
@@ -359,7 +367,7 @@ function Methods:showFetchedSources(result, options)
     })
     if #filtered_sources == 0 and #self:getSourceLanguageFilterChoices(result.sources) == 0 then
         if not options.silent then
-            self:showMessage(_("No Suwayomi sources match the selected languages."))
+            self:showMessage(tr("No Suwayomi sources match the selected languages."))
         end
         return
     end
