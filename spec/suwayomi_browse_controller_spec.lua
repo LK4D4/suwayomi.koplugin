@@ -337,63 +337,6 @@ describe("suwayomi/browse/controller", function()
         assert.is_nil(controller.source_fetch_active)
     end)
 
-    it("opens onboarding setup when browse credentials are missing", function()
-        helper.stubControllerDependencies()
-        for _, name in ipairs({
-            "suwayomi/browse/controller",
-            "suwayomi/i18n",
-            "suwayomi/settings",
-            "suwayomi/debug",
-        }) do
-            package.loaded[name] = nil
-            package.preload[name] = nil
-        end
-        installMarkerI18n()
-        package.preload["suwayomi/settings"] = function()
-            return {
-                load = function()
-                    return { server_url = "" }
-                end,
-            }
-        end
-        package.preload["suwayomi/debug"] = function()
-            return {
-                time = function(_, callback)
-                    return callback()
-                end,
-            }
-        end
-
-        local controller = require("suwayomi/browse/controller")
-        local plugin = {
-            messages = {},
-            setup_options = nil,
-            showMessage = function(self, message)
-                table.insert(self.messages, message)
-            end,
-            showOnboardingSetup = function(self, options)
-                self.setup_options = options
-            end,
-            schedulePendingReadSync = function()
-                error("unexpected sync")
-            end,
-            loadSourceCache = function()
-                error("unexpected cache")
-            end,
-            startSourceFetchWorker = function()
-                error("unexpected worker")
-            end,
-        }
-        for name, method in pairs(controller.methods) do
-            plugin[name] = method
-        end
-
-        plugin:browseSuwayomi()
-
-        assert.are.equal("tx:Set up your Suwayomi server login first.", plugin.messages[#plugin.messages])
-        assert.is_true(plugin.setup_options.first_run)
-    end)
-
     it("translates missing setup message before Browse opens onboarding", function()
         helper.stubControllerDependencies()
         for _, name in ipairs({
