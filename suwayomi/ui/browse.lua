@@ -224,7 +224,7 @@ local function copyDraft(draft)
         query = draft.query ~= nil and tostring(draft.query) or "",
         filters = {},
     }
-    for _, entry in ipairs(type(draft.filters) == "table" and draft.filters or {}) do
+    for _ , entry in ipairs(type(draft.filters) == "table" and draft.filters or {}) do
         local copied_entry = {}
         for key, value in pairs(entry) do
             if key == "group_change" and type(value) == "table" then
@@ -243,7 +243,7 @@ local function copyDraft(draft)
 end
 
 local function findDraftEntry(draft, position, state_type)
-    for _, entry in ipairs(draft.filters or {}) do
+    for _ , entry in ipairs(draft.filters or {}) do
         if entry.position == position and entry.type == state_type then
             return entry
         end
@@ -257,7 +257,7 @@ local function findDraftEntry(draft, position, state_type)
 end
 
 local function findGroupDraftEntry(draft, group_position, position, state_type)
-    for _, entry in ipairs(draft.filters or {}) do
+    for _ , entry in ipairs(draft.filters or {}) do
         local group_change = type(entry.group_change) == "table" and entry.group_change or nil
         if entry.position == group_position
             and group_change
@@ -286,7 +286,7 @@ local function findDraftStateEntry(draft, position, state_type, group_position)
 end
 
 local function getDraftState(draft, position, state_type, default, group_position)
-    for _, entry in ipairs(draft.filters or {}) do
+    for _ , entry in ipairs(draft.filters or {}) do
         local candidate = entry
         if group_position then
             candidate = entry.position == group_position
@@ -416,7 +416,7 @@ local function canShowGroupAsChecklist(filters)
     if type(filters) ~= "table" or #filters == 0 or #filters > 8 then
         return false
     end
-    for _, child in ipairs(filters) do
+    for _ , child in ipairs(filters) do
         local child_type = type(child) == "table" and child.type or nil
         if child_type ~= "CheckBoxFilter" then
             return false
@@ -925,7 +925,7 @@ local function buildMangaMenuTable(manga_list, onSelectCallback, options)
             callback = options.on_previous_page,
         })
     end
-    for _, row in ipairs(ListRows.buildMangaMenuTable(manga_list, {
+    for _ , row in ipairs(ListRows.buildMangaMenuTable(manga_list, {
         show_in_library = true,
         on_select = onSelectCallback,
     })) do

@@ -93,7 +93,7 @@ local function filterExtensionsBySearch(extensions, query)
     end
 
     local filtered = {}
-    for _, extension in ipairs(extensions or {}) do
+    for _ , extension in ipairs(extensions or {}) do
         if extensionMatchesSearch(extension, query) then
             table.insert(filtered, extension)
         end

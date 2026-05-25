@@ -125,7 +125,7 @@ function Methods:getSourceLanguageFilterChoices(sources)
     local seen = {}
     local languages = {}
     local selected_languages = self:getSourceLanguageFilterSet()
-    for _, source in ipairs(sources or {}) do
+    for _ , source in ipairs(sources or {}) do
         if isSourceTable(source) then
             local lang = normalizeLanguage(source.lang)
             if lang and not seen[lang] then
@@ -137,7 +137,7 @@ function Methods:getSourceLanguageFilterChoices(sources)
     table.sort(languages, sortLanguages)
 
     local actions = {}
-    for _, lang in ipairs(languages) do
+    for _ , lang in ipairs(languages) do
         table.insert(actions, {
             code = lang,
             label = formatLanguageLabel(lang),
@@ -169,7 +169,7 @@ function Methods:filterSourcesByLanguage(sources)
     local browse_settings = self:loadBrowseSettings()
     local filtered = {}
 
-    for _, source in ipairs(sources or {}) do
+    for _ , source in ipairs(sources or {}) do
         if self:sourceMatchesBrowseSettings(source, selected_languages, browse_settings) then
             table.insert(filtered, source)
         end
