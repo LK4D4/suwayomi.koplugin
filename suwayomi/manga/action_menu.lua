@@ -2,10 +2,10 @@
 --
 -- Responsibility: Owns shared manga-level action definitions used by manga rows and chapter-list title menus.
 -- Owned state: none; action execution stays on plugin controller methods.
--- Dependencies: gettext only.
+-- Dependencies: suwayomi/i18n.
 -- External data: manga and chapter state come from callers and remain untrusted until controller methods validate them.
 
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 
 local MangaActionMenu = {}
 
@@ -66,27 +66,27 @@ function MangaActionMenu.buildMainActions(owner, manga, options)
     local destructive_library_action
 
     if options.include_open_chapters then
-        table.insert(actions, { id = "open_chapters", text = _("Open chapters") })
+        table.insert(actions, { id = "open_chapters", text = I18n.t("Open chapters") })
     end
     if options.include_select_all and hasVisibleChapters(owner) then
-        table.insert(actions, { id = "select_all", text = _("Select all") })
+        table.insert(actions, { id = "select_all", text = I18n.t("Select all") })
     end
-    table.insert(actions, { id = "manga_information", text = _("Manga information") })
+    table.insert(actions, { id = "manga_information", text = I18n.t("Manga information") })
     if canOpenFirstUnread(owner, manga) then
-        table.insert(actions, { id = "open_first_unread", text = _("Open first unread") })
+        table.insert(actions, { id = "open_first_unread", text = I18n.t("Open first unread") })
     end
 
-    table.insert(actions, { id = "refresh_chapters", text = _("Refresh chapters") })
+    table.insert(actions, { id = "refresh_chapters", text = I18n.t("Refresh chapters") })
     if manga and manga.id then
         if manga.in_library == true then
-            destructive_library_action = { id = "remove_from_library", text = _("Remove from library"), destructive = true }
+            destructive_library_action = { id = "remove_from_library", text = I18n.t("Remove from library"), destructive = true }
         else
-            table.insert(actions, { id = "add_to_library", text = _("Add to library") })
+            table.insert(actions, { id = "add_to_library", text = I18n.t("Add to library") })
         end
     end
-    table.insert(actions, { id = "bulk_downloads", text = _("Bulk downloads"), submenu = true })
-    table.insert(actions, { id = "keep_downloaded", text = _("Download ahead"), submenu = true })
-    table.insert(actions, { id = "delete_read_downloaded", text = _("Delete read downloads"), destructive = true })
+    table.insert(actions, { id = "bulk_downloads", text = I18n.t("Bulk downloads"), submenu = true })
+    table.insert(actions, { id = "keep_downloaded", text = I18n.t("Download ahead"), submenu = true })
+    table.insert(actions, { id = "delete_read_downloaded", text = I18n.t("Delete read downloads"), destructive = true })
     if destructive_library_action then
         table.insert(actions, destructive_library_action)
     end
@@ -96,21 +96,21 @@ end
 
 function MangaActionMenu.buildBulkDownloadActions()
     return {
-        { id = "download_first_unread", text = _("Download first unread") },
-        { id = "download_next_5_unread", text = _("Download next 5") },
-        { id = "download_next_10_unread", text = _("Download next 10") },
-        { id = "download_next_50_unread", text = _("Download next 50") },
-        { id = "download_all_unread", text = _("Download all unread") },
-        { id = "download_all_chapters", text = _("Download all chapters") },
+        { id = "download_first_unread", text = I18n.t("Download first unread") },
+        { id = "download_next_5_unread", text = I18n.t("Download next 5") },
+        { id = "download_next_10_unread", text = I18n.t("Download next 10") },
+        { id = "download_next_50_unread", text = I18n.t("Download next 50") },
+        { id = "download_all_unread", text = I18n.t("Download all unread") },
+        { id = "download_all_chapters", text = I18n.t("Download all chapters") },
     }
 end
 
 function MangaActionMenu.buildKeepDownloadedActions()
     return {
-        { id = "keep_next_5_unread", text = _("Keep next 5 downloaded") },
-        { id = "keep_next_10_unread", text = _("Keep next 10 downloaded") },
-        { id = "keep_next_50_unread", text = _("Keep next 50 downloaded") },
-        { id = "keep_next_0_unread", text = _("Stop download ahead") },
+        { id = "keep_next_5_unread", text = I18n.t("Keep next 5 downloaded") },
+        { id = "keep_next_10_unread", text = I18n.t("Keep next 10 downloaded") },
+        { id = "keep_next_50_unread", text = I18n.t("Keep next 50 downloaded") },
+        { id = "keep_next_0_unread", text = I18n.t("Stop download ahead") },
     }
 end
 

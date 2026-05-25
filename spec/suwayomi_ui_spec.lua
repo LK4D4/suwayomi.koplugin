@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+local Marker = require("spec/support/i18n_marker")
+
 describe("suwayomi/ui", function()
     local shown_dialog
     local closed_dialog
@@ -538,6 +540,10 @@ describe("suwayomi/ui", function()
     end)
 
     after_each(function()
+        Marker.uninstall()
+    end)
+
+    after_each(function()
         package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = nil
         package.preload["suwayomi/i18n"] = nil
@@ -721,34 +727,6 @@ describe("suwayomi/ui", function()
         return count
     end
 
-    local function installMarkerI18n()
-        package.preload["suwayomi/i18n"] = function()
-            return {
-                t = function(text)
-                    return "tx:" .. text
-                end,
-                f = function(text, ...)
-                    local result = "tx:" .. text
-                    for index, value in ipairs({...}) do
-                        result = result:gsub("%%" .. index, tostring(value))
-                    end
-                    return result
-                end,
-                n = function(singular, plural, count)
-                    return "tx:" .. (tonumber(count) == 1 and singular or plural)
-                end,
-                count = function(count, singular, plural)
-                    local result = "tx:" .. (tonumber(count) == 1 and singular or plural)
-                    return result:gsub("%%1", tostring(count))
-                end,
-                join = function(parts, separator)
-                    return table.concat(parts or {}, "tx:" .. tostring(separator or " "))
-                end,
-            }
-        end
-        package.loaded["suwayomi/i18n"] = nil
-    end
-
     local function sampleManga()
         return {
             id = 42,
@@ -888,6 +866,118 @@ describe("suwayomi/ui", function()
         dialog.poster_job = events.poster_job.active
         title.close_callback()
         assert.are.equal(events.poster_job.active, events.canceled_poster_job)
+    end)
+
+    it("routes manga information chrome through i18n while keeping metadata raw", function()
+        Marker.install()
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/ui/manga_info"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        local ui = require("suwayomi/ui")
+
+        local manga = {
+            id = "m1",
+            title = "Sousou no Frieren",
+            source = { name = "MangaDex" },
+            status = "ONGOING",
+            authors = { "Kanehito Yamada" },
+            artists = { "Tsukasa Abe" },
+            chapter_count = 128,
+            unread_count = 7,
+            download_count = 3,
+            in_library = true,
+            categories = { "Reading" },
+            genres = { "Adventure" },
+            first_unread_chapter = { name = "Chapter 118" },
+            description = "",
+        }
+
+        local dialog = ui.showMangaInformation(manga, {
+            poster_loading = true,
+            actions = {
+                { id = "open_chapters", text = "tx:Open chapters" },
+            },
+        })
+        local text = ui.buildMangaInformationText(manga)
+
+        assert.truthy(text:find("tx:Source: MangaDex", 1, true))
+        assert.truthy(text:find("tx:Status: tx:Ongoing", 1, true))
+        assert.truthy(text:find("tx:Author: Kanehito Yamada", 1, true))
+        assert.truthy(text:find("tx:Library: tx:In library", 1, true))
+        assert.truthy(text:find("tx:No description available.", 1, true))
+        assert.are.equal("Sousou no Frieren", findWidget(dialog, "titlebar").title)
+        assert.are.equal("tx:Open chapters", findWidget(dialog, "buttontable").buttons[1][1].text)
+    end)
+
+    it("routes additional manga status labels through i18n while keeping metadata raw", function()
+        Marker.install()
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/ui/manga_info"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        local ui = require("suwayomi/ui")
+
+        local text = ui.buildMangaInformationText({
+            source = { name = "MangaDex" },
+            status = "ON_HIATUS",
+            description = "",
+        })
+        local raw_text = ui.buildMangaInformationText({
+            source = { name = "MangaDex" },
+            status = "LICENSED_PLUS",
+            description = "",
+        })
+
+        assert.truthy(text:find("tx:Status: tx:On hiatus", 1, true))
+        assert.truthy(text:find("tx:Source: MangaDex", 1, true))
+        assert.truthy(raw_text:find("tx:Status: LICENSED_PLUS", 1, true))
+    end)
+
+    it("routes manga poster placeholders and default title through i18n", function()
+        Marker.install()
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/ui/manga_info"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        local ui = require("suwayomi/ui")
+
+        local raw_id_dialog = ui.showMangaInformation({
+            id = "m1",
+            title = nil,
+            description = "",
+            thumbnail_url = "thumb://missing",
+        }, {
+            poster_loading = true,
+        })
+        assert.are.equal("tx:Loading...", findWidget(raw_id_dialog, "textwidget").text)
+        assert.are.equal("m1", findWidget(raw_id_dialog, "titlebar").title)
+
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/ui/manga_info"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        ui = require("suwayomi/ui")
+
+        local loading_dialog = ui.showMangaInformation({
+            id = "",
+            title = "",
+            description = "",
+            thumbnail_url = "thumb://missing",
+        }, {
+            poster_loading = true,
+        })
+        assert.are.equal("tx:Loading...", findWidget(loading_dialog, "textwidget").text)
+        assert.are.equal("tx:Manga information", findWidget(loading_dialog, "titlebar").title)
+
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/ui/manga_info"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        ui = require("suwayomi/ui")
+
+        local no_poster_dialog = ui.showMangaInformation({
+            id = "",
+            title = "",
+            description = "",
+        }, {})
+        assert.are.equal("tx:No poster", findWidget(no_poster_dialog, "textwidget").text)
+        assert.are.equal("tx:Manga information", findWidget(no_poster_dialog, "titlebar").title)
     end)
 
     it("shows manga information without a poster when there is no thumbnail URL", function()
@@ -1151,7 +1241,7 @@ describe("suwayomi/ui", function()
     end)
 
     it("routes login dialog labels through i18n", function()
-        installMarkerI18n()
+        Marker.install()
         local ui = require("suwayomi/ui")
 
         ui.showLoginDialog({
@@ -1284,7 +1374,7 @@ describe("suwayomi/ui", function()
     end)
 
     it("routes onboarding connection labels and statuses through i18n", function()
-        installMarkerI18n()
+        Marker.install()
         local ui = require("suwayomi/ui")
 
         ui.showOnboardingConnectionDialog({
@@ -1465,7 +1555,7 @@ describe("suwayomi/ui", function()
     end)
 
     it("routes the default action menu title through i18n", function()
-        installMarkerI18n()
+        Marker.install()
         package.loaded.gettext = nil
         package.loaded["suwayomi/ui"] = nil
 
@@ -1481,7 +1571,7 @@ describe("suwayomi/ui", function()
     end)
 
     it("routes shared menu default labels through i18n", function()
-        installMarkerI18n()
+        Marker.install()
 
         local ui = require("suwayomi/ui")
 
@@ -1977,7 +2067,7 @@ describe("suwayomi/ui", function()
     end)
 
     it("routes setup and settings choice dialog labels through i18n", function()
-        installMarkerI18n()
+        Marker.install()
         local ui = require("suwayomi/ui")
 
         ui.showParallelDownloadsMenu({

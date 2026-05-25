@@ -2,10 +2,10 @@
 --
 -- Responsibility: format already-loaded manga metadata and show read-only KOReader dialog content.
 -- Owned state: none; KOReader dialog/widgets own runtime state.
--- Dependencies: KOReader container/image/text widgets, thumbnail cache, UIManager, gettext.
+-- Dependencies: KOReader container/image/text widgets, thumbnail cache, UIManager, suwayomi/i18n.
 -- External data: manga fields come from server responses and are displayed only after nil/empty checks.
 
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 
 local MangaInfo = {}
 local POSTER_CACHE_OPTIONS = {
@@ -93,12 +93,24 @@ local function chapterName(chapter)
 end
 
 local function formatStatus(status)
-    status = cleanText(status)
-    if not status then
+    local raw_status = cleanText(status)
+    if not raw_status then
         return nil
     end
-    local normalized = status:gsub("_", " "):lower()
-    return normalized:sub(1, 1):upper() .. normalized:sub(2)
+    local normalized = raw_status:gsub("_", " "):lower()
+    if normalized == "ongoing" then
+        return I18n.t("Ongoing")
+    end
+    if normalized == "on hiatus" then
+        return I18n.t("On hiatus")
+    end
+    if normalized == "completed" then
+        return I18n.t("Completed")
+    end
+    if normalized == "unknown" then
+        return I18n.t("Unknown")
+    end
+    return raw_status
 end
 
 local function appendField(lines, label, value)
@@ -112,19 +124,19 @@ function MangaInfo.buildMetadataText(manga)
     manga = manga or {}
     local lines = {}
 
-    appendField(lines, _("Source"), sourceName(manga.source))
-    appendField(lines, _("Status"), formatStatus(manga.status))
-    appendField(lines, _("Author"), joinList(manga.authors or manga.author))
-    appendField(lines, _("Artist"), joinList(manga.artists or manga.artist))
-    appendField(lines, _("Chapters"), manga.chapter_count)
-    appendField(lines, _("Unread"), manga.unread_count)
-    appendField(lines, _("Downloaded"), manga.download_count)
+    appendField(lines, I18n.t("Source"), sourceName(manga.source))
+    appendField(lines, I18n.t("Status"), formatStatus(manga.status))
+    appendField(lines, I18n.t("Author"), joinList(manga.authors or manga.author))
+    appendField(lines, I18n.t("Artist"), joinList(manga.artists or manga.artist))
+    appendField(lines, I18n.t("Chapters"), manga.chapter_count)
+    appendField(lines, I18n.t("Unread"), manga.unread_count)
+    appendField(lines, I18n.t("Downloaded"), manga.download_count)
     if manga.in_library ~= nil then
-        appendField(lines, _("Library"), manga.in_library and _("In library") or _("Not in library"))
+        appendField(lines, I18n.t("Library"), manga.in_library and I18n.t("In library") or I18n.t("Not in library"))
     end
-    appendField(lines, _("Categories"), joinList(manga.categories))
-    appendField(lines, _("Genres"), joinList(manga.genres or manga.genre))
-    appendField(lines, _("First unread"), chapterName(manga.first_unread_chapter))
+    appendField(lines, I18n.t("Categories"), joinList(manga.categories))
+    appendField(lines, I18n.t("Genres"), joinList(manga.genres or manga.genre))
+    appendField(lines, I18n.t("First unread"), chapterName(manga.first_unread_chapter))
     return table.concat(lines, "\n")
 end
 
@@ -132,15 +144,15 @@ function MangaInfo.buildPrimaryMetadataText(manga)
     manga = manga or {}
     local lines = {}
 
-    appendField(lines, _("Source"), sourceName(manga.source))
-    appendField(lines, _("Status"), formatStatus(manga.status))
-    appendField(lines, _("Author"), joinList(manga.authors or manga.author))
-    appendField(lines, _("Artist"), joinList(manga.artists or manga.artist))
-    appendField(lines, _("Chapters"), manga.chapter_count)
-    appendField(lines, _("Unread"), manga.unread_count)
-    appendField(lines, _("Downloaded"), manga.download_count)
+    appendField(lines, I18n.t("Source"), sourceName(manga.source))
+    appendField(lines, I18n.t("Status"), formatStatus(manga.status))
+    appendField(lines, I18n.t("Author"), joinList(manga.authors or manga.author))
+    appendField(lines, I18n.t("Artist"), joinList(manga.artists or manga.artist))
+    appendField(lines, I18n.t("Chapters"), manga.chapter_count)
+    appendField(lines, I18n.t("Unread"), manga.unread_count)
+    appendField(lines, I18n.t("Downloaded"), manga.download_count)
     if manga.in_library ~= nil then
-        appendField(lines, _("Library"), manga.in_library and _("In library") or _("Not in library"))
+        appendField(lines, I18n.t("Library"), manga.in_library and I18n.t("In library") or I18n.t("Not in library"))
     end
     return table.concat(lines, "\n")
 end
@@ -149,14 +161,14 @@ function MangaInfo.buildDetailsText(manga)
     manga = manga or {}
     local lines = {}
 
-    appendField(lines, _("Categories"), joinList(manga.categories))
-    appendField(lines, _("Genres"), joinList(manga.genres or manga.genre))
-    appendField(lines, _("First unread"), chapterName(manga.first_unread_chapter))
+    appendField(lines, I18n.t("Categories"), joinList(manga.categories))
+    appendField(lines, I18n.t("Genres"), joinList(manga.genres or manga.genre))
+    appendField(lines, I18n.t("First unread"), chapterName(manga.first_unread_chapter))
     return table.concat(lines, "\n")
 end
 
 function MangaInfo.buildDescriptionText(manga)
-    return cleanText(manga and manga.description) or _("No description available.")
+    return cleanText(manga and manga.description) or I18n.t("No description available.")
 end
 
 local function escapeHtml(text)
@@ -307,7 +319,7 @@ function MangaInfo.buildDescriptionHtml(manga)
     closeList()
     local details = MangaInfo.buildDetailsText(manga)
     if details ~= "" then
-        table.insert(html, "<h3>" .. escapeHtml(_("Details")) .. "</h3>")
+        table.insert(html, "<h3>" .. escapeHtml(I18n.t("Details")) .. "</h3>")
         local detail_lines = {}
         for line in (details .. "\n"):gmatch("([^\n]*)\n") do
             table.insert(detail_lines, (escapeHtml(line)))
@@ -604,7 +616,7 @@ local function buildPosterWidget(modules, manga, options, width, height)
                 h = height,
             },
             modules.TextWidget:new{
-                text = (options and options.poster_loading) and _("Loading...") or _("No poster"),
+                text = (options and options.poster_loading) and I18n.t("Loading...") or I18n.t("No poster"),
                 face = modules.Font:getFace("infofont"),
             },
         }
@@ -620,7 +632,15 @@ local function buildPosterWidget(modules, manga, options, width, height)
 end
 
 local function mangaTitle(manga)
-    return manga and (manga.title or tostring(manga.id)) or _("Manga information")
+    local title = cleanText(manga and manga.title)
+    if title then
+        return title
+    end
+    local id = cleanText(manga and manga.id)
+    if id then
+        return id
+    end
+    return I18n.t("Manga information")
 end
 
 local function lineThickness(Size)
@@ -747,11 +767,10 @@ end
 local function buildActionButtons(dialog)
     local buttons = {}
     local options = dialog.options or {}
-    local gettext = _
     for _, action in ipairs(options.actions or {}) do
         if action and action.id and action.text then
             table.insert(buttons, {
-                text = gettext(action.text),
+                text = action.text,
                 callback = function()
                     dialog:dismiss()
                     if options.onAction then
