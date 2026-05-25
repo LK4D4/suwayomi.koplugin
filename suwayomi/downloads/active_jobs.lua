@@ -53,7 +53,7 @@ end
 function ActiveJobs:appendSnapshotJobs(snapshot)
     -- Snapshot construction stays here so queue.lua does not need to know the
     -- active job table shape.
-    for _, job in pairs(self.jobs or {}) do
+    for _index, job in pairs(self.jobs or {}) do
         table.insert(snapshot.active, self.queue:copySnapshotJob(job, "downloading"))
     end
 end
@@ -253,11 +253,11 @@ end
 
 function ActiveJobs:cancelAll()
     local active_jobs = {}
-    for _, active in pairs(self.jobs or {}) do
+    for _index, active in pairs(self.jobs or {}) do
         table.insert(active_jobs, active)
     end
 
-    for _, active in ipairs(active_jobs) do
+    for _index, active in ipairs(active_jobs) do
         self:finishWithCancel(active, { process = false })
     end
     self:process()
@@ -410,7 +410,7 @@ function ActiveJobs:poll()
     end
 
     local active_jobs = {}
-    for _, active in pairs(self.jobs or {}) do
+    for _index, active in pairs(self.jobs or {}) do
         table.insert(active_jobs, active)
     end
 

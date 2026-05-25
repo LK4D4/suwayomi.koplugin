@@ -141,7 +141,7 @@ function Methods:getFirstUnreadChapterForManga(manga)
         return nil
     end
 
-    for _, chapter in ipairs(self:getVisibleChapters(context.chapters or {})) do
+    for _index, chapter in ipairs(self:getVisibleChapters(context.chapters or {})) do
         if chapter.is_read ~= true then
             return chapter
         end
@@ -156,7 +156,7 @@ function Methods:getUnreadChaptersForManga(manga)
     if not context then
         return chapters
     end
-    for _, chapter in ipairs(self:getVisibleChapters(context.chapters or {})) do
+    for _index, chapter in ipairs(self:getVisibleChapters(context.chapters or {})) do
         if chapter.is_read ~= true then
             table.insert(chapters, chapter)
         end
@@ -234,7 +234,7 @@ end
 
 function Methods:getSelectedChapterCount()
     local count = 0
-    for _, selected in pairs(self.selected_chapters or {}) do
+    for _index, selected in pairs(self.selected_chapters or {}) do
         if selected then
             count = count + 1
         end
@@ -245,7 +245,7 @@ end
 
 function Methods:getSelectedChapters(manga, chapters)
     local selected = {}
-    for _, chapter in ipairs(self:getVisibleChapters(chapters)) do
+    for _index, chapter in ipairs(self:getVisibleChapters(chapters)) do
         if self:isChapterSelected(manga, chapter) then
             table.insert(selected, chapter)
         end
@@ -261,7 +261,7 @@ function Methods:pruneChapterSelectionForCurrentContext()
 
     local context = self.current_chapter_context
     local valid_keys = {}
-    for _, chapter in ipairs(self:getVisibleChapters(context and context.chapters or {})) do
+    for _index, chapter in ipairs(self:getVisibleChapters(context and context.chapters or {})) do
         valid_keys[self:getChapterSelectionKey(context and context.manga, chapter)] = true
     end
 
@@ -290,7 +290,7 @@ end
 function Methods:getChapterScanlatorChoices(chapters)
     local choices = {}
     local seen = {}
-    for _, chapter in ipairs(chapters or {}) do
+    for _index, chapter in ipairs(chapters or {}) do
         local scanlator = self:getChapterScanlator(chapter)
         if scanlator and not seen[scanlator] then
             seen[scanlator] = true
@@ -306,7 +306,7 @@ function Methods:getValidMangaScanlatorFilter(manga, chapters)
     if not filter then
         return nil
     end
-    for _, scanlator in ipairs(self:getChapterScanlatorChoices(chapters)) do
+    for _index, scanlator in ipairs(self:getChapterScanlatorChoices(chapters)) do
         if scanlator == filter then
             return filter
         end
@@ -321,7 +321,7 @@ function Methods:getVisibleChapters(chapters)
     end
 
     local visible = {}
-    for _, chapter in ipairs(chapters or {}) do
+    for _index, chapter in ipairs(chapters or {}) do
         if self:getChapterScanlator(chapter) == self.current_scanlator_filter then
             table.insert(visible, chapter)
         end
@@ -372,7 +372,7 @@ function Methods:selectAllChapters()
     local chapters = self:getVisibleChapters(context and context.chapters or {})
 
     self.selected_chapters = {}
-    for _, chapter in ipairs(chapters) do
+    for _index, chapter in ipairs(chapters) do
         self.selected_chapters[self:getChapterSelectionKey(manga, chapter)] = true
     end
     self.selection_mode = self:getSelectedChapterCount() > 0
@@ -410,7 +410,7 @@ function Methods:getChaptersBefore(chapter)
         return chapters
     end
 
-    for _, current in ipairs(self:getVisibleChapters(self.current_chapter_context.chapters)) do
+    for _index, current in ipairs(self:getVisibleChapters(self.current_chapter_context.chapters)) do
         if tostring(current.id or "") == tostring(chapter.id or "") then
             return chapters
         end
@@ -489,7 +489,7 @@ end
 
 function Methods:getNextUnreadChaptersForDownload(manga, limit)
     local chapters = {}
-    for _, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
+    for _index, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
         if self:canQueueChapterDownload(manga, chapter) then
             table.insert(chapters, chapter)
             if #chapters >= limit then
@@ -503,7 +503,7 @@ end
 
 function Methods:getReadChaptersFromCurrentContext()
     local read_chapters = {}
-    for _, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
+    for _index, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
         if chapter.is_read == true then
             table.insert(read_chapters, chapter)
         end
@@ -544,7 +544,7 @@ function Methods:getScanlatorFilterActions()
         { id = "scanlator_filter_all", text = I18n.t("All scanlators") },
     }
     local context = self.current_chapter_context
-    for _, scanlator in ipairs(self:getChapterScanlatorChoices(context and context.chapters or {})) do
+    for _index, scanlator in ipairs(self:getChapterScanlatorChoices(context and context.chapters or {})) do
         table.insert(actions, {
             id = "scanlator_filter_value",
             text = scanlator,

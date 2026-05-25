@@ -98,7 +98,7 @@ end
 
 function ListRows.buildMangaMenuTable(manga_list, options)
     local menu_table = {}
-    for _, manga in ipairs(manga_list or {}) do
+    for _index, manga in ipairs(manga_list or {}) do
         table.insert(menu_table, ListRows.buildMangaRow(manga, options))
     end
     return menu_table
@@ -154,7 +154,7 @@ end
 
 function ListRows.buildSourceMenuTable(sources, options)
     local menu_table = {}
-    for _, source in ipairs(sources or {}) do
+    for _index, source in ipairs(sources or {}) do
         table.insert(menu_table, ListRows.buildSourceRow(source, options))
     end
     return menu_table
@@ -247,7 +247,7 @@ function ListRows.buildExtensionMenuTable(extensions, options)
     local available = {}
     local show_empty_sections = options.show_empty_sections == true and #(extensions or {}) > 0
 
-    for _, extension in ipairs(extensions or {}) do
+    for _index, extension in ipairs(extensions or {}) do
         if type(extension) == "table" and extension.has_update == true then
             table.insert(updates, extension)
         elseif type(extension) == "table" and extension.is_installed == true then
@@ -262,7 +262,7 @@ function ListRows.buildExtensionMenuTable(extensions, options)
             return
         end
         table.insert(menu_table, ListRows.buildSectionHeaderRow(sectionTitle(label, #group)))
-        for _, extension in ipairs(group) do
+        for _index, extension in ipairs(group) do
             table.insert(menu_table, ListRows.buildExtensionRow(extension, options))
         end
     end
@@ -354,7 +354,7 @@ end
 
 function ListRows.buildGlobalSearchSummaryMenuTable(summaries, options)
     local menu_table = {}
-    for _, summary in ipairs(summaries or {}) do
+    for _index, summary in ipairs(summaries or {}) do
         table.insert(menu_table, ListRows.buildGlobalSearchSummaryRow(summary, options))
     end
     return menu_table
@@ -390,7 +390,7 @@ end
 
 function ListRows.buildLibraryCategoryMenuTable(categories, options)
     local menu_table = {}
-    for _, category in ipairs(categories or {}) do
+    for _index, category in ipairs(categories or {}) do
         table.insert(menu_table, ListRows.buildLibraryCategoryRow(category, options))
     end
     return menu_table
@@ -438,7 +438,7 @@ end
 
 function ListRows.buildChapterMenuTable(chapters, options)
     local menu_table = {}
-    for _, chapter in ipairs(chapters or {}) do
+    for _index, chapter in ipairs(chapters or {}) do
         table.insert(menu_table, ListRows.buildChapterRow(chapter, options))
     end
     return menu_table

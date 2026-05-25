@@ -28,7 +28,7 @@ local function getFirstUnreadFromContext(owner, manga)
     if owner.getVisibleChapters then
         chapters = owner:getVisibleChapters(chapters) or {}
     end
-    for _, chapter in ipairs(chapters) do
+    for _index, chapter in ipairs(chapters) do
         if chapter.is_read ~= true then
             return chapter, true
         end

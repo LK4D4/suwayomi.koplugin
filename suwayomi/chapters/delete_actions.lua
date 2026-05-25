@@ -135,7 +135,7 @@ function Methods:deleteChaptersAfterManualMarkRead(manga, chapters, options)
     end
 
     local deleted = 0
-    for _, chapter in ipairs(chapters or {}) do
+    for _index, chapter in ipairs(chapters or {}) do
         local ok = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
             ledger = options.ledger,
             quiet_active = true,
@@ -157,7 +157,7 @@ function Methods:getChapterLedgerEntryForDelete(ledger, manga, chapter)
         return entry
     end
 
-    for _, existing in pairs(ledger or {}) do
+    for _index, existing in pairs(ledger or {}) do
         if sameId(existing.manga_id, manga and manga.id)
             and sameId(existing.chapter_id, chapter and chapter.id)
         then

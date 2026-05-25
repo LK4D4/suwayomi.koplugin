@@ -280,7 +280,7 @@ function Methods:startFetchChaptersForManga(manga, options)
     end, I18n.t("Could not load chapters."), "chapter_menu")
 end
 
-function Methods:buildReaderReturnCloseTarget(_, manga)
+function Methods:buildReaderReturnCloseTarget (_reader, manga)
     if type(manga) ~= "table" then
         return nil
     end

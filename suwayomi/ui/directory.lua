@@ -8,7 +8,7 @@
 -- External data: selected paths are returned to controller code for persistence
 -- and filesystem validation; this module only constructs the widget.
 
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 
 local DirectoryUI = {}
 local NEW_FOLDER_ACTION = "new_folder"
@@ -26,7 +26,7 @@ function DirectoryUI.showDirectoryChooser(callback, start_dir)
     local UIManager = require("ui/uimanager")
 
     local DirectoryChooser = PathChooser:extend{
-        title = _("Choose download directory"),
+        title = I18n.t("Choose download directory"),
         select_directory = true,
         select_file = false,
         show_files = false,
@@ -41,14 +41,14 @@ function DirectoryUI.showDirectoryChooser(callback, start_dir)
             for index = 1, #item_table do
                 local item = item_table[index]
                 if item.path == current_folder_path then
-                    item.text = _("Use this folder")
+                    item.text = I18n.t("Use this folder")
                     item.bold = true
                     new_folder_index = index + 1
                     break
                 end
             end
             table.insert(item_table, new_folder_index, {
-                text = _("New folder"),
+                text = I18n.t("New folder"),
                 suwayomi_action = NEW_FOLDER_ACTION,
             })
         end

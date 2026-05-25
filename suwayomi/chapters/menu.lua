@@ -83,7 +83,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
     local ledger_upsert_count = 0
     local reader_return_entries = {}
 
-    for _, chapter in ipairs(chapters or {}) do
+    for _index, chapter in ipairs(chapters or {}) do
         local item = {}
         for key, value in pairs(chapter) do
             item[key] = value
@@ -92,7 +92,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         local chapter_exists = false
         local chapter_path
         if download_directory and download_directory ~= "" then
-            _, chapter_path = SuwayomiDownloader:getTargetPath(download_directory, manga, item)
+            chapter_path = select(2, SuwayomiDownloader:getTargetPath(download_directory, manga, item))
             chapter_exists = SuwayomiDownloader:chapterExists(chapter_path)
             local metadata_finished = chapter_exists and self:isChapterPathFinishedInKoreader(chapter_path)
             local history_read = chapter_exists and history_paths[chapter_path] == true
@@ -196,7 +196,7 @@ end
 
 function Methods:buildCachedChapterMenuMap()
     local items_by_key = {}
-    for _, item in ipairs((self.current_chapter_options and self.current_chapter_options.chapters) or {}) do
+    for _index, item in ipairs((self.current_chapter_options and self.current_chapter_options.chapters) or {}) do
         items_by_key[self:getChapterDownloadKey(
             self.current_chapter_context.manga,
             item
@@ -209,7 +209,7 @@ end
 function Methods:buildQuickChapterMenuItems(manga, chapters)
     local cached_items = self:buildCachedChapterMenuMap()
     local items = {}
-    for _, chapter in ipairs(chapters or {}) do
+    for _index, chapter in ipairs(chapters or {}) do
         local item = {}
         for key, value in pairs(chapter) do
             item[key] = value
@@ -312,7 +312,7 @@ function Methods:getBulkChapterActions()
     end
 
     local manga_actions = MangaActionMenu.buildMainActions(self, self.current_chapter_context and self.current_chapter_context.manga, {})
-    for _, action in ipairs(manga_actions) do
+    for _index, action in ipairs(manga_actions) do
         table.insert(actions, action)
     end
     if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then

@@ -293,7 +293,7 @@ function Methods:reconcileDownloadedChapterLedger(ledger)
     local current_context_changed = false
     local read_count = 0
 
-    for _, entry in pairs(ledger or {}) do
+    for _index, entry in pairs(ledger or {}) do
         if type(entry) == "table" and type(entry.path) == "string" and entry.path ~= "" then
             local metadata_finished = self:isChapterPathFinishedInKoreader(entry.path)
             local history_read = history_paths[entry.path] == true
@@ -351,7 +351,7 @@ function Methods:getUnreadDownloadBufferCandidates(manga, limit)
     local missing = {}
     local unread_count = 0
 
-    for _, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
+    for _index, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
         if chapter.is_read ~= true then
             unread_count = unread_count + 1
             if not self:isChapterDownloadAvailable(manga, chapter) then
@@ -394,7 +394,7 @@ end
 function Methods:getQueueableKeepNextUnreadDownloads(manga, chapters)
     local queueable = {}
     local max_chapters = tonumber(self.max_batch_queue_chapters) or 50
-    for _, chapter in ipairs(chapters or {}) do
+    for _index, chapter in ipairs(chapters or {}) do
         local status = self:getDownloadQueue():getStatus(manga, chapter)
         local downloaded = self:isChapterDownloaded(manga, chapter)
         if not downloaded and not (status and (

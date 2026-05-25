@@ -8,6 +8,9 @@ self = false
 -- own luacheck config also leaves line-length enforcement off.
 ignore = {
     "631",
+    "211/_.*",
+    "212/_.*",
+    "213/_.*",
 }
 
 exclude_files = {

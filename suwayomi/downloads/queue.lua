@@ -158,11 +158,11 @@ function DownloadQueue:getSnapshot()
 
     self.active_job_lifecycle:appendSnapshotJobs(snapshot)
 
-    for _, job in ipairs(self.items or {}) do
+    for _index, job in ipairs(self.items or {}) do
         table.insert(snapshot.queued, self:copySnapshotJob(job, "queued"))
     end
 
-    for _, job in ipairs(self:loadPersistentJobs()) do
+    for _index, job in ipairs(self:loadPersistentJobs()) do
         if job.state == "failed" then
             table.insert(snapshot.failed, self:copySnapshotJob(job, "failed"))
         end
@@ -186,7 +186,7 @@ end
 function DownloadQueue:clearFailed()
     local remaining = {}
     local cleared = 0
-    for _, job in ipairs(self:loadPersistentJobs()) do
+    for _index, job in ipairs(self:loadPersistentJobs()) do
         if job.state == "failed" then
             cleared = cleared + 1
             if job.manga and job.chapter then
@@ -219,7 +219,7 @@ function DownloadQueue:getTargetChapterPath(job)
     if not job or not job.download_directory or not job.manga or not job.chapter or not self.downloader.getTargetPath then
         return nil
     end
-    local _, chapter_path = self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter)
+    local chapter_path = select(2, self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter))
     return chapter_path
 end
 
@@ -290,7 +290,7 @@ function DownloadQueue:cancelPending(manga, chapter)
 
     local removed = false
     local remaining = {}
-    for _, item in ipairs(self.items or {}) do
+    for _index, item in ipairs(self.items or {}) do
         if (item.key or self:getKey(item.manga, item.chapter)) == key then
             removed = true
         else
@@ -317,7 +317,7 @@ function DownloadQueue:cancelQueued()
     local canceled_keys = {}
     local remaining_items = {}
 
-    for _, item in ipairs(self.items or {}) do
+    for _index, item in ipairs(self.items or {}) do
         local key = item.key or self:getKey(item.manga or {}, item.chapter or {})
         if key and key ~= "" then
             canceled_keys[key] = true
@@ -328,7 +328,7 @@ function DownloadQueue:cancelQueued()
     self.items = remaining_items
 
     local remaining_jobs = {}
-    for _, job in ipairs(self:loadPersistentJobs()) do
+    for _index, job in ipairs(self:loadPersistentJobs()) do
         local key = job.key or self:getKey(job.manga or {}, job.chapter or {})
         if job.state == "queued" and not self:getActiveJob(key) then
             if key and key ~= "" then
@@ -401,7 +401,7 @@ function DownloadQueue:cleanupInterruptedDownload(job)
     if not job or not job.download_directory or not job.manga or not job.chapter then
         return false
     end
-    local _, chapter_path = self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter)
+    local chapter_path = select(2, self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter))
     local partial_path = self.downloader.getPartialPath and self.downloader:getPartialPath(chapter_path) or (chapter_path .. ".part")
     os.remove(partial_path)
     if self.downloader.getDirectPartialPath then
@@ -470,12 +470,12 @@ function DownloadQueue:recover()
     local should_process = false
     local seen_recovered_keys = {}
     local recoverable_active_keys = {}
-    for _, job in ipairs(jobs) do
+    for _index, job in ipairs(jobs) do
         if job.manga and job.chapter and job.download_directory and (job.state == "queued" or job.state == "downloading") then
             recoverable_active_keys[self:getKey(job.manga, job.chapter)] = true
         end
     end
-    for _, job in ipairs(jobs) do
+    for _index, job in ipairs(jobs) do
         if job.manga and job.chapter and job.download_directory and (job.state == "queued" or job.state == "downloading") then
             local recovered
             if job.state == "downloading" then
@@ -577,7 +577,7 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
     local persistent_jobs = {}
     local queued_count = 0
 
-    for _, chapter in ipairs(chapters or {}) do
+    for _index, chapter in ipairs(chapters or {}) do
         local status = self:getStatus(manga, chapter)
         if status and (status.state == "queued" or status.state == "downloading") then
             if not options.quiet_duplicate then

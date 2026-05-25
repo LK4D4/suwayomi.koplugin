@@ -13,7 +13,7 @@ function SuwayomiClient:mangaBelongsToCategory(manga, category)
     if not category or not category.id then
         return true
     end
-    for _, candidate in ipairs(manga.categories or {}) do
+    for _index, candidate in ipairs(manga.categories or {}) do
         if tostring(candidate.id) == tostring(category.id) then
             return true
         end
@@ -27,7 +27,7 @@ function SuwayomiClient:filterLibraryMangaByCategory(manga_list, category)
     end
 
     local filtered = {}
-    for _, manga in ipairs(manga_list or {}) do
+    for _index, manga in ipairs(manga_list or {}) do
         if self:mangaBelongsToCategory(manga, category) then
             table.insert(filtered, manga)
         end
@@ -42,7 +42,7 @@ function SuwayomiClient:buildLibraryCategoryChoices(categories)
             name = I18n.t("All manga"),
         },
     }
-    for _, category in ipairs(categories or {}) do
+    for _index, category in ipairs(categories or {}) do
         table.insert(choices, category)
     end
     return choices

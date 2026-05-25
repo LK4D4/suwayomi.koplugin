@@ -66,7 +66,7 @@ local function joinList(values)
         return cleanText(values)
     end
     local parts = {}
-    for _, value in ipairs(values) do
+    for _index, value in ipairs(values) do
         local text = cleanText(type(value) == "table" and (value.name or value.title or value.id) or value)
         if text then
             table.insert(parts, text)
@@ -363,7 +363,7 @@ local function countLines(text)
     if text == nil or text == "" then
         return 0
     end
-    local _, count = tostring(text):gsub("\n", "\n")
+    local count = select(2, tostring(text):gsub("\n", "\n"))
     return count + 1
 end
 
@@ -591,7 +591,7 @@ local function bindDialog(widget, dialog)
     if widget.manga_info_html_box then
         widget.dialog = dialog
     end
-    for _, child in ipairs(widget) do
+    for _index, child in ipairs(widget) do
         bindDialog(child, dialog)
     end
 end
@@ -767,7 +767,7 @@ end
 local function buildActionButtons(dialog)
     local buttons = {}
     local options = dialog.options or {}
-    for _, action in ipairs(options.actions or {}) do
+    for _index, action in ipairs(options.actions or {}) do
         if action and action.id and action.text then
             table.insert(buttons, {
                 text = action.text,
@@ -886,7 +886,7 @@ local function buildDialog(modules, manga, options)
                     self:refreshContent()
                 end
             end,
-            on_error = function(_, failed_active)
+            on_error = function(_unused, failed_active)
                 if self.poster_job == failed_active then
                     self.poster_job = nil
                     self.options = self.options or {}

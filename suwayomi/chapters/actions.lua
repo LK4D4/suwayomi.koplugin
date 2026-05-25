@@ -26,7 +26,7 @@ end
 local Methods = {}
 
 local function mergeMethods(target, ...)
-    for _, method_table in ipairs({...}) do
+    for _index, method_table in ipairs({...}) do
         for name, method in pairs(method_table or {}) do
             target[name] = method
         end
@@ -138,7 +138,7 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
     local skipped = 0
     local capped = 0
     local queueable = {}
-    for _, chapter in ipairs(chapters or {}) do
+    for _index, chapter in ipairs(chapters or {}) do
         local status = self:getDownloadQueue():getStatus(manga, chapter)
         local downloaded = self:isChapterDownloaded(manga, chapter)
         if downloaded or (status and (status.state == "queued" or status.state == "downloading" or status.state == "downloaded" or status.state == "skipped")) then
@@ -274,7 +274,7 @@ function Methods:deleteSelectedChapters()
     local missing = 0
     local active = 0
     self:withChapterMenuRefreshSuppressed(function()
-        for _, chapter in ipairs(chapters) do
+        for _index, chapter in ipairs(chapters) do
             local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
                 quiet_active = true,
                 quiet_missing = true,
@@ -365,7 +365,7 @@ function Methods:deleteReadChaptersFromDevice()
     local active = 0
     local failed = 0
     self:withChapterMenuRefreshSuppressed(function()
-        for _, chapter in ipairs(read_chapters) do
+        for _index, chapter in ipairs(read_chapters) do
             local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
                 quiet_active = true,
                 quiet_delete_failed = true,
@@ -432,7 +432,7 @@ end
 function Methods:getReadDownloadedChaptersFromCurrentContext()
     local manga = self.current_chapter_context and self.current_chapter_context.manga
     local chapters = {}
-    for _, chapter in ipairs(self:getReadChaptersFromCurrentContext()) do
+    for _index, chapter in ipairs(self:getReadChaptersFromCurrentContext()) do
         local downloaded = self:isChapterDownloaded(manga, chapter)
         if downloaded then
             table.insert(chapters, chapter)
@@ -479,7 +479,7 @@ function Methods:markSelectedChaptersRead()
     end
 
     local ledger = self:loadChapterLedger()
-    for _, chapter in ipairs(chapters) do
+    for _index, chapter in ipairs(chapters) do
         self:markChapterRead(manga, chapter, {
             ledger = ledger,
             skip_refresh = true,
@@ -520,7 +520,7 @@ function Methods:markSelectedChaptersUnread()
     end
 
     local ledger = self:loadChapterLedger()
-    for _, chapter in ipairs(chapters) do
+    for _index, chapter in ipairs(chapters) do
         self:markChapterUnread(manga, chapter, {
             ledger = ledger,
             skip_refresh = true,

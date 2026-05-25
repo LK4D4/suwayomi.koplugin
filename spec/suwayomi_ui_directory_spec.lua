@@ -5,22 +5,20 @@ package.path = "?.lua;" .. package.path
 describe("suwayomi/ui/directory", function()
     local shown_dialog
     local created_folder_with
+    local Marker
 
     before_each(function()
         shown_dialog = nil
         created_folder_with = nil
 
         package.loaded["suwayomi/ui/directory"] = nil
-        package.loaded.gettext = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.loaded["ui/widget/pathchooser"] = nil
         package.loaded["ui/uimanager"] = nil
         package.loaded["apps/filemanager/filemanager"] = nil
 
-        package.preload.gettext = function()
-            return function(text)
-                return text
-            end
-        end
+        Marker = require("spec/support/i18n_marker")
+        Marker.install()
 
         package.preload["ui/widget/pathchooser"] = function()
             local PathChooser = {}
@@ -103,7 +101,7 @@ describe("suwayomi/ui/directory", function()
     end)
 
     after_each(function()
-        package.preload.gettext = nil
+        Marker.uninstall()
         package.preload["ui/widget/pathchooser"] = nil
         package.preload["ui/uimanager"] = nil
         package.preload["apps/filemanager/filemanager"] = nil
@@ -117,7 +115,7 @@ describe("suwayomi/ui/directory", function()
             chosen_path = path
         end)
 
-        assert.are.equal("Choose download directory", shown_dialog.title)
+        assert.are.equal("tx:Choose download directory", shown_dialog.title)
         assert.is_true(shown_dialog.select_directory)
         assert.is_false(shown_dialog.select_file)
         assert.is_false(shown_dialog.show_files)
@@ -144,7 +142,7 @@ describe("suwayomi/ui/directory", function()
 
         local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books/Manga")
 
-        assert.are.equal("Use this folder", item_table[1].text)
+        assert.are.equal("tx:Use this folder", item_table[1].text)
         assert.are.equal("/storage/emulated/0/Books/Manga/.", item_table[1].path)
 
         shown_dialog:onMenuSelect(item_table[1])
@@ -199,8 +197,8 @@ describe("suwayomi/ui/directory", function()
 
         local item_table = shown_dialog:genItemTable({}, {}, "/storage/emulated/0/Books")
 
-        assert.are.equal("Use this folder", item_table[1].text)
-        assert.are.equal("New folder", item_table[2].text)
+        assert.are.equal("tx:Use this folder", item_table[1].text)
+        assert.are.equal("tx:New folder", item_table[2].text)
 
         shown_dialog:onMenuSelect(item_table[2])
 
