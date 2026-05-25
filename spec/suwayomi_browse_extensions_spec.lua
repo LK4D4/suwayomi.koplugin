@@ -7,7 +7,9 @@ local ui_calls
 local function resetModules()
     for _, name in ipairs({
         "suwayomi/browse/extensions",
+        "suwayomi/ui/browse",
         "suwayomi/ui",
+        "suwayomi/ui/list_rows",
         "suwayomi/settings",
         "suwayomi/subprocess/job",
         "suwayomi/browse/extension_worker",
@@ -626,6 +628,41 @@ describe("suwayomi/browse/extensions", function()
         controller:showExtensionActions(nil)
 
         assert.are.equal("ctx:extension title:Extension", controller.title_menu_options.title)
+    end)
+
+    it("passes translated fallback title through to the action dialog when extension is nil", function()
+        resetModules()
+        installMarkerI18n()
+
+        local shown_dialog
+        package.preload["suwayomi/ui"] = function()
+            return {
+                showActionMenu = function(options, onSelect)
+                    shown_dialog = {
+                        title = options.title,
+                        actions = options.actions,
+                        onSelect = onSelect,
+                    }
+                    return shown_dialog
+                end,
+            }
+        end
+        package.preload["suwayomi/ui/list_rows"] = function()
+            return {
+                getExtensionTitle = function()
+                    return ""
+                end,
+            }
+        end
+
+        local browse_ui = require("suwayomi/ui/browse")
+
+        browse_ui.showExtensionActionMenu(nil, function() end, {
+            title = "ctx:extension title:Extension",
+        })
+
+        assert.are.equal("ctx:extension title:Extension", shown_dialog.title)
+        assert.are.equal("tx:No actions available", shown_dialog.actions[1].text)
     end)
 
     it("updates source cache from successful install results without showing source menu", function()

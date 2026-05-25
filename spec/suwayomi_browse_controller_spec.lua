@@ -201,6 +201,58 @@ describe("suwayomi/browse/controller", function()
         assert.are.same({}, controller.messages)
     end)
 
+    it("falls back to full translated source fetch startup error when worker error is nil", function()
+        helper.stubControllerDependencies()
+        installMarkerI18n()
+        package.loaded["suwayomi/browse/controller"] = nil
+        package.loaded["suwayomi/subprocess/job"] = nil
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                buildResultPath = function()
+                    return "/settings/source_fetch.json"
+                end,
+                start = function(options)
+                    options.on_error(nil)
+                    return nil
+                end,
+                schedulePoll = function() end,
+                poll = function() end,
+            }
+        end
+
+        local controller_module = require("suwayomi/browse/controller")
+        local controller = buildController(controller_module)
+
+        assert.is_false(controller:startSourceFetchWorker({ server_url = "https://suwayomi.example" }))
+        assert.are.same({ "tx:Could not start source loading: unknown error" }, controller.messages)
+    end)
+
+    it("falls back to full translated source fetch startup error when worker error is blank", function()
+        helper.stubControllerDependencies()
+        installMarkerI18n()
+        package.loaded["suwayomi/browse/controller"] = nil
+        package.loaded["suwayomi/subprocess/job"] = nil
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                buildResultPath = function()
+                    return "/settings/source_fetch.json"
+                end,
+                start = function(options)
+                    options.on_error("   ")
+                    return nil
+                end,
+                schedulePoll = function() end,
+                poll = function() end,
+            }
+        end
+
+        local controller_module = require("suwayomi/browse/controller")
+        local controller = buildController(controller_module)
+
+        assert.is_false(controller:startSourceFetchWorker({ server_url = "https://suwayomi.example" }))
+        assert.are.same({ "tx:Could not start source loading: unknown error" }, controller.messages)
+    end)
+
     it("cancels source fetch workers and ignores late completions after plugin close", function()
         local started_options
         local canceled = {}

@@ -40,6 +40,12 @@ local function credentialField(credentials, field)
     return tostring(type(credentials) == "table" and credentials[field] or "")
 end
 
+local function trim(value)
+    value = value == nil and "" or tostring(value)
+    value = value:gsub("^%s+", ""):gsub("%s+$", "")
+    return value
+end
+
 local function credentialsMatch(left, right)
     return credentialField(left, "server_url") == credentialField(right, "server_url")
         and credentialField(left, "auth_method") == credentialField(right, "auth_method")
@@ -126,7 +132,12 @@ function Methods:startSourceFetchWorker(credentials, options)
             self.source_fetch_active = nil
             self:closeLoadingMessage(active.loading_message)
             if not options.silent then
-                self:showMessage(I18n.f("Could not start source loading: %1", err or I18n.t("unknown error")))
+                local message = trim(err)
+                if message ~= "" then
+                    self:showMessage(I18n.f("Could not start source loading: %1", message))
+                else
+                    self:showMessage(I18n.t("Could not start source loading: unknown error"))
+                end
             end
         end,
     })

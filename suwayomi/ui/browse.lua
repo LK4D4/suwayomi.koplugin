@@ -123,7 +123,7 @@ function BrowseUI.showExtensionActionMenu(extension, onSelectCallback, options)
     end
 
     return require("suwayomi/ui").showActionMenu({
-        title = ListRows.getExtensionTitle(extension),
+        title = options.title or ListRows.getExtensionTitle(extension),
         actions = actions,
         anchor = options.anchor,
         close_callback = options.close_callback,
