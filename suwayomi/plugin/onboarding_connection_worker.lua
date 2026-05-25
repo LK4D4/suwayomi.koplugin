@@ -50,12 +50,23 @@ end
 
 local function normalizeResult(result)
     result = type(result) == "table" and result or {}
-    result.ok = result.ok == true
-    result.source_count = tonumber(result.source_count) or 0
-    result.error = result.error
-    result.error_id = result.error_id
-    result.message_id = result.message_id
-    return result
+    return {
+        ok = result.ok == true,
+        source_count = tonumber(result.source_count) or 0,
+        error = result.error,
+        error_id = result.error_id,
+        message_id = result.message_id,
+    }
+end
+
+local function externalErrorMessage(response)
+    if type(response) ~= "table" then
+        return nil
+    end
+    if type(response.error) ~= "string" or response.error == "" then
+        return nil
+    end
+    return response.error
 end
 
 function OnboardingConnectionWorker:writeResult(result_path, result)
@@ -82,13 +93,14 @@ function OnboardingConnectionWorker:run(credentials, result_path)
                 message_id = successMessageId(attempt),
             }
         else
+            local external_error = externalErrorMessage(response)
             local error_id
-            if response.error == nil then
+            if external_error == nil then
                 error_id = "could_not_connect"
             end
             result = {
                 ok = false,
-                error = response.error,
+                error = external_error,
                 error_id = error_id,
             }
         end

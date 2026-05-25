@@ -136,4 +136,66 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
         assert.are.equal("HTTP 401 Unauthorized from Suwayomi", result.error)
         assert.is_nil(result.error_id)
     end)
+
+    it("drops legacy and unexpected keys when reading persisted results", function()
+        clearModules()
+        package.preload["suwayomi/api"] = function()
+            return {}
+        end
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                readResult = function(_, normalize)
+                    return normalize({
+                        ok = false,
+                        source_count = 7,
+                        error_id = "missing_server_url",
+                        message_id = "connection_test_passed",
+                        message = "legacy message",
+                        extra = "unexpected",
+                    })
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/plugin/onboarding_connection_worker")
+        local result = worker:readResult("/tmp/result.json")
+
+        assert.are.same({
+            ok = false,
+            source_count = 7,
+            error = nil,
+            error_id = "missing_server_url",
+            message_id = "connection_test_passed",
+        }, result)
+        assert.is_nil(result.message)
+        assert.is_nil(result.extra)
+    end)
+
+    it("maps missing external connection errors to could_not_connect", function()
+        clearModules()
+        package.preload["suwayomi/api"] = function()
+            return {
+                testConnection = function()
+                    return {
+                        ok = false,
+                        error = false,
+                    }
+                end,
+            }
+        end
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                writeResult = function(_, result)
+                    return result
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/plugin/onboarding_connection_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, "/tmp/result.json")
+
+        assert.is_false(result.ok)
+        assert.are.equal("could_not_connect", result.error_id)
+        assert.is_nil(result.error)
+    end)
 end)
