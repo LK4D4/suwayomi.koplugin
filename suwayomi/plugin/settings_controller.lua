@@ -26,6 +26,37 @@ end
 
 local Methods = {}
 
+local ONBOARDING_RESULT_MESSAGES = {
+    connection_test_passed = "Connection test passed.",
+    connection_test_passed_after_retry = "Connection test passed after retry.",
+}
+
+local ONBOARDING_RESULT_ERRORS = {
+    missing_server_url = "Enter a Suwayomi server URL first.",
+    could_not_connect = "Could not connect to Suwayomi.",
+}
+
+local function translateResultMessage(result)
+    local message_id = result and result.message_id
+    local msgid = message_id and ONBOARDING_RESULT_MESSAGES[message_id]
+    if msgid then
+        return I18n.t(msgid)
+    end
+    return (result and result.message) or I18n.t("Connection test passed.")
+end
+
+local function translateResultError(result)
+    if result and result.error then
+        return result.error
+    end
+    local error_id = result and result.error_id
+    local msgid = error_id and ONBOARDING_RESULT_ERRORS[error_id]
+    if msgid then
+        return I18n.t(msgid)
+    end
+    return I18n.t("Could not connect to Suwayomi.")
+end
+
 local function formatLibraryCategoryPickerBehavior(behavior)
     local labels = {
         automatic = I18n.t("Automatic"),
@@ -191,7 +222,7 @@ function Methods:finishOnboardingConnectionTest(active, result)
         if active and active.update_dialog ~= false then
             SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "passed")
         end
-        local message = result.message or I18n.t("Connection test passed.")
+        local message = translateResultMessage(result)
         if active and active.show_continue_message == false then
             self:showMessage(message)
         else
@@ -202,7 +233,7 @@ function Methods:finishOnboardingConnectionTest(active, result)
     if active and active.update_dialog ~= false then
         SuwayomiUI.updateOnboardingConnectionDialogStatus(self.onboarding_connection_dialog, "failed")
     end
-    self:showMessage((result and result.error) or I18n.t("Could not connect to Suwayomi."))
+    self:showMessage(translateResultError(result))
 end
 
 

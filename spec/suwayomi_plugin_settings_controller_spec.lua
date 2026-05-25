@@ -34,6 +34,13 @@ local function installMarkerI18n()
                 end
                 return result
             end,
+            n = function(singular, plural, count)
+                return "tx:" .. (tonumber(count) == 1 and singular or plural)
+            end,
+            count = function(count, singular, plural)
+                local result = "tx:" .. (tonumber(count) == 1 and singular or plural)
+                return result:gsub("%%1", tostring(count))
+            end,
         }
     end
     package.loaded["suwayomi/i18n"] = nil
@@ -500,6 +507,93 @@ describe("suwayomi/plugin/settings_controller", function()
             ok = false,
         })
         assert.are.equal("tx:Could not connect to Suwayomi.", state.messages[#state.messages])
+    end)
+
+    it("translates onboarding worker success message ids", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+            show_continue_message = false,
+        }, {
+            ok = true,
+            message_id = "connection_test_passed_after_retry",
+        })
+
+        assert.are.equal("tx:Connection test passed after retry.", state.messages[#state.messages])
+    end)
+
+    it("translates onboarding worker error ids but keeps raw worker errors", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+        }, {
+            ok = false,
+            error_id = "missing_server_url",
+        })
+        assert.are.equal("tx:Enter a Suwayomi server URL first.", state.messages[#state.messages])
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+        }, {
+            ok = false,
+            error = "HTTP 401 Unauthorized from Suwayomi",
+        })
+        assert.are.equal("HTTP 401 Unauthorized from Suwayomi", state.messages[#state.messages])
+    end)
+
+    it("translates onboarding continue prompt around translated success ids", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+        }, {
+            ok = true,
+            message_id = "connection_test_passed",
+        })
+
+        assert.are.equal(
+            "tx:Connection test passed. tx:You can continue.",
+            state.messages[#state.messages]
+        )
     end)
 
     it("waits for timed-out onboarding connection workers to finish before cleanup", function()
