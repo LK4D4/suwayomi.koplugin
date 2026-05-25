@@ -3,8 +3,8 @@
 -- Responsibility: render extension menus and coordinate extension fetch/install/update/uninstall
 -- worker results without blocking KOReader UI callbacks on network work.
 -- Owned state: plugin-bound current extension menu/action and active worker.
--- Dependencies: KOReader UI helpers, Suwayomi settings, subprocess job helper,
--- and Browse extension worker.
+-- Dependencies: KOReader UI helpers, plugin i18n facade, Suwayomi settings,
+-- subprocess job helper, and Browse extension worker.
 -- External data: extension records, source refresh results, credentials, and
 -- worker files are treated as untrusted until normalized locally.
 
@@ -13,9 +13,8 @@ local SuwayomiExtensionWorker = require("suwayomi/browse/extension_worker")
 local SubprocessJob = require("suwayomi/subprocess/job")
 local SuwayomiSettings = require("suwayomi/settings")
 local SourceLanguages = require("suwayomi/source_languages")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
 
 local Extensions = {}
 local Methods = {}
@@ -104,26 +103,26 @@ end
 
 local function extensionTimeoutMessage(action)
     if action == "install" then
-        return _("Extension install timed out.")
+        return I18n.t("Extension install timed out.")
     end
     if action == "update" then
-        return _("Extension update timed out.")
+        return I18n.t("Extension update timed out.")
     end
     if action == "uninstall" then
-        return _("Extension uninstall timed out.")
+        return I18n.t("Extension uninstall timed out.")
     end
-    return _("Extension list loading timed out.")
+    return I18n.t("Extension list loading timed out.")
 end
 
 local function actionPastTense(action)
     if action == "install" then
-        return _("install succeeded")
+        return I18n.c("extension result", "install succeeded")
     end
     if action == "update" then
-        return _("update succeeded")
+        return I18n.c("extension result", "update succeeded")
     end
     if action == "uninstall" then
-        return _("uninstall succeeded")
+        return I18n.c("extension result", "uninstall succeeded")
     end
     return nil
 end
@@ -134,10 +133,10 @@ local function refreshWarningMessage(action, refresh_kind, error_message)
         return nil
     end
     if refresh_kind == "extension" then
-        return T(_("Extension %1, but extension list refresh failed: %2"), action_label, error_message)
+        return I18n.f("Extension %1, but extension list refresh failed: %2", action_label, error_message)
     end
     if refresh_kind == "source" then
-        return T(_("Extension %1, but source refresh failed: %2"), action_label, error_message)
+        return I18n.f("Extension %1, but source refresh failed: %2", action_label, error_message)
     end
     return nil
 end
@@ -169,7 +168,7 @@ function Methods:startExtensionWorker(credentials, request, options)
     request = request or { action = "fetch" }
     if self.extension_worker_active then
         if not options.silent and self.showMessage then
-            self:showMessage(_("Extension task already running."))
+            self:showMessage(I18n.t("Extension task already running."))
         end
         return false
     end
@@ -181,7 +180,7 @@ function Methods:startExtensionWorker(credentials, request, options)
         options = options,
         result_path = result_path,
         loading_message = not options.silent
-            and self:showLoadingMessage(options.loading_message or _("Loading extensions..."))
+            and self:showLoadingMessage(options.loading_message or I18n.t("Loading extensions..."))
             or nil,
     }
 
@@ -218,7 +217,7 @@ function Methods:startExtensionWorker(credentials, request, options)
             self.extension_worker_active = nil
             self:closeLoadingMessage(active.loading_message)
             if not options.silent then
-                self:showMessage(T(_("Could not start extension task: %1"), err or _("unknown error")))
+                self:showMessage(I18n.f("Could not start extension task: %1", err or I18n.t("unknown error")))
             end
         end,
     })
@@ -279,7 +278,7 @@ end
 function Methods:showExtensions()
     local credentials = SuwayomiSettings:load()
     if credentials.server_url == "" then
-        self:showMessage(_("Set up your Suwayomi server login first."))
+        self:showMessage(I18n.t("Set up your Suwayomi server login first."))
         if self.showOnboardingSetup then
             self:showOnboardingSetup({ first_run = true })
         end
@@ -288,22 +287,22 @@ function Methods:showExtensions()
     return self:startExtensionWorker(credentials, {
         action = "fetch",
     }, {
-        loading_message = _("Loading extensions..."),
+        loading_message = I18n.t("Loading extensions..."),
         force_new = true,
     })
 end
 
 local function extensionActionMessage(action)
     if action == "install" then
-        return _("Installing extension...")
+        return I18n.t("Installing extension...")
     end
     if action == "update" then
-        return _("Updating extension...")
+        return I18n.t("Updating extension...")
     end
     if action == "uninstall" then
-        return _("Uninstalling extension...")
+        return I18n.t("Uninstalling extension...")
     end
-    return _("Updating extension...")
+    return I18n.t("Updating extension...")
 end
 
 function Methods:showExtensionActions(extension)
@@ -316,7 +315,7 @@ function Methods:showExtensionActions(extension)
             loading_message = extensionActionMessage(action),
         })
     end, self.getTitleBarMenuOptions and self:getTitleBarMenuOptions({
-        title = extension and extension.name or _("Extension"),
+        title = extension and extension.name or I18n.c("extension title", "Extension"),
         actions = {},
     }) or {})
 end
@@ -325,11 +324,11 @@ function Methods:showFetchedExtensions(result, options)
     local SuwayomiUI = getUI()
     options = options or {}
     if not result then
-        self:showMessage(_("Could not load Suwayomi extensions."))
+        self:showMessage(I18n.t("Could not load Suwayomi extensions."))
         return
     end
     if not result.ok then
-        self:showMessage(_(result.error or "Could not load Suwayomi extensions."))
+        self:showMessage(result.error or I18n.t("Could not load Suwayomi extensions."))
         return
     end
 
@@ -377,21 +376,23 @@ function Methods:showFetchedExtensions(result, options)
         local actions = {
             {
                 id = "search_extensions",
-                text = query and T(_("Search extensions: %1"), query) or _("Search extensions"),
+                text = query
+                    and I18n.cf("extension action", "Search extensions: %1", query)
+                    or I18n.c("extension action", "Search extensions"),
             },
         }
         if query then
             table.insert(actions, {
                 id = "clear_extension_search",
-                text = T(_("Clear search: %1"), query),
+                text = I18n.cf("extension action", "Clear search: %1", query),
             })
         end
-        table.insert(actions, { id = "refresh_extensions", text = _("Refresh extension list") })
+        table.insert(actions, { id = "refresh_extensions", text = I18n.t("Refresh extension list") })
 
         local menu_options = {}
         if self.getTitleBarMenuOptions then
             menu_options = self:getTitleBarMenuOptions({
-                title = _("Suwayomi Extensions"),
+                title = I18n.t("Suwayomi Extensions"),
                 actions = actions,
                 onSelect = function(action)
                     if action and action.id == "search_extensions" then
@@ -402,7 +403,7 @@ function Methods:showFetchedExtensions(result, options)
                         return self:startExtensionWorker(options.credentials, {
                             action = "fetch",
                         }, {
-                            loading_message = _("Refreshing extensions..."),
+                            loading_message = I18n.t("Refreshing extensions..."),
                         })
                     end
                 end,
@@ -420,7 +421,7 @@ function Methods:showFetchedExtensions(result, options)
             menu_options.itemnumber = 1
         end
         if query then
-            menu_options.empty_text = _("No matching extensions")
+            menu_options.empty_text = I18n.t("No matching extensions")
             menu_options.show_empty_extension_sections = true
             menu_options.on_close = function()
                 applySearch("")

@@ -11,15 +11,44 @@ local function resetModules()
         "suwayomi/settings",
         "suwayomi/subprocess/job",
         "suwayomi/browse/extension_worker",
+        "suwayomi/i18n",
+        "gettext",
+        "ffi/util",
     }) do
         package.loaded[name] = nil
         package.preload[name] = nil
     end
 end
 
+local function installMarkerI18n()
+    local function substitute(template, values)
+        return (tostring(template):gsub("%%(%d+)", function(index)
+            return tostring(values[tonumber(index)] or "")
+        end))
+    end
+
+    package.preload["suwayomi/i18n"] = function()
+        return {
+            t = function(text)
+                return "tx:" .. tostring(text)
+            end,
+            f = function(template, ...)
+                return "tx:" .. substitute(template, { ... })
+            end,
+            c = function(context, text)
+                return "ctx:" .. tostring(context) .. ":" .. tostring(text)
+            end,
+            cf = function(context, template, ...)
+                return "ctx:" .. tostring(context) .. ":" .. substitute(template, { ... })
+            end,
+        }
+    end
+end
+
 local function stubDependencies(options)
     options = options or {}
     helper.stubControllerDependencies()
+    installMarkerI18n()
     ui_calls = {}
 
     package.preload["suwayomi/ui"] = function()
@@ -166,7 +195,7 @@ describe("suwayomi/browse/extensions", function()
 
         controller:showExtensions()
 
-        assert.are.equal("Set up your Suwayomi server login first.", controller.messages[#controller.messages])
+        assert.are.equal("tx:Set up your Suwayomi server login first.", controller.messages[#controller.messages])
         assert.is_true(controller.setup_options.first_run)
     end)
 
@@ -192,6 +221,9 @@ describe("suwayomi/browse/extensions", function()
         assert.are.equal("pkg.mangadex", ui_calls.extensions_menu.extensions[1].pkg_name)
         assert.are.equal("search_extensions", controller.title_menu_options.actions[1].id)
         assert.are.equal("refresh_extensions", controller.title_menu_options.actions[2].id)
+        assert.are.equal("ctx:extension action:Search extensions", controller.title_menu_options.actions[1].text)
+        assert.are.equal("tx:Refresh extension list", controller.title_menu_options.actions[2].text)
+        assert.are.equal("tx:Suwayomi Extensions", controller.title_menu_options.title)
         controller.title_menu_options.onSelect(controller.title_menu_options.actions[2])
         assert.are.equal("fetch", started.request.action)
     end)
@@ -219,6 +251,9 @@ describe("suwayomi/browse/extensions", function()
         assert.are.equal("pkg.buondua", ui_calls.updated_extensions_menu.extensions[1].pkg_name)
         assert.are.equal(1, #ui_calls.updated_extensions_menu.extensions)
         assert.are.equal("clear_extension_search", controller.title_menu_options.actions[2].id)
+        assert.are.equal("ctx:extension action:Search extensions: buon", controller.title_menu_options.actions[1].text)
+        assert.are.equal("ctx:extension action:Clear search: buon", controller.title_menu_options.actions[2].text)
+        assert.are.equal("tx:No matching extensions", ui_calls.updated_extensions_menu.options.empty_text)
 
         controller.title_menu_options.onSelect({ id = "clear_extension_search" })
 
@@ -417,7 +452,7 @@ describe("suwayomi/browse/extensions", function()
         })
 
         assert.is_false(started)
-        assert.are.same({ "Extension task already running." }, controller.messages)
+        assert.are.same({ "tx:Extension task already running." }, controller.messages)
     end)
 
     it("clears active extension fetch state and closes loading UI on timeout", function()
@@ -435,7 +470,7 @@ describe("suwayomi/browse/extensions", function()
 
         assert.is_nil(controller.extension_worker_active)
         assert.are.equal("Loading extensions...", controller.closed_loading.message)
-        assert.are.same({ "Extension list loading timed out." }, controller.messages)
+        assert.are.same({ "tx:Extension list loading timed out." }, controller.messages)
         assert.is_true(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
             action = "fetch",
         }))
@@ -521,7 +556,7 @@ describe("suwayomi/browse/extensions", function()
 
         assert.is_nil(controller.extension_worker_active)
         assert.are.equal("Installing extension...", controller.closed_loading.message)
-        assert.are.same({ "Extension install timed out." }, controller.messages)
+        assert.are.same({ "tx:Extension install timed out." }, controller.messages)
         assert.is_true(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
             action = "update",
             pkg_name = "pkg.mangadex",
@@ -579,7 +614,18 @@ describe("suwayomi/browse/extensions", function()
         assert.are.equal("uninstall", started.request.action)
         assert.are.equal("pkg.mangadex", started.request.pkg_name)
         assert.are.equal("https://suwayomi.example", started.credentials.server_url)
-        assert.are.equal("Uninstalling extension...", started.options.loading_message)
+        assert.are.equal("tx:Uninstalling extension...", started.options.loading_message)
+    end)
+
+    it("uses translated fallback title for extension action menus", function()
+        local extensions = loadExtensions()
+        local controller = buildController(extensions, {
+            current_extension_credentials = { server_url = "https://suwayomi.example" },
+        })
+
+        controller:showExtensionActions(nil)
+
+        assert.are.equal("ctx:extension title:Extension", controller.title_menu_options.title)
     end)
 
     it("updates source cache from successful install results without showing source menu", function()
@@ -645,7 +691,7 @@ describe("suwayomi/browse/extensions", function()
         assert.are.equal("old-source", controller.saved_source_cache.sources[1].id)
         assert.is_nil(refreshed_sources)
         assert.are.equal(
-            "Extension update succeeded, but source refresh failed: Connection timed out while waiting for Suwayomi.",
+            "tx:Extension ctx:extension result:update succeeded, but source refresh failed: Connection timed out while waiting for Suwayomi.",
             controller.messages[#controller.messages]
         )
         assert.are.equal("pkg.mangadex", ui_calls.extensions_menu.extensions[1].pkg_name)
@@ -674,12 +720,49 @@ describe("suwayomi/browse/extensions", function()
         })
 
         assert.are.equal(
-            "Extension install succeeded, but extension list refresh failed: Extension catalog timed out.",
+            "tx:Extension ctx:extension result:install succeeded, but extension list refresh failed: Extension catalog timed out.",
             controller.messages[#controller.messages]
         )
         assert.are.equal("source-mangadex", controller.saved_source_cache.sources[1].id)
         assert.are.equal("pkg.mangadex", ui_calls.extensions_menu.extensions[1].pkg_name)
         assert.are.equal("Installing extension...", controller.closed_loading.message)
+    end)
+
+    it("translates extension refresh warning frames while keeping raw errors", function()
+        local extensions = loadExtensions()
+        local controller = buildController(extensions)
+
+        controller:finishExtensionWorker({
+            credentials = { server_url = "https://suwayomi.example" },
+        }, {
+            ok = true,
+            action = "install",
+            extension_refresh_ok = false,
+            extension_refresh_error = "HTTP 504 upstream timeout",
+            source_refresh_ok = false,
+            source_refresh_error = "worker: source refresh blew up",
+            sources = {},
+            extensions = {
+                { pkg_name = "pkg.mangadex", name = "MangaDex", is_installed = true },
+            },
+        })
+
+        assert.are.same({
+            "tx:Extension ctx:extension result:install succeeded, but extension list refresh failed: HTTP 504 upstream timeout",
+            "tx:Extension ctx:extension result:install succeeded, but source refresh failed: worker: source refresh blew up",
+        }, controller.messages)
+    end)
+
+    it("keeps raw extension worker errors untranslated", function()
+        local extensions = loadExtensions()
+        local controller = buildController(extensions)
+
+        controller:showFetchedExtensions({
+            ok = false,
+            error = "worker panic: pkg.mangadex exploded",
+        }, { credentials = { server_url = "https://suwayomi.example" } })
+
+        assert.are.same({ "worker panic: pkg.mangadex exploded" }, controller.messages)
     end)
 
     it("does not clear source cache from extension list fetch results", function()
