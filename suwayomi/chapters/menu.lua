@@ -2,16 +2,14 @@
 --
 -- Responsibility: Owns chapter row, action, bulk action, and quick-refresh menu construction.
 -- Owned state: Builds UI data structures and callbacks; destructive actions remain in suwayomi/chapters/actions.lua.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiDebug = require("suwayomi/debug")
+local I18n = require("suwayomi/i18n")
 local MangaActionMenu = require("suwayomi/manga/action_menu")
-local _ = require("gettext")
-local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
 
 local ChapterMenu = {}
 ChapterMenu.__index = ChapterMenu
@@ -190,7 +188,7 @@ function Methods:buildChapterMenuOptions(manga, chapters, ledger)
     local visible_chapters = self:getVisibleChapters(chapters)
 
     return copyTitleBarOptions({
-        title = self.formatChapterListScreenTitle and self:formatChapterListScreenTitle(manga) or _("Chapters"),
+        title = self.formatChapterListScreenTitle and self:formatChapterListScreenTitle(manga) or I18n.t("Chapters"),
         chapters = self:buildChapterMenuItems(manga, visible_chapters, ledger),
     }, self:getChapterTitleBarMenuOptions(manga))
 end
@@ -259,7 +257,7 @@ function Methods:buildQuickChapterMenuOptions(manga, chapters)
     local visible_chapters = self:getVisibleChapters(chapters)
 
     return copyTitleBarOptions({
-        title = self.formatChapterListScreenTitle and self:formatChapterListScreenTitle(manga) or _("Chapters"),
+        title = self.formatChapterListScreenTitle and self:formatChapterListScreenTitle(manga) or I18n.t("Chapters"),
         chapters = self:buildQuickChapterMenuItems(manga, visible_chapters),
     }, self:getChapterTitleBarMenuOptions(manga))
 end
@@ -271,21 +269,21 @@ function Methods:getChapterActions(manga, chapter)
     local actions = {}
 
     if status and (status.state == "queued" or status.state == "downloading") then
-        table.insert(actions, { id = "cancel_download", text = _("Cancel download"), destructive = true })
+        table.insert(actions, { id = "cancel_download", text = I18n.t("Cancel download"), destructive = true })
     elseif downloaded then
-        table.insert(actions, { id = "open", text = _("Open") })
+        table.insert(actions, { id = "open", text = I18n.c("chapter action", "Open") })
     else
-        table.insert(actions, { id = "download", text = _("Download") })
+        table.insert(actions, { id = "download", text = I18n.c("chapter action", "Download") })
     end
 
     if chapter.is_read == true then
-        table.insert(actions, { id = "mark_unread", text = _("Mark as unread") })
+        table.insert(actions, { id = "mark_unread", text = I18n.t("Mark as unread") })
     else
-        table.insert(actions, { id = "mark_read", text = _("Mark as read") })
-        table.insert(actions, { id = "mark_previous_read", text = _("Mark previous as read") })
+        table.insert(actions, { id = "mark_read", text = I18n.t("Mark as read") })
+        table.insert(actions, { id = "mark_previous_read", text = I18n.t("Mark previous as read") })
     end
     if downloaded then
-        table.insert(actions, { id = "delete", text = _("Delete from device"), destructive = true })
+        table.insert(actions, { id = "delete", text = I18n.t("Delete from device"), destructive = true })
     end
     return actions
 end
@@ -295,22 +293,22 @@ function Methods:getBulkChapterActions()
     local actions = {}
 
     if self:getSelectedChapterCount() > 0 then
-        table.insert(actions, { id = "download_selected", text = _("Download selected") })
-        table.insert(actions, { id = "mark_read_selected", text = _("Mark read") })
-        table.insert(actions, { id = "mark_unread_selected", text = _("Mark unread") })
-        table.insert(actions, { id = "clear_selection", text = _("Clear selection") })
+        table.insert(actions, { id = "download_selected", text = I18n.t("Download selected") })
+        table.insert(actions, { id = "mark_read_selected", text = I18n.t("Mark read") })
+        table.insert(actions, { id = "mark_unread_selected", text = I18n.t("Mark unread") })
+        table.insert(actions, { id = "clear_selection", text = I18n.t("Clear selection") })
         if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
-            table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter"), submenu = true })
+            table.insert(actions, { id = "scanlator_filter", text = I18n.t("Scanlator filter"), submenu = true })
         end
         if hasCancelableDownloads(self) then
-            table.insert(actions, { id = "cancel_all_downloads", text = _("Cancel all downloads"), destructive = true })
+            table.insert(actions, { id = "cancel_all_downloads", text = I18n.t("Cancel all downloads"), destructive = true })
         end
-        table.insert(actions, { id = "delete_selected", text = _("Delete downloads"), destructive = true })
+        table.insert(actions, { id = "delete_selected", text = I18n.t("Delete downloads"), destructive = true })
         return actions
     end
 
     if self.current_chapter_context and #(self:getVisibleChapters(self.current_chapter_context.chapters or {})) > 0 then
-        table.insert(actions, { id = "select_all", text = _("Select all") })
+        table.insert(actions, { id = "select_all", text = I18n.t("Select all") })
     end
 
     local manga_actions = MangaActionMenu.buildMainActions(self, self.current_chapter_context and self.current_chapter_context.manga, {})
@@ -318,10 +316,10 @@ function Methods:getBulkChapterActions()
         table.insert(actions, action)
     end
     if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
-        table.insert(actions, { id = "scanlator_filter", text = _("Scanlator filter"), submenu = true })
+        table.insert(actions, { id = "scanlator_filter", text = I18n.t("Scanlator filter"), submenu = true })
     end
     if hasCancelableDownloads(self) then
-        table.insert(actions, { id = "cancel_all_downloads", text = _("Cancel all downloads"), destructive = true })
+        table.insert(actions, { id = "cancel_all_downloads", text = I18n.t("Cancel all downloads"), destructive = true })
     end
 
     return actions
@@ -353,7 +351,7 @@ function Methods:showScanlatorFilterActions(menu_context)
     end
 
     SuwayomiUI.showChapterActionsMenu({
-        title = _("Scanlator filter"),
+        title = I18n.t("Scanlator filter"),
         actions = self:getScanlatorFilterActions(),
         anchor = menu_context and menu_context.anchor,
         on_back = function()
@@ -376,7 +374,7 @@ function Methods:showBulkDownloadActions(menu_context)
     end
 
     SuwayomiUI.showChapterActionsMenu({
-        title = _("Bulk downloads"),
+        title = I18n.t("Bulk downloads"),
         actions = self:getBulkDownloadActions(),
         anchor = menu_context and menu_context.anchor,
         on_back = function()
@@ -394,7 +392,7 @@ function Methods:showKeepDownloadedActions(menu_context)
     end
 
     SuwayomiUI.showChapterActionsMenu({
-        title = _("Download ahead"),
+        title = I18n.t("Download ahead"),
         actions = MangaActionMenu.buildKeepDownloadedActions(),
         anchor = menu_context and menu_context.anchor,
         on_back = function()
@@ -413,12 +411,9 @@ function Methods:showBulkChapterActions(menu_context)
     end
 
     local count = self:getSelectedChapterCount()
-    local title = _("Chapter downloads")
+    local title = I18n.t("Chapter downloads")
     if count > 0 then
-        title = T(
-            self:pluralize(count, _("%1 selected chapter"), _("%1 selected chapters")),
-            count
-        )
+        title = I18n.count(count, "%1 selected chapter", "%1 selected chapters")
     end
     local options = {
         title = title,

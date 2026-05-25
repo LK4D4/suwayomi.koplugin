@@ -2,12 +2,10 @@
 --
 -- Responsibility: Owns chapter context, selection, filtering, status formatting, and ledger merge helpers.
 -- Owned state: State lives on the plugin instance so KOReader callbacks keep the same behavior during the extraction.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
-local _ = require("gettext")
-local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
+local I18n = require("suwayomi/i18n")
 local SuwayomiSettings = require("suwayomi/settings")
 
 local ChapterContext = {}
@@ -129,7 +127,7 @@ function Methods:ensureMangaChapterContext(manga)
     end
 
     if not manga or not manga.id then
-        self:showMessage(_("This manga has no chapters loaded."))
+        self:showMessage(I18n.t("This manga has no chapters loaded."))
         return nil
     end
 
@@ -334,9 +332,11 @@ end
 
 function Methods:formatChapterListTitle(manga)
     local selected_count = self:getSelectedChapterCount()
-    local title = manga.title
+    local title = manga and manga.title or nil
     if self.selection_mode then
-        title = T(_("%1 selected"), selected_count)
+        title = I18n.count(selected_count, "%1 selected", "%1 selected")
+    elseif title == nil or title == "" then
+        title = I18n.t("Chapters")
     end
     if self.current_scanlator_filter then
         title = title .. " - " .. self.current_scanlator_filter
@@ -347,13 +347,13 @@ end
 function Methods:formatChapterListScreenTitle(manga)
     local selected_count = self:getSelectedChapterCount()
     if self.selection_mode then
-        return T(_("%1 selected"), selected_count)
+        return I18n.count(selected_count, "%1 selected", "%1 selected")
     end
     local context = formatChapterScreenContext(manga)
     if context then
         return context
     end
-    return _("Chapters")
+    return I18n.t("Chapters")
 end
 
 
@@ -431,18 +431,20 @@ end
 function Methods:formatBulkDownloadMessage(queued, skipped)
     local parts = {}
     if queued > 0 then
-        table.insert(parts, T(
-            self:pluralize(queued, _("Queued %1 selected chapter download."), _("Queued %1 selected chapter downloads.")),
-            queued
+        table.insert(parts, I18n.count(
+            queued,
+            "Queued %1 selected chapter download.",
+            "Queued %1 selected chapter downloads."
         ))
     else
-        table.insert(parts, _("No new downloads queued."))
+        table.insert(parts, I18n.t("No new downloads queued."))
     end
 
     if skipped > 0 then
-        table.insert(parts, T(
-            self:pluralize(skipped, _("Skipped %1 already downloaded or queued."), _("Skipped %1 already downloaded or queued.")),
-            skipped
+        table.insert(parts, I18n.count(
+            skipped,
+            "Skipped %1 already downloaded or queued.",
+            "Skipped %1 already downloaded or queued."
         ))
     end
     return table.concat(parts, " ")
@@ -539,7 +541,7 @@ end
 
 function Methods:getScanlatorFilterActions()
     local actions = {
-        { id = "scanlator_filter_all", text = _("All scanlators") },
+        { id = "scanlator_filter_all", text = I18n.t("All scanlators") },
     }
     local context = self.current_chapter_context
     for _, scanlator in ipairs(self:getChapterScanlatorChoices(context and context.chapters or {})) do

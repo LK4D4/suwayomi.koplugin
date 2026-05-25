@@ -1,9 +1,18 @@
 package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/controller_module_spec_helper")
+local Marker = require("spec/support/i18n_marker")
 
 describe("suwayomi/chapters/context", function()
     local fake_settings
+    local function installPlugin(fields)
+        local controller = require("suwayomi/chapters/context")
+        local plugin = fields or {}
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+        return plugin
+    end
 
     before_each(function()
         fake_settings = {}
@@ -36,13 +45,16 @@ describe("suwayomi/chapters/context", function()
     end)
 
     after_each(function()
+        Marker.uninstall()
         package.loaded["suwayomi/chapters/context"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.loaded.gettext = nil
         package.loaded["ffi/util"] = nil
         package.loaded["suwayomi/settings"] = nil
         package.loaded["suwayomi/readsync/ledger"] = nil
         package.preload.gettext = nil
         package.preload["ffi/util"] = nil
+        package.preload["suwayomi/i18n"] = nil
         package.preload["suwayomi/settings"] = nil
         package.preload["suwayomi/readsync/ledger"] = nil
     end)
@@ -96,6 +108,86 @@ describe("suwayomi/chapters/context", function()
             "2 selected - Very Long Scanlator Name That Would Truncate In Header",
             plugin:formatChapterListTitle(manga)
         )
+    end)
+
+    it("translates chapter context title fallbacks and selected counts", function()
+        Marker.install()
+        package.loaded["suwayomi/chapters/context"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        local manga = { id = "m1", title = "Frieren" }
+        local plugin = installPlugin({
+            selected_chapters = {},
+        })
+
+        assert.are.equal("tx:Chapters", plugin:formatChapterListScreenTitle({}))
+
+        plugin.selection_mode = true
+        plugin.selected_chapters = {
+            ["m1:c1"] = true,
+            ["m1:c2"] = true,
+            ["m1:c3"] = true,
+        }
+
+        assert.are.equal("tx:3 selected", plugin:formatChapterListScreenTitle(manga))
+    end)
+
+    it("translates chapter list title counts while keeping manga and scanlator data raw", function()
+        Marker.install()
+        package.loaded["suwayomi/chapters/context"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        local manga = { id = "m1", title = "Frieren" }
+        local plugin = installPlugin({
+            selected_chapters = {},
+        })
+
+        assert.are.equal("Frieren", plugin:formatChapterListTitle(manga))
+        assert.are.equal("tx:Chapters", plugin:formatChapterListTitle({}))
+        assert.are.equal("tx:Chapters", plugin:formatChapterListTitle())
+
+        plugin.selection_mode = true
+        plugin.selected_chapters = {
+            ["m1:c1"] = true,
+            ["m1:c2"] = true,
+            ["m1:c3"] = true,
+        }
+
+        assert.are.equal("tx:3 selected", plugin:formatChapterListTitle(manga))
+    end)
+
+    it("translates only scanlator filter chrome", function()
+        Marker.install()
+        package.loaded["suwayomi/chapters/context"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        local plugin = installPlugin({
+            current_chapter_context = {
+                manga = { id = "m1", title = "Frieren" },
+                chapters = {
+                    { id = "c1", name = "Chapter 1", scanlator = "Alpha" },
+                    { id = "c2", name = "Chapter 2", scanlator = "Beta" },
+                },
+            },
+            current_scanlator_filter = "Beta",
+        })
+
+        local actions = plugin:getScanlatorFilterActions()
+
+        assert.are.equal("tx:All scanlators", actions[1].text)
+        assert.are.equal("Alpha", actions[2].text)
+        assert.are.equal("Beta", actions[3].text)
+        assert.are.equal("Beta", actions[3].scanlator)
+    end)
+
+    it("translates batch queue summaries", function()
+        Marker.install()
+        package.loaded["suwayomi/chapters/context"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        local plugin = installPlugin()
+
+        assert.are.equal(
+            "tx:Queued 2 selected chapter downloads. tx:Skipped 1 already downloaded or queued.",
+            plugin:formatBulkDownloadMessage(2, 1)
+        )
+        assert.are.equal("tx:No new downloads queued.", plugin:formatBulkDownloadMessage(0, 0))
     end)
 
     it("builds previous ranges from visible scanlator-filtered chapters", function()
