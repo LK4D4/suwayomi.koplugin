@@ -25,13 +25,13 @@ local function installMarkerI18n()
     package.preload["suwayomi/i18n"] = function()
         return {
             t = function(text)
-                return "tx:" .. text
+                return "tx:" .. tostring(text)
             end,
             f = function(text, ...)
-                local args = { ... }
-                return "tx:" .. (text:gsub("%%(%d+)", function(index)
-                    return tostring(args[tonumber(index)])
-                end))
+                local values = { ... }
+                return "tx:" .. tostring(text):gsub("%%(%d+)", function(index)
+                    return tostring(values[tonumber(index)] or "")
+                end)
             end,
         }
     end
