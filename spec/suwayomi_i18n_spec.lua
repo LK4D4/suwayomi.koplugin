@@ -36,7 +36,8 @@ describe("suwayomi/i18n", function()
         end
     end
 
-    local function installPluralGettext(prefix)
+    local function installPluralGettext(prefix, plural_prefix)
+        local native_plural_prefix = plural_prefix or "np:"
         package.preload.gettext = function()
             local gettext = function(text)
                 return prefix .. tostring(text)
@@ -49,7 +50,7 @@ describe("suwayomi/i18n", function()
                 __index = {
                     ngettext = function(singular, plural, count)
                         local chosen = tonumber(count) == 1 and singular or plural
-                        return "np:" .. tostring(chosen)
+                        return native_plural_prefix .. tostring(chosen)
                     end,
                 },
             })
@@ -149,6 +150,34 @@ describe("suwayomi/i18n", function()
 
         assert.are.equal("np:%1 chapters", i18n.n("%1 chapter", "%1 chapters", 2))
         assert.are.equal("np:2 chapters", i18n.count(2, "%1 chapter", "%1 chapters"))
+    end)
+
+    it("formats plural translations with multiple placeholders", function()
+        installPluralGettext("tx:", "tx:")
+        installTemplate()
+
+        local i18n = require("suwayomi/i18n")
+
+        assert.are.equal(
+            "tx:Queue 1 missing download to keep the next 5 unread chapters available?",
+            i18n.nf(
+                1,
+                "Queue %1 missing download to keep the next %2 unread chapters available?",
+                "Queue %1 missing downloads to keep the next %2 unread chapters available?",
+                1,
+                5
+            )
+        )
+        assert.are.equal(
+            "tx:Queue 3 missing downloads to keep the next 5 unread chapters available?",
+            i18n.nf(
+                3,
+                "Queue %1 missing download to keep the next %2 unread chapters available?",
+                "Queue %1 missing downloads to keep the next %2 unread chapters available?",
+                3,
+                5
+            )
+        )
     end)
 
     it("does not leak native plural helper into later gettext stubs", function()

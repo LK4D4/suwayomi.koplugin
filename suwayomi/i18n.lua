@@ -142,6 +142,10 @@ function I18n.count(count, singular_msgid, plural_msgid)
     return loadTemplate()(I18n.n(singular_msgid, plural_msgid, count), count)
 end
 
+function I18n.nf(count, singular_msgid, plural_msgid, ...)
+    return loadTemplate()(I18n.n(singular_msgid, plural_msgid, count), ...)
+end
+
 function I18n.join(parts, separator_msgid)
     local rendered = {}
     local source = parts or {}
