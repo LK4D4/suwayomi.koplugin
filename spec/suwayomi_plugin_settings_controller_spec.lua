@@ -535,6 +535,58 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("tx:Connection test passed after retry.", state.messages[#state.messages])
     end)
 
+    it("keeps legacy onboarding success messages raw when no known message id exists", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+            show_continue_message = false,
+        }, {
+            ok = true,
+            message = "Connection test passed. Found 85 sources.",
+        })
+
+        assert.are.equal("Connection test passed. Found 85 sources.", state.messages[#state.messages])
+    end)
+
+    it("falls back to translated default when onboarding worker returns an unknown success message id", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+            show_continue_message = false,
+        }, {
+            ok = true,
+            message_id = "unknown_message_id",
+        })
+
+        assert.are.equal("tx:Connection test passed.", state.messages[#state.messages])
+    end)
+
     it("translates onboarding worker error ids but keeps raw worker errors", function()
         local plugin, state = installController({
             gettext = function(text)
@@ -566,6 +618,31 @@ describe("suwayomi/plugin/settings_controller", function()
             error = "HTTP 401 Unauthorized from Suwayomi",
         })
         assert.are.equal("HTTP 401 Unauthorized from Suwayomi", state.messages[#state.messages])
+    end)
+
+    it("falls back to translated default when onboarding worker returns an unknown error id", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+        }, {
+            ok = false,
+            error_id = "unknown_error_id",
+        })
+
+        assert.are.equal("tx:Could not connect to Suwayomi.", state.messages[#state.messages])
     end)
 
     it("translates onboarding continue prompt around translated success ids", function()
