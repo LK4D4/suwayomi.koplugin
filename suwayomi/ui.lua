@@ -109,14 +109,14 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
             return options.on_title_bar_left_tap(menu, ...)
         end
     end
-    menu.onMenuSelect = function(_, entry)
+    menu.onMenuSelect = function(_menu, entry)
         if entry and entry.callback then
             entry.callback()
         end
         return true
     end
     if onHoldCallback then
-        menu.onMenuHold = function(_, entry)
+        menu.onMenuHold = function(_menu, entry)
             if entry and entry.chapter then
                 onHoldCallback(entry.chapter)
             end
@@ -134,7 +134,7 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
 
     options = options or {}
     local columns = options.vertical and 1 or (options.columns or 1)
-    for _, action in ipairs(options.actions or {}) do
+    for _index, action in ipairs(options.actions or {}) do
         table.insert(row, {
             text = action.text,
             callback = function()
@@ -221,7 +221,7 @@ end
 
 local function appendActionButtonRows(buttons, actions, columns, dialogProvider, UIManager, onSelectCallback)
     local row = {}
-    for _, action in ipairs(actions or {}) do
+    for _index, action in ipairs(actions or {}) do
         table.insert(row, buildActionMenuButton(action, dialogProvider, UIManager, onSelectCallback))
         if #row == columns then
             table.insert(buttons, row)
@@ -238,7 +238,7 @@ end
 local function splitActionGroups(actions)
     local normal_actions = {}
     local destructive_actions = {}
-    for _, action in ipairs(actions or {}) do
+    for _index, action in ipairs(actions or {}) do
         if action.destructive == true then
             table.insert(destructive_actions, action)
         else
@@ -334,7 +334,7 @@ function SuwayomiUI.updateChapterMenu(menu, options, onSelectCallback, onHoldCal
         end
     end
     if onHoldCallback then
-        menu.onMenuHold = function(_, entry)
+        menu.onMenuHold = function(_menu, entry)
             if entry and entry.chapter then
                 onHoldCallback(entry.chapter)
             end
@@ -353,7 +353,7 @@ end
 function SuwayomiUI.buildLanguageMenuTable(options, onToggleCallback)
     local menu_table = {}
 
-    for _, language in ipairs(options.languages or {}) do
+    for _index, language in ipairs(options.languages or {}) do
         table.insert(menu_table, {
             text = language.label,
             state = newStateMark("check", language.enabled),
@@ -391,7 +391,7 @@ function SuwayomiUI.showLanguageMenu(options)
     local close_ran = false
     local choices = {}
 
-    for _, language in ipairs(options.languages or {}) do
+    for _index, language in ipairs(options.languages or {}) do
         table.insert(choices, {
             value = language.code,
             text = language.label,
@@ -413,7 +413,7 @@ function SuwayomiUI.showLanguageMenu(options)
         title = options.title or I18n.t("Suwayomi source languages"),
         choices = choices,
         anchor = options.anchor,
-        isSelected = function(_, choice)
+        isSelected = function(_value, choice)
             return choice.language and choice.language.enabled == true
         end,
         onToggle = function(code, selected, choice)
@@ -437,7 +437,7 @@ local function buildLibraryCategoryPickerBehaviorChoices(choices)
     }
 
     local dialog_choices = {}
-    for _, behavior in ipairs(choices or { "automatic", "always", "never" }) do
+    for _index, behavior in ipairs(choices or { "automatic", "always", "never" }) do
         table.insert(dialog_choices, {
             value = behavior,
             text = labels[behavior] or behavior,
@@ -458,7 +458,7 @@ local function buildDeleteFinishedWhileReadingChoices(choices)
     }
 
     local dialog_choices = {}
-    for _, value in ipairs(choices or { 0, 1, 2, 3, 4, 5 }) do
+    for _index, value in ipairs(choices or { 0, 1, 2, 3, 4, 5 }) do
         table.insert(dialog_choices, {
             value = value,
             text = labels[value] or tostring(value),
@@ -470,7 +470,7 @@ end
 
 local function buildParallelDownloadChoices(choices)
     local dialog_choices = {}
-    for _, value in ipairs(choices or { 1, 2, 3, 4 }) do
+    for _index, value in ipairs(choices or { 1, 2, 3, 4 }) do
         table.insert(dialog_choices, {
             value = value,
             text = tostring(value),
@@ -592,7 +592,7 @@ local function formatOnboardingConnectionTitle(status)
         failed = I18n.t("failed"),
         untested = I18n.t("not tested"),
     }
-    return I18n.t("Suwayomi setup: connection") .. " (" .. (suffixes[status] or suffixes.untested) .. ")"
+    return I18n.f("Suwayomi setup: connection (%1)", suffixes[status] or suffixes.untested)
 end
 
 function SuwayomiUI.updateOnboardingConnectionDialogStatus(dialog, status)
