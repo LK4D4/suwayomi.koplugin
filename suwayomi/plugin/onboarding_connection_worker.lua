@@ -12,6 +12,22 @@ local OnboardingConnectionWorker = {}
 local CONNECTION_TEST_ATTEMPTS = 3
 local CONNECTION_TEST_TIMEOUT_SECONDS = 5
 
+local function normalizeExternalErrorMessage(error_message)
+    if type(error_message) ~= "string" then
+        return nil
+    end
+    if error_message:match("^%s*$") then
+        return nil
+    end
+    return error_message
+end
+
+local function hasServerUrl(credentials)
+    return type(credentials) == "table"
+        and type(credentials.server_url) == "string"
+        and credentials.server_url:match("^%s*$") == nil
+end
+
 local function isTransientConnectionError(error_message)
     error_message = tostring(error_message or ""):lower()
     return error_message:match("timed out") ~= nil
@@ -53,7 +69,7 @@ local function normalizeResult(result)
     return {
         ok = result.ok == true,
         source_count = tonumber(result.source_count) or 0,
-        error = result.error,
+        error = normalizeExternalErrorMessage(result.error),
         error_id = result.error_id,
         message_id = result.message_id,
     }
@@ -63,10 +79,7 @@ local function externalErrorMessage(response)
     if type(response) ~= "table" then
         return nil
     end
-    if type(response.error) ~= "string" or response.error == "" then
-        return nil
-    end
-    return response.error
+    return normalizeExternalErrorMessage(response.error)
 end
 
 function OnboardingConnectionWorker:writeResult(result_path, result)
@@ -79,7 +92,7 @@ end
 
 function OnboardingConnectionWorker:run(credentials, result_path)
     local result
-    if not credentials or credentials.server_url == "" then
+    if not hasServerUrl(credentials) then
         result = {
             ok = false,
             error_id = "missing_server_url",

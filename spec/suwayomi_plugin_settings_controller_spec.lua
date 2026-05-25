@@ -651,6 +651,32 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("HTTP 401 Unauthorized from Suwayomi", state.messages[#state.messages])
     end)
 
+    it("ignores blank worker errors so known error ids still translate", function()
+        local plugin, state = installController({
+            gettext = function(text)
+                return text
+            end,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        plugin:finishOnboardingConnectionTest({
+            credentials = state.credentials,
+            loading_message = nil,
+        }, {
+            ok = false,
+            error = "",
+            error_id = "missing_server_url",
+        })
+
+        assert.are.equal("tx:Enter a Suwayomi server URL first.", state.messages[#state.messages])
+    end)
+
     it("falls back to translated default when onboarding worker returns an unknown error id", function()
         local plugin, state = installController({
             gettext = function(text)

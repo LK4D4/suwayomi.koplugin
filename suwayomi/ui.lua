@@ -134,7 +134,8 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
 
     options = options or {}
     local columns = options.vertical and 1 or (options.columns or 1)
-    for _index, action in ipairs(options.actions or {}) do
+    for action_index = 1, #(options.actions or {}) do
+        local action = options.actions[action_index]
         table.insert(row, {
             text = action.text,
             callback = function()
@@ -221,7 +222,8 @@ end
 
 local function appendActionButtonRows(buttons, actions, columns, dialogProvider, UIManager, onSelectCallback)
     local row = {}
-    for _index, action in ipairs(actions or {}) do
+    for action_index = 1, #(actions or {}) do
+        local action = actions[action_index]
         table.insert(row, buildActionMenuButton(action, dialogProvider, UIManager, onSelectCallback))
         if #row == columns then
             table.insert(buttons, row)
@@ -238,7 +240,8 @@ end
 local function splitActionGroups(actions)
     local normal_actions = {}
     local destructive_actions = {}
-    for _index, action in ipairs(actions or {}) do
+    for action_index = 1, #(actions or {}) do
+        local action = actions[action_index]
         if action.destructive == true then
             table.insert(destructive_actions, action)
         else
@@ -353,7 +356,8 @@ end
 function SuwayomiUI.buildLanguageMenuTable(options, onToggleCallback)
     local menu_table = {}
 
-    for _index, language in ipairs(options.languages or {}) do
+    for language_index = 1, #(options.languages or {}) do
+        local language = options.languages[language_index]
         table.insert(menu_table, {
             text = language.label,
             state = newStateMark("check", language.enabled),
@@ -391,7 +395,8 @@ function SuwayomiUI.showLanguageMenu(options)
     local close_ran = false
     local choices = {}
 
-    for _index, language in ipairs(options.languages or {}) do
+    for language_index = 1, #(options.languages or {}) do
+        local language = options.languages[language_index]
         table.insert(choices, {
             value = language.code,
             text = language.label,
@@ -437,7 +442,8 @@ local function buildLibraryCategoryPickerBehaviorChoices(choices)
     }
 
     local dialog_choices = {}
-    for _index, behavior in ipairs(choices or { "automatic", "always", "never" }) do
+    for behavior_index = 1, #(choices or { "automatic", "always", "never" }) do
+        local behavior = choices[behavior_index]
         table.insert(dialog_choices, {
             value = behavior,
             text = labels[behavior] or behavior,
@@ -458,7 +464,8 @@ local function buildDeleteFinishedWhileReadingChoices(choices)
     }
 
     local dialog_choices = {}
-    for _index, value in ipairs(choices or { 0, 1, 2, 3, 4, 5 }) do
+    for value_index = 1, #(choices or { 0, 1, 2, 3, 4, 5 }) do
+        local value = choices[value_index]
         table.insert(dialog_choices, {
             value = value,
             text = labels[value] or tostring(value),
@@ -470,7 +477,8 @@ end
 
 local function buildParallelDownloadChoices(choices)
     local dialog_choices = {}
-    for _index, value in ipairs(choices or { 1, 2, 3, 4 }) do
+    for value_index = 1, #(choices or { 1, 2, 3, 4 }) do
+        local value = choices[value_index]
         table.insert(dialog_choices, {
             value = value,
             text = tostring(value),

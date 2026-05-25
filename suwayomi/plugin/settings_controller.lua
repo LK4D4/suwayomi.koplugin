@@ -36,6 +36,13 @@ local ONBOARDING_RESULT_ERRORS = {
     could_not_connect = "Could not connect to Suwayomi.",
 }
 
+local function externalErrorMessage(error_message)
+    if type(error_message) ~= "string" or error_message:match("^%s*$") then
+        return nil
+    end
+    return error_message
+end
+
 local function translateResultMessage(result)
     local message_id = result and result.message_id
     local msgid = message_id and ONBOARDING_RESULT_MESSAGES[message_id]
@@ -46,8 +53,9 @@ local function translateResultMessage(result)
 end
 
 local function translateResultError(result)
-    if result and result.error then
-        return result.error
+    local external_error = result and externalErrorMessage(result.error)
+    if external_error then
+        return external_error
     end
     local error_id = result and result.error_id
     local msgid = error_id and ONBOARDING_RESULT_ERRORS[error_id]

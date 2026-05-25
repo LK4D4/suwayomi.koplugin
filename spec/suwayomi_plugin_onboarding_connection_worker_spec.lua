@@ -109,6 +109,34 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
         assert.is_nil(result.error)
     end)
 
+    it("treats nil server url as missing without calling the API", function()
+        clearModules()
+        local api_called = false
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchSources = function()
+                    api_called = true
+                    return { ok = true }
+                end,
+            }
+        end
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                writeResult = function(_, result)
+                    return result
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/plugin/onboarding_connection_worker")
+        local result = worker:run({ server_url = nil }, "/tmp/result.json")
+
+        assert.is_false(api_called)
+        assert.is_false(result.ok)
+        assert.are.equal("missing_server_url", result.error_id)
+        assert.is_nil(result.error)
+    end)
+
     it("keeps raw API errors as external data", function()
         clearModules()
         package.preload["suwayomi/api"] = function()
@@ -169,6 +197,35 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
         }, result)
         assert.is_nil(result.message)
         assert.is_nil(result.extra)
+    end)
+
+    it("drops blank persisted raw errors while preserving error ids", function()
+        clearModules()
+        package.preload["suwayomi/api"] = function()
+            return {}
+        end
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                readResult = function(_, normalize)
+                    return normalize({
+                        ok = false,
+                        error = "",
+                        error_id = "missing_server_url",
+                    })
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/plugin/onboarding_connection_worker")
+        local result = worker:readResult("/tmp/result.json")
+
+        assert.are.same({
+            ok = false,
+            source_count = 0,
+            error = nil,
+            error_id = "missing_server_url",
+            message_id = nil,
+        }, result)
     end)
 
     it("maps missing external connection errors to could_not_connect", function()
