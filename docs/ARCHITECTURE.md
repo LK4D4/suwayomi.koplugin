@@ -20,7 +20,7 @@ Tests, docs, CI files, worktrees, and `AGENTS.md` are development-only and must 
 The public runtime facades are intentionally small and stable:
 
 - `suwayomi/api.lua` exposes Suwayomi GraphQL and binary HTTP helpers, including source extension fetch/install/update/uninstall operations. It delegates query construction to `suwayomi/api/queries.lua`, response decoding to `suwayomi/api/parsers.lua`, and HTTP/auth/URL handling to `suwayomi/api/transport.lua`.
-- `suwayomi/ui.lua` exposes KOReader menu/dialog helpers. It delegates Browse menus to `suwayomi/ui/browse.lua`, shared manga/source/chapter row formatting to `suwayomi/ui/list_rows.lua`, KOReader thumbnail list rendering to `suwayomi/ui/list_menu.lua`, Downloads menus to `suwayomi/ui/downloads.lua`, directory picking to `suwayomi/ui/directory.lua`, and shared menu plumbing to `suwayomi/ui/menu_utils.lua`.
+- `suwayomi/ui.lua` exposes KOReader menu/dialog helpers. It delegates Browse menus to `suwayomi/ui/browse.lua`, shared manga/source/chapter row formatting to `suwayomi/ui/list_rows.lua`, KOReader thumbnail list rendering to `suwayomi/ui/list_menu.lua`, Downloads menus to `suwayomi/ui/downloads.lua`, directory picking to `suwayomi/ui/directory.lua`, and shared menu plumbing to `suwayomi/ui/menu_utils.lua`. Directory chooser chrome routes through `suwayomi/i18n.lua`; selected paths remain external data.
 - `suwayomi/downloads/queue.lua` is the public device-local download queue. It owns enqueue/retry/cancel/recovery/snapshot/status APIs and delegates active subprocess scheduling to `suwayomi/downloads/active_jobs.lua`, persistence to `suwayomi/downloads/job_store.lua`, progress-file IO to `suwayomi/downloads/progress_file.lua`, and chapter-row status text to `suwayomi/downloads/status_formatter.lua`.
 - `suwayomi/client.lua` is the public Library/Browse client facade. It wires injected dependencies and installs focused flow modules from `suwayomi/client/`.
 - `suwayomi/chapters/actions.lua` is the chapter action facade for download, delete, read/unread, selected/bulk, and shared manga-level chapter actions.
@@ -53,10 +53,10 @@ Browse and Library:
 - `suwayomi/client/runtime.lua`: lazy runtime dependency lookup and worker timeout/concurrency settings.
 - `suwayomi/client/source_manga.lua`: source mode selection, source-specific search/source-filter prompts, source filter worker loading, source manga worker loading, filtered browse result pagination/retry, and manga action refresh callbacks. Plugin-authored prompt chrome routes through `suwayomi/i18n.lua`; source names and source filter labels/values remain external data.
 - `suwayomi/client/global_search.lua`: partial global search state, worker scheduling, cancellation, timeout handling, and live summary menu updates.
-- `suwayomi/client/library.lua`: async library category/paged manga loading, category filtering, and library manga menu refresh callbacks.
+- `suwayomi/client/library.lua`: async library category/paged manga loading, category filtering, and library manga menu refresh callbacks. Plugin-authored Library screen chrome routes through `suwayomi/i18n.lua`; category names, manga titles, source names, credentials URLs, and raw API errors remain external data.
 - `suwayomi/client/browse_chapter_counts.lua`: bounded background chapter-count enrichment for browse result rows.
 - `suwayomi/client/util.lua`: tiny shared helpers used by client flow modules.
-- `suwayomi/ui/list_rows.lua`: pure shared row formatting for manga and source records, including subtitles, status markers, and thumbnail metadata.
+- `suwayomi/ui/list_rows.lua`: pure shared row formatting for manga, source, category, and chapter records, including subtitles, status markers, count labels, and thumbnail metadata. Built-in row labels route through `suwayomi/i18n.lua`; record titles, source names, category names, and scanlator names remain external data.
 - `suwayomi/ui/list_menu.lua`: KOReader Menu-compatible thumbnail rows with cached thumbnail slots and page-change callbacks for Library, Browse/Search, source results, and chapter-like lists.
 - `suwayomi/ui/manga_menu.lua`: thin alias for `suwayomi/ui/list_menu.lua`; keep renderer behavior in `list_menu.lua`.
 - `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua`: private thumbnail cache pathing and bounded background thumbnail fetch support.
@@ -71,15 +71,16 @@ Browse and Library:
 - `suwayomi/browse/source_manga_worker.lua`: subprocess worker for source Popular/Latest/Search manga result pages, including search-only source filter changes.
 - `suwayomi/browse/chapter_count_worker.lua`: subprocess worker for browse-result chapter-count enrichment.
 - `suwayomi/source_filters.lua`: pure source filter draft normalization and Suwayomi `FilterChange` construction.
-- `suwayomi/manga/controller.lua`: async manga actions, refresh, library membership, chapter-context preload, first-unread helpers, and manga-level download/read actions.
-- `suwayomi/manga/action_menu.lua`: shared manga action definitions used by manga row action menus and chapter-list title menus.
+- `suwayomi/manga/controller.lua`: async manga actions, refresh, library membership, chapter-context preload, first-unread helpers, and manga-level download/read actions. Plugin-authored loading, confirmation, action, and fallback messages route through `suwayomi/i18n.lua`; manga titles, IDs, and raw API/worker errors remain external data.
+- `suwayomi/manga/action_menu.lua`: shared manga action definitions used by manga row action menus and chapter-list title menus. Action labels route through `suwayomi/i18n.lua`; action IDs remain stable controller data.
+- `suwayomi/ui/manga_info.lua`: read-only manga information dialog. Field labels, poster placeholders, default titles, and known status labels route through `suwayomi/i18n.lua`; manga metadata values remain external data.
 
 Downloads:
 
-- `suwayomi/downloads/controller.lua`: top-level Downloads hub, active/queued/failed actions, retry/clear/cancel, and downloaded-read reconciliation.
-- `suwayomi/downloads/directory.lua`: download-directory chooser, summary, persistence callback flow, and default directory probing.
-- `suwayomi/downloads/queue.lua`: public KOReader-local queue facade.
-- `suwayomi/downloads/active_jobs.lua`: bounded active chapter jobs, subprocess launch, progress polling, watchdog handling, and replacement scheduling.
+- `suwayomi/downloads/controller.lua`: top-level Downloads hub, active/queued/failed actions, retry/clear/cancel, and downloaded-read reconciliation. Plugin-authored hub chrome, action labels, confirmations, and summaries route through `suwayomi/i18n.lua`; job titles, manga/chapter names, and job keys remain external data.
+- `suwayomi/downloads/directory.lua`: download-directory chooser, summary, persistence callback flow, and default directory probing. Plugin-authored summary/save messages route through `suwayomi/i18n.lua`; directory paths remain external data.
+- `suwayomi/downloads/queue.lua`: public KOReader-local queue facade. Duplicate enqueue messages route through `suwayomi/i18n.lua`; queue keys, persisted state, and progress state remain data.
+- `suwayomi/downloads/active_jobs.lua`: bounded active chapter jobs, subprocess launch, progress polling, watchdog handling, and replacement scheduling. Plugin-authored fallback/startup failure text routes through `suwayomi/i18n.lua`; raw worker errors remain external data.
 - `suwayomi/downloads/job_store.lua`: persisted queue schema, serialization-safe job metadata, duplicate handling, and recovery normalization.
 - `suwayomi/downloads/progress_file.lua`: per-job progress path, read/write format, and fallback progress writing.
 - `suwayomi/downloads/status_formatter.lua`: chapter status symbols and user-facing queue/download status text.
@@ -87,11 +88,11 @@ Downloads:
 
 Chapters and read state:
 
-- `suwayomi/chapters/context.lua`: current manga/chapter context and visible chapter filtering state; remote chapter loading is owned by async manga request helpers.
-- `suwayomi/chapters/menu.lua`: chapter menu construction, updates, selection mode, and menu refresh behavior.
-- `suwayomi/chapters/actions.lua`: chapter and selected-chapter action facade.
+- `suwayomi/chapters/context.lua`: current manga/chapter context and visible chapter filtering state; remote chapter loading is owned by async manga request helpers. Plugin-authored title fallbacks, selected-count titles, scanlator menu chrome, and queue summaries route through `suwayomi/i18n.lua`; manga titles and scanlator values remain external data.
+- `suwayomi/chapters/menu.lua`: chapter menu construction, updates, selection mode, and menu refresh behavior. Plugin-authored action labels, bulk-menu titles, and scanlator menu chrome route through `suwayomi/i18n.lua`; chapter names remain external data.
+- `suwayomi/chapters/actions.lua`: chapter and selected-chapter action facade. Plugin-authored open/delete/download/read messages, confirmations, and summaries route through `suwayomi/i18n.lua`; chapter names, manga titles, and filesystem paths remain external data.
 - `suwayomi/chapters/local_downloads.lua`: local archive existence/open/delete helpers.
-- `suwayomi/chapters/delete_actions.lua`: device delete and batch cleanup flows.
+- `suwayomi/chapters/delete_actions.lua`: device delete and batch cleanup flows. Plugin-authored delete refusal/failure messages route through `suwayomi/i18n.lua`.
 - `suwayomi/chapters/read_actions.lua`: read/unread actions and mark-previous orchestration.
 - `suwayomi/readsync/ledger.lua`: local read ledger persistence.
 - `suwayomi/readsync/koreader_metadata.lua`: KOReader sidecar/history inspection.
@@ -167,6 +168,7 @@ Coverage is organized around runtime boundaries:
 - UI specs cover menu table construction and KOReader dialog/menu helper behavior with stubbed widgets.
 - I18n specs stub KOReader `gettext` and `ffi/util.template` directly. Module specs that assert visible built-in labels should clear `suwayomi/i18n` from `package.loaded` before requiring the module under test so each spec controls the active gettext stub. Worker specs should prefer structured message/error IDs for plugin-authored text and reserve raw strings for server/API data.
 - Browse and extension i18n specs use marker `suwayomi/i18n` stubs to prove plugin-authored menu chrome routes through the facade. Source names, extension names, package names, server errors, source filter labels, and source filter values remain external data and are asserted without translation markers.
+- Library, manga, chapter, and downloads i18n specs use marker `suwayomi/i18n` stubs to prove plugin-authored menu chrome, confirmations, status summaries, and fallback errors route through the facade. Library category names, manga titles, chapter names, scanlator names, source names, category/genre metadata, filesystem paths, raw API errors, and raw worker errors remain external data and are asserted without translation markers.
 - Queue/download specs cover persisted jobs, active worker scheduling, progress files, status text, and one-chapter CBZ behavior without real network or real subprocess timing.
 - Controller specs exercise plugin-bound methods with KOReader/runtime stubs rather than requiring real KOReader.
 - Read-sync specs isolate ledger, metadata/history handling, worker behavior, and controller polling/retry flows.
