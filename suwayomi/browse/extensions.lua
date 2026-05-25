@@ -114,29 +114,27 @@ local function extensionTimeoutMessage(action)
     return I18n.t("Extension list loading timed out.")
 end
 
-local function actionPastTense(action)
-    if action == "install" then
-        return I18n.c("extension result", "install succeeded")
-    end
-    if action == "update" then
-        return I18n.c("extension result", "update succeeded")
-    end
-    if action == "uninstall" then
-        return I18n.c("extension result", "uninstall succeeded")
-    end
-    return nil
-end
-
 local function refreshWarningMessage(action, refresh_kind, error_message)
-    local action_label = actionPastTense(action)
-    if not action_label or not error_message or error_message == "" then
+    if not error_message or error_message == "" then
         return nil
     end
-    if refresh_kind == "extension" then
-        return I18n.f("Extension %1, but extension list refresh failed: %2", action_label, error_message)
+    if action == "install" and refresh_kind == "extension" then
+        return I18n.f("Extension install succeeded, but extension list refresh failed: %1", error_message)
     end
-    if refresh_kind == "source" then
-        return I18n.f("Extension %1, but source refresh failed: %2", action_label, error_message)
+    if action == "install" and refresh_kind == "source" then
+        return I18n.f("Extension install succeeded, but source refresh failed: %1", error_message)
+    end
+    if action == "update" and refresh_kind == "extension" then
+        return I18n.f("Extension update succeeded, but extension list refresh failed: %1", error_message)
+    end
+    if action == "update" and refresh_kind == "source" then
+        return I18n.f("Extension update succeeded, but source refresh failed: %1", error_message)
+    end
+    if action == "uninstall" and refresh_kind == "extension" then
+        return I18n.f("Extension uninstall succeeded, but extension list refresh failed: %1", error_message)
+    end
+    if action == "uninstall" and refresh_kind == "source" then
+        return I18n.f("Extension uninstall succeeded, but source refresh failed: %1", error_message)
     end
     return nil
 end
@@ -217,7 +215,12 @@ function Methods:startExtensionWorker(credentials, request, options)
             self.extension_worker_active = nil
             self:closeLoadingMessage(active.loading_message)
             if not options.silent then
-                self:showMessage(I18n.f("Could not start extension task: %1", err or I18n.t("unknown error")))
+                local message = trim(err)
+                if message ~= "" then
+                    self:showMessage(I18n.f("Could not start extension task: %1", message))
+                else
+                    self:showMessage(I18n.t("Could not start extension task: unknown error"))
+                end
             end
         end,
     })

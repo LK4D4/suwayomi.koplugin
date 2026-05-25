@@ -691,7 +691,7 @@ describe("suwayomi/browse/extensions", function()
         assert.are.equal("old-source", controller.saved_source_cache.sources[1].id)
         assert.is_nil(refreshed_sources)
         assert.are.equal(
-            "tx:Extension ctx:extension result:update succeeded, but source refresh failed: Connection timed out while waiting for Suwayomi.",
+            "tx:Extension update succeeded, but source refresh failed: Connection timed out while waiting for Suwayomi.",
             controller.messages[#controller.messages]
         )
         assert.are.equal("pkg.mangadex", ui_calls.extensions_menu.extensions[1].pkg_name)
@@ -720,7 +720,7 @@ describe("suwayomi/browse/extensions", function()
         })
 
         assert.are.equal(
-            "tx:Extension ctx:extension result:install succeeded, but extension list refresh failed: Extension catalog timed out.",
+            "tx:Extension install succeeded, but extension list refresh failed: Extension catalog timed out.",
             controller.messages[#controller.messages]
         )
         assert.are.equal("source-mangadex", controller.saved_source_cache.sources[1].id)
@@ -748,9 +748,95 @@ describe("suwayomi/browse/extensions", function()
         })
 
         assert.are.same({
-            "tx:Extension ctx:extension result:install succeeded, but extension list refresh failed: HTTP 504 upstream timeout",
-            "tx:Extension ctx:extension result:install succeeded, but source refresh failed: worker: source refresh blew up",
+            "tx:Extension install succeeded, but extension list refresh failed: HTTP 504 upstream timeout",
+            "tx:Extension install succeeded, but source refresh failed: worker: source refresh blew up",
         }, controller.messages)
+    end)
+
+    it("translates full warning sentences for update and uninstall refresh failures", function()
+        local extensions = loadExtensions()
+        local controller = buildController(extensions)
+
+        controller:finishExtensionWorker({
+            credentials = { server_url = "https://suwayomi.example" },
+        }, {
+            ok = true,
+            action = "update",
+            extension_refresh_ok = false,
+            extension_refresh_error = "stale extension cache",
+            sources = {},
+            extensions = {
+                { pkg_name = "pkg.mangadex", name = "MangaDex", is_installed = true },
+            },
+        })
+
+        controller:finishExtensionWorker({
+            credentials = { server_url = "https://suwayomi.example" },
+        }, {
+            ok = true,
+            action = "uninstall",
+            source_refresh_ok = false,
+            source_refresh_error = "worker: source cleanup crashed",
+            sources = {},
+            extensions = {
+                { pkg_name = "pkg.mangadex", name = "MangaDex", is_installed = false },
+            },
+        })
+
+        assert.are.same({
+            "tx:Extension update succeeded, but extension list refresh failed: stale extension cache",
+            "tx:Extension uninstall succeeded, but source refresh failed: worker: source cleanup crashed",
+        }, controller.messages)
+    end)
+
+    it("skips refresh warnings for unknown actions", function()
+        local extensions = loadExtensions()
+        local controller = buildController(extensions)
+
+        controller:finishExtensionWorker({
+            credentials = { server_url = "https://suwayomi.example" },
+        }, {
+            ok = true,
+            action = "mystery",
+            extension_refresh_ok = false,
+            extension_refresh_error = "should stay hidden",
+            sources = {},
+            extensions = {},
+        })
+
+        assert.are.same({}, controller.messages)
+    end)
+
+    it("shows full translated fallback when extension task start error is unknown", function()
+        local extensions = loadExtensionsWithSubprocessStub(nil, nil, {
+            start = function(start_options)
+                start_options.on_error(nil)
+                return nil
+            end,
+        })
+        local controller = buildController(extensions)
+
+        assert.is_false(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
+            action = "fetch",
+        }))
+
+        assert.are.same({ "tx:Could not start extension task: unknown error" }, controller.messages)
+    end)
+
+    it("keeps raw startup errors as placeholders in translated task start message", function()
+        local extensions = loadExtensionsWithSubprocessStub(nil, nil, {
+            start = function(start_options)
+                start_options.on_error("spawn failed: EPIPE")
+                return nil
+            end,
+        })
+        local controller = buildController(extensions)
+
+        assert.is_false(controller:startExtensionWorker({ server_url = "https://suwayomi.example" }, {
+            action = "fetch",
+        }))
+
+        assert.are.same({ "tx:Could not start extension task: spawn failed: EPIPE" }, controller.messages)
     end)
 
     it("keeps raw extension worker errors untranslated", function()
