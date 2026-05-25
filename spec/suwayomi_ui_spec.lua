@@ -721,6 +721,34 @@ describe("suwayomi/ui", function()
         return count
     end
 
+    local function installMarkerI18n()
+        package.preload["suwayomi/i18n"] = function()
+            return {
+                t = function(text)
+                    return "tx:" .. text
+                end,
+                f = function(text, ...)
+                    local result = "tx:" .. text
+                    for index, value in ipairs({...}) do
+                        result = result:gsub("%%" .. index, tostring(value))
+                    end
+                    return result
+                end,
+                n = function(singular, plural, count)
+                    return "tx:" .. (tonumber(count) == 1 and singular or plural)
+                end,
+                count = function(count, singular, plural)
+                    local result = "tx:" .. (tonumber(count) == 1 and singular or plural)
+                    return result:gsub("%%1", tostring(count))
+                end,
+                join = function(parts, separator)
+                    return table.concat(parts or {}, "tx:" .. tostring(separator or " "))
+                end,
+            }
+        end
+        package.loaded["suwayomi/i18n"] = nil
+    end
+
     local function sampleManga()
         return {
             id = 42,
@@ -1122,6 +1150,29 @@ describe("suwayomi/ui", function()
         assert.are.equal(shown_dialog, closed_dialog)
     end)
 
+    it("routes login dialog labels through i18n", function()
+        installMarkerI18n()
+        local ui = require("suwayomi/ui")
+
+        ui.showLoginDialog({
+            credentials = {
+                server_url = "https://saved.example",
+                username = "saved-user",
+                password = "saved-pass",
+            },
+        })
+
+        assert.are.equal("tx:Suwayomi login", shown_dialog.title)
+        assert.are.equal("tx:Server URL", shown_dialog.fields[1].hint)
+        assert.are.equal("https://saved.example", shown_dialog.fields[1].text)
+        assert.are.equal("tx:Username", shown_dialog.fields[2].hint)
+        assert.are.equal("saved-user", shown_dialog.fields[2].text)
+        assert.are.equal("tx:Password", shown_dialog.fields[3].hint)
+        assert.are.equal("saved-pass", shown_dialog.fields[3].text)
+        assert.are.equal("tx:Cancel", shown_dialog.buttons[1][1].text)
+        assert.are.equal("tx:Save", shown_dialog.buttons[1][2].text)
+    end)
+
     it("shows onboarding connection dialog with test and continue actions", function()
         local ui = require("suwayomi/ui")
         local tested_credentials
@@ -1230,6 +1281,32 @@ describe("suwayomi/ui", function()
 
         ui.updateOnboardingConnectionDialogStatus(shown_dialog, "failed")
         assert.are.equal("Suwayomi setup: connection (failed)", shown_dialog.title)
+    end)
+
+    it("routes onboarding connection labels and statuses through i18n", function()
+        installMarkerI18n()
+        local ui = require("suwayomi/ui")
+
+        ui.showOnboardingConnectionDialog({
+            credentials = {
+                server_url = "https://saved.example",
+                username = "saved-user",
+                password = "saved-pass",
+            },
+            connection_status = "untested",
+        })
+
+        assert.are.equal("tx:Suwayomi setup: connection (tx:not tested)", shown_dialog.title)
+        assert.are.equal("tx:Server URL", shown_dialog.fields[1].hint)
+        assert.are.equal("https://saved.example", shown_dialog.fields[1].text)
+        assert.are.equal("tx:Username", shown_dialog.fields[2].hint)
+        assert.are.equal("tx:Password", shown_dialog.fields[3].hint)
+        assert.are.equal("tx:Cancel", shown_dialog.buttons[1][1].text)
+        assert.are.equal("tx:Test connection", shown_dialog.buttons[1][2].text)
+        assert.are.equal("tx:Continue", shown_dialog.buttons[2][1].text)
+
+        ui.updateOnboardingConnectionDialogStatus(shown_dialog, "passed")
+        assert.are.equal("tx:Suwayomi setup: connection (tx:tested)", shown_dialog.title)
     end)
 
     it("runs onboarding close callback when setup dialog closes", function()
@@ -1388,15 +1465,8 @@ describe("suwayomi/ui", function()
     end)
 
     it("routes the default action menu title through i18n", function()
-        package.preload["suwayomi/i18n"] = function()
-            return {
-                t = function(text)
-                    return "tx:" .. text
-                end,
-            }
-        end
+        installMarkerI18n()
         package.loaded.gettext = nil
-        package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/ui"] = nil
 
         local ui = require("suwayomi/ui")
@@ -1411,15 +1481,7 @@ describe("suwayomi/ui", function()
     end)
 
     it("routes shared menu default labels through i18n", function()
-        package.preload["suwayomi/i18n"] = function()
-            return {
-                t = function(text)
-                    return "tx:" .. text
-                end,
-            }
-        end
-        package.loaded["suwayomi/i18n"] = nil
-        package.loaded["suwayomi/ui"] = nil
+        installMarkerI18n()
 
         local ui = require("suwayomi/ui")
 
@@ -1912,6 +1974,36 @@ describe("suwayomi/ui", function()
         shown_dialog.buttons[2][1].callback()
 
         assert.are.equal(1, selected)
+    end)
+
+    it("routes setup and settings choice dialog labels through i18n", function()
+        installMarkerI18n()
+        local ui = require("suwayomi/ui")
+
+        ui.showParallelDownloadsMenu({
+            current = 2,
+            choices = { 1, 2 },
+        })
+        assert.are.equal("tx:Parallel chapter downloads", shown_dialog.title)
+        assert.are.equal("1", shown_dialog.buttons[1][1].text)
+
+        ui.showLibraryCategoryPickerBehaviorMenu({
+            current = "always",
+            choices = { "automatic", "always", "never" },
+        })
+        assert.are.equal("tx:Library category picker", shown_dialog.title)
+        assert.are.equal("tx:Automatic", shown_dialog.buttons[1][1].text)
+        assert.are.equal("tx:Always ask", shown_dialog.buttons[2][1].text)
+        assert.are.equal("tx:Never ask", shown_dialog.buttons[3][1].text)
+
+        ui.showDeleteFinishedWhileReadingMenu({
+            current = 2,
+            choices = { 0, 1, 2 },
+        })
+        assert.are.equal("tx:Delete finished chapters", shown_dialog.title)
+        assert.are.equal("tx:Disabled", shown_dialog.buttons[1][1].text)
+        assert.are.equal("tx:Last read chapter", shown_dialog.buttons[2][1].text)
+        assert.are.equal("tx:Second to last read chapter", shown_dialog.buttons[3][1].text)
     end)
 
     it("shows the language menu as a checklist dialog", function()
