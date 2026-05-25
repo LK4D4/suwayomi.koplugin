@@ -51,7 +51,7 @@ Browse and Library:
 
 - `suwayomi/client.lua`: public Library/Browse client facade and dependency container.
 - `suwayomi/client/runtime.lua`: lazy runtime dependency lookup and worker timeout/concurrency settings.
-- `suwayomi/client/source_manga.lua`: source mode selection, source-specific search/source-filter prompts, source filter worker loading, source manga worker loading, filtered browse result pagination/retry, and manga action refresh callbacks.
+- `suwayomi/client/source_manga.lua`: source mode selection, source-specific search/source-filter prompts, source filter worker loading, source manga worker loading, filtered browse result pagination/retry, and manga action refresh callbacks. Plugin-authored prompt chrome routes through `suwayomi/i18n.lua`; source names and source filter labels/values remain external data.
 - `suwayomi/client/global_search.lua`: partial global search state, worker scheduling, cancellation, timeout handling, and live summary menu updates.
 - `suwayomi/client/library.lua`: async library category/paged manga loading, category filtering, and library manga menu refresh callbacks.
 - `suwayomi/client/browse_chapter_counts.lua`: bounded background chapter-count enrichment for browse result rows.
@@ -60,10 +60,10 @@ Browse and Library:
 - `suwayomi/ui/list_menu.lua`: KOReader Menu-compatible thumbnail rows with cached thumbnail slots and page-change callbacks for Library, Browse/Search, source results, and chapter-like lists.
 - `suwayomi/ui/manga_menu.lua`: thin alias for `suwayomi/ui/list_menu.lua`; keep renderer behavior in `list_menu.lua`.
 - `suwayomi/ui/thumbnail_cache.lua`, `suwayomi/ui/thumbnail_worker.lua`: private thumbnail cache pathing and bounded background thumbnail fetch support.
-- `suwayomi/browse/controller.lua`: Browse entry flow, source fetch worker lifecycle, polling, and source-cache refresh.
-- `suwayomi/browse/source_catalog.lua`: source filtering, source cache IO, and source-list rendering.
+- `suwayomi/browse/controller.lua`: Browse entry flow, source fetch worker lifecycle, polling, and source-cache refresh. Plugin-authored Browse status text routes through `suwayomi/i18n.lua`; raw worker/server errors remain external data.
+- `suwayomi/browse/source_catalog.lua`: source filtering, source cache IO, and source-list rendering. Plugin-authored menu chrome routes through `suwayomi/i18n.lua`; source names and source filter labels/values remain external data.
 - `suwayomi/source_languages.lua`: source language code-to-label formatting for Browse filters and source rows; owns the static Suwayomi WebUI language label table.
-- `suwayomi/browse/extensions.lua`: extension list rendering, extension install/update/uninstall action routing, and extension worker result handling.
+- `suwayomi/browse/extensions.lua`: extension list rendering, extension install/update/uninstall action routing, and extension worker result handling. Plugin-authored extension UI text routes through `suwayomi/i18n.lua`; extension names, package names, and raw errors remain external data.
 - `suwayomi/browse/source_fetch_worker.lua`: subprocess worker for fetching sources into a result file.
 - `suwayomi/browse/extension_worker.lua`: subprocess worker for fetching available extensions and installing/updating/uninstalling a selected extension.
 - `suwayomi/browse/global_search_worker.lua`: subprocess worker for fetching one source's first search page into a result file for partial global search.
@@ -166,6 +166,7 @@ Coverage is organized around runtime boundaries:
 - Client specs are split by flow: `spec/suwayomi_client_source_manga_spec.lua`, `spec/suwayomi_client_global_search_spec.lua`, `spec/suwayomi_client_library_spec.lua`, and the small facade-focused `spec/suwayomi_client_spec.lua`.
 - UI specs cover menu table construction and KOReader dialog/menu helper behavior with stubbed widgets.
 - I18n specs stub KOReader `gettext` and `ffi/util.template` directly. Module specs that assert visible built-in labels should clear `suwayomi/i18n` from `package.loaded` before requiring the module under test so each spec controls the active gettext stub. Worker specs should prefer structured message/error IDs for plugin-authored text and reserve raw strings for server/API data.
+- Browse and extension i18n specs use marker `suwayomi/i18n` stubs to prove plugin-authored menu chrome routes through the facade. Source names, extension names, package names, server errors, source filter labels, and source filter values remain external data and are asserted without translation markers.
 - Queue/download specs cover persisted jobs, active worker scheduling, progress files, status text, and one-chapter CBZ behavior without real network or real subprocess timing.
 - Controller specs exercise plugin-bound methods with KOReader/runtime stubs rather than requiring real KOReader.
 - Read-sync specs isolate ledger, metadata/history handling, worker behavior, and controller polling/retry flows.
