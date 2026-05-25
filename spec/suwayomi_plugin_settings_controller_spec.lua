@@ -437,6 +437,37 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("tx:Hide in-library results: tx:no", browse_items[2].text_func())
     end)
 
+    it("routes downloads and library settings summaries through i18n", function()
+        local plugin = installController({
+            gettext = function(text)
+                return text
+            end,
+            delete_chapters_settings = {
+                delete_after_mark_read = true,
+                delete_finished_while_reading = 2,
+            },
+            category_behavior = "always",
+            parallel = 4,
+        })
+        installMarkerI18n()
+        package.loaded["suwayomi/plugin/settings_controller"] = nil
+
+        local controller = require("suwayomi/plugin/settings_controller")
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        local menu = plugin:buildSettingsMenu()
+        local library_items = findMenuItem(menu, "tx:Library").sub_item_table
+        local downloads_items = findMenuItem(menu, "tx:Downloads").sub_item_table
+
+        assert.are.equal("tx:Category picker: tx:Always ask", library_items[1].text_func())
+        assert.are.equal("tx:Download directory: not set", downloads_items[1].text_func())
+        assert.are.equal("tx:Parallel downloads: 4", downloads_items[2].text_func())
+        assert.are.equal("tx:Delete after manual mark-read: tx:yes", downloads_items[3].text_func())
+        assert.are.equal("tx:Delete while reading: tx:Second to last read chapter", downloads_items[4].text_func())
+    end)
+
     it("keeps subprocess start errors raw while translating fixed startup text", function()
         local plugin, state = installController({
             gettext = function(text)
