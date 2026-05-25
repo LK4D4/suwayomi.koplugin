@@ -310,10 +310,10 @@ local function sortStateText(filter, state)
     state = type(state) == "table" and state or {}
     local index = tonumber(state.index) or 0
     local label = values[index + 1] or tostring(index)
-    local direction = state.ascending == false
-        and I18n.c("source filter sort direction", "Descending")
-        or I18n.c("source filter sort direction", "Ascending")
-    return label .. " - " .. direction
+    if state.ascending == false then
+        return I18n.cf("source filter sort summary", "%1 - Descending", label)
+    end
+    return I18n.cf("source filter sort summary", "%1 - Ascending", label)
 end
 
 local function triStateText(value)
