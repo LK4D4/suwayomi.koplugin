@@ -1,3 +1,7 @@
+package.path = "?.lua;" .. package.path
+
+local Marker = require("spec/support/i18n_marker")
+
 describe("suwayomi/ui/list_rows", function()
     before_each(function()
         package.preload["ffi/util"] = nil
@@ -12,6 +16,7 @@ describe("suwayomi/ui/list_rows", function()
     end)
 
     after_each(function()
+        Marker.uninstall()
         package.preload["ffi/util"] = nil
         package.loaded["ffi/util"] = nil
         package.preload["gettext"] = nil
@@ -486,6 +491,28 @@ describe("suwayomi/ui/list_rows", function()
         assert.are.equal("2 manga", row.mandatory)
         row.callback()
         assert.are.same({ id = 7, name = "Favorites", manga_count = 2 }, selected)
+    end)
+
+    it("routes library category and chapter row chrome through i18n without translating external data", function()
+        Marker.install()
+        package.loaded["suwayomi/ui/list_rows"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local rows = require("suwayomi/ui/list_rows")
+
+        assert.are.equal("Reading", rows.getLibraryCategoryTitle({ name = "Reading" }))
+        assert.are.equal("tx:12 manga", rows.getLibraryCategoryMandatory({ manga_count = 12 }))
+
+        local chapter_row = rows.buildChapterRow({
+            id = "c1",
+            name = "Chapter 1",
+            scanlator = "Asura",
+            menu_status = "tx:Read",
+        }, {})
+
+        assert.are.equal("Chapter 1", chapter_row.text)
+        assert.truthy(tostring(chapter_row.subtitle or ""):find("Asura", 1, true))
+        assert.are.equal("tx:Read", chapter_row.mandatory)
     end)
 
     it("builds chapter rows with shared text columns and no thumbnail slot", function()

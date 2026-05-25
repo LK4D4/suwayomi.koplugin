@@ -6,6 +6,7 @@
 -- External data: validated by the moved methods before UI rendering or worker use.
 
 local M = {}
+local I18n = require("suwayomi/i18n")
 
 function M.install(SuwayomiClient)
 function SuwayomiClient:mangaBelongsToCategory(manga, category)
@@ -38,7 +39,7 @@ function SuwayomiClient:buildLibraryCategoryChoices(categories)
     local choices = {
         {
             id = nil,
-            name = self:translate("All manga"),
+            name = I18n.t("All manga"),
         },
     }
     for _, category in ipairs(categories or {}) do
@@ -47,8 +48,8 @@ function SuwayomiClient:buildLibraryCategoryChoices(categories)
     return choices
 end
 
-local function libraryTimeoutMessage(client)
-    return client:translate("Library loading timed out. Check your connection, then open Library again.")
+local function libraryTimeoutMessage()
+    return I18n.t("Library loading timed out. Check your connection, then open Library again.")
 end
 
 function SuwayomiClient:startLibraryNetworkRequest(credentials, request, loading_message, on_finish)
@@ -63,14 +64,14 @@ function SuwayomiClient:startLibraryNetworkRequest(credentials, request, loading
 
     local request_token = {}
     active_requests[slot_key] = request_token
-    local active = request_job.start({
+    local ok, active, start_err = pcall(request_job.start, {
         owner = self.plugin,
         credentials = credentials,
         request = request,
         loading_message = loading_message,
         result_prefix = "library_request",
         timeout_seconds = self:getNetworkRequestTimeoutSeconds(),
-        timeout_message = libraryTimeoutMessage(self),
+        timeout_message = libraryTimeoutMessage(),
         on_cancel = function()
             if active_requests[slot_key] == request_token then
                 active_requests[slot_key] = nil
@@ -86,11 +87,15 @@ function SuwayomiClient:startLibraryNetworkRequest(credentials, request, loading
             end
         end,
     })
+    if not ok then
+        start_err = active
+        active = nil
+    end
     if not active then
         if active_requests[slot_key] == request_token then
             active_requests[slot_key] = nil
         end
-        return false
+        return false, start_err
     end
     if active_requests[slot_key] == request_token then
         request_token.active = active
@@ -116,10 +121,11 @@ end
 
 function SuwayomiClient:showLibraryMangaResult(category, credentials, result)
     if not result then
+        self.plugin:showMessage(I18n.t("Could not load Suwayomi library."))
         return
     end
     if not result.ok then
-        self.plugin:showMessage(self:translate(result.error))
+        self.plugin:showMessage(result.error or I18n.t("Could not load Suwayomi library."))
         return
     end
 
@@ -134,16 +140,16 @@ function SuwayomiClient:showLibraryMangaResult(category, credentials, result)
 
     if #manga == 0 then
         if category and category.id then
-            self.plugin:showMessage(self:translate("This category has no manga."))
+            self.plugin:showMessage(I18n.t("No manga in this library category."))
         else
-            self.plugin:showMessage(self:translate("Your Suwayomi library is empty."))
+            self.plugin:showMessage(I18n.t("Your Suwayomi library is empty."))
         end
         return
     end
 
     local library_manga = manga
     local menu_options = self:getTitleBarMenuOptions({
-        title = self:translate("Suwayomi Library"),
+        title = I18n.t("Suwayomi Library"),
     }) or {}
     menu_options.thumbnail_credentials = credentials
     local library_menu
@@ -188,19 +194,24 @@ end
 
 function SuwayomiClient:showLibraryManga(category, credentials)
     credentials = credentials or self.settings:load()
-    return self:startLibraryNetworkRequest(credentials, {
+    local started, err = self:startLibraryNetworkRequest(credentials, {
         action = "fetch_library_manga_pages",
-    }, self:translate("Loading library manga..."), function(result)
+    }, I18n.t("Loading library..."), function(result)
         self:showLibraryMangaResult(category, credentials, result)
     end)
+    if not started then
+        self.plugin:showMessage(I18n.f("Could not start library loading: %1", err or I18n.t("unknown error")))
+    end
+    return started
 end
 
 function SuwayomiClient:showLibraryCategoriesResult(credentials, result)
     if not result then
+        self.plugin:showMessage(I18n.t("Could not load Suwayomi library."))
         return
     end
     if not result.ok then
-        self.plugin:showMessage(self:translate(result.error))
+        self.plugin:showMessage(result.error or I18n.t("Could not load library categories."))
         return
     end
 
@@ -215,7 +226,7 @@ function SuwayomiClient:showLibraryCategoriesResult(credentials, result)
         local category_menu = self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
             self:showLibraryManga(category, credentials)
         end, self:getTitleBarMenuOptions({
-            title = self:translate("Suwayomi Library"),
+            title = I18n.t("Suwayomi Library"),
         }))
         self:trackScreen("library-categories", category_menu)
         return
@@ -228,7 +239,7 @@ function SuwayomiClient:showLibrary()
     return self:time("showLibrary", {}, function()
         local credentials = self.settings:load()
         if not credentials.server_url or credentials.server_url == "" then
-            self.plugin:showMessage(self:translate("Set up your Suwayomi server login first."))
+            self.plugin:showMessage(I18n.t("Set up your Suwayomi server login first."))
             if self.plugin.showOnboardingSetup then
                 self.plugin:showOnboardingSetup({ first_run = true })
             end
@@ -238,11 +249,15 @@ function SuwayomiClient:showLibrary()
             self.plugin:schedulePendingReadSync(credentials)
         end
 
-        return self:startLibraryNetworkRequest(credentials, {
+        local started, err = self:startLibraryNetworkRequest(credentials, {
             action = "fetch_library_categories",
-        }, self:translate("Loading library..."), function(result)
+        }, I18n.t("Loading categories..."), function(result)
             self:showLibraryCategoriesResult(credentials, result)
         end)
+        if not started then
+            self.plugin:showMessage(I18n.f("Could not start library loading: %1", err or I18n.t("unknown error")))
+        end
+        return started
     end)
 end
 end

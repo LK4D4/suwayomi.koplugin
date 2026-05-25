@@ -1,9 +1,11 @@
 package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/suwayomi_client_spec_helper")
+local Marker = require("spec/support/i18n_marker")
 
 describe("suwayomi/client library flows", function()
     after_each(function()
+        Marker.uninstall()
         helper.clearClientModules()
     end)
 
@@ -272,6 +274,51 @@ describe("suwayomi/client library flows", function()
         assert.is_nil(shown_manga[1].menu_text)
     end)
 
+    it("translates library screen chrome while keeping category names raw", function()
+        Marker.install()
+        package.loaded["suwayomi/client/library"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local shown_categories
+        local captured_title_options
+        local client, state = helper.newClient({
+            title_menu_options = { title_bar_left_icon = "appbar.menu" },
+            capture_title_options = function(menu_options)
+                captured_title_options = menu_options
+            end,
+            api = {
+                fetchCategories = function()
+                    return {
+                        ok = true,
+                        categories = {
+                            { id = "default", name = "Default" },
+                            { id = "reading", name = "Reading" },
+                        },
+                    }
+                end,
+                fetchLibraryManga = function()
+                    return { ok = true, manga = {} }
+                end,
+            },
+            ui = {
+                showLibraryCategoryMenu = function(categories)
+                    shown_categories = categories
+                end,
+                showLibraryMangaMenu = function()
+                    error("unexpected manga menu")
+                end,
+            },
+        })
+
+        client:showLibrary()
+
+        assert.are.equal("tx:Suwayomi Library", captured_title_options.title)
+        assert.are.equal("tx:All manga", shown_categories[1].name)
+        assert.are.equal("Default", shown_categories[2].name)
+        assert.are.equal("Reading", shown_categories[3].name)
+        assert.are.equal("https://suwayomi.example", state.scheduled_sync_credentials().server_url)
+    end)
+
     it("can always show the category picker even for a single category", function()
         local shown_categories
         local client = newClient({
@@ -438,7 +485,44 @@ describe("suwayomi/client library flows", function()
 
         client:showLibrary()
 
-        assert.are.equal("This category has no manga.", state.shown_messages[#state.shown_messages])
+        assert.are.equal("No manga in this library category.", state.shown_messages[#state.shown_messages])
+    end)
+
+    it("translates library fallback messages but keeps raw API errors", function()
+        Marker.install()
+        package.loaded["suwayomi/client/library"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local client, state = newClient({
+            api = {
+                fetchCategories = function()
+                    return { ok = true, categories = {} }
+                end,
+                fetchLibraryManga = function()
+                    return { ok = true, manga = {} }
+                end,
+            },
+            ui = {
+                showLibraryCategoryMenu = function()
+                    error("unexpected category menu")
+                end,
+                showLibraryMangaMenu = function()
+                    error("unexpected manga menu")
+                end,
+            },
+        })
+
+        client:showLibraryMangaResult(nil, {}, { ok = false, error = "HTTP 500 from Suwayomi" })
+        assert.are.equal("HTTP 500 from Suwayomi", state.shown_messages[#state.shown_messages])
+
+        client:showLibraryCategoriesResult({}, { ok = false, error = "HTTP 503 category API" })
+        assert.are.equal("HTTP 503 category API", state.shown_messages[#state.shown_messages])
+
+        client:showLibraryMangaResult({ id = "reading", name = "Reading" }, {}, { ok = true, manga = {} })
+        assert.are.equal("tx:No manga in this library category.", state.shown_messages[#state.shown_messages])
+
+        client:showLibraryCategoriesResult({}, nil)
+        assert.are.equal("tx:Could not load Suwayomi library.", state.shown_messages[#state.shown_messages])
     end)
 
     it("uses action-aware timeout feedback for library loads", function()
@@ -459,6 +543,50 @@ describe("suwayomi/client library flows", function()
         assert.are.equal(
             "Library loading timed out. Check your connection, then open Library again.",
             requests[1].timeout_message
+        )
+    end)
+
+    it("surfaces thrown library startup errors inside translated fallback message", function()
+        Marker.install()
+        package.loaded["suwayomi/client/library"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local client, state = newClient({
+            network_request_job = {
+                start = function()
+                    error("worker boom", 0)
+                end,
+                cancel = function() end,
+            },
+            ui = {},
+        })
+
+        assert.is_false(client:showLibraryManga(nil))
+        assert.are.equal(
+            "tx:Could not start library loading: worker boom",
+            state.shown_messages[#state.shown_messages]
+        )
+    end)
+
+    it("surfaces soft library startup errors inside translated fallback message", function()
+        Marker.install()
+        package.loaded["suwayomi/client/library"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+
+        local client, state = newClient({
+            network_request_job = {
+                start = function()
+                    return nil, "soft boom"
+                end,
+                cancel = function() end,
+            },
+            ui = {},
+        })
+
+        assert.is_false(client:showLibrary())
+        assert.are.equal(
+            "tx:Could not start library loading: soft boom",
+            state.shown_messages[#state.shown_messages]
         )
     end)
 
