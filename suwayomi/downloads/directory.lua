@@ -2,13 +2,13 @@
 --
 -- Responsibility: Owns the shared download-directory chooser, persistence, summary, and retry callback flow.
 -- Owned state: Persists only through suwayomi/settings.lua; callbacks execute on plugin instances.
--- Dependencies: KOReader UI helpers, settings, filesystem probing, and gettext.
+-- Dependencies: KOReader UI helpers, settings, filesystem probing, and the plugin i18n facade.
 -- External data: Settings values, selected paths, and filesystem paths remain untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 
 local DownloadsDirectory = {}
 DownloadsDirectory.__index = DownloadsDirectory
@@ -111,7 +111,7 @@ end
 function Methods:getDownloadDirectorySummary()
     local path = normalizeDownloadDirectory(SuwayomiSettings:loadDownloadDirectory())
     if not path or path == "" then
-        return _("not set")
+        return I18n.t("not set")
     end
 
     path = tostring(path):gsub("/+$", "")
@@ -129,7 +129,7 @@ function Methods:chooseDownloadDirectory(callback, options)
     SuwayomiUI.showDirectoryChooser(function(path)
         local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
         if not (options and options.suppress_saved_message) then
-            self:showMessage(_("Suwayomi download directory saved."))
+            self:showMessage(I18n.t("Suwayomi download directory saved."))
         end
         runCallback(callback, saved_path, options)
     end, self:getDownloadDirectoryChooserStartDir())

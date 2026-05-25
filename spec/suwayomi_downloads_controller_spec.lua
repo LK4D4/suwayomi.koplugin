@@ -1,6 +1,7 @@
 package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/controller_module_spec_helper")
+local Marker = require("spec/support/i18n_marker")
 
 local modules_to_clear = {
     "ffi/util",
@@ -15,6 +16,7 @@ local function clearModules()
         package.loaded[name] = nil
         package.preload[name] = nil
     end
+    package.loaded["suwayomi/i18n"] = nil
 end
 
 local function installController(options)
@@ -220,7 +222,22 @@ local function installController(options)
 end
 
 describe("suwayomi/downloads/controller", function()
-    after_each(clearModules)
+    local marker_installed = false
+
+    local function installMarker()
+        if not marker_installed then
+            Marker.install()
+            marker_installed = true
+        end
+    end
+
+    after_each(function()
+        if marker_installed then
+            Marker.uninstall()
+            marker_installed = false
+        end
+        clearModules()
+    end)
 
     it("exports downloads hub and ledger reconciliation methods", function()
         helper.assertControllerModule("suwayomi/downloads/controller", {
@@ -276,6 +293,44 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(1, queue.cancel_all_count)
         assert.are.equal(menu, state.closed_menus[1])
         assert.are.equal(2, state.downloads_count)
+    end)
+
+    it("translates downloads hub actions and summaries while keeping active job titles raw", function()
+        installMarker()
+        local queue = {
+            snapshot = {
+                active = {
+                    { key = "m1:c1", manga = { id = "m1", title = "Frieren" }, chapter = { id = "c1", name = "Chapter 1" } },
+                },
+                queued = {},
+                failed = {
+                    { key = "m1:c9", manga = { id = "m1", title = "Frieren" }, chapter = { id = "c9", name = "Chapter 9" } },
+                },
+            },
+        }
+        local plugin, state = installController({ queue = queue, download_directory = "" })
+        plugin.getDownloadDirectorySummary = nil
+        local menu = plugin:showDownloads()
+        local job = queue.snapshot.active[1]
+
+        assert.are.equal("tx:Downloads", state.title_menu_options.title)
+        assert.are.equal("tx:Cancel all downloads", state.title_menu_options.actions[1].text)
+        assert.are.equal("tx:Clear failed", state.title_menu_options.actions[2].text)
+        assert.are.equal("tx:not set", state.downloads_menu_options.download_directory_summary)
+
+        state.title_menu_options.onSelect(state.title_menu_options.actions[1], menu)
+        assert.are.equal("tx:Cancel all downloads?", state.confirm_options.text)
+        assert.are.equal("tx:Cancel downloads", state.confirm_options.ok_text)
+        assert.are.equal("tx:Keep downloads", state.confirm_options.cancel_text)
+
+        plugin:showActiveDownloadActions(job, menu)
+        assert.are.equal("Frieren / Chapter 1", state.actions_menu_options.title)
+        assert.are.equal("tx:Open chapter list", state.actions_menu_options.actions[1].text)
+        assert.are.equal("tx:Cancel download", state.actions_menu_options.actions[2].text)
+
+        assert.are.equal("tx:Deleted 2 selected chapters from device.tx: tx:Canceled 1 queued download.tx: tx:Skipped 3 chapters not downloaded.tx: tx:1 download is still in progress.", plugin:formatBulkDeleteMessage(2, 1, 3, 1))
+        assert.are.equal("tx:Skipped 1 chapter not downloaded.", plugin:formatBulkDeleteMessage(0, 0, 1, 0))
+        assert.are.equal("tx:No selected chapters were deleted.", plugin:formatBulkDeleteMessage(0, 0, 0, 0))
     end)
 
     it("refreshes the active downloads hub in place when queue status changes", function()
@@ -363,6 +418,34 @@ describe("suwayomi/downloads/controller", function()
         assert.are.same({}, state.messages)
     end)
 
+    it("translates failed download action labels while keeping job titles raw", function()
+        installMarker()
+        local job = {
+            key = "m1:c1",
+            manga = { id = "m1", title = "Frieren" },
+            chapter = { id = "c1", name = "Chapter 1" },
+        }
+        local plugin, state = installController({
+            queue = {
+                snapshot = {
+                    active = {},
+                    queued = {},
+                    failed = { job },
+                },
+            },
+            retry_ok = false,
+        })
+
+        plugin:showFailedDownloadActions(job, { name = "downloads-menu" })
+
+        assert.are.equal("tx:Download actions", state.actions_menu_options.title)
+        assert.are.equal("tx:Retry", state.actions_menu_options.actions[1].text)
+        assert.are.equal("tx:Close", state.actions_menu_options.actions[2].text)
+
+        state.actions_menu_callback(state.actions_menu_options.actions[1])
+        assert.are.equal("tx:Could not retry download.", state.messages[#state.messages])
+    end)
+
     it("wires queued and active row actions to queue and manga callbacks", function()
         local plugin, state = installController()
         local menu = { name = "downloads-menu" }
@@ -392,6 +475,60 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(job.chapter, plugin.queue.cancelled.chapter)
         assert.are.equal(menu, state.closed_menus[#state.closed_menus])
         assert.are.equal(3, state.downloads_count)
+    end)
+
+    it("translates missing queued and active cancel messages", function()
+        installMarker()
+        local plugin, state = installController({
+            cancel_pending_ok = false,
+            cancel_pending_state = "missing",
+        })
+        local menu = { name = "downloads-menu" }
+        local job = {
+            manga = { id = "m1", title = "Dandadan" },
+            chapter = { id = "c1", name = "Ch. 1" },
+        }
+
+        plugin:showQueuedDownloadActions(job, menu)
+        state.actions_menu_callback(state.actions_menu_options.actions[1])
+        assert.are.equal("tx:Download is no longer queued.", state.messages[#state.messages])
+
+        plugin:showActiveDownloadActions(job, menu)
+        state.actions_menu_callback(state.actions_menu_options.actions[2])
+        assert.are.equal("tx:Download is no longer active.", state.messages[#state.messages])
+    end)
+
+    it("translates queued action labels while keeping queued job titles raw", function()
+        installMarker()
+        local plugin, state = installController()
+        local menu = { name = "downloads-menu" }
+        local job = {
+            manga = { id = "m1", title = "Dandadan" },
+            chapter = { id = "c1", name = "Ch. 1" },
+        }
+
+        plugin:showQueuedDownloadActions(job, menu)
+
+        assert.are.equal("Dandadan / Ch. 1", state.actions_menu_options.title)
+        assert.are.equal("tx:Cancel queued download", state.actions_menu_options.actions[1].text)
+        assert.are.equal("tx:Open chapter list", state.actions_menu_options.actions[2].text)
+    end)
+
+    it("translates already-downloading queued cancel message", function()
+        installMarker()
+        local plugin, state = installController({
+            cancel_pending_ok = false,
+            cancel_pending_state = "downloading",
+        })
+        local job = {
+            manga = { id = "m1", title = "Dandadan" },
+            chapter = { id = "c1", name = "Ch. 1" },
+        }
+
+        plugin:showQueuedDownloadActions(job, { name = "downloads-menu" })
+        state.actions_menu_callback(state.actions_menu_options.actions[1])
+
+        assert.are.equal("tx:Download is already downloading.", state.messages[#state.messages])
     end)
 
     it("does not reopen downloads after manga actions if the downloads route is gone", function()
@@ -574,5 +711,24 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(0, plugin:applyMangaKeepNextUnreadDownloadsPolicy())
 
         assert.is_nil(queue.enqueued)
+    end)
+
+    it("translates the empty download-ahead buffer toast", function()
+        installMarker()
+        local plugin = installController({
+            current_chapter_context = {
+                manga = { id = "m1", title = "Frieren" },
+                chapters = {
+                    { id = "c1", name = "Ch. 1", downloaded = true },
+                    { id = "c2", name = "Ch. 2", downloaded = true },
+                },
+            },
+        })
+        function plugin:getDownloadDirectoryOrChoose()
+            return "/books"
+        end
+
+        assert.are.equal(0, plugin:keepNextUnreadChaptersDownloaded(2))
+        assert.are.equal("tx:Download-ahead buffer is already downloaded or queued.", plugin.messages[#plugin.messages])
     end)
 end)

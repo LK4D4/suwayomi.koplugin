@@ -3,12 +3,21 @@ package.path = "?.lua;" .. package.path
 -- Directory-flow specs own the shared chooser, persistence, summary, and
 -- retry-callback behavior used by chapter, manga, downloads, and settings code.
 local helper = require("spec/support/controller_module_spec_helper")
+local Marker = require("spec/support/i18n_marker")
 
 describe("suwayomi/downloads/directory", function()
     local settings
     local ui
     local lfs
     local device
+    local marker_installed = false
+
+    local function installMarker()
+        if not marker_installed then
+            Marker.install()
+            marker_installed = true
+        end
+    end
 
     local function reset_modules()
         for _, name in ipairs({
@@ -22,6 +31,7 @@ describe("suwayomi/downloads/directory", function()
             package.loaded[name] = nil
             package.preload[name] = nil
         end
+        package.loaded["suwayomi/i18n"] = nil
         _G.G_reader_settings = nil
     end
 
@@ -81,7 +91,13 @@ describe("suwayomi/downloads/directory", function()
         return require("suwayomi/downloads/directory")
     end
 
-    after_each(reset_modules)
+    after_each(function()
+        if marker_installed then
+            Marker.uninstall()
+            marker_installed = false
+        end
+        reset_modules()
+    end)
 
     it("exports plugin-bound directory flow methods", function()
         local Directory = load_directory()
@@ -164,6 +180,37 @@ describe("suwayomi/downloads/directory", function()
 
         settings.download_directory = ""
         assert.are.equal("not set", plugin:getDownloadDirectorySummary())
+    end)
+
+    it("translates missing-directory summary and save toast while keeping paths raw", function()
+        installMarker()
+        local Directory = load_directory({
+            existing = {
+                ["/start"] = "directory",
+            },
+            download_directory = "",
+        })
+        local callback_path
+        local plugin = {
+            messages = {},
+            showMessage = function(self, message)
+                table.insert(self.messages, message)
+            end,
+        }
+        for name, method in pairs(Directory.methods) do
+            plugin[name] = method
+        end
+
+        assert.are.equal("tx:not set", plugin:getDownloadDirectorySummary())
+
+        settings.download_directory = "/start"
+        plugin:chooseDownloadDirectory(function(path)
+            callback_path = path
+        end)
+        ui.calls[1].callback("/chosen/raw/path")
+
+        assert.are.equal("/chosen/raw/path", callback_path)
+        assert.are.same({ "tx:Suwayomi download directory saved." }, plugin.messages)
     end)
 
     it("chooses, saves, reports, and callbacks with the saved directory", function()

@@ -9,7 +9,7 @@
 -- External data: queue settings, manga/chapter tables, progress files, and
 -- worker results are normalized before callers see snapshots.
 
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 local ActiveJobs = require("suwayomi/downloads/active_jobs")
 local JobStore = require("suwayomi/downloads/job_store")
 local ProgressFile = require("suwayomi/downloads/progress_file")
@@ -536,7 +536,7 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
     local status = self:getStatus(manga, chapter)
     if status and (status.state == "queued" or status.state == "downloading") then
         if not options.quiet_duplicate then
-            self.onMessage(_("Chapter download is already in progress."))
+            self.onMessage(I18n.t("Chapter download is already in progress."))
         end
         return false, status.state
     end
@@ -581,7 +581,7 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
         local status = self:getStatus(manga, chapter)
         if status and (status.state == "queued" or status.state == "downloading") then
             if not options.quiet_duplicate then
-                self.onMessage(_("Chapter download is already in progress."))
+            self.onMessage(I18n.t("Chapter download is already in progress."))
             end
         else
             if status and status.state == "failed" then

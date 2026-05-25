@@ -5,12 +5,11 @@
 -- Owned state: active job table plus poll-scheduled flag; persisted state still
 -- flows through the queue facade and JobStore.
 -- Dependencies: queue facade callbacks, KOReader subprocess utilities, progress
--- files, and gettext/template helpers.
+-- files, and the plugin i18n facade.
 -- External data: worker progress files and subprocess status are treated as
 -- untrusted until normalized into queue status and persisted job records.
 
-local _ = require("gettext")
-local T = require("ffi/util").template
+local I18n = require("suwayomi/i18n")
 local ProgressFile = require("suwayomi/downloads/progress_file")
 
 local ActiveJobs = {}
@@ -141,7 +140,7 @@ function ActiveJobs:startQueuedJob(queued)
         local message = queue:formatFailureMessage(
             queued.manga,
             queued.chapter,
-            T(_("Could not start chapter download: %1"), err or _("unknown error"))
+            I18n.f("Could not start chapter download: %1", err or I18n.t("unknown error"))
         )
         queue:upsertPersistentJob(queue:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "failed", {
             started_at = queued.started_at,
@@ -214,7 +213,7 @@ end
 
 function ActiveJobs:finishWithFailure(active, message)
     local queue = self.queue
-    local failure_message = queue:formatFailureMessage(active.manga, active.chapter, message or _("Chapter download failed."))
+    local failure_message = queue:formatFailureMessage(active.manga, active.chapter, message or I18n.t("Chapter download failed."))
     self:terminateJob(active)
     self:removeJob(active)
     if queue.cleanupInterruptedDownload then
@@ -308,7 +307,7 @@ function ActiveJobs:finishFromProgress(active, progress)
             local message = queue:formatFailureMessage(
                 active.manga,
                 active.chapter,
-                _("Chapter download finished but the archive is missing.")
+                I18n.t("Chapter download finished but the archive is missing.")
             )
             queue:setStatus(active.manga, active.chapter, { state = "failed" })
             queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
@@ -347,7 +346,7 @@ function ActiveJobs:finishFromProgress(active, progress)
         local message = queue:formatFailureMessage(
             active.manga,
             active.chapter,
-            progress.error or _("Chapter download failed.")
+            progress.error or I18n.t("Chapter download failed.")
         )
         queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
             started_at = active.started_at,
@@ -382,7 +381,7 @@ function ActiveJobs:finishWithoutProgress(active)
     end
 
     queue:setStatus(active.manga, active.chapter, { state = "failed" })
-    local message = queue:formatFailureMessage(active.manga, active.chapter, _("Chapter download failed."))
+    local message = queue:formatFailureMessage(active.manga, active.chapter, I18n.t("Chapter download failed."))
     queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
         started_at = active.started_at,
         last_progress_at = queue.now(),
@@ -424,7 +423,7 @@ function ActiveJobs:poll()
             -- The worker may have died without writing terminal progress. The
             -- watchdog converts that silent active state into a recoverable
             -- failed job instead of leaving a permanent "downloading" row.
-            self:finishWithFailure(active, _("Chapter download timed out."))
+            self:finishWithFailure(active, I18n.t("Chapter download timed out."))
         else
             local done = queue.ffi_util.isSubProcessDone(active.pid)
             local terminal = progress and (progress.state == "downloaded" or progress.state == "skipped" or progress.state == "failed")

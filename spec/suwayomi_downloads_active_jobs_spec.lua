@@ -2,6 +2,8 @@ package.path = "?.lua;" .. package.path
 
 -- Active job specs exercise subprocess lifecycle and progress polling behind
 -- the queue facade. Queue persistence/facade behavior stays in queue specs.
+local Marker = require("spec/support/i18n_marker")
+
 describe("suwayomi/downloads/active_jobs", function()
     local original_io_open
     local original_os_remove
@@ -9,6 +11,14 @@ describe("suwayomi/downloads/active_jobs", function()
     local removed_paths
     local renamed_paths
     local progress_files
+    local marker_installed = false
+
+    local function installMarker()
+        if not marker_installed then
+            Marker.install()
+            marker_installed = true
+        end
+    end
 
     local function path_was_removed(path)
         for _, removed_path in ipairs(removed_paths or {}) do
@@ -246,6 +256,7 @@ describe("suwayomi/downloads/active_jobs", function()
         install_progress_file_mock()
         package.loaded.gettext = nil
         package.loaded["ffi/util"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = function()
             return function(text)
                 return text
@@ -273,8 +284,13 @@ describe("suwayomi/downloads/active_jobs", function()
         package.loaded["suwayomi/downloads/queue"] = nil
         package.loaded.gettext = nil
         package.loaded["ffi/util"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = nil
         package.preload["ffi/util"] = nil
+        if marker_installed then
+            Marker.uninstall()
+            marker_installed = false
+        end
     end)
 
     it("loads as the active download lifecycle module", function()
@@ -589,6 +605,60 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.same({}, context.archive_ready_calls)
     end)
 
+    it("translates fallback startup and missing-archive failures while keeping raw worker errors raw", function()
+        installMarker()
+        local startup = build_queue()
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        startup.queue.ffi_util.runInSubProcess = function()
+            return nil
+        end
+        startup.queue:enqueue(manga, chapter, "/books")
+        startup.run_scheduled()
+
+        assert.are.equal(
+            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): tx:Could not start chapter download: tx:unknown error",
+            startup.messages[#startup.messages]
+        )
+
+        local missing_archive = build_queue()
+        missing_archive.queue:enqueue(manga, chapter, "/books")
+        missing_archive.run_scheduled()
+
+        assert.are.equal(
+            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): tx:Chapter download finished but the archive is missing.",
+            missing_archive.messages[#missing_archive.messages]
+        )
+
+        local worker_failure = build_queue({
+            downloader = {
+                getTargetPath = function(_, download_directory, target_manga, target_chapter)
+                    return download_directory .. "/" .. target_manga.title,
+                        download_directory .. "/" .. target_manga.title .. "/" .. target_chapter.name .. (target_chapter.id and (" [id-" .. target_chapter.id .. "]") or "") .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                writeProgress = function(_, progress_path)
+                    local handle = assert(io.open(progress_path, "w"))
+                    handle:write("state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n")
+                    handle:close()
+                end,
+                downloadChapterWithProgress = function(self, _, _, _, _, progress_path)
+                    self:writeProgress(progress_path)
+                end,
+                chapterExists = function() return false end,
+            },
+        })
+
+        worker_failure.queue:enqueue(manga, chapter, "/books")
+        worker_failure.run_scheduled()
+
+        assert.are.equal(
+            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): network timeout",
+            worker_failure.messages[#worker_failure.messages]
+        )
+    end)
+
     it("persists chapter details when the downloader reports failure", function()
         local context = build_queue({
             downloader = {
@@ -699,6 +769,25 @@ describe("suwayomi/downloads/active_jobs", function()
         )
         assert.is_true(path_was_removed(chapter_path .. ".part"))
         assert.is_true(path_was_removed(chapter_path .. ".direct.part"))
+    end)
+
+    it("translates the watchdog timeout failure", function()
+        installMarker()
+        local context = build_queue({
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+
+        context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
+        table.remove(context.scheduled, 1).callback()
+
+        context.advance((30 * 60) + 1)
+        table.remove(context.scheduled, 1).callback()
+
+        assert.are.equal(
+            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): tx:Chapter download timed out.",
+            context.messages[#context.messages]
+        )
     end)
 
     it("does not time out an active job that is still reporting progress", function()

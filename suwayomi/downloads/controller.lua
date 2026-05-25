@@ -2,14 +2,12 @@
 --
 -- Responsibility: Owns the Downloads hub UI, retry/cancel actions, download-ahead refills, and downloaded-read reconciliation.
 -- Owned state: Uses the device-local queue only; it must not call Suwayomi server download mutations.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- Dependencies: KOReader UI helpers and Suwayomi runtime modules, including the plugin i18n facade.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
-local _ = require("gettext")
-local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
+local I18n = require("suwayomi/i18n")
 
 local DownloadsController = {}
 DownloadsController.__index = DownloadsController
@@ -41,9 +39,9 @@ end
 
 function Methods:formatCancelQueuedDownloadMessage(state)
     if state == "downloading" then
-        return _("Download is already downloading.")
+        return I18n.t("Download is already downloading.")
     end
-    return _("Download is no longer queued.")
+    return I18n.t("Download is no longer queued.")
 end
 
 
@@ -51,10 +49,10 @@ function Methods:getDownloadsTitleActions(snapshot)
     snapshot = snapshot or {}
     local actions = {}
     if #(snapshot.active or {}) > 0 or #(snapshot.queued or {}) > 0 then
-        table.insert(actions, { id = "cancel_all", text = _("Cancel all downloads"), destructive = true })
+        table.insert(actions, { id = "cancel_all", text = I18n.t("Cancel all downloads"), destructive = true })
     end
     if #(snapshot.failed or {}) > 0 then
-        table.insert(actions, { id = "clear_failed", text = _("Clear failed") })
+        table.insert(actions, { id = "clear_failed", text = I18n.t("Clear failed") })
     end
 
     return actions
@@ -75,10 +73,10 @@ function Methods:performDownloadsTitleAction(action, menu)
         end
         if SuwayomiUI.showConfirm then
             SuwayomiUI.showConfirm({
-                text = _("Cancel all downloads?"),
-                ok_text = _("Cancel downloads"),
+                text = I18n.t("Cancel all downloads?"),
+                ok_text = I18n.t("Cancel downloads"),
                 ok_callback = callback,
-                cancel_text = _("Keep downloads"),
+                cancel_text = I18n.t("Keep downloads"),
             })
         else
             callback()
@@ -104,7 +102,7 @@ function Methods:getDownloadsTitleBarOptions(snapshot)
         return {}
     end
     return self:getTitleBarMenuOptions({
-        title = _("Downloads"),
+        title = I18n.t("Downloads"),
         actions = self:getDownloadsTitleActions(snapshot),
         onSelect = function(action, menu)
             return self:performDownloadsTitleAction(action, menu)
@@ -119,7 +117,7 @@ function Methods:getDownloadsMenuOptions(snapshot)
     else
         options.download_directory_summary = SuwayomiSettings:loadDownloadDirectory()
         if not options.download_directory_summary or options.download_directory_summary == "" then
-            options.download_directory_summary = _("not set")
+            options.download_directory_summary = I18n.t("not set")
         end
     end
     return options
@@ -132,17 +130,17 @@ function Methods:showFailedDownloadActions(job, menu)
     end
 
     SuwayomiUI.showChapterActionsMenu({
-        title = _("Download actions"),
+        title = I18n.t("Download actions"),
         actions = {
-            { id = "retry", text = _("Retry") },
-            { id = "close", text = _("Close") },
+            { id = "retry", text = I18n.t("Retry") },
+            { id = "close", text = I18n.t("Close") },
         },
     }, function(action)
         if action and action.id == "retry" then
             local ok = self:getDownloadQueue():retryFailed(job.key)
             self:closeMenu(menu)
             if not ok then
-                self:showMessage(_("Could not retry download."))
+                self:showMessage(I18n.t("Could not retry download."))
             end
             self:showDownloads()
         end
@@ -210,10 +208,10 @@ function Methods:showQueuedDownloadActions(job, menu)
     end
 
     local actions = {
-        { id = "cancel_queued", text = _("Cancel queued download") },
+        { id = "cancel_queued", text = I18n.t("Cancel queued download") },
     }
     if self:canOpenDownloadJobChapterList(job) then
-        table.insert(actions, { id = "open_chapter_list", text = _("Open chapter list") })
+        table.insert(actions, { id = "open_chapter_list", text = I18n.t("Open chapter list") })
     end
 
     SuwayomiUI.showChapterActionsMenu({
@@ -246,9 +244,9 @@ function Methods:showActiveDownloadActions(job, menu)
     end
     local actions = {}
     if self:canOpenDownloadJobChapterList(job) then
-        table.insert(actions, { id = "open_chapter_list", text = _("Open chapter list") })
+        table.insert(actions, { id = "open_chapter_list", text = I18n.t("Open chapter list") })
     end
-    table.insert(actions, { id = "cancel_download", text = _("Cancel download"), destructive = true })
+    table.insert(actions, { id = "cancel_download", text = I18n.t("Cancel download"), destructive = true })
 
     SuwayomiUI.showChapterActionsMenu({
         title = self:getDownloadJobTitle(job),
@@ -266,7 +264,7 @@ function Methods:showActiveDownloadActions(job, menu)
             local cancelled = self:getDownloadQueue():cancelPending(job.manga, job.chapter)
             self:closeMenu(menu)
             if not cancelled then
-                self:showMessage(_("Download is no longer active."), { timeout = 2 })
+                self:showMessage(I18n.t("Download is no longer active."), { timeout = 2 })
             end
             self:showDownloads()
         end
@@ -324,40 +322,28 @@ end
 
 
 function Methods:formatActiveDownloadCount(count)
-    if count == 1 then
-        return _("1 download is still in progress.")
-    end
-    return T(_("%1 downloads are still in progress."), count)
+    return I18n.count(count, "1 download is still in progress.", "%1 downloads are still in progress.")
 end
 
 
 function Methods:formatBulkDeleteMessage(deleted, canceled, missing, active)
     local parts = {}
     if deleted > 0 then
-        table.insert(parts, T(
-            self:pluralize(deleted, _("Deleted %1 selected chapter from device."), _("Deleted %1 selected chapters from device.")),
-            deleted
-        ))
+        table.insert(parts, I18n.count(deleted, "Deleted %1 selected chapter from device.", "Deleted %1 selected chapters from device."))
     end
     if canceled > 0 then
-        table.insert(parts, T(
-            self:pluralize(canceled, _("Canceled %1 queued download."), _("Canceled %1 queued downloads.")),
-            canceled
-        ))
+        table.insert(parts, I18n.count(canceled, "Canceled %1 queued download.", "Canceled %1 queued downloads."))
     end
     if missing > 0 then
-        table.insert(parts, T(
-            self:pluralize(missing, _("Skipped %1 not downloaded."), _("Skipped %1 not downloaded.")),
-            missing
-        ))
+        table.insert(parts, I18n.count(missing, "Skipped %1 chapter not downloaded.", "Skipped %1 chapters not downloaded."))
     end
     if active > 0 then
         table.insert(parts, self:formatActiveDownloadCount(active))
     end
     if #parts == 0 then
-        return _("No selected chapters were deleted.")
+        return I18n.t("No selected chapters were deleted.")
     end
-    return table.concat(parts, " ")
+    return I18n.join(parts, " ")
 end
 
 
@@ -497,7 +483,7 @@ function Methods:keepNextUnreadChaptersDownloaded(limit)
     self:saveMangaKeepNextUnreadDownloadsLimit(manga, requested_limit)
     local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
     if #chapters == 0 then
-        self:showMessage(_("Download-ahead buffer is already downloaded or queued."))
+        self:showMessage(I18n.t("Download-ahead buffer is already downloaded or queued."))
         return 0
     end
 

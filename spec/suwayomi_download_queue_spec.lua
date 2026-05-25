@@ -1,5 +1,7 @@
 package.path = "?.lua;" .. package.path
 
+local Marker = require("spec/support/i18n_marker")
+
 describe("suwayomi/downloads/queue", function()
     local original_io_open
     local original_os_remove
@@ -7,6 +9,14 @@ describe("suwayomi/downloads/queue", function()
     local removed_paths
     local renamed_paths
     local progress_files
+    local marker_installed = false
+
+    local function installMarker()
+        if not marker_installed then
+            Marker.install()
+            marker_installed = true
+        end
+    end
 
     local function install_progress_file_mock()
         original_io_open = io.open
@@ -232,6 +242,7 @@ describe("suwayomi/downloads/queue", function()
         install_progress_file_mock()
         package.loaded.gettext = nil
         package.loaded["ffi/util"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = function()
             return function(text)
                 return text
@@ -258,8 +269,13 @@ describe("suwayomi/downloads/queue", function()
         package.loaded["suwayomi/downloads/queue"] = nil
         package.loaded.gettext = nil
         package.loaded["ffi/util"] = nil
+        package.loaded["suwayomi/i18n"] = nil
         package.preload.gettext = nil
         package.preload["ffi/util"] = nil
+        if marker_installed then
+            Marker.uninstall()
+            marker_installed = false
+        end
     end)
 
     it("persists queued downloads and removes them after success", function()
@@ -368,6 +384,19 @@ describe("suwayomi/downloads/queue", function()
 
         assert.are.equal(1, #context.saved_queue())
         assert.are.equal("Chapter download is already in progress.", context.messages[#context.messages])
+    end)
+
+    it("translates the duplicate queue message while keeping queue keys raw", function()
+        installMarker()
+        local context = build_queue({ subprocess_done = false })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
+        assert.is_false(context.queue:enqueue(manga, chapter, "/books"))
+
+        assert.are.equal("m1:398", context.saved_queue()[1].key)
+        assert.are.equal("tx:Chapter download is already in progress.", context.messages[#context.messages])
     end)
 
     it("can suppress the duplicate download message for bulk enqueue", function()
