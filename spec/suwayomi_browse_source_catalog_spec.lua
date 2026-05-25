@@ -32,7 +32,7 @@ local function installMarkerI18n()
             end,
             f = function(text, ...)
                 local values = { ... }
-                return ("tx:" .. tostring(text)):gsub("%%(%d+)", function(index)
+                return "tx:" .. tostring(text):gsub("%%(%d+)", function(index)
                     return tostring(values[tonumber(index)] or "")
                 end)
             end,
