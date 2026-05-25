@@ -198,4 +198,32 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
         assert.are.equal("could_not_connect", result.error_id)
         assert.is_nil(result.error)
     end)
+
+    it("maps blank external connection errors to could_not_connect", function()
+        clearModules()
+        package.preload["suwayomi/api"] = function()
+            return {
+                testConnection = function()
+                    return {
+                        ok = false,
+                        error = "",
+                    }
+                end,
+            }
+        end
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                writeResult = function(_, result)
+                    return result
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/plugin/onboarding_connection_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, "/tmp/result.json")
+
+        assert.is_false(result.ok)
+        assert.are.equal("could_not_connect", result.error_id)
+        assert.is_nil(result.error)
+    end)
 end)
