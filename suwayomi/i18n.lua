@@ -11,6 +11,7 @@ local I18n = {}
 
 local cached_gettext
 local cached_ngettext
+local cached_pgettext
 local cached_template
 
 local function identity(text)
@@ -24,11 +25,11 @@ local function fallbackTemplate(text, ...)
     end)
 end
 
-local function extractNGettext(gettext)
-    local ok, ngettext = pcall(function()
-        return gettext.ngettext
+local function extractMethod(gettext, method_name)
+    local ok, method = pcall(function()
+        return gettext[method_name]
     end)
-    return ok and type(ngettext) == "function" and ngettext or nil
+    return ok and type(method) == "function" and method or nil
 end
 
 local function splitLines(text)
@@ -71,20 +72,22 @@ end
 
 local function loadGettext()
     if cached_gettext then
-        return cached_gettext, cached_ngettext
+        return cached_gettext, cached_ngettext, cached_pgettext
     end
     local ok, gettext = pcall(require, "gettext")
     if ok then
         cached_gettext = type(gettext) == "function" and gettext or identity
-        cached_ngettext = extractNGettext(cached_gettext)
-        return cached_gettext, cached_ngettext
+        cached_ngettext = extractMethod(cached_gettext, "ngettext")
+        cached_pgettext = extractMethod(cached_gettext, "pgettext")
+        return cached_gettext, cached_ngettext, cached_pgettext
     end
     if not isMissingModuleError("gettext", gettext) then
         error(gettext, 0)
     end
     cached_gettext = identity
     cached_ngettext = nil
-    return cached_gettext, cached_ngettext
+    cached_pgettext = nil
+    return cached_gettext, cached_ngettext, cached_pgettext
 end
 
 local function loadTemplate()
@@ -113,6 +116,18 @@ end
 
 function I18n.f(msgid, ...)
     return loadTemplate()(I18n.t(msgid), ...)
+end
+
+function I18n.c(context, msgid)
+    local gettext, _, pgettext = loadGettext()
+    if pgettext then
+        return pgettext(context, msgid)
+    end
+    return gettext(msgid)
+end
+
+function I18n.cf(context, msgid, ...)
+    return loadTemplate()(I18n.c(context, msgid), ...)
 end
 
 function I18n.n(singular_msgid, plural_msgid, count)

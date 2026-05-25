@@ -57,6 +57,26 @@ describe("suwayomi/i18n", function()
         end
     end
 
+    local function installContextGettext(prefix)
+        package.preload.gettext = function()
+            local gettext = function(text)
+                return prefix .. tostring(text)
+            end
+            if not function_metatable_saved then
+                function_metatable = debug.getmetatable(gettext)
+                function_metatable_saved = true
+            end
+            debug.setmetatable(gettext, {
+                __index = {
+                    pgettext = function(context, text)
+                        return "ctx:" .. tostring(context) .. ":" .. tostring(text)
+                    end,
+                },
+            })
+            return gettext
+        end
+    end
+
     local function installTemplate()
         package.preload["ffi/util"] = function()
             return {
@@ -138,6 +158,34 @@ describe("suwayomi/i18n", function()
         local i18n = require("suwayomi/i18n")
 
         assert.are.equal("tx:3 chapters", i18n.count(3, "%1 chapter", "%1 chapters"))
+    end)
+
+    it("uses native gettext context helper when available", function()
+        installContextGettext("tx:")
+
+        local i18n = require("suwayomi/i18n")
+
+        assert.are.equal("ctx:browse action:Search", i18n.c("browse action", "Search"))
+    end)
+
+    it("falls back to normal gettext when native context helper is missing", function()
+        installGettext("tx:")
+
+        local i18n = require("suwayomi/i18n")
+
+        assert.are.equal("tx:Search", i18n.c("browse action", "Search"))
+    end)
+
+    it("formats contextual translated templates", function()
+        installContextGettext("tx:")
+        installTemplate()
+
+        local i18n = require("suwayomi/i18n")
+
+        assert.are.equal(
+            "ctx:browse action:Search extensions: komga",
+            i18n.cf("browse action", "Search extensions: %1", "komga")
+        )
     end)
 
     it("joins non-empty labels with a translated separator", function()
