@@ -14,7 +14,7 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
 
     after_each(clearModules)
 
-    it("tests connection with a lightweight API probe", function()
+    it("returns message id for successful connection test", function()
         clearModules()
         package.preload["suwayomi/api"] = function()
             return {
@@ -36,6 +36,7 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
                     return normalize({
                         ok = true,
                         source_count = 2,
+                        message_id = "connection_test_passed",
                     })
                 end,
             }
@@ -45,7 +46,8 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
         local result = worker:run({ server_url = "https://suwayomi.example" }, "/tmp/result.json")
 
         assert.is_true(result.ok)
-        assert.are.equal("Connection test passed.", result.message)
+        assert.are.equal("connection_test_passed", result.message_id)
+        assert.is_nil(result.message)
     end)
 
     it("retries transient connection test timeouts", function()
@@ -78,7 +80,8 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
 
         assert.is_true(result.ok)
         assert.are.equal(3, attempts)
-        assert.are.equal("Connection test passed after retry.", result.message)
+        assert.are.equal("connection_test_passed_after_retry", result.message_id)
+        assert.is_nil(result.message)
     end)
 
     it("returns readable failure for missing server url", function()
@@ -102,6 +105,35 @@ describe("suwayomi/plugin/onboarding_connection_worker", function()
         local result = worker:run({ server_url = "" }, "/tmp/result.json")
 
         assert.is_false(result.ok)
-        assert.are.equal("Enter a Suwayomi server URL first.", result.error)
+        assert.are.equal("missing_server_url", result.error_id)
+        assert.is_nil(result.error)
+    end)
+
+    it("keeps raw API errors as external data", function()
+        clearModules()
+        package.preload["suwayomi/api"] = function()
+            return {
+                testConnection = function()
+                    return {
+                        ok = false,
+                        error = "HTTP 401 Unauthorized from Suwayomi",
+                    }
+                end,
+            }
+        end
+        package.preload["suwayomi/subprocess/job"] = function()
+            return {
+                writeResult = function(_, result)
+                    return result
+                end,
+            }
+        end
+
+        local worker = require("suwayomi/plugin/onboarding_connection_worker")
+        local result = worker:run({ server_url = "https://suwayomi.example" }, "/tmp/result.json")
+
+        assert.is_false(result.ok)
+        assert.are.equal("HTTP 401 Unauthorized from Suwayomi", result.error)
+        assert.is_nil(result.error_id)
     end)
 end)

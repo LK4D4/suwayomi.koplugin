@@ -41,11 +41,11 @@ local function runConnectionTest(credentials)
     return last_response or { ok = false, error = "Could not connect to Suwayomi." }, CONNECTION_TEST_ATTEMPTS
 end
 
-local function successMessage(attempt)
+local function successMessageId(attempt)
     if attempt and attempt > 1 then
-        return "Connection test passed after retry."
+        return "connection_test_passed_after_retry"
     end
-    return "Connection test passed."
+    return "connection_test_passed"
 end
 
 local function normalizeResult(result)
@@ -53,7 +53,8 @@ local function normalizeResult(result)
     result.ok = result.ok == true
     result.source_count = tonumber(result.source_count) or 0
     result.error = result.error
-    result.message = result.message
+    result.error_id = result.error_id
+    result.message_id = result.message_id
     return result
 end
 
@@ -70,7 +71,7 @@ function OnboardingConnectionWorker:run(credentials, result_path)
     if not credentials or credentials.server_url == "" then
         result = {
             ok = false,
-            error = "Enter a Suwayomi server URL first.",
+            error_id = "missing_server_url",
         }
     else
         local response, attempt = runConnectionTest(credentials)
@@ -78,12 +79,17 @@ function OnboardingConnectionWorker:run(credentials, result_path)
             result = {
                 ok = true,
                 source_count = 0,
-                message = successMessage(attempt),
+                message_id = successMessageId(attempt),
             }
         else
+            local error_id
+            if response.error == nil then
+                error_id = "could_not_connect"
+            end
             result = {
                 ok = false,
-                error = response.error or "Could not connect to Suwayomi.",
+                error = response.error,
+                error_id = error_id,
             }
         end
     end
