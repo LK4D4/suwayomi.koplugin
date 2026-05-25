@@ -2,10 +2,10 @@
 --
 -- Responsibility: Delete device-local chapter archives and coordinate queue/ledger cleanup.
 -- Owned state: Mutates plugin queue status and settings-backed read ledger through injected plugin methods.
--- Dependencies: Plugin mixin methods, local download helpers, and gettext.
+-- Dependencies: Plugin mixin methods, local download helpers, settings, and i18n.
 -- External data: Queue state, ledger entries, and filesystem paths are checked before destructive cleanup.
 
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 local SuwayomiSettings = require("suwayomi/settings")
 
 local ChapterDeleteActions = {}
@@ -56,7 +56,7 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
     local status = self:getDownloadQueue():getStatus(manga, chapter)
     if status and status.state == "downloading" then
         if not options.quiet_active then
-            self:showMessage(_("This chapter is downloading. Wait for it to finish before deleting it."))
+            self:showMessage(I18n.t("This chapter is downloading. Wait for it to finish before deleting it."))
         end
         return false, "downloading"
     end
@@ -64,7 +64,7 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
     local cancelled, queue_state = self:getDownloadQueue():cancelPending(manga, chapter)
     if queue_state == "downloading" then
         if not options.quiet_active then
-            self:showMessage(_("This chapter is downloading. Wait for it to finish before deleting it."))
+            self:showMessage(I18n.t("This chapter is downloading. Wait for it to finish before deleting it."))
         end
         return false, "downloading"
     end
@@ -78,7 +78,7 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
     end
     if not downloaded or not chapter_path then
         if not options.quiet_missing then
-            self:showMessage(_("This chapter is not downloaded."))
+            self:showMessage(I18n.t("This chapter is not downloaded."))
         end
         return false, cancelled and "queued" or "missing"
     end
@@ -87,7 +87,7 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
     local removed = self:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
     if not removed then
         if not options.quiet_delete_failed then
-            self:showMessage(_("Could not delete this chapter from device."))
+            self:showMessage(I18n.t("Could not delete this chapter from device."))
         end
         return false, "delete_failed"
     end

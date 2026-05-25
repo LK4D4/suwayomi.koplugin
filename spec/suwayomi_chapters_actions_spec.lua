@@ -1,6 +1,7 @@
 package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/controller_module_spec_helper")
+local Marker = require("spec/support/i18n_marker")
 
 describe("suwayomi/chapters/actions", function()
     local original_os_remove
@@ -19,6 +20,7 @@ describe("suwayomi/chapters/actions", function()
             "suwayomi/chapters/local_downloads",
             "suwayomi/chapters/delete_actions",
             "suwayomi/chapters/read_actions",
+            "suwayomi/i18n",
             "suwayomi/settings",
             "suwayomi/downloads/downloader",
             "suwayomi/ui",
@@ -256,6 +258,7 @@ describe("suwayomi/chapters/actions", function()
         package.preload["suwayomi/readsync/worker"] = nil
         package.preload["suwayomi/readsync/ledger"] = nil
         package.preload["suwayomi/browse/source_fetch_worker"] = nil
+        Marker.uninstall()
     end)
 
     it("exports chapter and bulk action methods", function()
@@ -358,6 +361,78 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.ledger["m1:c1"].path)
         package.preload["apps/reader/readerui"] = nil
         package.loaded["apps/reader/readerui"] = nil
+    end)
+
+    it("translates chapter action refusal and confirmation messages", function()
+        Marker.install()
+        reset_modules()
+
+        local plugin = build_plugin({
+            existing = {},
+        })
+        function plugin:showBulkActionConfirmation(text, ok_text, callback)
+            self.confirmation = {
+                text = text,
+                ok_text = ok_text,
+                callback = callback,
+            }
+            return true
+        end
+
+        plugin:openChapter(manga, chapter)
+        assert.are.equal("tx:Download the chapter first.", plugin.messages[#plugin.messages])
+
+        plugin:confirmDeleteChapterFromDevice(manga, chapter)
+        assert.are.equal("tx:Delete downloaded file for Chapter 1 from this device?", plugin.confirmation.text)
+        assert.are.equal("tx:Delete", plugin.confirmation.ok_text)
+    end)
+
+    it("translates chapter delete refusal and failure messages", function()
+        Marker.install()
+        reset_modules()
+
+        local downloading_plugin = build_plugin({
+            queue = {
+                status = {
+                    ["m1:c1"] = { state = "downloading" },
+                },
+            },
+        })
+
+        local ok, state = downloading_plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+
+        assert.is_false(ok)
+        assert.are.equal("downloading", state)
+        assert.are.equal(
+            "tx:This chapter is downloading. Wait for it to finish before deleting it.",
+            downloading_plugin.messages[#downloading_plugin.messages]
+        )
+
+        local missing_plugin = build_plugin()
+
+        ok, state = missing_plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+
+        assert.is_false(ok)
+        assert.are.equal("missing", state)
+        assert.are.equal("tx:This chapter is not downloaded.", missing_plugin.messages[#missing_plugin.messages])
+
+        local failing_plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+            remove_results = {
+                ["/downloads/Manga/Chapter 1.cbz"] = false,
+            },
+        })
+
+        ok, state = failing_plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+
+        assert.is_false(ok)
+        assert.are.equal("delete_failed", state)
+        assert.are.equal(
+            "tx:Could not delete this chapter from device.",
+            failing_plugin.messages[#failing_plugin.messages]
+        )
     end)
 
     it("deletes archives, clears queue status, and removes unread ledger entries", function()
@@ -536,6 +611,38 @@ describe("suwayomi/chapters/actions", function()
         }, removed_paths)
     end)
 
+    it("translates selected chapter bulk confirmations", function()
+        Marker.install()
+        reset_modules()
+
+        local chapter2 = { id = "c2", name = "Chapter 2" }
+        local plugin = build_plugin({
+            current_chapter_context = {
+                manga = manga,
+                chapters = {
+                    chapter,
+                    chapter2,
+                },
+            },
+        })
+        function plugin:getSelectedChapters()
+            return { chapter, chapter2 }
+        end
+        function plugin:showBulkActionConfirmation(text, ok_text, callback)
+            self.confirmation = {
+                text = text,
+                ok_text = ok_text,
+                callback = callback,
+            }
+            return true
+        end
+
+        plugin:confirmDeleteSelectedChapters()
+
+        assert.are.equal("tx:Delete 2 selected downloads from device?", plugin.confirmation.text)
+        assert.are.equal("tx:Delete", plugin.confirmation.ok_text)
+    end)
+
     it("preserves read ledger entries while clearing their local path", function()
         local plugin = build_plugin({
             existing = {
@@ -712,6 +819,23 @@ describe("suwayomi/chapters/actions", function()
         assert.are.same({
             "Deleted 1 chapter from device. Skipped 3 downloads. 1 active download. 1 missing download. Failed to delete 1 download.",
         }, plugin.messages)
+    end)
+
+    it("translates chapter delete result summaries", function()
+        Marker.install()
+        reset_modules()
+
+        local plugin = build_plugin()
+
+        assert.are.equal(
+            "tx:Deleted 2 chapters from device. tx:Skipped 1 download. tx:1 active download. tx:3 missing downloads. tx:Failed to delete 1 download.",
+            plugin:formatReadDownloadDeleteMessage(2, {
+                skipped = 1,
+                active = 1,
+                missing = 3,
+                failed = 1,
+            })
+        )
     end)
 
     it("deletes the configured finished chapter offset while reading", function()
@@ -953,6 +1077,41 @@ describe("suwayomi/chapters/actions", function()
         plugin.confirmation.callback()
 
         assert.are.same({ team_a }, plugin.enqueued.chapters)
+    end)
+
+    it("translates next unread chapter bulk confirmations", function()
+        Marker.install()
+        reset_modules()
+
+        local chapter2 = { id = "c2", name = "Chapter 2", is_read = false }
+        local plugin = build_plugin({
+            current_chapter_context = {
+                manga = manga,
+                chapters = {
+                    chapter,
+                    chapter2,
+                },
+            },
+        })
+        function plugin:getDownloadDirectoryOrChoose()
+            return "/downloads"
+        end
+        function plugin:getNextUnreadChaptersForDownload()
+            return { chapter, chapter2 }
+        end
+        function plugin:showBulkActionConfirmation(text, ok_text, callback)
+            self.confirmation = {
+                text = text,
+                ok_text = ok_text,
+                callback = callback,
+            }
+            return true
+        end
+
+        plugin:confirmNextUnreadChapterDownloads(2)
+
+        assert.are.equal("tx:Queue 2 unread chapter downloads?", plugin.confirmation.text)
+        assert.are.equal("tx:Queue", plugin.confirmation.ok_text)
     end)
 
     it("keeps burger action origin when opening nested bulk action menus", function()

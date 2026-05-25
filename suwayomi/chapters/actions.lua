@@ -2,7 +2,7 @@
 --
 -- Responsibility: Public chapter action facade composed from focused action modules plus remaining download/bulk orchestration.
 -- Owned state: State stays on the plugin instance so KOReader callbacks keep stable method names and return values.
--- Dependencies: Focused chapter action modules, KOReader UI helpers, settings, debug timing, and gettext.
+-- Dependencies: Focused chapter action modules, KOReader UI helpers, settings, debug timing, and i18n.
 -- External data: API responses, settings values, queue status, worker files, and filesystem paths remain untrusted at module boundaries.
 
 local ChapterDeleteActions = require("suwayomi/chapters/delete_actions")
@@ -10,9 +10,7 @@ local ChapterLocalDownloads = require("suwayomi/chapters/local_downloads")
 local ChapterReadActions = require("suwayomi/chapters/read_actions")
 local MangaActionMenu = require("suwayomi/manga/action_menu")
 local SuwayomiDebug = require("suwayomi/debug")
-local _ = require("gettext")
-local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
+local I18n = require("suwayomi/i18n")
 
 local ChapterActions = {}
 ChapterActions.__index = ChapterActions
@@ -45,13 +43,13 @@ mergeMethods(
 function Methods:openChapter(manga, chapter)
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
     if not downloaded or not chapter_path then
-        self:showMessage(_("Download the chapter first."))
+        self:showMessage(I18n.t("Download the chapter first."))
         return false
     end
 
     local ok, ReaderUI = pcall(require, "apps/reader/readerui")
     if not ok or not ReaderUI then
-        self:showMessage(_("KOReader could not open this chapter right now."))
+        self:showMessage(I18n.t("KOReader could not open this chapter right now."))
         return false
     end
 
@@ -69,7 +67,7 @@ function Methods:openChapter(manga, chapter)
     elseif ReaderUI.showReader then
         ReaderUI:showReader(chapter_path)
     else
-        self:showMessage(_("KOReader could not open this chapter right now."))
+        self:showMessage(I18n.t("KOReader could not open this chapter right now."))
         return false
     end
 
@@ -111,20 +109,20 @@ function Methods:cancelChapterDownload(manga, chapter)
         return true
     end
     if state == "downloading" then
-        self:showMessage(_("Download is no longer active."))
+        self:showMessage(I18n.t("Download is no longer active."))
     else
-        self:showMessage(_("Download is no longer queued."))
+        self:showMessage(I18n.t("Download is no longer queued."))
     end
     return false
 end
 
 
 function Methods:confirmDeleteChapterFromDevice(manga, chapter)
-    local chapter_name = chapter and chapter.name or _("this chapter")
+    local chapter_name = chapter and chapter.name or I18n.t("this chapter")
     if self.showBulkActionConfirmation then
         return self:showBulkActionConfirmation(
-            T(_("Delete downloaded file for %1 from this device?"), chapter_name),
-            _("Delete"),
+            I18n.f("Delete downloaded file for %1 from this device?", chapter_name),
+            I18n.t("Delete"),
             function()
                 self:deleteChapterFromDevice(manga, chapter)
             end
@@ -161,8 +159,8 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
     self:refreshChapterMenu({ quick = true })
 
     if capped > 0 then
-        self:showMessage(T(
-            _("Queued first %1 downloads. Refine the chapter selection to queue more."),
+        self:showMessage(I18n.f(
+            "Queued first %1 downloads. Refine the chapter selection to queue more.",
             self.max_batch_queue_chapters
         ))
     elseif queued == 0 and skipped > 0 then
@@ -198,16 +196,13 @@ function Methods:confirmNextUnreadChapterDownloads(limit)
 
     local chapters = self:getNextUnreadChaptersForDownload(manga, limit)
     if #chapters == 0 then
-        self:showMessage(_("No unread chapters available to download."))
+        self:showMessage(I18n.t("No unread chapters available to download."))
         return 0
     end
 
     return self:showBulkActionConfirmation(
-        T(
-            self:pluralize(#chapters, _("Queue %1 unread chapter download?"), _("Queue %1 unread chapter downloads?")),
-            #chapters
-        ),
-        _("Queue"),
+        I18n.count(#chapters, "Queue %1 unread chapter download?", "Queue %1 unread chapter downloads?"),
+        I18n.t("Queue"),
         function()
             self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
         end
@@ -230,7 +225,7 @@ function Methods:enqueueNextUnreadChapterDownloads(limit)
 
     local chapters = self:getNextUnreadChaptersForDownload(manga, limit)
     if #chapters == 0 then
-        self:showMessage(_("No unread chapters available to download."))
+        self:showMessage(I18n.t("No unread chapters available to download."))
         return 0
     end
 
@@ -246,7 +241,7 @@ function Methods:downloadSelectedChapters()
     local manga = self.current_chapter_context.manga
     local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
     if #chapters == 0 then
-        self:showMessage(_("No chapters selected."))
+        self:showMessage(I18n.t("No chapters selected."))
         return 0
     end
 
@@ -270,7 +265,7 @@ function Methods:deleteSelectedChapters()
     local manga = self.current_chapter_context.manga
     local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
     if #chapters == 0 then
-        self:showMessage(_("No chapters selected."))
+        self:showMessage(I18n.t("No chapters selected."))
         return 0
     end
 
@@ -328,21 +323,18 @@ function Methods:confirmDeleteSelectedChapters()
     local manga = self.current_chapter_context.manga
     local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
     if #chapters == 0 then
-        self:showMessage(_("No chapters selected."))
+        self:showMessage(I18n.t("No chapters selected."))
         return 0
     end
 
     if self.showBulkActionConfirmation then
         return self:showBulkActionConfirmation(
-            T(
-                self:pluralize(
-                    #chapters,
-                    _("Delete %1 selected download from device?"),
-                    _("Delete %1 selected downloads from device?")
-                ),
-                #chapters
+            I18n.count(
+                #chapters,
+                "Delete %1 selected download from device?",
+                "Delete %1 selected downloads from device?"
             ),
-            _("Delete"),
+            I18n.t("Delete"),
             function()
                 self:deleteSelectedChapters()
             end
@@ -351,6 +343,7 @@ function Methods:confirmDeleteSelectedChapters()
 
     return self:deleteSelectedChapters()
 end
+
 
 
 function Methods:deleteReadChaptersFromDevice()
@@ -424,15 +417,12 @@ function Methods:confirmDeleteReadChaptersFromDevice()
     end
 
     return self:showBulkActionConfirmation(
-        T(
-            self:pluralize(
-                #read_chapters,
-                _("Delete %1 read download from device?"),
-                _("Delete %1 read downloads from device?")
-            ),
-            #read_chapters
+        I18n.count(
+            #read_chapters,
+            "Delete %1 read download from device?",
+            "Delete %1 read downloads from device?"
         ),
-        _("Delete"),
+        I18n.t("Delete"),
         function()
             self:deleteReadChaptersFromDevice()
         end
@@ -452,34 +442,23 @@ function Methods:getReadDownloadedChaptersFromCurrentContext()
 end
 
 function Methods:formatReadDownloadDeleteMessage(deleted, details)
-    local message = T(
-        self:pluralize(deleted, _("Deleted %1 chapter from device."), _("Deleted %1 chapters from device.")),
-        deleted
-    )
+    local message = I18n.count(deleted, "Deleted %1 chapter from device.", "Deleted %1 chapters from device.")
     details = details or {}
     local skipped = details.skipped or (details.active or 0) + (details.missing or 0) + (details.failed or 0)
     if skipped > 0 then
-        message = message .. " " .. T(
-            self:pluralize(skipped, _("Skipped %1 download."), _("Skipped %1 downloads.")),
-            skipped
-        )
+        message = message .. " " .. I18n.count(skipped, "Skipped %1 download.", "Skipped %1 downloads.")
     end
     if (details.active or 0) > 0 then
-        message = message .. " " .. T(
-            self:pluralize(details.active, _("%1 active download."), _("%1 active downloads.")),
-            details.active
-        )
+        message = message .. " " .. I18n.count(details.active, "%1 active download.", "%1 active downloads.")
     end
     if (details.missing or 0) > 0 then
-        message = message .. " " .. T(
-            self:pluralize(details.missing, _("%1 missing download."), _("%1 missing downloads.")),
-            details.missing
-        )
+        message = message .. " " .. I18n.count(details.missing, "%1 missing download.", "%1 missing downloads.")
     end
     if (details.failed or 0) > 0 then
-        message = message .. " " .. T(
-            self:pluralize(details.failed, _("Failed to delete %1 download."), _("Failed to delete %1 downloads.")),
-            details.failed
+        message = message .. " " .. I18n.count(
+            details.failed,
+            "Failed to delete %1 download.",
+            "Failed to delete %1 downloads."
         )
     end
     return message
@@ -495,7 +474,7 @@ function Methods:markSelectedChaptersRead()
     local manga = self.current_chapter_context.manga
     local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
     if #chapters == 0 then
-        self:showMessage(_("No chapters selected."))
+        self:showMessage(I18n.t("No chapters selected."))
         return 0
     end
 
@@ -536,7 +515,7 @@ function Methods:markSelectedChaptersUnread()
     local manga = self.current_chapter_context.manga
     local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
     if #chapters == 0 then
-        self:showMessage(_("No chapters selected."))
+        self:showMessage(I18n.t("No chapters selected."))
         return 0
     end
 
