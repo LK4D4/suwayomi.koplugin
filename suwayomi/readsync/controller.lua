@@ -2,7 +2,7 @@
 --
 -- Responsibility: Owns read-sync worker scheduling, result application, manual sync, and document-close sync.
 -- Owned state: Coordinates ledger, KOReader metadata, downloads cleanup, and subprocess result files.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and plugin i18n facade.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
@@ -10,9 +10,8 @@ local SuwayomiReadSyncWorker = require("suwayomi/readsync/worker")
 local SubprocessJob = require("suwayomi/subprocess/job")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiDebug = require("suwayomi/debug")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 local FFIUtil = require("ffi/util")
-local T = FFIUtil.template
 
 local ReadSyncController = {}
 ReadSyncController.__index = ReadSyncController
@@ -102,7 +101,7 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
         end,
         on_error = function(err)
             self.pending_read_sync_active = nil
-            self:showMessage(T(_("Could not start read sync: %1"), err or _("unknown error")))
+            self:showMessage(I18n.f("Could not start read sync: %1", err or I18n.t("unknown error")))
         end,
         on_cleanup = function(cleaned_active)
             if self.pending_read_sync_active == cleaned_active then
@@ -266,26 +265,26 @@ end
 
 function Methods:syncReadStateNow()
     if self.pending_read_sync_active then
-        self:showMessage(_("Read state sync is already running."))
+        self:showMessage(I18n.t("Read state sync is already running."))
         return false
     end
 
     self:reconcileDownloadedChapterLedger()
 
     if not self:hasPendingReadSync(self:loadChapterLedger()) then
-        self:showMessage(_("Read state is already synced."))
+        self:showMessage(I18n.t("Read state is already synced."))
         return false
     end
 
     local credentials = SuwayomiSettings:load()
     if not credentials or credentials.server_url == "" then
-        self:showMessage(_("Set up your Suwayomi server login first."))
+        self:showMessage(I18n.t("Set up your Suwayomi server login first."))
         return false
     end
 
     local started = self:startPendingReadSyncWorker(credentials, self.read_sync_batch_size)
     if started then
-        self:showMessage(_("Read state sync started."))
+        self:showMessage(I18n.t("Read state sync started."))
         return true
     end
     return false

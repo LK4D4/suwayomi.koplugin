@@ -2,13 +2,13 @@
 --
 -- Responsibility: Persist chapter return context and restore Suwayomi chapter menus from KOReader reader mode.
 -- Owned state: Settings-backed reader return context table keyed by local chapter path.
--- Dependencies: KOReader reader/filemanager UI modules, Suwayomi settings/API, and plugin chapter menu methods.
+-- Dependencies: KOReader reader/filemanager UI modules, Suwayomi settings/API, plugin i18n facade, and plugin chapter menu methods.
 -- External data: Document paths, persisted contexts, and API responses are treated as optional and checked before use.
 
 local SuwayomiSettings = require("suwayomi/settings")
 local NetworkRequestJob = require("suwayomi/network/request_job")
 local UIManager = require("ui/uimanager")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 
 local ReaderReturn = {}
 ReaderReturn.__index = ReaderReturn
@@ -266,17 +266,17 @@ end
 
 function Methods:fetchReaderReturnChapters(context)
     if not context or not context.manga_id then
-        self:showMessage(_("This book is not linked to Suwayomi chapters."))
+        self:showMessage(I18n.t("This book is not linked to Suwayomi chapters."))
         return nil
     end
 
-    self:showMessage(_("Chapters are loading."))
+    self:showMessage(I18n.t("Chapters are loading."))
     return nil
 end
 
 function Methods:startReaderReturnChapterRequest(context)
     if not context or not context.manga_id then
-        self:showMessage(_("This book is not linked to Suwayomi chapters."))
+        self:showMessage(I18n.t("This book is not linked to Suwayomi chapters."))
         return false
     end
 
@@ -298,10 +298,10 @@ function Methods:startReaderReturnChapterRequest(context)
             action = "fetch_reader_return_chapters_for_manga",
             manga_id = context.manga_id,
         },
-        loading_message = _("Loading chapters..."),
+        loading_message = I18n.t("Loading chapters..."),
         result_prefix = "reader_return_chapters",
         timeout_seconds = self.reader_return_timeout_seconds or 30,
-        timeout_message = _("Could not load chapters."),
+        timeout_message = I18n.t("Could not load chapters."),
         on_cancel = function()
             if self.active_reader_return_request == request_token then
                 self.active_reader_return_request = nil
@@ -321,12 +321,12 @@ function Methods:startReaderReturnChapterRequest(context)
             end
             if not result.ok then
                 self.active_reader_return_request = nil
-                self:showMessage(_(result.error))
+                self:showMessage(result.error)
                 return
             end
             if not result.chapters or #result.chapters == 0 then
                 self.active_reader_return_request = nil
-                self:showMessage(_("This manga has no chapters."))
+                self:showMessage(I18n.t("This manga has no chapters."))
                 return
             end
 
@@ -407,7 +407,7 @@ end
 function Methods:returnToSuwayomiChapters(context)
     context = context or self:getCurrentReaderReturnContext()
     if not context then
-        self:showMessage(_("This book is not linked to Suwayomi chapters."))
+        self:showMessage(I18n.t("This book is not linked to Suwayomi chapters."))
         return false
     end
 

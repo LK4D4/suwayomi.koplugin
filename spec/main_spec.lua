@@ -182,6 +182,7 @@ describe("suwayomi plugin", function()
         assert.are.equal(1, #runtime.client_instances)
         assert.are.equal(plugin, first_client.options.plugin)
         assert.is_function(first_client.options.gettext)
+        assert.are.equal("Library", first_client.options.gettext("Library"))
     end)
 
     it("constructs the download queue lazily with saved settings and recovers it on init", function()

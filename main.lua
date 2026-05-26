@@ -30,7 +30,7 @@ local DownloadsController = require("suwayomi/downloads/controller")
 local ReadSyncLedger = require("suwayomi/readsync/ledger")
 local KoreaderMetadata = require("suwayomi/readsync/koreader_metadata")
 local ReadSyncController = require("suwayomi/readsync/controller")
-local _ = require("gettext")
+local I18n = require("suwayomi/i18n")
 
 local SuwayomiPlugin = WidgetContainer:extend{
     name = "suwayomi",
@@ -106,7 +106,7 @@ function SuwayomiPlugin:createClient()
         settings = SuwayomiSettings,
         debug = SuwayomiDebug,
         plugin = self,
-        gettext = _,
+        gettext = I18n.t,
     }
 end
 
@@ -206,7 +206,7 @@ function SuwayomiPlugin:onDispatcherRegisterActions()
     Dispatcher:registerAction("suwayomi_action", {
         category = "none",
         event = "SuwayomiAction",
-        title = _("Suwayomi"),
+        title = I18n.t("Suwayomi"),
         filemanager = true,
     })
 end
