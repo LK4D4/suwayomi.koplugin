@@ -40,11 +40,16 @@ plural_forms() {
     esac
 }
 
+normalize_line_endings() {
+    perl -0pi -e 's/\r\n/\n/g' "$@"
+}
+
 normalize_po_header() {
     local locale="$1"
     local po="$2"
     local plural
     plural="$(plural_forms "$locale")"
+    normalize_line_endings "$po"
     sed -i \
         -e 's/PO-Revision-Date: .*/PO-Revision-Date: 1970-01-01 00:00+0000\\n"/' \
         -e 's/POT-Creation-Date: .*/POT-Creation-Date: 1970-01-01 00:00+0000\\n"/' \
@@ -54,6 +59,7 @@ normalize_po_header() {
         my $plural = $ENV{PLURAL_FORMS};
         s/"Plural-Forms: [^\n]*\\n"\n(?:"[^:"]*[^\n]*\\n"\n)*/"Plural-Forms: $plural\\n"\n/s;
     ' "$po"
+    normalize_line_endings "$po"
 }
 
 mkdir -p l10n/templates
@@ -82,6 +88,7 @@ xgettext \
     "${lua_files[@]}"
 
 sed -i 's/POT-Creation-Date: .*/POT-Creation-Date: 1970-01-01 00:00+0000\\n"/' "$template"
+normalize_line_endings "$template"
 
 for locale in "${locales[@]}"; do
     locale_dir="l10n/$locale"

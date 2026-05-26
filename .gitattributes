@@ -1,1 +1,4 @@
+.gitattributes text eol=lf
 *.sh text eol=lf
+l10n/**/*.po text eol=lf
+l10n/**/*.pot text eol=lf
