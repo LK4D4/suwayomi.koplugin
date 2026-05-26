@@ -33,11 +33,20 @@ jobs:
           luarocks install luasec
           luarocks install luacheck
 
+      - name: Install gettext tools
+        run: sudo apt-get update && sudo apt-get install -y gettext
+
       - name: Run lint
         run: luacheck --codes spec suwayomi main.lua _meta.lua
 
       - name: Run tests
         run: busted spec
+
+      - name: Check l10n catalogs
+        run: ./scripts/check-l10n.sh
+
+      - name: Compile l10n catalogs
+        run: ./scripts/compile-l10n.sh
 
       - name: Build project
         run: |
