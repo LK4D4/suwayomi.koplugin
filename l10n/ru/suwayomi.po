@@ -51,6 +51,9 @@ msgstr[0] "%1 глава"
 msgstr[1] "%1 главы"
 msgstr[2] "%1 глав"
 
+msgid "%1 failed for %2"
+msgstr "%1: ошибка для %2"
+
 msgid "%1 filters"
 msgstr "%1 фильтров"
 
@@ -167,8 +170,14 @@ msgstr "Отменить загрузку"
 msgid "Cancel downloads"
 msgstr "Отменить загрузки"
 
+msgid "Cancel loading"
+msgstr "Отменить загрузку"
+
 msgid "Cancel queued download"
 msgstr "Отменить загрузку в очереди"
+
+msgid "Cancel search"
+msgstr "Отменить поиск"
 
 msgid "Canceled %1 queued download."
 msgid_plural "Canceled %1 queued downloads."
@@ -267,6 +276,12 @@ msgstr "Не удалось загрузить главы."
 msgid "Could not load library categories."
 msgstr "Не удалось загрузить категории библиотеки."
 
+msgid "Could not load manga."
+msgstr "Не удалось загрузить мангу."
+
+msgid "Could not load source filters."
+msgstr "Не удалось загрузить фильтры источника."
+
 msgid "Could not retry download."
 msgstr "Не удалось повторить загрузку."
 
@@ -285,8 +300,17 @@ msgstr "Не удалось запустить задачу расширения
 msgid "Could not start library loading: %1"
 msgstr "Не удалось начать загрузку библиотеки: %1"
 
+msgid "Could not start manga loading."
+msgstr "Не удалось начать загрузку манги."
+
 msgid "Could not start read sync: %1"
 msgstr "Не удалось начать синхронизацию прочитанного: %1"
+
+msgid "Could not start search."
+msgstr "Не удалось начать поиск."
+
+msgid "Could not start source filter loading."
+msgstr "Не удалось начать загрузку фильтров источника."
 
 msgid "Could not start source loading: %1"
 msgstr "Не удалось начать загрузку источников: %1"
@@ -431,6 +455,15 @@ msgstr "Скачивание %1/%2"
 msgid "Downloads"
 msgstr "Загрузки"
 
+msgid "Edit filters"
+msgstr "Изменить фильтры"
+
+msgid "Edit search"
+msgstr "Изменить поиск"
+
+msgid "Enter a search query."
+msgstr "Введите поисковый запрос."
+
 msgid "Error"
 msgstr "Ошибка"
 
@@ -489,6 +522,9 @@ msgstr[2] "Не удалось удалить %1 загрузок."
 
 msgid "Fifth to last read chapter"
 msgstr "Пятая глава перед последней прочитанной"
+
+msgid "Filter"
+msgstr "Фильтр"
 
 msgid "First unread"
 msgstr "Первая непрочитанная"
@@ -550,6 +586,9 @@ msgctxt "source mode"
 msgid "Latest"
 msgstr "Последние"
 
+msgid "Latest manga is not supported by this source."
+msgstr "Этот источник не поддерживает последние манги."
+
 msgid "Library"
 msgstr "Библиотека"
 
@@ -565,6 +604,9 @@ msgstr ""
 "Истекло время ожидания загрузки библиотеки. Проверьте подключение и снова "
 "откройте библиотеку."
 
+msgid "Loading canceled."
+msgstr "Загрузка отменена."
+
 msgid "Loading categories..."
 msgstr "Загрузка категорий..."
 
@@ -576,6 +618,12 @@ msgstr "Загрузка расширений..."
 
 msgid "Loading library..."
 msgstr "Загрузка библиотеки..."
+
+msgid "Loading manga..."
+msgstr "Загрузка манги..."
+
+msgid "Loading source filters..."
+msgstr "Загрузка фильтров источника..."
 
 msgid "Loading sources..."
 msgstr "Загрузка источников..."
@@ -630,6 +678,12 @@ msgstr "Нет загрузок в очереди."
 
 msgid "No manga in this library category."
 msgstr "В этой категории библиотеки нет манги."
+
+msgid "No manga match these filters."
+msgstr "Нет манги, соответствующей этим фильтрам."
+
+msgid "No manga match this search."
+msgstr "Нет манги, соответствующей этому поиску."
 
 msgid "No matching extensions"
 msgstr "Нет подходящих расширений"
@@ -836,6 +890,10 @@ msgstr "Поисковый запрос"
 msgid "Search text"
 msgstr "Текст поиска"
 
+msgctxt "source mode"
+msgid "Search: %1"
+msgstr "Поиск: %1"
+
 msgid "Second to last read chapter"
 msgstr "Глава перед последней прочитанной"
 
@@ -886,6 +944,9 @@ msgstr "Источник"
 
 msgid "Source filters"
 msgstr "Фильтры источника"
+
+msgid "Source filters are unavailable."
+msgstr "Фильтры источника недоступны."
 
 msgid "Source loading timed out."
 msgstr "Истекло время ожидания загрузки источника."
@@ -964,6 +1025,9 @@ msgstr "Языки источников Suwayomi"
 msgid "Sync"
 msgstr "Синхронизация"
 
+msgid "Tap to retry"
+msgstr "Нажмите, чтобы повторить"
+
 msgid "Test connection"
 msgstr "Проверить подключение"
 
@@ -1005,6 +1069,15 @@ msgstr "Для этой манги главы ещё не загружены."
 
 msgid "This manga has no chapters."
 msgstr "У этой манги нет глав."
+
+msgid "This source has no filters."
+msgstr "У этого источника нет фильтров."
+
+msgid "This source has no manga."
+msgstr "У этого источника нет манги."
+
+msgid "Timed out."
+msgstr "Время ожидания истекло."
 
 msgctxt "extension action"
 msgid "Uninstall"

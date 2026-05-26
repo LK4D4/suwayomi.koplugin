@@ -6,6 +6,7 @@
 -- External data: validated by the moved methods before UI rendering or worker use.
 
 local util = require("suwayomi/client/util")
+local I18n = require("suwayomi/i18n")
 local copyOptions = util.copyOptions
 local trim = util.trim
 
@@ -48,7 +49,7 @@ function SuwayomiClient:searchSourceForSummary(credentials, source, query)
         return {
             source = source,
             status = "error",
-            error = result and result.error or self:translate("Could not load manga."),
+            error = result and result.error or I18n.t("Could not load manga."),
         }
     end
 
@@ -86,10 +87,10 @@ function SuwayomiClient:buildGlobalSearchMenuOptions(search)
         cancel = function()
             self:cancelGlobalSearch(search)
         end
-        table.insert(actions, { id = "cancel_search", text = self:translate("Cancel search") })
+        table.insert(actions, { id = "cancel_search", text = I18n.t("Cancel search") })
     end
     local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
-        title = self:translate("Global search"),
+        title = I18n.t("Global search"),
         actions = actions,
         onSelect = function(action)
             if action and action.id == "cancel_search" and cancel then
@@ -131,7 +132,7 @@ function SuwayomiClient:applyGlobalSearchResult(search, index, result)
     end
     if not result or result.ok ~= true then
         summary.status = "error"
-        summary.error = result and result.error or self:translate("Could not load manga.")
+        summary.error = result and result.error or I18n.t("Could not load manga.")
         summary.manga = {}
         summary.result_count = 0
         return
@@ -319,7 +320,7 @@ function SuwayomiClient:startGlobalSearchJob(search, index)
         local summary = search.summaries[index]
         if summary then
             summary.status = "error"
-            summary.error = self:translate("Could not start search.")
+            summary.error = I18n.t("Could not start search.")
         end
         self:updateGlobalSearchMenu(search)
     end
@@ -333,7 +334,7 @@ function SuwayomiClient:showGlobalSearch(sources)
     return self.ui.showGlobalSearchPrompt(function(query)
         local search_query = trim(query)
         if search_query == "" then
-            self.plugin:showMessage(self:translate("Enter a search query."))
+            self.plugin:showMessage(I18n.t("Enter a search query."))
             return
         end
 

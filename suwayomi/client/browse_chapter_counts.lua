@@ -5,6 +5,8 @@
 -- Dependencies: SuwayomiClient core helpers and injected runtime services.
 -- External data: validated by the moved methods before UI rendering or worker use.
 
+local I18n = require("suwayomi/i18n")
+
 local M = {}
 local CHAPTER_COUNT_TIMEOUT_ERROR = "Chapter count timed out; open manga to load chapters"
 
@@ -165,7 +167,7 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
                         self:releaseBrowseChapterCountJob(state, timed_out_active)
                         self:applyBrowseChapterCountResult(timed_out_active.manga, {
                             ok = false,
-                            error = self:translate(CHAPTER_COUNT_TIMEOUT_ERROR),
+                            error = I18n.t(CHAPTER_COUNT_TIMEOUT_ERROR),
                         })
                         if state.refresh then
                             state.refresh()
@@ -192,7 +194,7 @@ function SuwayomiClient:startNextBrowseChapterCountJobs(state)
             else
                 self:applyBrowseChapterCountResult(manga, {
                     ok = false,
-                    error = self:translate("Could not load chapters."),
+                    error = I18n.t("Could not load chapters."),
                 })
                 if state.refresh then
                     state.refresh()

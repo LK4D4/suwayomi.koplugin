@@ -7,6 +7,7 @@
 
 local util = require("suwayomi/client/util")
 local SourceFilters = require("suwayomi/source_filters")
+local I18n = require("suwayomi/i18n")
 local copyOptions = util.copyOptions
 local trim = util.trim
 
@@ -53,7 +54,7 @@ end
 
 function SuwayomiClient:getSourceDisplayName(source)
     if type(source) ~= "table" then
-        return self:translate("Source")
+        return I18n.t("Source")
     end
     return source.display_name
         or source.displayName
@@ -66,14 +67,14 @@ function SuwayomiClient:getSourceModeTitle(options)
     local mode = options.type or "POPULAR"
     if mode == "SEARCH" then
         if trim(options.query) == "" and type(options.filters) == "table" and #options.filters > 0 then
-            return self:translate("Filter")
+            return I18n.t("Filter")
         end
-        return self:translate("Search") .. ": " .. tostring(options.query or "")
+        return I18n.cf("source mode", "Search: %1", tostring(options.query or ""))
     end
     if mode == "LATEST" then
-        return self:translate("Latest")
+        return I18n.c("source mode", "Latest")
     end
-    return self:translate("Popular")
+    return I18n.c("source mode", "Popular")
 end
 
 function SuwayomiClient:buildBrowseResultTitle(source, options)
@@ -86,14 +87,14 @@ function SuwayomiClient:getSourceModeScreenTitle(options)
     local mode = options.type or "POPULAR"
     if mode == "SEARCH" then
         if trim(options.query) == "" and type(options.filters) == "table" and #options.filters > 0 then
-            return self:translate("Filter")
+            return I18n.t("Filter")
         end
-        return self:translate("Search")
+        return I18n.c("source mode", "Search")
     end
     if mode == "LATEST" then
-        return self:translate("Latest")
+        return I18n.c("source mode", "Latest")
     end
-    return self:translate("Popular")
+    return I18n.c("source mode", "Popular")
 end
 
 function SuwayomiClient:buildBrowseResultScreenTitle(_, options)
@@ -123,7 +124,7 @@ function SuwayomiClient:showSourceSearchPrompt(source, options)
     return self.ui.showSourceSearchPrompt(source, function(query)
         local search_query = trim(query)
         if search_query == "" then
-            self.plugin:showMessage(self:translate("Enter a search query."))
+            self.plugin:showMessage(I18n.t("Enter a search query."))
             return
         end
         self:showMangaForSource(source, {
@@ -156,7 +157,7 @@ function SuwayomiClient:showSourceModeMenu(source)
             skip_mode_menu = true,
         })
     end, self:getTitleBarMenuOptions({
-        title = source and (source.name or source.display_name or source.displayName) or self:translate("Suwayomi Source"),
+        title = source and (source.name or source.display_name or source.displayName) or I18n.t("Suwayomi Source"),
     }))
     return self:trackScreen("browse-source", mode_menu)
 end
@@ -253,7 +254,7 @@ function SuwayomiClient:cancelSourceFilterLoad(state, options)
         self:showSourceMangaStatus(
             state.menu,
             state.title,
-            self:translate("Loading canceled."),
+            I18n.t("Loading canceled."),
             state.detail_title
         )
     end
@@ -273,7 +274,7 @@ function SuwayomiClient:buildSourceFilterLoadingMenuOptions(state)
     local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
         title = state.detail_title,
         actions = {
-            { id = "cancel_source_filters", text = self:translate("Cancel loading") },
+            { id = "cancel_source_filters", text = I18n.t("Cancel loading") },
         },
         onSelect = function(action)
             if action and action.id == "cancel_source_filters" then
@@ -316,17 +317,17 @@ end
 
 function SuwayomiClient:openSourceFilterEditor(credentials, source, schema, draft)
     if not self.ui.showSourceFilterEditor then
-        self.plugin:showMessage(self:translate("Source filters are unavailable."))
+        self.plugin:showMessage(I18n.t("Source filters are unavailable."))
         return
     end
     draft = SourceFilters.normalizeDraft(draft)
     local editor = self.ui.showSourceFilterEditor(source, schema, draft, {
         title_options = self:getTitleBarMenuOptions({
-            title = self:getSourceDisplayName(source) .. " " .. self:translate("filters"),
+            title = I18n.f("%1 filters", self:getSourceDisplayName(source)),
             actions = {
-                { id = "apply_source_filters", text = self:translate("Apply filters") },
-                { id = "reset_source_filters", text = self:translate("Reset filters") },
-                { id = "source_filter_search_text", text = self:translate("Search text") },
+                { id = "apply_source_filters", text = I18n.t("Apply filters") },
+                { id = "reset_source_filters", text = I18n.t("Reset filters") },
+                { id = "source_filter_search_text", text = I18n.t("Search text") },
             },
             onSelect = function(action, menu)
                 local action_id = action and action.id
@@ -362,23 +363,23 @@ function SuwayomiClient:showSourceFilters(source)
     local credentials = self.settings:load()
     local runtime = self:resolveSourceFilterRuntime()
     if not runtime then
-        self.plugin:showMessage(self:translate("Could not load source filters."))
+        self.plugin:showMessage(I18n.t("Could not load source filters."))
         return
     end
 
     self:supersedeSourceFilterLoad()
 
-    local detail_title = self:getSourceDisplayName(source) .. " - " .. self:translate("Source filters")
+    local detail_title = self:getSourceDisplayName(source) .. " - " .. I18n.t("Source filters")
     local state = {
         token = self:nextSourceFilterLoadToken(),
         credentials = credentials,
         source = source,
-        title = self:translate("Source filters"),
+        title = I18n.t("Source filters"),
         detail_title = detail_title,
         runtime = runtime,
     }
     local menu = self.ui.showMangaMenu({
-        { title = self:translate("Loading source filters...") },
+        { title = I18n.t("Loading source filters...") },
     }, nil, self:buildSourceFilterLoadingMenuOptions(state))
     state.menu = menu
     self._active_source_filter_load = state
@@ -391,8 +392,8 @@ function SuwayomiClient:showSourceFilters(source)
             raw_menu_row = true,
         }
         if options.retry == true then
-            row.subtitle = self:translate("Tap to retry")
-            row.mandatory = self:translate("Retry")
+            row.subtitle = I18n.t("Tap to retry")
+            row.mandatory = I18n.t("Retry")
             row.callback = function()
                 return self:showSourceFilters(source)
             end
@@ -430,16 +431,16 @@ function SuwayomiClient:showSourceFilters(source)
             self:clearSourceFilterLoad(state)
             result = result or {
                 ok = false,
-                error = self:translate("Could not load source filters."),
+                error = I18n.t("Could not load source filters."),
                 filters = {},
             }
             local result_source = result.source or finished_active.source or source
             if not result.ok then
-                showStatus(result.error or self:translate("Could not load source filters."), { retry = true })
+                showStatus(result.error or I18n.t("Could not load source filters."), { retry = true })
                 return
             end
             if type(result.filters) ~= "table" or #result.filters == 0 then
-                showStatus(self:translate("This source has no filters."))
+                showStatus(I18n.t("This source has no filters."))
                 return
             end
             return self:openSourceFilterEditor(
@@ -456,13 +457,13 @@ function SuwayomiClient:showSourceFilters(source)
             state.finished = true
             state.active = nil
             self:clearSourceFilterLoad(state)
-            showStatus(self:translate("Timed out."), { retry = true })
+            showStatus(I18n.t("Timed out."), { retry = true })
         end,
     })
     if not ok or not active then
         state.finished = true
         self:clearSourceFilterLoad(state)
-        showStatus(self:translate("Could not start source filter loading."), { retry = true })
+        showStatus(I18n.t("Could not start source filter loading."), { retry = true })
         return
     end
     if not state.finished then
@@ -510,7 +511,7 @@ function SuwayomiClient:buildSourceMangaLoadingMenuOptions(state)
     local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
         title = state.detail_title,
         actions = {
-            { id = "cancel_source_manga", text = self:translate("Cancel loading") },
+            { id = "cancel_source_manga", text = I18n.t("Cancel loading") },
         },
         onSelect = function(action)
             if action and action.id == "cancel_source_manga" then
@@ -540,13 +541,13 @@ end
 
 function SuwayomiClient:buildSourceMangaFailureMessage(source, browse_options, error_text)
     if browse_options.type ~= "SEARCH" then
-        return self:translate(error_text)
+        return tostring(error_text or "")
     end
     local operation = self:getSourceModeScreenTitle(browse_options)
     local source_name = self:getSourceDisplayName(source)
-    local prefix = operation .. " " .. self:translate("failed for") .. " " .. source_name
+    local prefix = I18n.f("%1 failed for %2", operation, source_name)
     local detail = trim(error_text)
-    if detail ~= "" and detail ~= self:translate("Could not load manga.") then
+    if detail ~= "" and detail ~= I18n.t("Could not load manga.") then
         return prefix .. ": " .. detail
     end
     return prefix .. "."
@@ -568,8 +569,8 @@ function SuwayomiClient:buildSourceMangaFailureRows(source, browse_options, mess
     local rows = {
         {
             text = message,
-            subtitle = self:translate("Tap to retry"),
-            mandatory = self:translate("Retry"),
+            subtitle = I18n.t("Tap to retry"),
+            mandatory = I18n.t("Retry"),
             raw_menu_row = true,
             callback = function()
                 return self:showMangaForSource(source, retry_options)
@@ -578,7 +579,7 @@ function SuwayomiClient:buildSourceMangaFailureRows(source, browse_options, mess
     }
     if type(browse_options.filter_schema) == "table" then
         table.insert(rows, {
-            text = self:translate("Edit filters"),
+            text = I18n.t("Edit filters"),
             raw_menu_row = true,
             callback = function()
                 local credentials = self.settings:load()
@@ -592,7 +593,7 @@ function SuwayomiClient:buildSourceMangaFailureRows(source, browse_options, mess
         })
     else
         table.insert(rows, {
-            text = self:translate("Edit search"),
+            text = I18n.t("Edit search"),
             raw_menu_row = true,
             callback = function()
                 return self:showSourceSearchPrompt(source, {
@@ -624,11 +625,11 @@ end
 
 function SuwayomiClient:buildSourceMangaEmptyMessage(browse_options)
     if self:isSourceFilterSearch(browse_options) then
-        return self:translate("No manga match these filters.")
+        return I18n.t("No manga match these filters.")
     elseif browse_options and browse_options.type == "SEARCH" then
-        return self:translate("No manga match this search.")
+        return I18n.t("No manga match this search.")
     end
-    return self:translate("This source has no manga.")
+    return I18n.t("This source has no manga.")
 end
 
 function SuwayomiClient:buildSourceMangaEmptyRows(source, browse_options, message)
@@ -641,7 +642,7 @@ function SuwayomiClient:buildSourceMangaEmptyRows(source, browse_options, messag
     }
     if type(browse_options and browse_options.filter_schema) == "table" then
         table.insert(rows, {
-            text = self:translate("Edit filters"),
+            text = I18n.t("Edit filters"),
             raw_menu_row = true,
             callback = function()
                 local credentials = self.settings:load()
@@ -655,7 +656,7 @@ function SuwayomiClient:buildSourceMangaEmptyRows(source, browse_options, messag
         })
     elseif browse_options and browse_options.type == "SEARCH" then
         table.insert(rows, {
-            text = self:translate("Edit search"),
+            text = I18n.t("Edit search"),
             raw_menu_row = true,
             callback = function()
                 return self:showSourceSearchPrompt(source, {
@@ -703,7 +704,7 @@ function SuwayomiClient:cancelSourceMangaLoad(state, options)
     state.active = nil
     self:clearSourceMangaLoad(state)
     if not options.silent then
-        self:showSourceMangaStatus(state.menu, state.title, self:translate("Loading canceled."), state.detail_title)
+        self:showSourceMangaStatus(state.menu, state.title, I18n.t("Loading canceled."), state.detail_title)
     end
 end
 
@@ -817,7 +818,7 @@ function SuwayomiClient:appendSourceMangaResult(session, result, refresh)
     end
     result = result or {
         ok = false,
-        error = self:translate("Could not load manga."),
+        error = I18n.t("Could not load manga."),
     }
     if not result.ok then
         self.plugin:showMessage(self:buildSourceMangaFailureMessage(
@@ -851,7 +852,7 @@ function SuwayomiClient:startSourceMangaAppendLoad(session, refresh)
     local runtime = self:resolveSourceMangaRuntime()
     if not runtime then
         session.has_next_page = false
-        self.plugin:showMessage(self:translate("Could not start manga loading."))
+        self.plugin:showMessage(I18n.t("Could not start manga loading."))
         refresh()
         return
     end
@@ -906,7 +907,7 @@ function SuwayomiClient:startSourceMangaAppendLoad(session, refresh)
             self:appendSourceMangaResult(session, {
                 ok = false,
                 browse_options = next_options,
-                error = self:translate("Timed out."),
+                error = I18n.t("Timed out."),
             }, refresh)
         end,
     })
@@ -914,7 +915,7 @@ function SuwayomiClient:startSourceMangaAppendLoad(session, refresh)
         session.loading_more = false
         session.active = nil
         session.has_next_page = false
-        self.plugin:showMessage(self:translate("Could not start manga loading."))
+        self.plugin:showMessage(I18n.t("Could not start manga loading."))
         refresh()
         return
     end
@@ -934,7 +935,7 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
             self:showSourceMangaStatus(
                 existing_menu,
                 self:buildBrowseResultScreenTitle(source, browse_options),
-                self:translate("Latest manga is not supported by this source."),
+                I18n.t("Latest manga is not supported by this source."),
                 self:buildBrowseResultTitle(source, browse_options)
             )
             return
@@ -1078,7 +1079,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
     }
 
     state.menu = self.ui.showMangaMenu({
-        { title = self:translate("Loading manga...") },
+        { title = I18n.t("Loading manga...") },
     }, nil, self:buildSourceMangaLoadingMenuOptions(state))
     self:trackScreen("browse-results", state.menu)
     self._active_source_manga_load = state
@@ -1110,7 +1111,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
             self:clearSourceMangaLoad(state)
             result = result or {
                 ok = false,
-                error = self:translate("Could not load manga."),
+                error = I18n.t("Could not load manga."),
             }
             local result_source = result and result.source or finished_active.source or source
             local result_options = result and result.browse_options or finished_active.browse_options or browse_options
@@ -1132,7 +1133,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
                 state.menu,
                 state.source,
                 state.browse_options,
-                self:translate("Timed out.")
+                I18n.t("Timed out.")
             )
         end,
     })
@@ -1147,7 +1148,7 @@ function SuwayomiClient:startSourceMangaLoad(credentials, source, browse_options
             state.menu,
             state.source,
             state.browse_options,
-            self:translate("Could not start manga loading.")
+            I18n.t("Could not start manga loading.")
         )
         return true
     end
@@ -1184,7 +1185,7 @@ function SuwayomiClient:showMangaForSource(source, options)
             return
         end
 
-        self.plugin:showMessage(self:translate("Could not start manga loading."))
+        self.plugin:showMessage(I18n.t("Could not start manga loading."))
     end)
 end
 end

@@ -1,15 +1,63 @@
 package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/suwayomi_client_spec_helper")
+local I18nMarker = require("spec/support/i18n_marker")
 
 describe("suwayomi/client source manga flows", function()
+    local marker_installed = false
+
     after_each(function()
+        if marker_installed then
+            I18nMarker.uninstall()
+            marker_installed = false
+        end
         helper.clearClientModules()
     end)
 
     local newClient = helper.newClient
     local buildSourceMangaSubprocessFake = helper.buildSourceMangaSubprocessFake
     local buildChapterCountSubprocessFake = helper.buildChapterCountSubprocessFake
+
+    it("translates source manga loading chrome and mode titles", function()
+        I18nMarker.install()
+        marker_installed = true
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local shown_manga
+        local shown_options
+        local captured_title_options
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            ui = {
+                showMangaMenu = function(manga, _, menu_options)
+                    shown_manga = manga
+                    shown_options = menu_options
+                    return { name = "source-manga-loading" }
+                end,
+            },
+            capture_title_options = function(menu_options)
+                captured_title_options = menu_options
+            end,
+            title_menu_options = { title_bar_left_icon = "appbar.menu" },
+        })
+
+        client:showMangaForSource({
+            id = "s1",
+            display_name = "MangaDex (EN)",
+            lang = "en",
+        }, {
+            type = "POPULAR",
+            skip_mode_menu = true,
+        })
+
+        assert.are.equal("tx:Loading manga...", shown_manga[1].title)
+        assert.are.equal("ctx:source mode:Popular", shown_options.title)
+        assert.are.equal("MangaDex (EN) - ctx:source mode:Popular", captured_title_options.title)
+        assert.are.equal("s1", started[1].source.id)
+    end)
 
     it("loads manga for a source and routes row taps to manga information", function()
         local captured_title_options

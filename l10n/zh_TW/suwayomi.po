@@ -48,6 +48,9 @@ msgid_plural "%1 chapters"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "%1 failed for %2"
+msgstr ""
+
 msgid "%1 filters"
 msgstr ""
 
@@ -157,7 +160,13 @@ msgstr ""
 msgid "Cancel downloads"
 msgstr ""
 
+msgid "Cancel loading"
+msgstr ""
+
 msgid "Cancel queued download"
+msgstr ""
+
+msgid "Cancel search"
 msgstr ""
 
 msgid "Canceled %1 queued download."
@@ -256,6 +265,12 @@ msgstr ""
 msgid "Could not load library categories."
 msgstr ""
 
+msgid "Could not load manga."
+msgstr ""
+
+msgid "Could not load source filters."
+msgstr ""
+
 msgid "Could not retry download."
 msgstr ""
 
@@ -274,7 +289,16 @@ msgstr ""
 msgid "Could not start library loading: %1"
 msgstr ""
 
+msgid "Could not start manga loading."
+msgstr ""
+
 msgid "Could not start read sync: %1"
+msgstr ""
+
+msgid "Could not start search."
+msgstr ""
+
+msgid "Could not start source filter loading."
 msgstr ""
 
 msgid "Could not start source loading: %1"
@@ -416,6 +440,15 @@ msgstr ""
 msgid "Downloads"
 msgstr ""
 
+msgid "Edit filters"
+msgstr ""
+
+msgid "Edit search"
+msgstr ""
+
+msgid "Enter a search query."
+msgstr ""
+
 msgid "Error"
 msgstr ""
 
@@ -472,6 +505,9 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "Fifth to last read chapter"
+msgstr ""
+
+msgid "Filter"
 msgstr ""
 
 msgid "First unread"
@@ -534,6 +570,9 @@ msgctxt "source mode"
 msgid "Latest"
 msgstr ""
 
+msgid "Latest manga is not supported by this source."
+msgstr ""
+
 msgid "Library"
 msgstr ""
 
@@ -547,6 +586,9 @@ msgid ""
 "Library loading timed out. Check your connection, then open Library again."
 msgstr ""
 
+msgid "Loading canceled."
+msgstr ""
+
 msgid "Loading categories..."
 msgstr ""
 
@@ -557,6 +599,12 @@ msgid "Loading extensions..."
 msgstr ""
 
 msgid "Loading library..."
+msgstr ""
+
+msgid "Loading manga..."
+msgstr ""
+
+msgid "Loading source filters..."
 msgstr ""
 
 msgid "Loading sources..."
@@ -611,6 +659,12 @@ msgid "No downloads queued."
 msgstr ""
 
 msgid "No manga in this library category."
+msgstr ""
+
+msgid "No manga match these filters."
+msgstr ""
+
+msgid "No manga match this search."
 msgstr ""
 
 msgid "No matching extensions"
@@ -805,6 +859,10 @@ msgstr ""
 msgid "Search text"
 msgstr ""
 
+msgctxt "source mode"
+msgid "Search: %1"
+msgstr ""
+
 msgid "Second to last read chapter"
 msgstr ""
 
@@ -851,6 +909,9 @@ msgid "Source"
 msgstr ""
 
 msgid "Source filters"
+msgstr ""
+
+msgid "Source filters are unavailable."
 msgstr ""
 
 msgid "Source loading timed out."
@@ -927,6 +988,9 @@ msgstr ""
 msgid "Sync"
 msgstr ""
 
+msgid "Tap to retry"
+msgstr ""
+
 msgid "Test connection"
 msgstr ""
 
@@ -967,6 +1031,15 @@ msgid "This manga has no chapters loaded."
 msgstr ""
 
 msgid "This manga has no chapters."
+msgstr ""
+
+msgid "This source has no filters."
+msgstr ""
+
+msgid "This source has no manga."
+msgstr ""
+
+msgid "Timed out."
 msgstr ""
 
 msgctxt "extension action"
