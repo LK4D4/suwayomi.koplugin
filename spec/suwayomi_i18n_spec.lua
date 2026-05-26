@@ -467,6 +467,27 @@ describe("suwayomi/i18n", function()
         assert.are.equal("Biblioteca", i18n.t("Library"))
 
         i18n.reset()
-        assert.are.equal("Library", i18n.t("Library"))
+        assert.are.equal("native:Library", i18n.t("Library"))
+    end)
+
+    it("re-reads KOReader language after reset clears a test locale override", function()
+        _G.G_reader_settings = {
+            readSetting = function(_, key)
+                return key == "language" and "de" or nil
+            end,
+        }
+        installCatalogGettext({
+            catalogs = {
+                de = { translation = { Library = "Bibliothek" }, context = {} },
+                es = { translation = { Library = "Biblioteca" }, context = {} },
+            },
+        })
+
+        local i18n = require("suwayomi/i18n")
+        i18n.setLocaleForTests("es")
+        assert.are.equal("Biblioteca", i18n.t("Library"))
+
+        i18n.reset()
+        assert.are.equal("Bibliothek", i18n.t("Library"))
     end)
 end)

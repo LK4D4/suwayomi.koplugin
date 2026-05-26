@@ -353,7 +353,7 @@ function I18n.reset()
     cached_pgettext = nil
     cached_template = nil
     cached_catalogs = {}
-    test_locale = false
+    test_locale = nil
 end
 
 function I18n.setLocaleForTests(locale)
