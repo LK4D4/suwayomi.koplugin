@@ -18,1109 +18,1088 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 
 msgid " "
-msgstr ""
+msgstr " "
 
 msgid " (Ch. %1)"
-msgstr ""
+msgstr "（第 %1 章）"
 
 msgid " (Suwayomi id %1)"
-msgstr ""
+msgstr "（Suwayomi ID %1）"
 
 msgctxt "source filter sort summary"
 msgid "%1 - Ascending"
-msgstr ""
+msgstr "%1 - 升序"
 
 msgctxt "source filter sort summary"
 msgid "%1 - Descending"
-msgstr ""
+msgstr "%1 - 降序"
 
 msgid "%1 active download."
 msgid_plural "%1 active downloads."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%1 个下载正在进行。"
 
 #. Translators: %1 active downloads, %2 queued downloads, %3 failed downloads.
 msgid "%1 active, %2 queued, %3 failed"
-msgstr ""
+msgstr "%1 个进行中，%2 个排队中，%3 个失败"
 
 msgid "%1 chapter"
 msgid_plural "%1 chapters"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%1 章"
 
 msgid "%1 failed for %2"
-msgstr ""
+msgstr "%2 的%1失败了"
 
 msgid "%1 filters"
-msgstr ""
+msgstr "%1 个筛选器"
 
 msgid "%1 manga"
 msgid_plural "%1 manga"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%1 部漫画"
 
 msgid "%1 missing download."
 msgid_plural "%1 missing downloads."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "缺少 %1 个下载。"
 
 msgid "%1 result"
 msgid_plural "%1 results"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%1 个结果"
 
 msgid "%1 results"
-msgstr ""
+msgstr "%1 个结果"
 
 msgid "%1 selected"
 msgid_plural "%1 selected"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已选择 %1 项"
 
 msgid "%1 selected chapter"
 msgid_plural "%1 selected chapters"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已选择 %1 章"
 
 msgid "1 download is still in progress."
 msgid_plural "%1 downloads are still in progress."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "还有 1 个下载正在进行。"
 
 msgid "1 selected"
 msgid_plural "%1 selected"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已选择 1 项"
 
 msgid "Actions"
-msgstr ""
+msgstr "操作"
 
 msgid "Add to library"
-msgstr ""
+msgstr "添加到书架"
 
 msgid "Adding to library..."
-msgstr ""
+msgstr "正在添加到书架..."
 
 msgid "All manga"
-msgstr ""
+msgstr "所有漫画"
 
 msgid "All scanlators"
-msgstr ""
+msgstr "所有汉化组"
 
 msgid "Always ask"
-msgstr ""
+msgstr "总是询问"
 
 msgctxt "source filter tri-state"
 msgid "Any"
-msgstr ""
+msgstr "任意"
 
 msgid "Apply filters"
-msgstr ""
+msgstr "应用筛选"
 
 msgid "Artist"
-msgstr ""
+msgstr "画师"
 
 msgctxt "source filter sort direction"
 msgid "Ascending"
-msgstr ""
+msgstr "升序"
 
 msgid "Author"
-msgstr ""
+msgstr "作者"
 
 msgid "Automatic"
-msgstr ""
+msgstr "自动"
 
 msgid "Available"
-msgstr ""
+msgstr "可用"
 
 msgid "Back"
-msgstr ""
+msgstr "返回"
 
 msgid "Browse"
-msgstr ""
+msgstr "浏览"
 
 msgid "Browse settings are unavailable."
-msgstr ""
+msgstr "浏览设置不可用。"
 
 msgid "Bulk downloads"
-msgstr ""
+msgstr "批量下载"
 
 msgid "Cancel"
-msgstr ""
+msgstr "取消"
 
 msgid "Cancel all downloads"
-msgstr ""
+msgstr "取消所有下载"
 
 msgid "Cancel all downloads?"
-msgstr ""
+msgstr "取消所有下载？"
 
 msgid "Cancel download"
-msgstr ""
+msgstr "取消下载"
 
 msgid "Cancel downloads"
-msgstr ""
+msgstr "取消下载"
 
 msgid "Cancel loading"
-msgstr ""
+msgstr "取消加载"
 
 msgid "Cancel queued download"
-msgstr ""
+msgstr "取消排队下载"
 
 msgid "Cancel search"
-msgstr ""
+msgstr "取消搜索"
 
 msgid "Canceled %1 queued download."
 msgid_plural "Canceled %1 queued downloads."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已取消 %1 个排队下载。"
 
 msgid "Categories"
-msgstr ""
+msgstr "分类"
 
 msgid "Category picker: %1"
-msgstr ""
+msgstr "分类选择：%1"
 
 msgid "Chapter actions"
-msgstr ""
+msgstr "章节操作"
 
 msgid "Chapter download failed."
-msgstr ""
+msgstr "章节下载失败。"
 
 msgid "Chapter download finished but the archive is missing."
-msgstr ""
+msgstr "章节下载已完成，但压缩包缺失。"
 
 msgid "Chapter download is already in progress."
-msgstr ""
+msgstr "章节已在下载中。"
 
 msgid "Chapter download timed out."
-msgstr ""
+msgstr "章节下载超时。"
 
 msgid "Chapter downloads"
-msgstr ""
+msgstr "章节下载"
 
 msgid "Chapters"
-msgstr ""
+msgstr "章节"
 
 msgid "Chapters are loading."
-msgstr ""
+msgstr "章节正在加载。"
 
 msgid "Checking chapters"
-msgstr ""
+msgstr "正在检查章节"
 
 msgid "Choose"
-msgstr ""
+msgstr "选择"
 
 msgid "Choose download directory"
-msgstr ""
+msgstr "选择下载目录"
 
 msgid "Clear failed"
-msgstr ""
+msgstr "清除失败项"
 
 msgctxt "extension action"
 msgid "Clear search: %1"
-msgstr ""
+msgstr "清除搜索：%1"
 
 msgid "Clear selection"
-msgstr ""
+msgstr "清除选择"
 
 msgid "Close"
-msgstr ""
+msgstr "关闭"
 
 msgid "Close plugin"
-msgstr ""
+msgstr "关闭插件"
 
 msgid "Completed"
-msgstr ""
+msgstr "已完结"
 
 msgid "Connection"
-msgstr ""
+msgstr "连接"
 
 msgid "Connection test already running."
-msgstr ""
+msgstr "连接测试已在运行。"
 
 msgid "Connection test passed."
-msgstr ""
+msgstr "连接测试通过。"
 
 msgid "Continue"
-msgstr ""
+msgstr "继续"
 
 msgid "Could not connect to Suwayomi."
-msgstr ""
+msgstr "无法连接到 Suwayomi。"
 
 msgid "Could not delete this chapter from device."
-msgstr ""
+msgstr "无法从设备删除此章节。"
 
 msgid "Could not download \"%1\"%2: %3"
-msgstr ""
+msgstr "无法下载“%1”%2：%3"
 
 msgid "Could not load Suwayomi extensions."
-msgstr ""
+msgstr "无法加载 Suwayomi 扩展。"
 
 msgid "Could not load Suwayomi library."
-msgstr ""
+msgstr "无法加载 Suwayomi 书架。"
 
 msgid "Could not load chapters."
-msgstr ""
+msgstr "无法加载章节。"
 
 msgid "Could not load library categories."
-msgstr ""
+msgstr "无法加载书架分类。"
 
 msgid "Could not load manga."
-msgstr ""
+msgstr "无法加载漫画。"
 
 msgid "Could not load source filters."
-msgstr ""
+msgstr "无法加载源筛选器。"
 
 msgid "Could not retry download."
-msgstr ""
+msgstr "无法重试下载。"
 
 msgid "Could not start chapter download: %1"
-msgstr ""
+msgstr "无法开始章节下载：%1"
 
 msgid "Could not start connection test: %1"
-msgstr ""
+msgstr "无法开始连接测试：%1"
 
 msgid "Could not start extension task: %1"
-msgstr ""
+msgstr "无法开始扩展任务：%1"
 
 msgid "Could not start extension task: unknown error"
-msgstr ""
+msgstr "无法开始扩展任务：未知错误"
 
 msgid "Could not start library loading: %1"
-msgstr ""
+msgstr "无法开始加载书架：%1"
 
 msgid "Could not start manga loading."
-msgstr ""
+msgstr "无法开始加载漫画。"
 
 msgid "Could not start read sync: %1"
-msgstr ""
+msgstr "无法开始阅读状态同步：%1"
 
 msgid "Could not start search."
-msgstr ""
+msgstr "无法开始搜索。"
 
 msgid "Could not start source filter loading."
-msgstr ""
+msgstr "无法开始加载源筛选器。"
 
 msgid "Could not start source loading: %1"
-msgstr ""
+msgstr "无法开始加载源：%1"
 
 msgid "Could not start source loading: unknown error"
-msgstr ""
+msgstr "无法开始加载源：未知错误"
 
 msgid "Could not update library."
-msgstr ""
+msgstr "无法更新书架。"
 
 msgid "Delete"
-msgstr ""
+msgstr "删除"
 
 msgid "Delete %1 read download from device?"
 msgid_plural "Delete %1 read downloads from device?"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "从设备删除 %1 个已读下载？"
 
 msgid "Delete %1 selected download from device?"
 msgid_plural "Delete %1 selected downloads from device?"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "从设备删除 %1 个选中的下载？"
 
 msgid "Delete after manual mark-read: %1"
-msgstr ""
+msgstr "手动标记已读后删除：%1"
 
 msgid "Delete chapter settings are unavailable."
-msgstr ""
+msgstr "章节删除设置不可用。"
 
 msgid "Delete downloaded file for %1 from this device?"
-msgstr ""
+msgstr "从此设备删除 %1 的已下载文件？"
 
 msgid "Delete downloads"
-msgstr ""
+msgstr "删除下载"
 
 msgid "Delete finished chapters"
-msgstr ""
+msgstr "删除已完成章节"
 
 msgid "Delete from device"
-msgstr ""
+msgstr "从设备删除"
 
 msgid "Delete read downloads"
-msgstr ""
+msgstr "删除已读下载"
 
 msgid "Delete while reading: %1"
-msgstr ""
+msgstr "阅读时删除：%1"
 
 msgid "Deleted %1 chapter from device."
 msgid_plural "Deleted %1 chapters from device."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已从设备删除 %1 章。"
 
 msgid "Deleted %1 selected chapter from device."
 msgid_plural "Deleted %1 selected chapters from device."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已从设备删除 %1 个选中章节。"
 
 msgctxt "source filter sort direction"
 msgid "Descending"
-msgstr ""
+msgstr "降序"
 
 msgid "Details"
-msgstr ""
+msgstr "详情"
 
 msgid "Disabled"
-msgstr ""
+msgstr "禁用"
 
 msgid "Done"
-msgstr ""
+msgstr "已完成"
 
 msgctxt "chapter action"
 msgid "Download"
-msgstr ""
+msgstr "下载"
 
 msgid "Download actions"
-msgstr ""
+msgstr "下载操作"
 
 msgid "Download ahead"
-msgstr ""
+msgstr "提前下载"
 
 msgid "Download all chapters"
-msgstr ""
+msgstr "下载全部章节"
 
 msgid "Download all unread"
-msgstr ""
+msgstr "下载全部未读"
 
 msgid "Download directory: %1"
-msgstr ""
+msgstr "下载目录：%1"
 
 msgid "Download first unread"
-msgstr ""
+msgstr "下载第一个未读章节"
 
 msgid "Download folder"
-msgstr ""
+msgstr "下载文件夹"
 
 msgid "Download is already downloading."
-msgstr ""
+msgstr "下载已在进行中。"
 
 msgid "Download is no longer active."
-msgstr ""
+msgstr "下载不再进行中。"
 
 msgid "Download is no longer queued."
-msgstr ""
+msgstr "下载不再排队中。"
 
 msgid "Download next 10"
-msgstr ""
+msgstr "下载接下来 10 章"
 
 msgid "Download next 5"
-msgstr ""
+msgstr "下载接下来 5 章"
 
 msgid "Download next 50"
-msgstr ""
+msgstr "下载接下来 50 章"
 
 msgid "Download selected"
-msgstr ""
+msgstr "下载选中的"
 
 msgid "Download the chapter first."
-msgstr ""
+msgstr "请先下载此章节。"
 
 msgid "Download-ahead buffer is already downloaded or queued."
-msgstr ""
+msgstr "提前下载缓冲中的章节已下载或已加入队列。"
 
 msgid "Downloaded"
-msgstr ""
+msgstr "已下载"
 
 msgid "Downloaded chapters are in %1."
-msgstr ""
+msgstr "已下载章节位于 %1。"
 
 msgid "Downloading"
-msgstr ""
+msgstr "正在下载"
 
 msgid "Downloading %1"
-msgstr ""
+msgstr "正在下载 %1"
 
 msgid "Downloading %1/%2"
-msgstr ""
+msgstr "正在下载 %1/%2"
 
 msgid "Downloads"
-msgstr ""
+msgstr "下载"
 
 msgid "Edit filters"
-msgstr ""
+msgstr "编辑筛选器"
 
 msgid "Edit search"
-msgstr ""
+msgstr "编辑搜索"
 
 msgid "Enter a search query."
-msgstr ""
+msgstr "请输入搜索内容。"
 
 msgid "Error"
-msgstr ""
+msgstr "错误"
 
 msgctxt "source filter tri-state"
 msgid "Exclude"
-msgstr ""
+msgstr "排除"
 
 msgctxt "extension title"
 msgid "Extension"
-msgstr ""
+msgstr "扩展"
 
 msgid "Extension install succeeded, but extension list refresh failed: %1"
-msgstr ""
+msgstr "扩展安装成功，但扩展列表刷新失败：%1"
 
 msgid "Extension install succeeded, but source refresh failed: %1"
-msgstr ""
+msgstr "扩展安装成功，但源刷新失败：%1"
 
 msgid "Extension install timed out."
-msgstr ""
+msgstr "扩展安装超时。"
 
 msgid "Extension list loading timed out."
-msgstr ""
+msgstr "扩展列表加载超时。"
 
 msgid "Extension name, language, or package"
-msgstr ""
+msgstr "扩展名称、语言或包名"
 
 msgid "Extension task already running."
-msgstr ""
+msgstr "扩展任务已在运行。"
 
 msgid "Extension uninstall succeeded, but extension list refresh failed: %1"
-msgstr ""
+msgstr "扩展卸载成功，但扩展列表刷新失败：%1"
 
 msgid "Extension uninstall succeeded, but source refresh failed: %1"
-msgstr ""
+msgstr "扩展卸载成功，但源刷新失败：%1"
 
 msgid "Extension uninstall timed out."
-msgstr ""
+msgstr "扩展卸载超时。"
 
 msgid "Extension update succeeded, but extension list refresh failed: %1"
-msgstr ""
+msgstr "扩展更新成功，但扩展列表刷新失败：%1"
 
 msgid "Extension update succeeded, but source refresh failed: %1"
-msgstr ""
+msgstr "扩展更新成功，但源刷新失败：%1"
 
 msgid "Extension update timed out."
-msgstr ""
+msgstr "扩展更新超时。"
 
 msgid "Failed"
-msgstr ""
+msgstr "失败"
 
 msgid "Failed to delete %1 download."
 msgid_plural "Failed to delete %1 downloads."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "删除 %1 个下载失败。"
 
 msgid "Fifth to last read chapter"
-msgstr ""
+msgstr "倒数第 5 个已读章节"
 
 msgid "Filter"
-msgstr ""
+msgstr "筛选"
 
 msgid "First unread"
-msgstr ""
+msgstr "第一个未读章节"
 
 msgid "Fourth to last read chapter"
-msgstr ""
+msgstr "倒数第 4 个已读章节"
 
 msgid "Genres"
-msgstr ""
+msgstr "题材"
 
 msgid "Global search"
-msgstr ""
+msgstr "全局搜索"
 
 msgid "Go to Suwayomi"
-msgstr ""
+msgstr "前往 Suwayomi"
 
 msgid "Hide in-library results: %1"
-msgstr ""
+msgstr "隐藏书架中的结果：%1"
 
 msgid "In Library"
-msgstr ""
+msgstr "在书架中"
 
 msgid "In library"
-msgstr ""
+msgstr "在书架中"
 
 msgctxt "source filter tri-state"
 msgid "Include"
-msgstr ""
+msgstr "包含"
 
 msgctxt "extension action"
 msgid "Install"
-msgstr ""
+msgstr "安装"
 
 msgid "Installed"
-msgstr ""
+msgstr "已安装"
 
 msgid "Installing extension..."
-msgstr ""
+msgstr "正在安装扩展..."
 
 msgid "KOReader could not open this chapter right now."
-msgstr ""
+msgstr "KOReader 现在无法打开此章节。"
 
 msgid "Keep downloads"
-msgstr ""
+msgstr "保留下载"
 
 msgid "Keep next 10 downloaded"
-msgstr ""
+msgstr "保持后续 10 章已下载"
 
 msgid "Keep next 5 downloaded"
-msgstr ""
+msgstr "保持后续 5 章已下载"
 
 msgid "Keep next 50 downloaded"
-msgstr ""
+msgstr "保持后续 50 章已下载"
 
 msgid "Last read chapter"
-msgstr ""
+msgstr "最近阅读的章节"
 
 msgctxt "source mode"
 msgid "Latest"
-msgstr ""
+msgstr "最新"
 
 msgid "Latest manga is not supported by this source."
-msgstr ""
+msgstr "此源不支持最新漫画。"
 
 msgid "Library"
-msgstr ""
+msgstr "书架"
 
 msgid "Library category picker"
-msgstr ""
+msgstr "书架分类选择器"
 
 msgid "Library category picker settings are unavailable."
-msgstr ""
+msgstr "书架分类选择器设置不可用。"
 
 msgid ""
 "Library loading timed out. Check your connection, then open Library again."
-msgstr ""
+msgstr "书架加载超时。请检查连接，然后重新打开书架。"
 
 msgid "Loading canceled."
-msgstr ""
+msgstr "加载已取消。"
 
 msgid "Loading categories..."
-msgstr ""
+msgstr "正在加载分类..."
 
 msgid "Loading chapters..."
-msgstr ""
+msgstr "正在加载章节..."
 
 msgid "Loading extensions..."
-msgstr ""
+msgstr "正在加载扩展..."
 
 msgid "Loading library..."
-msgstr ""
+msgstr "正在加载书架..."
 
 msgid "Loading manga..."
-msgstr ""
+msgstr "正在加载漫画..."
 
 msgid "Loading source filters..."
-msgstr ""
+msgstr "正在加载源筛选器..."
 
 msgid "Loading sources..."
-msgstr ""
+msgstr "正在加载源..."
 
 msgid "Loading..."
-msgstr ""
+msgstr "正在加载..."
 
 msgid "Login information"
-msgstr ""
+msgstr "登录信息"
 
 msgid "Manga actions"
-msgstr ""
+msgstr "漫画操作"
 
 msgid "Manga information"
-msgstr ""
+msgstr "漫画信息"
 
 msgid "Mark as read"
-msgstr ""
+msgstr "标记为已读"
 
 msgid "Mark as unread"
-msgstr ""
+msgstr "标记为未读"
 
 msgid "Mark previous as read"
-msgstr ""
+msgstr "标记之前的章节为已读"
 
 msgid "Mark read"
-msgstr ""
+msgstr "标记已读"
 
 msgid "Mark unread"
-msgstr ""
+msgstr "标记未读"
 
 msgid "Never ask"
-msgstr ""
+msgstr "从不询问"
 
 msgid "New folder"
-msgstr ""
+msgstr "新文件夹"
 
 msgid "Next page"
-msgstr ""
+msgstr "下一页"
 
 msgid "No actions available"
-msgstr ""
+msgstr "没有可用操作"
 
 msgid "No chapters selected."
-msgstr ""
+msgstr "未选择章节。"
 
 msgid "No description available."
-msgstr ""
+msgstr "无可用描述。"
 
 msgid "No downloads queued."
-msgstr ""
+msgstr "没有排队中的下载。"
 
 msgid "No manga in this library category."
-msgstr ""
+msgstr "此书架分类中没有漫画。"
 
 msgid "No manga match these filters."
-msgstr ""
+msgstr "没有漫画匹配这些筛选条件。"
 
 msgid "No manga match this search."
-msgstr ""
+msgstr "没有漫画匹配此搜索。"
 
 msgid "No matching extensions"
-msgstr ""
+msgstr "没有匹配的扩展"
 
 msgid "No new downloads queued."
-msgstr ""
+msgstr "没有新的下载排队。"
 
 msgid "No poster"
-msgstr ""
+msgstr "没有封面"
 
 msgid "No results"
-msgstr ""
+msgstr "没有结果"
 
 msgid "No selected chapters were deleted."
-msgstr ""
+msgstr "未删除选中的章节。"
 
 msgid "No unread chapters available to download."
-msgstr ""
+msgstr "没有可下载的未读章节。"
 
 msgid "Not in library"
-msgstr ""
+msgstr "不在书架中"
 
 msgid "Not installed"
-msgstr ""
+msgstr "未安装"
 
 msgid "Obsolete"
-msgstr ""
+msgstr "过时"
 
 msgctxt "source filter state"
 msgid "Off"
-msgstr ""
+msgstr "关"
 
 msgctxt "source filter state"
 msgid "On"
-msgstr ""
+msgstr "开"
 
 msgid "On hiatus"
-msgstr ""
+msgstr "暂停更新"
 
 msgid "Ongoing"
-msgstr ""
+msgstr "连载中"
 
 msgctxt "chapter action"
 msgid "Open"
-msgstr ""
+msgstr "打开"
 
 msgid "Open Search > Suwayomi to access the plugin menu."
-msgstr ""
+msgstr "打开“搜索 > Suwayomi”以访问插件菜单。"
 
 msgid "Open chapter list"
-msgstr ""
+msgstr "打开章节列表"
 
 msgid "Open chapters"
-msgstr ""
+msgstr "打开章节"
 
 msgid "Open first unread"
-msgstr ""
+msgstr "打开第一个未读章节"
 
 msgid "Open next unread"
-msgstr ""
+msgstr "打开下一个未读章节"
 
 msgid "Parallel chapter downloads"
-msgstr ""
+msgstr "并行章节下载"
 
 msgid "Parallel downloads: %1"
-msgstr ""
+msgstr "并行下载数：%1"
 
 msgid "Password"
-msgstr ""
+msgstr "密码"
 
 msgctxt "source mode"
 msgid "Popular"
-msgstr ""
+msgstr "热门"
 
 msgid "Previous page"
-msgstr ""
+msgstr "上一页"
 
 msgid "Queue"
-msgstr ""
+msgstr "队列"
 
 msgid ""
 "Queue %1 missing download to keep the next %2 unread chapters available?"
 msgid_plural ""
 "Queue %1 missing downloads to keep the next %2 unread chapters available?"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "要将缺少的 %1 个下载加入队列，以保留接下来 %2 个未读章节可用吗？"
 
 msgid "Queue %1 unread chapter download?"
 msgid_plural "Queue %1 unread chapter downloads?"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "将 %1 个未读章节下载加入队列？"
 
 msgid "Queue downloads for all %1 chapter?"
 msgid_plural "Queue downloads for all %1 chapters?"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "将全部 %1 章下载加入队列？"
 
 msgid "Queue downloads for all %1 unread chapter?"
 msgid_plural "Queue downloads for all %1 unread chapters?"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "将全部 %1 个未读章节下载加入队列？"
 
 msgid "Queued"
-msgstr ""
+msgstr "排队中"
 
 msgid "Queued %1 selected chapter download."
 msgid_plural "Queued %1 selected chapter downloads."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已将 %1 个选中章节下载加入队列。"
 
 msgid "Queued first %1 downloads. Refine the chapter selection to queue more."
-msgstr ""
+msgstr "已将前 %1 个下载加入队列。请细化章节选择以加入更多。"
 
 msgid "Read"
-msgstr ""
+msgstr "已读"
 
 msgid "Read state is already synced."
-msgstr ""
+msgstr "阅读状态已同步。"
 
 msgid "Read state sync is already running."
-msgstr ""
+msgstr "阅读状态同步已在运行。"
 
 msgid "Read state sync started."
-msgstr ""
+msgstr "阅读状态同步已开始。"
 
 msgid "Refresh chapters"
-msgstr ""
+msgstr "刷新章节"
 
 msgid "Refresh extension list"
-msgstr ""
+msgstr "刷新扩展列表"
 
 msgid "Refreshing chapters..."
-msgstr ""
+msgstr "正在刷新章节..."
 
 msgid "Refreshing extensions..."
-msgstr ""
+msgstr "正在刷新扩展..."
 
 msgid "Remove"
-msgstr ""
+msgstr "移除"
 
 msgid "Remove %1 from your Suwayomi library?"
-msgstr ""
+msgstr "从 Suwayomi 书架移除 %1？"
 
 msgid "Remove from library"
-msgstr ""
+msgstr "从书架移除"
 
 msgid "Removing from library..."
-msgstr ""
+msgstr "正在从书架移除..."
 
 msgid "Reset filters"
-msgstr ""
+msgstr "重置筛选器"
 
 msgid "Retry"
-msgstr ""
+msgstr "重试"
 
 msgid "Save"
-msgstr ""
+msgstr "保存"
 
 msgid "Scanlator filter"
-msgstr ""
+msgstr "汉化组筛选器"
 
 msgctxt "extension action"
 msgid "Search"
-msgstr ""
+msgstr "搜索"
 
 msgctxt "source action"
 msgid "Search"
-msgstr ""
+msgstr "搜索"
 
 msgctxt "source mode"
 msgid "Search"
-msgstr ""
+msgstr "搜索"
 
 msgid "Search %1"
-msgstr ""
+msgstr "搜索 %1"
 
 msgid "Search extensions"
-msgstr ""
+msgstr "搜索扩展"
 
 msgctxt "extension action"
 msgid "Search extensions"
-msgstr ""
+msgstr "搜索扩展"
 
 msgctxt "extension action"
 msgid "Search extensions: %1"
-msgstr ""
+msgstr "搜索扩展：%1"
 
 msgid "Search query"
-msgstr ""
+msgstr "搜索内容"
 
 msgid "Search text"
-msgstr ""
+msgstr "搜索文本"
 
 msgctxt "source mode"
 msgid "Search: %1"
-msgstr ""
+msgstr "搜索：%1"
 
 msgid "Second to last read chapter"
-msgstr ""
+msgstr "倒数第 2 个已读章节"
 
 msgid "Select all"
-msgstr ""
+msgstr "全选"
 
 msgid "Server URL"
-msgstr ""
+msgstr "服务器 URL"
 
 msgid "Set a download folder in Settings > Downloads."
-msgstr ""
+msgstr "请在“设置 > 下载”中设置下载文件夹。"
 
 msgid "Set up your Suwayomi server login first."
-msgstr ""
+msgstr "请先设置 Suwayomi 服务器登录信息。"
 
 msgid "Settings"
-msgstr ""
+msgstr "设置"
 
 msgid "Settings are unavailable."
-msgstr ""
+msgstr "设置不可用。"
 
 msgid "Setup wizard"
-msgstr ""
+msgstr "设置向导"
 
 msgid "Show NSFW sources: %1"
-msgstr ""
+msgstr "显示 NSFW 源：%1"
 
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已跳过 %1 个已下载或已排队的项目。"
 
 msgid "Skipped %1 chapter not downloaded."
 msgid_plural "Skipped %1 chapters not downloaded."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已跳过 %1 个未下载章节。"
 
 msgid "Skipped %1 download."
 msgid_plural "Skipped %1 downloads."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "已跳过 %1 个下载。"
 
 msgid "Source"
-msgstr ""
+msgstr "源"
 
 msgid "Source filters"
-msgstr ""
+msgstr "源筛选器"
 
 msgid "Source filters are unavailable."
-msgstr ""
+msgstr "源筛选器不可用。"
 
 msgid "Source loading timed out."
-msgstr ""
+msgstr "源加载超时。"
 
 msgid "Status"
-msgstr ""
+msgstr "状态"
 
 msgid "Stop download ahead"
-msgstr ""
+msgstr "停止提前下载"
 
 msgid "Suwayomi"
-msgstr ""
+msgstr "Suwayomi"
 
 msgid "Suwayomi Chapters"
-msgstr ""
+msgstr "Suwayomi 章节"
 
 msgid "Suwayomi Client v1.0.4"
-msgstr ""
+msgstr "Suwayomi 客户端 v1.0.4"
 
 msgid "Suwayomi Downloads"
-msgstr ""
+msgstr "Suwayomi 下载"
 
 msgid "Suwayomi Extensions"
-msgstr ""
+msgstr "Suwayomi 扩展"
 
 msgid "Suwayomi Library"
-msgstr ""
+msgstr "Suwayomi 书架"
 
 msgid "Suwayomi Manga"
-msgstr ""
+msgstr "Suwayomi 漫画"
 
 msgid "Suwayomi Settings"
-msgstr ""
+msgstr "Suwayomi 设置"
 
 msgid "Suwayomi Source"
-msgstr ""
+msgstr "Suwayomi 源"
 
 msgid "Suwayomi Sources"
-msgstr ""
+msgstr "Suwayomi 源"
 
 msgid ""
 "Suwayomi client for KOReader. Browse your Suwayomi server, manage source "
 "extensions, sync read state, and download chapters as local CBZ files."
 msgstr ""
+"适用于 KOReader 的 Suwayomi 客户端。浏览你的 Suwayomi 服务器，管理源扩展，同"
+"步阅读状态，并将章节下载为本地 CBZ 文件。"
 
 msgid "Suwayomi connection test timed out."
-msgstr ""
+msgstr "Suwayomi 连接测试超时。"
 
 msgid "Suwayomi download directory saved."
-msgstr ""
+msgstr "Suwayomi 下载目录已保存。"
 
 msgid "Suwayomi home"
-msgstr ""
+msgstr "Suwayomi 主页"
 
 msgid "Suwayomi login"
-msgstr ""
+msgstr "Suwayomi 登录"
 
 msgid "Suwayomi login settings saved."
-msgstr ""
+msgstr "Suwayomi 登录设置已保存。"
 
 msgid "Suwayomi server did not refresh manga."
-msgstr ""
+msgstr "Suwayomi 服务器未刷新漫画。"
 
 msgid "Suwayomi setup complete."
-msgstr ""
+msgstr "Suwayomi 设置完成。"
 
 msgid "Suwayomi setup: connection (%1)"
-msgstr ""
+msgstr "Suwayomi 设置：连接（%1）"
 
 msgid "Suwayomi source languages"
-msgstr ""
+msgstr "Suwayomi 源语言"
 
 msgid "Sync"
-msgstr ""
+msgstr "同步"
 
 msgid "Tap to retry"
-msgstr ""
+msgstr "点按重试"
 
 msgid "Test connection"
-msgstr ""
+msgstr "测试连接"
 
 msgid "Test connection before continuing."
-msgstr ""
+msgstr "继续前请测试连接。"
 
 msgid "Testing Suwayomi connection..."
-msgstr ""
+msgstr "正在测试 Suwayomi 连接..."
 
 msgid "Text"
-msgstr ""
+msgstr "文本"
 
 msgid "Text filter"
-msgstr ""
+msgstr "文本筛选器"
 
 msgid "Third to last read chapter"
-msgstr ""
+msgstr "倒数第 3 个已读章节"
 
 msgid "This book is not linked to Suwayomi chapters."
-msgstr ""
+msgstr "此书未关联 Suwayomi 章节。"
 
 msgid "This chapter is downloading. Wait for it to finish before deleting it."
-msgstr ""
+msgstr "此章节正在下载。请等待下载完成后再删除。"
 
 msgid "This chapter is not downloaded."
-msgstr ""
+msgstr "此章节未下载。"
 
 msgid "This manga cannot be loaded right now."
-msgstr ""
+msgstr "此漫画现在无法加载。"
 
 msgid "This manga cannot be refreshed right now."
-msgstr ""
+msgstr "此漫画现在无法刷新。"
 
 msgid "This manga cannot be updated right now."
-msgstr ""
+msgstr "此漫画现在无法更新。"
 
 msgid "This manga has no chapters loaded."
-msgstr ""
+msgstr "此漫画没有已加载章节。"
 
 msgid "This manga has no chapters."
-msgstr ""
+msgstr "此漫画没有章节。"
 
 msgid "This source has no filters."
-msgstr ""
+msgstr "此源没有筛选器。"
 
 msgid "This source has no manga."
-msgstr ""
+msgstr "此源没有漫画。"
 
 msgid "Timed out."
-msgstr ""
+msgstr "已超时。"
 
 msgctxt "extension action"
 msgid "Uninstall"
-msgstr ""
+msgstr "卸载"
 
 msgid "Uninstalling extension..."
-msgstr ""
+msgstr "正在卸载扩展..."
 
 msgid "Unknown"
-msgstr ""
+msgstr "未知"
 
 msgid "Unknown error"
-msgstr ""
+msgstr "未知错误"
 
 msgid "Unread"
-msgstr ""
+msgstr "未读"
 
 msgid "Unsupported"
-msgstr ""
+msgstr "不支持"
 
 msgctxt "extension action"
 msgid "Update"
-msgstr ""
+msgstr "更新"
 
 msgid "Update available"
-msgstr ""
+msgstr "有更新可用"
 
 msgid "Updates"
-msgstr ""
+msgstr "更新"
 
 msgid "Updating extension..."
-msgstr ""
+msgstr "正在更新扩展..."
 
 msgid "Use this folder"
-msgstr ""
+msgstr "使用此文件夹"
 
 msgid "Username"
-msgstr ""
+msgstr "用户名"
 
 msgid "You can continue."
-msgstr ""
+msgstr "你可以继续。"
 
 msgid "Your Suwayomi library is empty."
-msgstr ""
+msgstr "你的 Suwayomi 书架为空。"
 
 msgid "canceled"
-msgstr ""
+msgstr "已取消"
 
 msgid "failed"
-msgstr ""
+msgstr "失败"
 
 msgid "no"
-msgstr ""
+msgstr "否"
 
 msgid "not set"
-msgstr ""
+msgstr "未设置"
 
 msgid "not tested"
-msgstr ""
+msgstr "未测试"
 
 msgid "searching"
-msgstr ""
+msgstr "正在搜索"
 
 msgid "source"
-msgstr ""
+msgstr "源"
 
 msgid "tested"
-msgstr ""
+msgstr "已测试"
 
 msgid "testing..."
-msgstr ""
+msgstr "正在测试..."
 
 msgid "this chapter"
-msgstr ""
+msgstr "此章节"
 
 msgid "timed out"
-msgstr ""
+msgstr "已超时"
 
 msgid "unknown error"
-msgstr ""
+msgstr "未知错误"
 
 msgid "yes"
-msgstr ""
+msgstr "是"
