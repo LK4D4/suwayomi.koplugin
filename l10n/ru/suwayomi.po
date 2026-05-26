@@ -9,8 +9,8 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/Suwayomi/Suwayomi-Server/issues\n"
 "POT-Creation-Date: 1970-01-01 00:00+0000\n"
 "PO-Revision-Date: 1970-01-01 00:00+0000\n"
-"Last-Translator: Automatically generated\n"
-"Language-Team: none\n"
+"Last-Translator: Codex draft for user review\n"
+"Language-Team: Russian\n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -19,1059 +19,1072 @@ msgstr ""
 "n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2;\n"
 
 msgid " "
-msgstr ""
+msgstr " "
 
 msgid " (Ch. %1)"
-msgstr ""
+msgstr " (гл. %1)"
 
 msgid " (Suwayomi id %1)"
-msgstr ""
+msgstr " (ID Suwayomi %1)"
 
 msgctxt "source filter sort summary"
 msgid "%1 - Ascending"
-msgstr ""
+msgstr "%1 - по возрастанию"
 
 msgctxt "source filter sort summary"
 msgid "%1 - Descending"
-msgstr ""
+msgstr "%1 - по убыванию"
 
 msgid "%1 active download."
 msgid_plural "%1 active downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "%1 активная загрузка."
+msgstr[1] "%1 активные загрузки."
+msgstr[2] "%1 активных загрузок."
 
 #. Translators: %1 active downloads, %2 queued downloads, %3 failed downloads.
 msgid "%1 active, %2 queued, %3 failed"
-msgstr ""
+msgstr "Активных: %1, в очереди: %2, с ошибкой: %3"
 
 msgid "%1 chapter"
 msgid_plural "%1 chapters"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "%1 глава"
+msgstr[1] "%1 главы"
+msgstr[2] "%1 глав"
 
 msgid "%1 filters"
-msgstr ""
+msgstr "%1 фильтров"
 
 msgid "%1 manga"
 msgid_plural "%1 manga"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "%1 манга"
+msgstr[1] "%1 манги"
+msgstr[2] "%1 манг"
 
 msgid "%1 missing download."
 msgid_plural "%1 missing downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "%1 отсутствующая загрузка."
+msgstr[1] "%1 отсутствующие загрузки."
+msgstr[2] "%1 отсутствующих загрузок."
 
 msgid "%1 result"
 msgid_plural "%1 results"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "%1 результат"
+msgstr[1] "%1 результата"
+msgstr[2] "%1 результатов"
 
 msgid "%1 results"
-msgstr ""
+msgstr "%1 результатов"
 
 msgid "%1 selected"
 msgid_plural "%1 selected"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "%1 выбрано"
+msgstr[1] "%1 выбрано"
+msgstr[2] "%1 выбрано"
 
 msgid "%1 selected chapter"
 msgid_plural "%1 selected chapters"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "%1 выбранная глава"
+msgstr[1] "%1 выбранные главы"
+msgstr[2] "%1 выбранных глав"
 
 msgid "1 download is still in progress."
 msgid_plural "%1 downloads are still in progress."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Одна загрузка ещё выполняется."
+msgstr[1] "%1 загрузки ещё выполняются."
+msgstr[2] "%1 загрузок ещё выполняются."
 
 msgid "1 selected"
 msgid_plural "%1 selected"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Выбран 1 элемент"
+msgstr[1] "Выбрано %1 элемента"
+msgstr[2] "Выбрано %1 элементов"
 
 msgid "Actions"
-msgstr ""
+msgstr "Действия"
 
 msgid "Add to library"
-msgstr ""
+msgstr "Добавить в библиотеку"
 
 msgid "Adding to library..."
-msgstr ""
+msgstr "Добавление в библиотеку..."
 
 msgid "All manga"
-msgstr ""
+msgstr "Вся манга"
 
 msgid "All scanlators"
-msgstr ""
+msgstr "Все сканлейторы"
 
 msgid "Always ask"
-msgstr ""
+msgstr "Всегда спрашивать"
 
 msgctxt "source filter tri-state"
 msgid "Any"
-msgstr ""
+msgstr "Любые"
 
 msgid "Apply filters"
-msgstr ""
+msgstr "Применить фильтры"
 
 msgid "Artist"
-msgstr ""
+msgstr "Художник"
 
 msgctxt "source filter sort direction"
 msgid "Ascending"
-msgstr ""
+msgstr "По возрастанию"
 
 msgid "Author"
-msgstr ""
+msgstr "Автор"
 
 msgid "Automatic"
-msgstr ""
+msgstr "Автоматически"
 
 msgid "Available"
-msgstr ""
+msgstr "Доступно"
 
 msgid "Back"
-msgstr ""
+msgstr "Назад"
 
 msgid "Browse"
-msgstr ""
+msgstr "Обзор"
 
 msgid "Browse settings are unavailable."
-msgstr ""
+msgstr "Настройки обзора недоступны."
 
 msgid "Bulk downloads"
-msgstr ""
+msgstr "Массовые загрузки"
 
 msgid "Cancel"
-msgstr ""
+msgstr "Отмена"
 
 msgid "Cancel all downloads"
-msgstr ""
+msgstr "Отменить все загрузки"
 
 msgid "Cancel all downloads?"
-msgstr ""
+msgstr "Отменить все загрузки?"
 
 msgid "Cancel download"
-msgstr ""
+msgstr "Отменить загрузку"
 
 msgid "Cancel downloads"
-msgstr ""
+msgstr "Отменить загрузки"
 
 msgid "Cancel queued download"
-msgstr ""
+msgstr "Отменить загрузку в очереди"
 
 msgid "Canceled %1 queued download."
 msgid_plural "Canceled %1 queued downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Отменена %1 загрузка в очереди."
+msgstr[1] "Отменены %1 загрузки в очереди."
+msgstr[2] "Отменено %1 загрузок в очереди."
 
 msgid "Categories"
-msgstr ""
+msgstr "Категории"
 
 msgid "Category picker: %1"
-msgstr ""
+msgstr "Выбор категории: %1"
 
 msgid "Chapter actions"
-msgstr ""
+msgstr "Действия с главами"
 
 msgid "Chapter download failed."
-msgstr ""
+msgstr "Не удалось скачать главу."
 
 msgid "Chapter download finished but the archive is missing."
-msgstr ""
+msgstr "Загрузка главы завершена, но архив не найден."
 
 msgid "Chapter download is already in progress."
-msgstr ""
+msgstr "Глава уже скачивается."
 
 msgid "Chapter download timed out."
-msgstr ""
+msgstr "Истекло время ожидания загрузки главы."
 
 msgid "Chapter downloads"
-msgstr ""
+msgstr "Загрузки глав"
 
 msgid "Chapters"
-msgstr ""
+msgstr "Главы"
 
 msgid "Chapters are loading."
-msgstr ""
+msgstr "Главы загружаются."
 
 msgid "Checking chapters"
-msgstr ""
+msgstr "Проверка глав"
 
 msgid "Choose"
-msgstr ""
+msgstr "Выбрать"
 
 msgid "Choose download directory"
-msgstr ""
+msgstr "Выберите папку загрузок"
 
 msgid "Clear failed"
-msgstr ""
+msgstr "Очистить ошибки"
 
 msgctxt "extension action"
 msgid "Clear search: %1"
-msgstr ""
+msgstr "Очистить поиск: %1"
 
 msgid "Clear selection"
-msgstr ""
+msgstr "Снять выделение"
 
 msgid "Close"
-msgstr ""
+msgstr "Закрыть"
 
 msgid "Close plugin"
-msgstr ""
+msgstr "Закрыть плагин"
 
 msgid "Completed"
-msgstr ""
+msgstr "Завершено"
 
 msgid "Connection"
-msgstr ""
+msgstr "Подключение"
 
 msgid "Connection test already running."
-msgstr ""
+msgstr "Проверка подключения уже выполняется."
 
 msgid "Connection test passed."
-msgstr ""
+msgstr "Проверка подключения успешна."
 
 msgid "Continue"
-msgstr ""
+msgstr "Продолжить"
 
 msgid "Could not connect to Suwayomi."
-msgstr ""
+msgstr "Не удалось подключиться к Suwayomi."
 
 msgid "Could not delete this chapter from device."
-msgstr ""
+msgstr "Не удалось удалить эту главу с устройства."
 
 msgid "Could not download \"%1\"%2: %3"
-msgstr ""
+msgstr "Не удалось скачать «%1»%2: %3"
 
 msgid "Could not load Suwayomi extensions."
-msgstr ""
+msgstr "Не удалось загрузить расширения Suwayomi."
 
 msgid "Could not load Suwayomi library."
-msgstr ""
+msgstr "Не удалось загрузить библиотеку Suwayomi."
 
 msgid "Could not load chapters."
-msgstr ""
+msgstr "Не удалось загрузить главы."
 
 msgid "Could not load library categories."
-msgstr ""
+msgstr "Не удалось загрузить категории библиотеки."
 
 msgid "Could not retry download."
-msgstr ""
+msgstr "Не удалось повторить загрузку."
 
 msgid "Could not start chapter download: %1"
-msgstr ""
+msgstr "Не удалось начать загрузку главы: %1"
 
 msgid "Could not start connection test: %1"
-msgstr ""
+msgstr "Не удалось начать проверку подключения: %1"
 
 msgid "Could not start extension task: %1"
-msgstr ""
+msgstr "Не удалось запустить задачу расширения: %1"
 
 msgid "Could not start extension task: unknown error"
-msgstr ""
+msgstr "Не удалось запустить задачу расширения: неизвестная ошибка"
 
 msgid "Could not start library loading: %1"
-msgstr ""
+msgstr "Не удалось начать загрузку библиотеки: %1"
 
 msgid "Could not start read sync: %1"
-msgstr ""
+msgstr "Не удалось начать синхронизацию прочитанного: %1"
 
 msgid "Could not start source loading: %1"
-msgstr ""
+msgstr "Не удалось начать загрузку источников: %1"
 
 msgid "Could not start source loading: unknown error"
-msgstr ""
+msgstr "Не удалось начать загрузку источников: неизвестная ошибка"
 
 msgid "Could not update library."
-msgstr ""
+msgstr "Не удалось обновить библиотеку."
 
 msgid "Delete"
-msgstr ""
+msgstr "Удалить"
 
 msgid "Delete %1 read download from device?"
 msgid_plural "Delete %1 read downloads from device?"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Удалить %1 прочитанную загрузку с устройства?"
+msgstr[1] "Удалить %1 прочитанные загрузки с устройства?"
+msgstr[2] "Удалить %1 прочитанных загрузок с устройства?"
 
 msgid "Delete %1 selected download from device?"
 msgid_plural "Delete %1 selected downloads from device?"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Удалить %1 выбранную загрузку с устройства?"
+msgstr[1] "Удалить %1 выбранные загрузки с устройства?"
+msgstr[2] "Удалить %1 выбранных загрузок с устройства?"
 
 msgid "Delete after manual mark-read: %1"
-msgstr ""
+msgstr "Удалять после ручной отметки прочитанного: %1"
 
 msgid "Delete chapter settings are unavailable."
-msgstr ""
+msgstr "Настройки удаления глав недоступны."
 
 msgid "Delete downloaded file for %1 from this device?"
-msgstr ""
+msgstr "Удалить скачанный файл для %1 с этого устройства?"
 
 msgid "Delete downloads"
-msgstr ""
+msgstr "Удалить загрузки"
 
 msgid "Delete finished chapters"
-msgstr ""
+msgstr "Удалить завершённые главы"
 
 msgid "Delete from device"
-msgstr ""
+msgstr "Удалить с устройства"
 
 msgid "Delete read downloads"
-msgstr ""
+msgstr "Удалять прочитанные загрузки"
 
 msgid "Delete while reading: %1"
-msgstr ""
+msgstr "Удалять во время чтения: %1"
 
 msgid "Deleted %1 chapter from device."
 msgid_plural "Deleted %1 chapters from device."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Удалена %1 глава с устройства."
+msgstr[1] "Удалены %1 главы с устройства."
+msgstr[2] "Удалено %1 глав с устройства."
 
 msgid "Deleted %1 selected chapter from device."
 msgid_plural "Deleted %1 selected chapters from device."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Удалена %1 выбранная глава с устройства."
+msgstr[1] "Удалены %1 выбранные главы с устройства."
+msgstr[2] "Удалено %1 выбранных глав с устройства."
 
 msgctxt "source filter sort direction"
 msgid "Descending"
-msgstr ""
+msgstr "По убыванию"
 
 msgid "Details"
-msgstr ""
+msgstr "Сведения"
 
 msgid "Disabled"
-msgstr ""
+msgstr "Отключено"
 
 msgid "Done"
-msgstr ""
+msgstr "Готово"
 
 msgctxt "chapter action"
 msgid "Download"
-msgstr ""
+msgstr "Скачать"
 
 msgid "Download actions"
-msgstr ""
+msgstr "Действия загрузки"
 
 msgid "Download ahead"
-msgstr ""
+msgstr "Скачать заранее"
 
 msgid "Download all chapters"
-msgstr ""
+msgstr "Скачать все главы"
 
 msgid "Download all unread"
-msgstr ""
+msgstr "Скачать все непрочитанные"
 
 msgid "Download directory: %1"
-msgstr ""
+msgstr "Папка загрузок: %1"
 
 msgid "Download first unread"
-msgstr ""
+msgstr "Скачать первую непрочитанную"
 
 msgid "Download folder"
-msgstr ""
+msgstr "Папка загрузок"
 
 msgid "Download is already downloading."
-msgstr ""
+msgstr "Загрузка уже выполняется."
 
 msgid "Download is no longer active."
-msgstr ""
+msgstr "Загрузка больше не активна."
 
 msgid "Download is no longer queued."
-msgstr ""
+msgstr "Загрузка больше не в очереди."
 
 msgid "Download next 10"
-msgstr ""
+msgstr "Скачать следующие 10"
 
 msgid "Download next 5"
-msgstr ""
+msgstr "Скачать следующие 5"
 
 msgid "Download next 50"
-msgstr ""
+msgstr "Скачать следующие 50"
 
 msgid "Download selected"
-msgstr ""
+msgstr "Скачать выбранное"
 
 msgid "Download the chapter first."
-msgstr ""
+msgstr "Сначала скачайте главу."
 
 msgid "Download-ahead buffer is already downloaded or queued."
-msgstr ""
+msgstr "Буфер предварительной загрузки уже скачан или стоит в очереди."
 
 msgid "Downloaded"
-msgstr ""
+msgstr "Скачано"
 
 msgid "Downloaded chapters are in %1."
-msgstr ""
+msgstr "Скачанные главы находятся в %1."
 
 msgid "Downloading"
-msgstr ""
+msgstr "Скачивание"
 
 msgid "Downloading %1"
-msgstr ""
+msgstr "Скачивание %1"
 
 msgid "Downloading %1/%2"
-msgstr ""
+msgstr "Скачивание %1/%2"
 
 msgid "Downloads"
-msgstr ""
+msgstr "Загрузки"
 
 msgid "Error"
-msgstr ""
+msgstr "Ошибка"
 
 msgctxt "source filter tri-state"
 msgid "Exclude"
-msgstr ""
+msgstr "Исключить"
 
 msgctxt "extension title"
 msgid "Extension"
-msgstr ""
+msgstr "Расширение"
 
 msgid "Extension install succeeded, but extension list refresh failed: %1"
-msgstr ""
+msgstr "Расширение установлено, но список расширений не обновился: %1"
 
 msgid "Extension install succeeded, but source refresh failed: %1"
-msgstr ""
+msgstr "Расширение установлено, но источники не обновились: %1"
 
 msgid "Extension install timed out."
-msgstr ""
+msgstr "Истекло время ожидания установки расширения."
 
 msgid "Extension list loading timed out."
-msgstr ""
+msgstr "Истекло время ожидания загрузки списка расширений."
 
 msgid "Extension name, language, or package"
-msgstr ""
+msgstr "Название, язык или пакет расширения"
 
 msgid "Extension task already running."
-msgstr ""
+msgstr "Задача расширения уже выполняется."
 
 msgid "Extension uninstall succeeded, but extension list refresh failed: %1"
-msgstr ""
+msgstr "Расширение удалено, но список расширений не обновился: %1"
 
 msgid "Extension uninstall succeeded, but source refresh failed: %1"
-msgstr ""
+msgstr "Расширение удалено, но источники не обновились: %1"
 
 msgid "Extension uninstall timed out."
-msgstr ""
+msgstr "Истекло время ожидания удаления расширения."
 
 msgid "Extension update succeeded, but extension list refresh failed: %1"
-msgstr ""
+msgstr "Расширение обновлено, но список расширений не обновился: %1"
 
 msgid "Extension update succeeded, but source refresh failed: %1"
-msgstr ""
+msgstr "Расширение обновлено, но источники не обновились: %1"
 
 msgid "Extension update timed out."
-msgstr ""
+msgstr "Истекло время ожидания обновления расширения."
 
 msgid "Failed"
-msgstr ""
+msgstr "Ошибка"
 
 msgid "Failed to delete %1 download."
 msgid_plural "Failed to delete %1 downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Не удалось удалить %1 загрузку."
+msgstr[1] "Не удалось удалить %1 загрузки."
+msgstr[2] "Не удалось удалить %1 загрузок."
 
 msgid "Fifth to last read chapter"
-msgstr ""
+msgstr "Пятая глава перед последней прочитанной"
 
 msgid "First unread"
-msgstr ""
+msgstr "Первая непрочитанная"
 
 msgid "Fourth to last read chapter"
-msgstr ""
+msgstr "Четвёртая глава перед последней прочитанной"
 
 msgid "Genres"
-msgstr ""
+msgstr "Жанры"
 
 msgid "Global search"
-msgstr ""
+msgstr "Глобальный поиск"
 
 msgid "Go to Suwayomi"
-msgstr ""
+msgstr "Перейти к Suwayomi"
 
 msgid "Hide in-library results: %1"
-msgstr ""
+msgstr "Скрывать результаты из библиотеки: %1"
 
 msgid "In Library"
-msgstr ""
+msgstr "В библиотеке"
 
 msgid "In library"
-msgstr ""
+msgstr "В библиотеке"
 
 msgctxt "source filter tri-state"
 msgid "Include"
-msgstr ""
+msgstr "Включить"
 
 msgctxt "extension action"
 msgid "Install"
-msgstr ""
+msgstr "Установить"
 
 msgid "Installed"
-msgstr ""
+msgstr "Установлено"
 
 msgid "Installing extension..."
-msgstr ""
+msgstr "Установка расширения..."
 
 msgid "KOReader could not open this chapter right now."
-msgstr ""
+msgstr "KOReader не смог открыть эту главу сейчас."
 
 msgid "Keep downloads"
-msgstr ""
+msgstr "Сохранять загрузки"
 
 msgid "Keep next 10 downloaded"
-msgstr ""
+msgstr "Держать скачанными следующие 10"
 
 msgid "Keep next 5 downloaded"
-msgstr ""
+msgstr "Держать скачанными следующие 5"
 
 msgid "Keep next 50 downloaded"
-msgstr ""
+msgstr "Держать скачанными следующие 50"
 
 msgid "Last read chapter"
-msgstr ""
+msgstr "Последняя прочитанная глава"
 
 msgctxt "source mode"
 msgid "Latest"
-msgstr ""
+msgstr "Последние"
 
 msgid "Library"
-msgstr ""
+msgstr "Библиотека"
 
 msgid "Library category picker"
-msgstr ""
+msgstr "Выбор категории библиотеки"
 
 msgid "Library category picker settings are unavailable."
-msgstr ""
+msgstr "Настройки выбора категории библиотеки недоступны."
 
 msgid ""
 "Library loading timed out. Check your connection, then open Library again."
 msgstr ""
+"Истекло время ожидания загрузки библиотеки. Проверьте подключение и снова "
+"откройте библиотеку."
 
 msgid "Loading categories..."
-msgstr ""
+msgstr "Загрузка категорий..."
 
 msgid "Loading chapters..."
-msgstr ""
+msgstr "Загрузка глав..."
 
 msgid "Loading extensions..."
-msgstr ""
+msgstr "Загрузка расширений..."
 
 msgid "Loading library..."
-msgstr ""
+msgstr "Загрузка библиотеки..."
 
 msgid "Loading sources..."
-msgstr ""
+msgstr "Загрузка источников..."
 
 msgid "Loading..."
-msgstr ""
+msgstr "Загрузка..."
 
 msgid "Login information"
-msgstr ""
+msgstr "Данные входа"
 
 msgid "Manga actions"
-msgstr ""
+msgstr "Действия с мангой"
 
 msgid "Manga information"
-msgstr ""
+msgstr "Информация о манге"
 
 msgid "Mark as read"
-msgstr ""
+msgstr "Отметить как прочитанное"
 
 msgid "Mark as unread"
-msgstr ""
+msgstr "Отметить как непрочитанное"
 
 msgid "Mark previous as read"
-msgstr ""
+msgstr "Отметить предыдущие как прочитанные"
 
 msgid "Mark read"
-msgstr ""
+msgstr "Отметить прочитанным"
 
 msgid "Mark unread"
-msgstr ""
+msgstr "Отметить непрочитанным"
 
 msgid "Never ask"
-msgstr ""
+msgstr "Никогда не спрашивать"
 
 msgid "New folder"
-msgstr ""
+msgstr "Новая папка"
 
 msgid "Next page"
-msgstr ""
+msgstr "Следующая страница"
 
 msgid "No actions available"
-msgstr ""
+msgstr "Нет доступных действий"
 
 msgid "No chapters selected."
-msgstr ""
+msgstr "Главы не выбраны."
 
 msgid "No description available."
-msgstr ""
+msgstr "Описание недоступно."
 
 msgid "No downloads queued."
-msgstr ""
+msgstr "Нет загрузок в очереди."
 
 msgid "No manga in this library category."
-msgstr ""
+msgstr "В этой категории библиотеки нет манги."
 
 msgid "No matching extensions"
-msgstr ""
+msgstr "Нет подходящих расширений"
 
 msgid "No new downloads queued."
-msgstr ""
+msgstr "Новые загрузки не добавлены в очередь."
 
 msgid "No poster"
-msgstr ""
+msgstr "Нет обложки"
 
 msgid "No results"
-msgstr ""
+msgstr "Нет результатов"
 
 msgid "No selected chapters were deleted."
-msgstr ""
+msgstr "Выбранные главы не были удалены."
 
 msgid "No unread chapters available to download."
-msgstr ""
+msgstr "Нет непрочитанных глав для скачивания."
 
 msgid "Not in library"
-msgstr ""
+msgstr "Не в библиотеке"
 
 msgid "Not installed"
-msgstr ""
+msgstr "Не установлено"
 
 msgid "Obsolete"
-msgstr ""
+msgstr "Устарело"
 
 msgctxt "source filter state"
 msgid "Off"
-msgstr ""
+msgstr "Выкл."
 
 msgctxt "source filter state"
 msgid "On"
-msgstr ""
+msgstr "Вкл."
 
 msgid "On hiatus"
-msgstr ""
+msgstr "Приостановлено"
 
 msgid "Ongoing"
-msgstr ""
+msgstr "Выходит"
 
 msgctxt "chapter action"
 msgid "Open"
-msgstr ""
+msgstr "Открыть"
 
 msgid "Open Search > Suwayomi to access the plugin menu."
-msgstr ""
+msgstr "Откройте Поиск > Suwayomi, чтобы перейти в меню плагина."
 
 msgid "Open chapter list"
-msgstr ""
+msgstr "Открыть список глав"
 
 msgid "Open chapters"
-msgstr ""
+msgstr "Открыть главы"
 
 msgid "Open first unread"
-msgstr ""
+msgstr "Открыть первую непрочитанную"
 
 msgid "Open next unread"
-msgstr ""
+msgstr "Открыть следующую непрочитанную"
 
 msgid "Parallel chapter downloads"
-msgstr ""
+msgstr "Параллельные загрузки глав"
 
 msgid "Parallel downloads: %1"
-msgstr ""
+msgstr "Параллельные загрузки: %1"
 
 msgid "Password"
-msgstr ""
+msgstr "Пароль"
 
 msgctxt "source mode"
 msgid "Popular"
-msgstr ""
+msgstr "Популярное"
 
 msgid "Previous page"
-msgstr ""
+msgstr "Предыдущая страница"
 
 msgid "Queue"
-msgstr ""
+msgstr "Очередь"
 
 msgid ""
 "Queue %1 missing download to keep the next %2 unread chapters available?"
 msgid_plural ""
 "Queue %1 missing downloads to keep the next %2 unread chapters available?"
 msgstr[0] ""
+"Добавить %1 отсутствующую загрузку в очередь, чтобы держать доступными "
+"следующие непрочитанные главы (%2)?"
 msgstr[1] ""
+"Добавить %1 отсутствующие загрузки в очередь, чтобы держать доступными "
+"следующие непрочитанные главы (%2)?"
 msgstr[2] ""
+"Добавить %1 отсутствующих загрузок в очередь, чтобы держать доступными "
+"следующие непрочитанные главы (%2)?"
 
 msgid "Queue %1 unread chapter download?"
 msgid_plural "Queue %1 unread chapter downloads?"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Добавить в очередь %1 непрочитанную главу?"
+msgstr[1] "Добавить в очередь %1 непрочитанные главы?"
+msgstr[2] "Добавить в очередь %1 непрочитанных глав?"
 
 msgid "Queue downloads for all %1 chapter?"
 msgid_plural "Queue downloads for all %1 chapters?"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Добавить в очередь загрузки для всех глав (%1)?"
+msgstr[1] "Добавить в очередь загрузки для всех глав (%1)?"
+msgstr[2] "Добавить в очередь загрузки для всех глав (%1)?"
 
 msgid "Queue downloads for all %1 unread chapter?"
 msgid_plural "Queue downloads for all %1 unread chapters?"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Добавить в очередь загрузки для всех непрочитанных глав (%1)?"
+msgstr[1] "Добавить в очередь загрузки для всех непрочитанных глав (%1)?"
+msgstr[2] "Добавить в очередь загрузки для всех непрочитанных глав (%1)?"
 
 msgid "Queued"
-msgstr ""
+msgstr "В очереди"
 
 msgid "Queued %1 selected chapter download."
 msgid_plural "Queued %1 selected chapter downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "В очередь добавлена %1 выбранная глава."
+msgstr[1] "В очередь добавлены %1 выбранные главы."
+msgstr[2] "В очередь добавлено %1 выбранных глав."
 
 msgid "Queued first %1 downloads. Refine the chapter selection to queue more."
 msgstr ""
+"Первые %1 загрузок добавлены в очередь. Уточните выбор глав, чтобы добавить "
+"больше."
 
 msgid "Read"
-msgstr ""
+msgstr "Прочитано"
 
 msgid "Read state is already synced."
-msgstr ""
+msgstr "Состояние прочтения уже синхронизировано."
 
 msgid "Read state sync is already running."
-msgstr ""
+msgstr "Синхронизация состояния прочтения уже выполняется."
 
 msgid "Read state sync started."
-msgstr ""
+msgstr "Синхронизация состояния прочтения началась."
 
 msgid "Refresh chapters"
-msgstr ""
+msgstr "Обновить главы"
 
 msgid "Refresh extension list"
-msgstr ""
+msgstr "Обновить список расширений"
 
 msgid "Refreshing chapters..."
-msgstr ""
+msgstr "Обновление глав..."
 
 msgid "Refreshing extensions..."
-msgstr ""
+msgstr "Обновление расширений..."
 
 msgid "Remove"
-msgstr ""
+msgstr "Удалить"
 
 msgid "Remove %1 from your Suwayomi library?"
-msgstr ""
+msgstr "Удалить %1 из библиотеки Suwayomi?"
 
 msgid "Remove from library"
-msgstr ""
+msgstr "Удалить из библиотеки"
 
 msgid "Removing from library..."
-msgstr ""
+msgstr "Удаление из библиотеки..."
 
 msgid "Reset filters"
-msgstr ""
+msgstr "Сбросить фильтры"
 
 msgid "Retry"
-msgstr ""
+msgstr "Повторить"
 
 msgid "Save"
-msgstr ""
+msgstr "Сохранить"
 
 msgid "Scanlator filter"
-msgstr ""
+msgstr "Фильтр сканлейторов"
 
 msgctxt "extension action"
 msgid "Search"
-msgstr ""
+msgstr "Поиск"
 
 msgctxt "source action"
 msgid "Search"
-msgstr ""
+msgstr "Поиск"
 
 msgctxt "source mode"
 msgid "Search"
-msgstr ""
+msgstr "Поиск"
 
 msgid "Search %1"
-msgstr ""
+msgstr "Искать %1"
 
 msgid "Search extensions"
-msgstr ""
+msgstr "Поиск расширений"
 
 msgctxt "extension action"
 msgid "Search extensions"
-msgstr ""
+msgstr "Искать расширения"
 
 msgctxt "extension action"
 msgid "Search extensions: %1"
-msgstr ""
+msgstr "Искать расширения: %1"
 
 msgid "Search query"
-msgstr ""
+msgstr "Поисковый запрос"
 
 msgid "Search text"
-msgstr ""
+msgstr "Текст поиска"
 
 msgid "Second to last read chapter"
-msgstr ""
+msgstr "Глава перед последней прочитанной"
 
 msgid "Select all"
-msgstr ""
+msgstr "Выбрать всё"
 
 msgid "Server URL"
-msgstr ""
+msgstr "URL сервера"
 
 msgid "Set a download folder in Settings > Downloads."
-msgstr ""
+msgstr "Укажите папку загрузок в Настройки > Загрузки."
 
 msgid "Set up your Suwayomi server login first."
-msgstr ""
+msgstr "Сначала настройте вход на сервер Suwayomi."
 
 msgid "Settings"
-msgstr ""
+msgstr "Настройки"
 
 msgid "Settings are unavailable."
-msgstr ""
+msgstr "Настройки недоступны."
 
 msgid "Setup wizard"
-msgstr ""
+msgstr "Мастер настройки"
 
 msgid "Show NSFW sources: %1"
-msgstr ""
+msgstr "Показывать NSFW-источники: %1"
 
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Пропущена %1 глава: уже скачана или в очереди."
+msgstr[1] "Пропущены %1 главы: уже скачаны или в очереди."
+msgstr[2] "Пропущено %1 глав: уже скачаны или в очереди."
 
 msgid "Skipped %1 chapter not downloaded."
 msgid_plural "Skipped %1 chapters not downloaded."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Пропущена %1 нескачанная глава."
+msgstr[1] "Пропущены %1 нескачанные главы."
+msgstr[2] "Пропущено %1 нескачанных глав."
 
 msgid "Skipped %1 download."
 msgid_plural "Skipped %1 downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Пропущена %1 загрузка."
+msgstr[1] "Пропущены %1 загрузки."
+msgstr[2] "Пропущено %1 загрузок."
 
 msgid "Source"
-msgstr ""
+msgstr "Источник"
 
 msgid "Source filters"
-msgstr ""
+msgstr "Фильтры источника"
 
 msgid "Source loading timed out."
-msgstr ""
+msgstr "Истекло время ожидания загрузки источника."
 
 msgid "Status"
-msgstr ""
+msgstr "Статус"
 
 msgid "Stop download ahead"
-msgstr ""
+msgstr "Остановить предварительную загрузку"
 
 msgid "Suwayomi"
-msgstr ""
+msgstr "Suwayomi"
 
 msgid "Suwayomi Chapters"
-msgstr ""
+msgstr "Главы Suwayomi"
 
 msgid "Suwayomi Client v1.0.4"
-msgstr ""
+msgstr "Клиент Suwayomi v1.0.4"
 
 msgid "Suwayomi Downloads"
-msgstr ""
+msgstr "Загрузки Suwayomi"
 
 msgid "Suwayomi Extensions"
-msgstr ""
+msgstr "Расширения Suwayomi"
 
 msgid "Suwayomi Library"
-msgstr ""
+msgstr "Библиотека Suwayomi"
 
 msgid "Suwayomi Manga"
-msgstr ""
+msgstr "Манга Suwayomi"
 
 msgid "Suwayomi Settings"
-msgstr ""
+msgstr "Настройки Suwayomi"
 
 msgid "Suwayomi Source"
-msgstr ""
+msgstr "Источник Suwayomi"
 
 msgid "Suwayomi Sources"
-msgstr ""
+msgstr "Источники Suwayomi"
 
 msgid ""
 "Suwayomi client for KOReader. Browse your Suwayomi server, manage source "
 "extensions, sync read state, and download chapters as local CBZ files."
 msgstr ""
+"Клиент Suwayomi для KOReader. Просматривайте сервер Suwayomi, управляйте "
+"расширениями источников, синхронизируйте состояние прочтения и скачивайте "
+"главы как локальные CBZ-файлы."
 
 msgid "Suwayomi connection test timed out."
-msgstr ""
+msgstr "Истекло время ожидания проверки подключения к Suwayomi."
 
 msgid "Suwayomi download directory saved."
-msgstr ""
+msgstr "Папка загрузок Suwayomi сохранена."
 
 msgid "Suwayomi home"
-msgstr ""
+msgstr "Главная Suwayomi"
 
 msgid "Suwayomi login"
-msgstr ""
+msgstr "Вход в Suwayomi"
 
 msgid "Suwayomi login settings saved."
-msgstr ""
+msgstr "Настройки входа в Suwayomi сохранены."
 
 msgid "Suwayomi server did not refresh manga."
-msgstr ""
+msgstr "Сервер Suwayomi не обновил мангу."
 
 msgid "Suwayomi setup complete."
-msgstr ""
+msgstr "Настройка Suwayomi завершена."
 
 msgid "Suwayomi setup: connection (%1)"
-msgstr ""
+msgstr "Настройка Suwayomi: подключение (%1)"
 
 msgid "Suwayomi source languages"
-msgstr ""
+msgstr "Языки источников Suwayomi"
 
 msgid "Sync"
-msgstr ""
+msgstr "Синхронизация"
 
 msgid "Test connection"
-msgstr ""
+msgstr "Проверить подключение"
 
 msgid "Test connection before continuing."
-msgstr ""
+msgstr "Проверьте подключение, прежде чем продолжить."
 
 msgid "Testing Suwayomi connection..."
-msgstr ""
+msgstr "Проверка подключения к Suwayomi..."
 
 msgid "Text"
-msgstr ""
+msgstr "Текст"
 
 msgid "Text filter"
-msgstr ""
+msgstr "Текстовый фильтр"
 
 msgid "Third to last read chapter"
-msgstr ""
+msgstr "Третья глава перед последней прочитанной"
 
 msgid "This book is not linked to Suwayomi chapters."
-msgstr ""
+msgstr "Эта книга не связана с главами Suwayomi."
 
 msgid "This chapter is downloading. Wait for it to finish before deleting it."
-msgstr ""
+msgstr "Эта глава скачивается. Дождитесь завершения перед удалением."
 
 msgid "This chapter is not downloaded."
-msgstr ""
+msgstr "Эта глава не скачана."
 
 msgid "This manga cannot be loaded right now."
-msgstr ""
+msgstr "Эту мангу сейчас нельзя загрузить."
 
 msgid "This manga cannot be refreshed right now."
-msgstr ""
+msgstr "Эту мангу сейчас нельзя обновить."
 
 msgid "This manga cannot be updated right now."
-msgstr ""
+msgstr "Эту мангу сейчас нельзя изменить."
 
 msgid "This manga has no chapters loaded."
-msgstr ""
+msgstr "Для этой манги главы ещё не загружены."
 
 msgid "This manga has no chapters."
-msgstr ""
+msgstr "У этой манги нет глав."
 
 msgctxt "extension action"
 msgid "Uninstall"
-msgstr ""
+msgstr "Удалить"
 
 msgid "Uninstalling extension..."
-msgstr ""
+msgstr "Удаление расширения..."
 
 msgid "Unknown"
-msgstr ""
+msgstr "Неизвестно"
 
 msgid "Unknown error"
-msgstr ""
+msgstr "Неизвестная ошибка"
 
 msgid "Unread"
-msgstr ""
+msgstr "Непрочитано"
 
 msgid "Unsupported"
-msgstr ""
+msgstr "Не поддерживается"
 
 msgctxt "extension action"
 msgid "Update"
-msgstr ""
+msgstr "Обновить"
 
 msgid "Update available"
-msgstr ""
+msgstr "Доступно обновление"
 
 msgid "Updates"
-msgstr ""
+msgstr "Обновления"
 
 msgid "Updating extension..."
-msgstr ""
+msgstr "Обновление расширения..."
 
 msgid "Use this folder"
-msgstr ""
+msgstr "Использовать эту папку"
 
 msgid "Username"
-msgstr ""
+msgstr "Имя пользователя"
 
 msgid "You can continue."
-msgstr ""
+msgstr "Можно продолжить."
 
 msgid "Your Suwayomi library is empty."
-msgstr ""
+msgstr "Ваша библиотека Suwayomi пуста."
 
 msgid "canceled"
-msgstr ""
+msgstr "отменено"
 
 msgid "failed"
-msgstr ""
+msgstr "ошибка"
 
 msgid "no"
-msgstr ""
+msgstr "нет"
 
 msgid "not set"
-msgstr ""
+msgstr "не задано"
 
 msgid "not tested"
-msgstr ""
+msgstr "не проверено"
 
 msgid "searching"
-msgstr ""
+msgstr "поиск"
 
 msgid "source"
-msgstr ""
+msgstr "источник"
 
 msgid "tested"
-msgstr ""
+msgstr "проверено"
 
 msgid "testing..."
-msgstr ""
+msgstr "проверка..."
 
 msgid "this chapter"
-msgstr ""
+msgstr "эта глава"
 
 msgid "timed out"
-msgstr ""
+msgstr "истекло время ожидания"
 
 msgid "unknown error"
-msgstr ""
+msgstr "неизвестная ошибка"
 
 msgid "yes"
-msgstr ""
+msgstr "да"
