@@ -3,7 +3,7 @@
 ## Project
 
 - LuaJIT/Lua 5.1 KOReader plugin for Suwayomi. KOReader runtime modules are usually stubbed in specs.
-- Runtime payload is `_meta.lua`, `main.lua`, `README.md`, and `suwayomi/`. Specs, docs, CI files, worktrees, and `AGENTS.md` are development-only.
+- Runtime payload is `_meta.lua`, `main.lua`, `README.md`, `suwayomi/`, and compiled `l10n/*/suwayomi.mo` catalogs when present. Specs, docs, CI files, worktrees, source `.po` files, template `.pot` files, and `AGENTS.md` are development-only.
 - `main.lua` is only lifecycle/composition glue. Put feature code in slash-style modules under `suwayomi/`, for example `require("suwayomi/api")`.
 - Use `docs/ARCHITECTURE.md` for the detailed module map. Update it when module ownership, facades, packaging boundaries, or test strategy change.
 
@@ -14,6 +14,7 @@
 - Install local deps with user-local LuaRocks packages: `busted`, `dkjson`, `luasocket`, `luasec`, and `luacheck`.
 - POSIX lint: `luacheck --codes spec suwayomi main.lua _meta.lua`
 - POSIX tests: `busted spec`
+- POSIX l10n check: `./scripts/check-l10n.sh`
 - Windows PowerShell lint: `luacheck --codes spec suwayomi main.lua _meta.lua`
 - Windows PowerShell tests: `busted spec`
 - Run one spec file with `busted spec/<file>`. Do not add a separate `luac` syntax pass; Luacheck already parses the project paths.
@@ -49,8 +50,8 @@
 
 ## Android Packaging
 
-- Release zips and manual device pushes include only `_meta.lua`, `main.lua`, `README.md`, and `suwayomi/`.
-- For Android QA, push the runtime payload to `/sdcard/koreader/plugins/suwayomi.koplugin/`; do not push `.git`, `spec`, docs, CI files, or worktrees.
+- Release zips and manual device pushes include only `_meta.lua`, `main.lua`, `README.md`, `suwayomi/`, and compiled `l10n/*/suwayomi.mo` catalogs when present.
+- For Android QA, push the runtime payload to `/sdcard/koreader/plugins/suwayomi.koplugin/`; do not push `.git`, `spec`, docs, CI files, worktrees, `.po`, or `.pot` files.
 
 ## Maintenance
 

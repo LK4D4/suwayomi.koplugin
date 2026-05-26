@@ -16,13 +16,16 @@ Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $stage | Out-Null
 Copy-Item _meta.lua, main.lua, README.md $stage
 Copy-Item suwayomi $stage -Recurse
+if (Test-Path l10n) {
+    Copy-Item l10n $stage -Recurse
+}
 
 adb shell mkdir -p /sdcard/koreader/plugins/suwayomi.koplugin
 adb push "$stage/." /sdcard/koreader/plugins/suwayomi.koplugin/
 ```
 
 The staged directory contains only plugin runtime files: `_meta.lua`, `main.lua`,
-`README.md`, and `suwayomi/`.
+`README.md`, `suwayomi/`, and `l10n/` compiled catalogs when present.
 
 4. Optional test settings can be pushed to `/sdcard/koreader/settings/suwayomi.lua`:
 

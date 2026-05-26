@@ -12,8 +12,9 @@ Runtime files shipped in releases are:
 - `main.lua`
 - `README.md`
 - `suwayomi/`
+- `l10n/<locale>/suwayomi.mo` when compiled catalogs exist
 
-Tests, docs, CI files, worktrees, and `AGENTS.md` are development-only and must not be included in manual Android plugin pushes or release payloads.
+Tests, docs, CI files, worktrees, `AGENTS.md`, source `.po` files, and template `.pot` files are development-only and must not be included in manual Android plugin pushes or release payloads.
 
 ## Public Facades
 
@@ -105,7 +106,8 @@ Shared support:
 - `suwayomi/settings.lua`: KOReader settings persistence.
 - `suwayomi/paths.lua`: source-scoped download path layout and path segment sanitization.
 - `suwayomi/debug.lua`: opt-in redacted debug logging.
-- `suwayomi/i18n.lua`: plugin-owned wrapper around KOReader gettext and template formatting for runtime UI strings. It intentionally does not choose locale, persist language settings, or translate server-provided manga/source/chapter data.
+- `suwayomi/i18n.lua`: plugin-owned wrapper around KOReader gettext and template formatting for runtime UI strings. It loads compiled plugin catalogs from `l10n/<locale>/suwayomi.mo` when KOReader has a matching language, restores KOReader's native gettext state after loading, and intentionally does not persist plugin language settings or translate server-provided manga/source/chapter data.
+- `suwayomi/i18n/locales.lua`: pure locale registry for supported plugin catalogs, WebUI aliases, KOReader aliases, and region fallback order.
 - `suwayomi/subprocess/job.lua`: shared helper for one-shot subprocess jobs that exchange compact JSON result files. Callers provide the worker body, result parser, poll/timeout values, and finish/error/cancel callbacks; the helper owns atomic `.tmp` writes, result path allocation, polling, timeout/cancel termination, child reaping, and result-file cleanup.
 
 Long-running subprocess patterns are intentionally split by shape: one-shot JSON result workers use `suwayomi/subprocess/job.lua`, while active downloads stay in `suwayomi/downloads/active_jobs.lua` because they require progress files, persisted queue state, and replacement scheduling.
@@ -172,12 +174,14 @@ Coverage is organized around runtime boundaries:
 - Queue/download specs cover persisted jobs, active worker scheduling, progress files, status text, and one-chapter CBZ behavior without real network or real subprocess timing.
 - Controller specs exercise plugin-bound methods with KOReader/runtime stubs rather than requiring real KOReader.
 - Read-sync specs isolate ledger, metadata/history handling, worker behavior, and controller polling/retry flows.
+- L10n tooling tests are shell-script based: `scripts/check-l10n.sh` verifies extraction freshness, `.po` validity, and generated `.mo` availability without requiring gettext tools on KOReader devices.
 
 Use the same checks as CI:
 
 ```bash
 PATH="$HOME/.luarocks/bin:$PATH" busted spec
 PATH="$HOME/.luarocks/bin:$PATH" luacheck --codes spec suwayomi main.lua _meta.lua
+./scripts/check-l10n.sh
 ```
 
 The Luacheck command covers project Lua parsing/linting while avoiding generated

@@ -41,7 +41,7 @@ On Android, `<your-device-root>` is usually `/sdcard`. On Kobo or Kindle, use th
 
 Do not leave the files in a nested path such as `koreader/plugins/suwayomi.koplugin/suwayomi.koplugin/`; KOReader will not discover the plugin there.
 
-5. Confirm the folder contains `_meta.lua`, `main.lua`, and `suwayomi/`.
+5. Confirm the folder contains `_meta.lua`, `main.lua`, `suwayomi/`, and compiled `l10n/` catalogs when the release includes translations.
 6. Restart KOReader.
 
 To update a manual install, replace the old `suwayomi.koplugin` folder with the new release folder, then restart KOReader.
@@ -98,5 +98,14 @@ Run commands from the plugin root:
 luacheck --codes spec suwayomi main.lua _meta.lua
 busted spec
 ```
+
+Translation catalog maintenance requires GNU gettext tools:
+
+```bash
+./scripts/update-l10n.sh
+./scripts/check-l10n.sh
+```
+
+See [docs/TRANSLATING.md](docs/TRANSLATING.md) for translator guidance and Weblate setup notes.
 
 Pull requests are welcome. Please keep runtime code under `suwayomi/`, add focused specs for behavior changes, and update `docs/ARCHITECTURE.md` when module ownership or packaging boundaries change.

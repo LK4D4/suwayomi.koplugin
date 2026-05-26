@@ -84,6 +84,8 @@ Run from repository root:
 ```bash
 rtk luacheck --codes spec suwayomi main.lua _meta.lua
 rtk busted spec
+./scripts/check-l10n.sh
+./scripts/compile-l10n.sh
 rtk git diff --check
 bash .github/scripts/stage-release-payload.sh
 ```
@@ -92,8 +94,9 @@ Expected:
 
 - Luacheck succeeds with no warnings.
 - Busted suite succeeds.
+- L10n source freshness check succeeds and compiled catalogs are generated.
 - Diff check succeeds.
-- Release payload contains only `_meta.lua`, `main.lua`, `README.md`, and `suwayomi/`.
+- Release payload contains only `_meta.lua`, `main.lua`, `README.md`, `suwayomi/`, and compiled `l10n/*/suwayomi.mo` catalogs when present.
 - Remove generated `suwayomi.koplugin/` after staging before committing.
 
 ## Device QA Notes
