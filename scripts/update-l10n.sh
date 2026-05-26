@@ -29,6 +29,33 @@ for tool in xgettext msgmerge msgattrib msginit; do
     }
 done
 
+plural_forms() {
+    case "$1" in
+        ar) printf '%s\n' 'nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;' ;;
+        fa|id|ja|ko|vi|zh_CN|zh_TW) printf '%s\n' 'nplurals=1; plural=0;' ;;
+        fr) printf '%s\n' 'nplurals=2; plural=(n > 1);' ;;
+        pl) printf '%s\n' 'nplurals=3; plural=n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2;' ;;
+        ru) printf '%s\n' 'nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2;' ;;
+        *) printf '%s\n' 'nplurals=2; plural=(n != 1);' ;;
+    esac
+}
+
+normalize_po_header() {
+    local locale="$1"
+    local po="$2"
+    local plural
+    plural="$(plural_forms "$locale")"
+    sed -i \
+        -e 's/PO-Revision-Date: .*/PO-Revision-Date: 1970-01-01 00:00+0000\\n"/' \
+        -e 's/POT-Creation-Date: .*/POT-Creation-Date: 1970-01-01 00:00+0000\\n"/' \
+        -e 's/Content-Type: text\/plain; charset=.*/Content-Type: text\/plain; charset=UTF-8\\n"/' \
+        "$po"
+    PLURAL_FORMS="$plural" perl -0pi -e '
+        my $plural = $ENV{PLURAL_FORMS};
+        s/"Plural-Forms: [^\n]*\\n"\n(?:"[^:"]*[^\n]*\\n"\n)*/"Plural-Forms: $plural\\n"\n/s;
+    ' "$po"
+}
+
 mkdir -p l10n/templates
 
 mapfile -t runtime_lua < <(find suwayomi -type f -name '*.lua' | LC_ALL=C sort)
@@ -66,14 +93,9 @@ for locale in "${locales[@]}"; do
             --locale="$locale" \
             --input="$template" \
             --output-file="$po"
-    else
-        msgmerge --update --backup=none "$po" "$template"
     fi
+    normalize_po_header "$locale" "$po"
+    msgmerge --update --backup=none "$po" "$template"
     msgattrib --no-obsolete --output-file="$po" "$po"
-    sed -i \
-        -e 's/PO-Revision-Date: .*/PO-Revision-Date: 1970-01-01 00:00+0000\\n"/' \
-        -e 's/POT-Creation-Date: .*/POT-Creation-Date: 1970-01-01 00:00+0000\\n"/' \
-        -e 's/Content-Type: text\/plain; charset=.*/Content-Type: text\/plain; charset=UTF-8\\n"/' \
-        -e 's/Plural-Forms: .*/Plural-Forms: nplurals=2; plural=(n != 1);\\n"/' \
-        "$po"
+    normalize_po_header "$locale" "$po"
 done

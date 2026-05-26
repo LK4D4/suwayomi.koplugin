@@ -25,6 +25,45 @@ git_cmd() {
     fi
 }
 
+expected_plural_forms() {
+    case "$1" in
+        ar) printf '%s\n' 'nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;' ;;
+        fa|id|ja|ko|vi|zh_CN|zh_TW) printf '%s\n' 'nplurals=1; plural=0;' ;;
+        fr) printf '%s\n' 'nplurals=2; plural=(n > 1);' ;;
+        pl) printf '%s\n' 'nplurals=3; plural=n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2;' ;;
+        ru) printf '%s\n' 'nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2;' ;;
+        *) printf '%s\n' 'nplurals=2; plural=(n != 1);' ;;
+    esac
+}
+
+check_plural_header() {
+    local po="$1"
+    local locale expected actual
+    locale="$(basename "$(dirname "$po")")"
+    expected="$(expected_plural_forms "$locale")"
+    actual="$(awk '
+        /^"Plural-Forms: / { collecting = 1 }
+        collecting && /^"/ {
+            line = $0
+            sub(/^"/, "", line)
+            sub(/"$/, "", line)
+            text = text line
+            if (line ~ /\\n$/) {
+                sub(/^Plural-Forms: /, "", text)
+                sub(/\\n$/, "", text)
+                print text
+                exit
+            }
+            next
+        }
+        collecting { exit }
+    ' "$po")"
+    if [ "$actual" != "$expected" ]; then
+        printf 'Unexpected plural header for %s: expected %s, got %s\n' "$locale" "$expected" "${actual:-<missing>}" >&2
+        return 1
+    fi
+}
+
 before="$(mktemp)"
 after="$(mktemp)"
 trap 'rm -f "$before" "$after"' EXIT
@@ -41,6 +80,7 @@ fi
 
 for po in l10n/*/"$domain.po"; do
     [ -f "$po" ] || continue
+    check_plural_header "$po"
     msgfmt --check --check-format --statistics --output-file=/dev/null "$po"
 done
 
