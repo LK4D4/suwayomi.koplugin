@@ -930,7 +930,7 @@ msgstr ""
 msgid "Suwayomi Chapters"
 msgstr ""
 
-msgid "Suwayomi Client v1.0.4"
+msgid "Suwayomi Client v1.0.5"
 msgstr ""
 
 msgid "Suwayomi Downloads"
