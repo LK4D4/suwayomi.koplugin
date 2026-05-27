@@ -21,14 +21,15 @@ Tracked catalogs:
 - `pl`
 - `pt`
 - `ru`
+- `uk`
 - `vi`
 - `zh_CN`
 - `zh_TW`
 
 Locale aliases:
 
-- `zh-Hans`, `zh_Hans`, and `zh_CN` use `zh_CN`.
-- `zh-Hant`, `zh_Hant`, and `zh_TW` use `zh_TW`.
+- `zh-Hans`, `zh_Hans`, `zh-CN`, and `zh_CN` use `zh_CN`.
+- `zh-Hant`, `zh_Hant`, `zh-TW`, and `zh_TW` use `zh_TW`.
 - `pt_BR` and other Portuguese regions try `pt` first.
 - Other regional locales try their full locale, then the base language.
 
@@ -105,14 +106,24 @@ Install GNU gettext tools, then run:
 ./scripts/check-l10n.sh
 ```
 
-Before release, compile runtime catalogs:
+`update-l10n.sh` refreshes `l10n/templates/suwayomi.pot`, creates missing
+locale catalogs, merges new strings, normalizes line endings, and preserves the
+project plural rules for every supported locale.
+
+`check-l10n.sh` verifies that source catalogs are current, checks plural
+headers, validates `.po` files with `msgfmt`, and compiles runtime `.mo`
+catalogs.
+
+If you only need to refresh compiled runtime catalogs, run:
 
 ```bash
 ./scripts/compile-l10n.sh
 ```
 
-Compiled `.mo` files are generated artifacts. Do not commit them unless a
-maintainer explicitly asks for a release artifact experiment.
+Compiled `.mo` files are generated runtime artifacts and are tracked for release
+payloads. Commit matching `.po` and `.mo` changes together after catalog updates.
+Do not commit generated `.pot` or `.po` churn unless it came from
+`update-l10n.sh`.
 
 ## Privacy
 
@@ -133,5 +144,8 @@ Recommended component settings:
 - Translation license: match repository license
 - Push commits: `.po` files only
 - Pull requests: enabled if direct push is not desired
+
+After merging Weblate `.po` updates, maintainers should run
+`./scripts/check-l10n.sh` and commit refreshed `.mo` files before release.
 
 Add a README Weblate badge only after the hosted component URL exists.

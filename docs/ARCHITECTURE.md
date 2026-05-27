@@ -136,7 +136,7 @@ common changes and the specs that usually cover them.
 | Read-sync ledger, KOReader sidecar/history handling, worker polling, or reconciliation | `suwayomi/readsync/ledger.lua`, `suwayomi/readsync/koreader_metadata.lua`, `suwayomi/readsync/worker.lua`, `suwayomi/readsync/controller.lua` | read-sync specs |
 | Settings persistence, source filter drafts, debug logging, or redaction | `suwayomi/settings.lua`, `suwayomi/debug.lua` | settings/debug specs |
 | Plugin UI text, translation helpers, or shared i18n formatting | `suwayomi/i18n.lua`, then the specific UI/controller module that owns the string | `spec/suwayomi_i18n_spec.lua`, plus the owning module spec |
-| Runtime packaging or Android manual push payload | plugin root `_meta.lua`, `main.lua`, `README.md`, `suwayomi/`, plus `AGENTS.md` packaging notes | release/manual QA checks |
+| Runtime packaging or Android manual push payload | plugin root `_meta.lua`, `main.lua`, `README.md`, `suwayomi/`, compiled `l10n/*/suwayomi.mo`, plus `AGENTS.md` packaging notes | release/manual QA checks |
 
 ## Data And Packaging Boundaries
 

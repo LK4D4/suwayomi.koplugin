@@ -104,6 +104,7 @@ Translation catalog maintenance requires GNU gettext tools:
 ```bash
 ./scripts/update-l10n.sh
 ./scripts/check-l10n.sh
+./scripts/compile-l10n.sh
 ```
 
 See [docs/TRANSLATING.md](docs/TRANSLATING.md) for translator guidance and Weblate setup notes.
