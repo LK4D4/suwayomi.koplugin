@@ -22,6 +22,7 @@ describe("suwayomi/i18n/locales", function()
             "pl",
             "pt",
             "ru",
+            "uk",
             "vi",
             "zh_CN",
             "zh_TW",

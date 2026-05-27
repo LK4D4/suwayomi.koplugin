@@ -21,6 +21,7 @@ local SUPPORTED = {
     "pl",
     "pt",
     "ru",
+    "uk",
     "vi",
     "zh_CN",
     "zh_TW",

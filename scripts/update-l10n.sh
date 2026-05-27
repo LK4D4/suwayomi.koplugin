@@ -17,6 +17,7 @@ locales=(
     pl
     pt
     ru
+    uk
     vi
     zh_CN
     zh_TW
@@ -35,7 +36,7 @@ plural_forms() {
         fa|id|ja|ko|vi|zh_CN|zh_TW) printf '%s\n' 'nplurals=1; plural=0;' ;;
         fr) printf '%s\n' 'nplurals=2; plural=(n > 1);' ;;
         pl) printf '%s\n' 'nplurals=3; plural=n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2;' ;;
-        ru) printf '%s\n' 'nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2;' ;;
+        ru|uk) printf '%s\n' 'nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2;' ;;
         *) printf '%s\n' 'nplurals=2; plural=(n != 1);' ;;
     esac
 }
