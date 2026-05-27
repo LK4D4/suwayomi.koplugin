@@ -51,10 +51,10 @@ msgstr[1] "%1 розділи"
 msgstr[2] "%1 розділів"
 
 msgid "%1 failed for %2"
-msgstr "%1 не вдалося для %2"
+msgstr "Не вдалося виконати %1 для %2"
 
 msgid "%1 filters"
-msgstr "%1 фільтрів"
+msgstr "Фільтри: %1"
 
 msgid "%1 manga"
 msgid_plural "%1 manga"
@@ -336,7 +336,7 @@ msgstr[1] "Видалити %1 вибрані завантаження з при
 msgstr[2] "Видалити %1 вибраних завантажень з пристрою?"
 
 msgid "Delete after manual mark-read: %1"
-msgstr "Видаляти після ручної позначки прочитаним: %1"
+msgstr "Видаляти після ручного позначення як прочитаного: %1"
 
 msgid "Delete chapter settings are unavailable."
 msgstr "Налаштування видалення розділів недоступні."
@@ -440,7 +440,7 @@ msgid "Downloaded"
 msgstr "Завантажено"
 
 msgid "Downloaded chapters are in %1."
-msgstr "Завантажені розділи в %1."
+msgstr "Завантажені розділи збережено в %1."
 
 msgid "Downloading"
 msgstr "Завантаження"
@@ -570,23 +570,23 @@ msgid "Keep downloads"
 msgstr "Зберігати завантаження"
 
 msgid "Keep next 10 downloaded"
-msgstr "Тримати наступні 10 завантаженими"
+msgstr "Зберігати завантаженими наступні 10"
 
 msgid "Keep next 5 downloaded"
-msgstr "Тримати наступні 5 завантаженими"
+msgstr "Зберігати завантаженими наступні 5"
 
 msgid "Keep next 50 downloaded"
-msgstr "Тримати наступні 50 завантаженими"
+msgstr "Зберігати завантаженими наступні 50"
 
 msgid "Last read chapter"
 msgstr "Останній прочитаний розділ"
 
 msgctxt "source mode"
 msgid "Latest"
-msgstr "Останнє"
+msgstr "Новинки"
 
 msgid "Latest manga is not supported by this source."
-msgstr "Це джерело не підтримує останню манґу."
+msgstr "Це джерело не підтримує режим «Новинки»."
 
 msgid "Library"
 msgstr "Бібліотека"
@@ -785,13 +785,13 @@ msgstr[2] "Додати в чергу завантаження %1 непрочи
 
 msgid "Queue downloads for all %1 chapter?"
 msgid_plural "Queue downloads for all %1 chapters?"
-msgstr[0] "Додати в чергу завантаження для всього %1 розділу?"
+msgstr[0] "Додати в чергу завантаження для %1 розділу?"
 msgstr[1] "Додати в чергу завантаження для всіх %1 розділів?"
 msgstr[2] "Додати в чергу завантаження для всіх %1 розділів?"
 
 msgid "Queue downloads for all %1 unread chapter?"
 msgid_plural "Queue downloads for all %1 unread chapters?"
-msgstr[0] "Додати в чергу завантаження для всього %1 непрочитаного розділу?"
+msgstr[0] "Додати в чергу завантаження для %1 непрочитаного розділу?"
 msgstr[1] "Додати в чергу завантаження для всіх %1 непрочитаних розділів?"
 msgstr[2] "Додати в чергу завантаження для всіх %1 непрочитаних розділів?"
 
@@ -1127,19 +1127,19 @@ msgid "canceled"
 msgstr "скасовано"
 
 msgid "failed"
-msgstr "невдало"
+msgstr "не пройдено"
 
 msgid "no"
 msgstr "ні"
 
 msgid "not set"
-msgstr "не задано"
+msgstr "не вказано"
 
 msgid "not tested"
 msgstr "не перевірено"
 
 msgid "searching"
-msgstr "пошук"
+msgstr "триває пошук"
 
 msgid "source"
 msgstr "джерело"
@@ -1148,7 +1148,7 @@ msgid "tested"
 msgstr "перевірено"
 
 msgid "testing..."
-msgstr "перевірка..."
+msgstr "перевіряється"
 
 msgid "this chapter"
 msgstr "цей розділ"
