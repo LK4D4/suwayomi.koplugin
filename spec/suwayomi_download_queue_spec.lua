@@ -1210,6 +1210,50 @@ describe("suwayomi/downloads/queue", function()
         ))
     end)
 
+    it("clears recovered failed jobs when only a legacy unsuffixed archive exists locally", function()
+        local legacy_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz"
+        local context = build_queue({
+            downloader = {
+                getTargetPath = function(_, download_directory, manga, chapter)
+                    return download_directory .. "/" .. manga.title,
+                        download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
+                end,
+                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                findExistingChapterPath = function()
+                    return legacy_path
+                end,
+                chapterExists = function(_, chapter_path)
+                    return chapter_path == legacy_path
+                end,
+            },
+            saved_queue = {
+                {
+                    key = "m1:398",
+                    state = "failed",
+                    download_directory = "/books",
+                    progress = {
+                        state = "failed",
+                        current = 2,
+                        total = 2,
+                        error = "Could not finalize chapter archive.",
+                        updated_at = 99,
+                    },
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                },
+            },
+        })
+
+        context.queue:recover()
+
+        assert.are.same({}, context.saved_queue())
+        assert.are.equal(0, #context.scheduled)
+        assert.is_nil(context.queue:getStatus(
+            { id = "m1", title = "Sousou no Frieren" },
+            { id = "398", name = "Official_Vol. 1 Ch. 1" }
+        ))
+    end)
+
     it("logs recovered interrupted downloads with progress context", function()
         local context = build_queue({
             saved_queue = {

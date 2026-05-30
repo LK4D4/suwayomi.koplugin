@@ -93,6 +93,9 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         local chapter_path
         if download_directory and download_directory ~= "" then
             chapter_path = select(2, SuwayomiDownloader:getTargetPath(download_directory, manga, item))
+            if SuwayomiDownloader.findExistingChapterPath then
+                chapter_path = SuwayomiDownloader:findExistingChapterPath(download_directory, manga, item) or chapter_path
+            end
             chapter_exists = SuwayomiDownloader:chapterExists(chapter_path)
             local metadata_finished = chapter_exists and self:isChapterPathFinishedInKoreader(chapter_path)
             local history_read = chapter_exists and history_paths[chapter_path] == true

@@ -67,6 +67,27 @@ function Downloader:getTargetPath(download_directory, manga, chapter)
     return SuwayomiPaths.getTargetPath(download_directory, manga, chapter)
 end
 
+function Downloader:getChapterPathCandidates(download_directory, manga, chapter)
+    if SuwayomiPaths.getChapterPathCandidates then
+        return SuwayomiPaths.getChapterPathCandidates(download_directory, manga, chapter)
+    end
+    local _, chapter_path = self:getTargetPath(download_directory, manga, chapter)
+    return chapter_path and { chapter_path } or {}
+end
+
+function Downloader:findExistingPathInCandidates(candidates)
+    for _, path in ipairs(candidates or {}) do
+        if self:chapterExists(path) then
+            return path
+        end
+    end
+    return nil
+end
+
+function Downloader:findExistingChapterPath(download_directory, manga, chapter)
+    return self:findExistingPathInCandidates(self:getChapterPathCandidates(download_directory, manga, chapter))
+end
+
 function Downloader:getPartialPath(chapter_path)
     return tostring(chapter_path or "") .. ".part"
 end
@@ -390,7 +411,16 @@ function Downloader:isZipArchiveResult(archive_result, archive_path)
     return true
 end
 
-function Downloader:finalizePartialArchive(partial_path, chapter_path)
+function Downloader:finalizePartialArchive(partial_path, chapter_path, existing_path)
+    if existing_path then
+        self:cleanupPartialFile(partial_path)
+        return {
+            ok = true,
+            skipped = true,
+            path = existing_path,
+        }
+    end
+
     local renamed, rename_error = os.rename(partial_path, chapter_path)
     if renamed then
         return {
@@ -430,8 +460,9 @@ function Downloader:downloadDirectChapterArchive(credentials, download_directory
     end
 
     local manga_dir, chapter_path = self:getTargetPath(download_directory, manga, chapter)
-    if self:chapterExists(chapter_path) then
-        return { ok = true, skipped = true, path = chapter_path }
+    local existing_path = self:findExistingChapterPath(download_directory, manga, chapter)
+    if existing_path then
+        return { ok = true, skipped = true, path = existing_path }
     end
 
     local directory_ok, directory_error = self:ensureDirectory(manga_dir)
@@ -457,7 +488,7 @@ function Downloader:downloadDirectChapterArchive(credentials, download_directory
         return nil
     end
 
-    return self:finalizePartialArchive(partial_path, chapter_path)
+    return self:finalizePartialArchive(partial_path, chapter_path, self:findExistingChapterPath(download_directory, manga, chapter))
 end
 
 function Downloader:writeProgress(progress_path, state, current, total, path, error_message)
@@ -490,9 +521,11 @@ function Downloader:startChapterDownload(credentials, download_directory, manga,
     end
 
     local manga_dir, chapter_path = self:getTargetPath(download_directory, manga, chapter)
-    if self:chapterExists(chapter_path) then
-        return { ok = true, skipped = true, path = chapter_path }
+    local existing_path = self:findExistingChapterPath(download_directory, manga, chapter)
+    if existing_path then
+        return { ok = true, skipped = true, path = existing_path }
     end
+    local chapter_path_candidates = self:getChapterPathCandidates(download_directory, manga, chapter)
     local partial_path = self:getPartialPath(chapter_path)
 
     local page_result = callWithTransientRetry(function()
@@ -525,6 +558,7 @@ function Downloader:startChapterDownload(credentials, download_directory, manga,
             pages = page_result.pages,
             writer = writer,
             chapter_path = chapter_path,
+            chapter_path_candidates = chapter_path_candidates,
             partial_path = partial_path,
             current = 0,
             written = 0,
@@ -559,6 +593,19 @@ function Downloader:finalizeChapterArchive(job)
             current = job.current,
             total = #job.pages,
             path = job.chapter_path,
+        }
+    end
+
+    local existing_path = self:findExistingPathInCandidates(job.chapter_path_candidates)
+    if existing_path then
+        self:cleanupPartialFile(job.partial_path)
+        return {
+            ok = true,
+            done = true,
+            skipped = true,
+            current = job.current,
+            total = #job.pages,
+            path = existing_path,
         }
     end
 
@@ -675,7 +722,7 @@ function Downloader:downloadChapter(credentials, download_directory, manga, chap
         end
     until result.done
 
-    return { ok = true, skipped = result and result.skipped, path = start_result.path }
+    return { ok = true, skipped = result and result.skipped, path = (result and result.path) or start_result.path }
 end
 
 function Downloader:downloadChapterWithProgress(credentials, download_directory, manga, chapter, progress_path)
@@ -721,7 +768,7 @@ function Downloader:downloadChapterWithProgress(credentials, download_directory,
         )
     until result.done
 
-    return { ok = true, path = start_result.path }
+    return { ok = true, skipped = result and result.skipped, path = (result and result.path) or start_result.path }
 end
 
 return Downloader

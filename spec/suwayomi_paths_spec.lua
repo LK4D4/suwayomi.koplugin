@@ -153,4 +153,23 @@ describe("suwayomi/paths", function()
         assert.are.equal("/books/MangaDex (EN)/Frieren/Chapter 1 [id-399].cbz", second)
         assert.are.equal("/books/MangaDex (EN)/Frieren/Chapter 1 [order-3].cbz", no_id)
     end)
+
+    it("lists canonical and legacy chapter archive path candidates", function()
+        local paths = load_paths()
+
+        assert.are.same({
+            "/books/MangaDex (EN)/Frieren/Chapter 1 [id-398].cbz",
+            "/books/MangaDex (EN)/Frieren/Chapter 1.cbz",
+            "/books/MangaDex (EN)/Frieren/Chapter 1 [order-7].cbz",
+            "/books/MangaDex (EN)/Frieren/Chapter 1 [chapter-1].cbz",
+        }, paths.getChapterPathCandidates("/books", {
+            title = "Frieren",
+            source = { displayName = "MangaDex (EN)" },
+        }, {
+            id = "398",
+            name = "Chapter 1",
+            source_order = 7,
+            chapter_number = 1,
+        }))
+    end)
 end)

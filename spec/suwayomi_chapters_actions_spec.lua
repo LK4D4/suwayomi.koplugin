@@ -74,9 +74,13 @@ describe("suwayomi/chapters/actions", function()
         downloader = {
             existing = options.existing or {},
             getTargetPath = function(_, download_directory, target_manga, target_chapter)
+                if options.get_target_path then
+                    return options.get_target_path(download_directory, target_manga, target_chapter)
+                end
                 return download_directory .. "/" .. target_manga.title,
                     download_directory .. "/" .. target_manga.title .. "/" .. target_chapter.name .. ".cbz"
             end,
+            findExistingChapterPath = options.find_existing_chapter_path,
             chapterExists = function(self, path)
                 return self.existing[path] == true
             end,
@@ -285,6 +289,25 @@ describe("suwayomi/chapters/actions", function()
             existing = {
                 ["/downloads/Manga/Chapter 1.cbz"] = true,
             },
+        })
+
+        local downloaded, chapter_path = plugin:isChapterDownloaded(manga, chapter)
+
+        assert.is_true(downloaded)
+        assert.are.equal("/downloads/Manga/Chapter 1.cbz", chapter_path)
+    end)
+
+    it("reports downloaded chapters when only a legacy unsuffixed archive exists", function()
+        local plugin = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+            },
+            get_target_path = function(download_directory)
+                return download_directory .. "/Manga", download_directory .. "/Manga/Chapter 1 [id-c1].cbz"
+            end,
+            find_existing_chapter_path = function()
+                return "/downloads/Manga/Chapter 1.cbz"
+            end,
         })
 
         local downloaded, chapter_path = plugin:isChapterDownloaded(manga, chapter)

@@ -466,6 +466,51 @@ describe("suwayomi/downloads/downloader", function()
         assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", result.path)
     end)
 
+    it("skips downloading when a legacy unsuffixed cbz already exists", function()
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/api"] = nil
+        package.loaded["suwayomi/fs"] = nil
+        package.loaded.lfs = nil
+        package.loaded["ffi/archiver"] = nil
+        package.loaded["ffi/util"] = nil
+        package.preload["suwayomi/api"] = function()
+            return {
+                fetchChapterPages = function()
+                    error("should not fetch pages for an existing legacy file")
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function(path, attribute)
+                    if path == "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz" and attribute == "mode" then
+                        return "file"
+                    end
+                end,
+            }
+        end
+        package.preload["ffi/archiver"] = function()
+            return {}
+        end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    if base:sub(-1) == "/" then
+                        return base .. segment
+                    end
+                    return base .. "/" .. segment
+                end,
+            }
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter({}, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
+
+        assert.is_true(result.ok)
+        assert.is_true(result.skipped)
+        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1.cbz", result.path)
+    end)
+
     it("builds a cbz from fetched page bytes", function()
         local added_files = {}
         local renamed_from

@@ -26,6 +26,13 @@ function Methods:getChapterPath(manga, chapter)
     end
 
     local SuwayomiDownloader = require("suwayomi/downloads/downloader")
+    if SuwayomiDownloader.findExistingChapterPath then
+        local existing_path = SuwayomiDownloader:findExistingChapterPath(download_directory, manga, chapter)
+        if existing_path then
+            return existing_path
+        end
+    end
+
     local _, chapter_path = SuwayomiDownloader:getTargetPath(download_directory, manga, chapter)
     return chapter_path
 end
@@ -37,6 +44,13 @@ function Methods:isChapterDownloaded(manga, chapter)
     end
 
     local SuwayomiDownloader = require("suwayomi/downloads/downloader")
+    if SuwayomiDownloader.findExistingChapterPath then
+        local download_directory = SuwayomiSettings:loadDownloadDirectory()
+        local existing_path = SuwayomiDownloader:findExistingChapterPath(download_directory, manga, chapter)
+        if existing_path then
+            return true, existing_path
+        end
+    end
     return SuwayomiDownloader:chapterExists(chapter_path), chapter_path
 end
 

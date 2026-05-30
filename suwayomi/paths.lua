@@ -26,6 +26,13 @@ local function present(value)
     return value
 end
 
+local function appendUnique(list, seen, value)
+    if value and value ~= "" and not seen[value] then
+        seen[value] = true
+        table.insert(list, value)
+    end
+end
+
 function SuwayomiPaths.sanitizePathSegment(name)
     local sanitized = tostring(name or "")
         :gsub("%c+", " ")
@@ -71,17 +78,43 @@ function SuwayomiPaths.getMangaDirectory(download_directory, manga)
 end
 
 function SuwayomiPaths.getChapterFilename(chapter)
+    return SuwayomiPaths.getChapterFilenames(chapter)[1]
+end
+
+function SuwayomiPaths.getChapterFilenames(chapter)
     local name = SuwayomiPaths.sanitizePathSegment(chapter and chapter.name)
-    if chapter and chapter.id ~= nil and tostring(chapter.id) ~= "" then
-        return name .. " [id-" .. SuwayomiPaths.sanitizePathSegment(chapter.id) .. "].cbz"
+    local filenames = {}
+    local seen = {}
+    local plain = name .. ".cbz"
+    local id = chapter and present(chapter.id)
+    local source_order = chapter and present(chapter.source_order)
+    local chapter_number = chapter and present(chapter.chapter_number)
+
+    local function addStable(label, value)
+        if value then
+            appendUnique(filenames, seen, name .. " [" .. label .. "-" .. SuwayomiPaths.sanitizePathSegment(value) .. "].cbz")
+        end
     end
-    if chapter and chapter.source_order ~= nil and tostring(chapter.source_order) ~= "" then
-        return name .. " [order-" .. SuwayomiPaths.sanitizePathSegment(chapter.source_order) .. "].cbz"
+
+    -- Keep current collision-safe target first, then recognize older local names.
+    if id then
+        addStable("id", id)
+    elseif source_order then
+        addStable("order", source_order)
+    elseif chapter_number then
+        addStable("chapter", chapter_number)
     end
-    if chapter and chapter.chapter_number ~= nil and tostring(chapter.chapter_number) ~= "" then
-        return name .. " [chapter-" .. SuwayomiPaths.sanitizePathSegment(chapter.chapter_number) .. "].cbz"
+
+    appendUnique(filenames, seen, plain)
+
+    if id then
+        addStable("order", source_order)
+        addStable("chapter", chapter_number)
+    elseif source_order then
+        addStable("chapter", chapter_number)
     end
-    return name .. ".cbz"
+
+    return filenames
 end
 
 function SuwayomiPaths.getChapterPath(download_directory, manga, chapter)
@@ -93,6 +126,19 @@ function SuwayomiPaths.getChapterPath(download_directory, manga, chapter)
         manga_dir,
         SuwayomiPaths.getChapterFilename(chapter)
     )
+end
+
+function SuwayomiPaths.getChapterPathCandidates(download_directory, manga, chapter)
+    local manga_dir = SuwayomiPaths.getMangaDirectory(download_directory, manga)
+    if not manga_dir then
+        return {}
+    end
+
+    local candidates = {}
+    for _, filename in ipairs(SuwayomiPaths.getChapterFilenames(chapter)) do
+        table.insert(candidates, FFIUtil.joinPath(manga_dir, filename))
+    end
+    return candidates
 end
 
 function SuwayomiPaths.getTargetPath(download_directory, manga, chapter)

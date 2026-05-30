@@ -245,6 +245,9 @@ function DownloadQueue:getExistingArchivePath(job, progress)
     if chapter_path and self.downloader:chapterExists(chapter_path) == true then
         return chapter_path
     end
+    if self.downloader.findExistingChapterPath and job and job.download_directory and job.manga and job.chapter then
+        return self.downloader:findExistingChapterPath(job.download_directory, job.manga, job.chapter)
+    end
     return nil
 end
 
