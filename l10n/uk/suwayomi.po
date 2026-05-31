@@ -54,7 +54,7 @@ msgid "%1 failed for %2"
 msgstr "Не вдалося виконати %1 для %2"
 
 msgid "%1 filters"
-msgstr "Фільтри: %1"
+msgstr "Фільтри %1"
 
 msgid "%1 manga"
 msgid_plural "%1 manga"
@@ -127,7 +127,7 @@ msgid "Apply filters"
 msgstr "Застосувати фільтри"
 
 msgid "Apply saved filter"
-msgstr ""
+msgstr "Застосувати збережений фільтр"
 
 msgid "Artist"
 msgstr "Художник"
@@ -261,7 +261,7 @@ msgid "Could not connect to Suwayomi."
 msgstr "Не вдалося під'єднатися до Suwayomi."
 
 msgid "Could not delete saved filter."
-msgstr ""
+msgstr "Не вдалося видалити збережений фільтр."
 
 msgid "Could not delete this chapter from device."
 msgstr "Не вдалося видалити цей розділ із пристрою."
@@ -285,7 +285,7 @@ msgid "Could not load manga."
 msgstr "Не вдалося завантажити манґу."
 
 msgid "Could not load saved filters."
-msgstr ""
+msgstr "Не вдалося завантажити збережені фільтри."
 
 msgid "Could not load source filters."
 msgstr "Не вдалося завантажити фільтри джерела."
@@ -294,7 +294,7 @@ msgid "Could not retry download."
 msgstr "Не вдалося повторити завантаження."
 
 msgid "Could not save saved filter."
-msgstr ""
+msgstr "Не вдалося зберегти фільтр."
 
 msgid "Could not start chapter download: %1"
 msgstr "Не вдалося почати завантаження розділу: %1"
@@ -369,10 +369,10 @@ msgid "Delete read downloads"
 msgstr "Видалити прочитані завантаження"
 
 msgid "Delete saved filter"
-msgstr ""
+msgstr "Видалити збережений фільтр"
 
 msgid "Delete saved filter \"%1\"?"
-msgstr ""
+msgstr "Видалити збережений фільтр \"%1\"?"
 
 msgid "Delete while reading: %1"
 msgstr "Видаляти під час читання: %1"
@@ -544,7 +544,7 @@ msgid "Filter"
 msgstr "Фільтр"
 
 msgid "Filter name"
-msgstr ""
+msgstr "Назва фільтра"
 
 msgid "First unread"
 msgstr "Перший непрочитаний"
@@ -718,7 +718,7 @@ msgid "No results"
 msgstr "Немає результатів"
 
 msgid "No saved filters."
-msgstr ""
+msgstr "Немає збережених фільтрів."
 
 msgid "No selected chapters were deleted."
 msgstr "Жоден вибраний розділ не видалено."
@@ -769,7 +769,7 @@ msgid "Open next unread"
 msgstr "Відкрити наступний непрочитаний"
 
 msgid "Overwrite saved filter \"%1\"?"
-msgstr ""
+msgstr "Перезаписати збережений фільтр \"%1\"?"
 
 msgid "Parallel chapter downloads"
 msgstr "Паралельні завантаження розділів"
@@ -882,28 +882,28 @@ msgid "Save"
 msgstr "Зберегти"
 
 msgid "Save current filter"
-msgstr ""
+msgstr "Зберегти поточний фільтр"
 
 msgid "Save filter"
-msgstr ""
+msgstr "Зберегти фільтр"
 
 msgid "Saved filter deleted."
-msgstr ""
+msgstr "Фільтр видалено."
 
 msgid "Saved filter saved."
-msgstr ""
+msgstr "Фільтр збережено."
 
 msgid "Saved filter saved. Invalid saved filters metadata was replaced."
-msgstr ""
+msgstr "Фільтр збережено. Некоректні метадані збережених фільтрів замінено."
 
 msgid "Saved filters"
-msgstr ""
+msgstr "Збережені фільтри"
 
 msgid "Saved filters are not supported by this server."
-msgstr ""
+msgstr "Сервер не підтримує збережені фільтри."
 
 msgid "Saved filters metadata is not valid JSON."
-msgstr ""
+msgstr "Метадані збережених фільтрів не є коректним JSON."
 
 msgid "Scanlator filter"
 msgstr "Фільтр сканлейтора"

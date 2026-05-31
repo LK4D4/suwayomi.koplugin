@@ -109,7 +109,7 @@ msgid "Apply filters"
 msgstr "应用筛选"
 
 msgid "Apply saved filter"
-msgstr ""
+msgstr "应用已保存的筛选器"
 
 msgid "Artist"
 msgstr "画师"
@@ -241,7 +241,7 @@ msgid "Could not connect to Suwayomi."
 msgstr "无法连接到 Suwayomi。"
 
 msgid "Could not delete saved filter."
-msgstr ""
+msgstr "无法删除已保存的筛选器。"
 
 msgid "Could not delete this chapter from device."
 msgstr "无法从设备删除此章节。"
@@ -265,7 +265,7 @@ msgid "Could not load manga."
 msgstr "无法加载漫画。"
 
 msgid "Could not load saved filters."
-msgstr ""
+msgstr "无法加载已保存的筛选器。"
 
 msgid "Could not load source filters."
 msgstr "无法加载源筛选器。"
@@ -274,7 +274,7 @@ msgid "Could not retry download."
 msgstr "无法重试下载。"
 
 msgid "Could not save saved filter."
-msgstr ""
+msgstr "无法保存筛选器。"
 
 msgid "Could not start chapter download: %1"
 msgstr "无法开始章节下载：%1"
@@ -345,10 +345,10 @@ msgid "Delete read downloads"
 msgstr "删除已读下载"
 
 msgid "Delete saved filter"
-msgstr ""
+msgstr "删除已保存的筛选器"
 
 msgid "Delete saved filter \"%1\"?"
-msgstr ""
+msgstr "要删除已保存的筛选器“%1”吗？"
 
 msgid "Delete while reading: %1"
 msgstr "阅读时删除：%1"
@@ -514,7 +514,7 @@ msgid "Filter"
 msgstr "筛选"
 
 msgid "Filter name"
-msgstr ""
+msgstr "筛选器名称"
 
 msgid "First unread"
 msgstr "第一个未读章节"
@@ -686,7 +686,7 @@ msgid "No results"
 msgstr "没有结果"
 
 msgid "No saved filters."
-msgstr ""
+msgstr "没有已保存的筛选器。"
 
 msgid "No selected chapters were deleted."
 msgstr "未删除选中的章节。"
@@ -737,7 +737,7 @@ msgid "Open next unread"
 msgstr "打开下一个未读章节"
 
 msgid "Overwrite saved filter \"%1\"?"
-msgstr ""
+msgstr "要覆盖已保存的筛选器“%1”吗？"
 
 msgid "Parallel chapter downloads"
 msgstr "并行章节下载"
@@ -832,28 +832,28 @@ msgid "Save"
 msgstr "保存"
 
 msgid "Save current filter"
-msgstr ""
+msgstr "保存当前筛选器"
 
 msgid "Save filter"
-msgstr ""
+msgstr "保存筛选器"
 
 msgid "Saved filter deleted."
-msgstr ""
+msgstr "筛选器已删除。"
 
 msgid "Saved filter saved."
-msgstr ""
+msgstr "筛选器已保存。"
 
 msgid "Saved filter saved. Invalid saved filters metadata was replaced."
-msgstr ""
+msgstr "筛选器已保存。已替换无效的已保存筛选器元数据。"
 
 msgid "Saved filters"
-msgstr ""
+msgstr "已保存的筛选器"
 
 msgid "Saved filters are not supported by this server."
-msgstr ""
+msgstr "此服务器不支持已保存的筛选器。"
 
 msgid "Saved filters metadata is not valid JSON."
-msgstr ""
+msgstr "已保存筛选器的元数据不是有效的 JSON。"
 
 msgid "Scanlator filter"
 msgstr "汉化组筛选器"
