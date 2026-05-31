@@ -458,6 +458,54 @@ describe("suwayomi plugin", function()
         assert.is_false(plugin:isSuwayomiScreenActive(library))
     end)
 
+    it("closes a source filter branch when Close plugin is selected from home", function()
+        local plugin = build_plugin()
+        local sources = { name = "sources" }
+        local filter_editor = { name = "source-filters" }
+        local saved_filters = { name = "saved-filters" }
+
+        plugin:trackSuwayomiScreen("browse-sources", sources)
+        plugin:trackSuwayomiScreen("source-filters", filter_editor)
+        plugin:trackSuwayomiScreen("saved-filters", saved_filters)
+        plugin:showHome()
+
+        runtime.shown_home_dialog.actions[6].callback()
+
+        assert.are.same({ runtime.shown_home_dialog, saved_filters, filter_editor, sources }, runtime.closed_widgets)
+        assert.is_false(plugin:isSuwayomiScreenActive(runtime.shown_home_dialog))
+        assert.is_false(plugin:isSuwayomiScreenActive(saved_filters))
+        assert.is_false(plugin:isSuwayomiScreenActive(filter_editor))
+        assert.is_false(plugin:isSuwayomiScreenActive(sources))
+    end)
+
+    it("closes the source menu after source row selection fires its close callback", function()
+        local plugin = build_plugin()
+        local source_close_calls = 0
+        local sources = {
+            name = "sources",
+            close_callback = function()
+                source_close_calls = source_close_calls + 1
+            end,
+        }
+        local filter_editor = { name = "source-filters" }
+        local browse_results = { name = "browse-results" }
+
+        plugin:trackSuwayomiScreen("browse-sources", sources)
+        sources.close_callback()
+        plugin:trackSuwayomiScreen("source-filters", filter_editor)
+        plugin:trackSuwayomiScreen("browse-results", browse_results)
+        plugin:showHome()
+
+        runtime.shown_home_dialog.actions[6].callback()
+
+        assert.are.same({ runtime.shown_home_dialog, browse_results, filter_editor, sources }, runtime.closed_widgets)
+        assert.are.equal(2, source_close_calls)
+        assert.is_false(plugin:isSuwayomiScreenActive(runtime.shown_home_dialog))
+        assert.is_false(plugin:isSuwayomiScreenActive(browse_results))
+        assert.is_false(plugin:isSuwayomiScreenActive(filter_editor))
+        assert.is_false(plugin:isSuwayomiScreenActive(sources))
+    end)
+
     it("preserves previous screens when navigating from the hub", function()
         local library = { name = "library" }
         local browse = { name = "browse" }

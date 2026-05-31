@@ -78,7 +78,7 @@ describe("suwayomi/navigation", function()
         assert.is_false(navigator:contains(third))
     end)
 
-    it("current widget close_callback removes the widget and calls original callback", function()
+    it("current widget close_callback preserves tracking and calls original callback", function()
         local Navigation = load_navigation()
         local navigator = Navigation.new(ui_manager)
         local original_calls = 0
@@ -93,8 +93,8 @@ describe("suwayomi/navigation", function()
 
         assert.are.equal(0, #closed)
         assert.are.equal(1, original_calls)
-        assert.is_false(navigator:contains(widget))
-        assert.is_false(navigator:isCurrent(widget))
+        assert.is_true(navigator:contains(widget))
+        assert.is_true(navigator:isCurrent(widget))
     end)
 
     it("non-current widget close_callback preserves navigation tracking", function()
@@ -133,6 +133,24 @@ describe("suwayomi/navigation", function()
         assert.are.same({ manga_actions, library }, closed)
         assert.is_false(navigator:contains(library))
         assert.is_false(navigator:contains(manga_actions))
+    end)
+
+    it("closeAll closes a current menu after row selection fires close_callback", function()
+        local Navigation = load_navigation()
+        local navigator = Navigation.new(ui_manager)
+        local source_menu = {
+            close_callback = function() end,
+        }
+        local filter_menu = {}
+
+        navigator:push("browse-sources", source_menu)
+        source_menu.close_callback()
+        navigator:push("source-filters", filter_menu)
+        navigator:closeAll()
+
+        assert.are.same({ filter_menu, source_menu }, closed)
+        assert.is_false(navigator:contains(source_menu))
+        assert.is_false(navigator:contains(filter_menu))
     end)
 
     it("closeAll calls the original close_callback exactly once", function()

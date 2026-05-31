@@ -45,12 +45,17 @@ local query_exports = {
     "_buildLegacyFetchExtensionsMutation",
     "_buildUpdateExtensionMutation",
     "_buildLegacyUpdateExtensionMutation",
+    "_buildSourceMetadataQuery",
+    "_buildSetSourceSavedSearchesMutation",
 }
 
 local parser_exports = {
     "parseSourcesResponse",
     "parseSourceFiltersResponse",
     "isSourceFiltersFieldError",
+    "parseSourceMetadataResponse",
+    "parseSetSourceMetasResponse",
+    "isSourceMetadataFieldError",
     "isOptionalMangaMetadataFieldError",
     "parseExtensionsResponse",
     "parseUpdateExtensionResponse",
@@ -225,6 +230,65 @@ function SuwayomiAPI.fetchSourceFilters(credentials, source_id)
         ok = true,
         source = parsed.source,
         filters = parsed.filters,
+    }
+end
+
+function SuwayomiAPI.fetchSourceMetadata(credentials, source_id)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildSourceMetadataQuery(source_id), "fetchSourceMetadata")
+    if not result.ok then
+        return result
+    end
+    if parsers.isSourceMetadataFieldError(result.response_body) then
+        return {
+            ok = false,
+            error = "Saved filters are not supported by this server.",
+        }
+    end
+
+    local parsed, parse_error = SuwayomiAPI.parseSourceMetadataResponse(result.response_body)
+    if not parsed then
+        logDebugEvent({ operation = "fetchSourceMetadata", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        source = parsed.source,
+        meta = parsed.meta,
+    }
+end
+
+function SuwayomiAPI.setSourceSavedSearches(credentials, source_id, saved_searches_json)
+    local result = performGraphQLRequest(
+        credentials,
+        SuwayomiAPI._buildSetSourceSavedSearchesMutation(source_id, saved_searches_json),
+        "setSourceSavedSearches"
+    )
+    if not result.ok then
+        return result
+    end
+    if parsers.isSourceMetadataFieldError(result.response_body) then
+        return {
+            ok = false,
+            error = "Saved filters are not supported by this server.",
+        }
+    end
+
+    local parsed, parse_error = SuwayomiAPI.parseSetSourceMetasResponse(result.response_body)
+    if not parsed then
+        logDebugEvent({ operation = "setSourceSavedSearches", event = "parse_error", error = parse_error })
+        return {
+            ok = false,
+            error = parse_error,
+        }
+    end
+
+    return {
+        ok = true,
+        meta = parsed.meta,
     }
 end
 

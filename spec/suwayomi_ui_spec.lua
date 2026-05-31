@@ -600,6 +600,10 @@ describe("suwayomi/ui", function()
         local selected
 
         assert.is_function(ui.showSourceFilterEditor)
+        assert.is_function(ui.showSavedFiltersMenu)
+        assert.is_function(ui.showSavedFilterNamePrompt)
+        assert.is_function(ui.showDeleteSavedFilterConfirm)
+        assert.is_function(ui.showOverwriteSavedFilterConfirm)
         ui.showMangaMenu({
             { id = "m1", title = "One Piece" },
         }, function(manga)

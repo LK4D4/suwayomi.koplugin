@@ -384,6 +384,90 @@ function Parsers.isSourceFiltersFieldError(response_body)
     return false
 end
 
+local function parseMetaNode(meta)
+    if type(meta) ~= "table" or meta.key == nil or meta.value == nil then
+        return nil
+    end
+    return {
+        key = tostring(meta.key),
+        value = tostring(meta.value),
+        source_id = meta.sourceId ~= nil and tostring(meta.sourceId) or nil,
+    }
+end
+
+function Parsers.parseSourceMetadataResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local source = payload and payload.data and payload.data.source
+    if type(source) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not return source metadata."
+    end
+
+    local meta = {}
+    for _, raw_meta in ipairs(type(source.meta) == "table" and source.meta or {}) do
+        local parsed = parseMetaNode(raw_meta)
+        if parsed then
+            parsed.source_id = nil
+            table.insert(meta, parsed)
+        end
+    end
+
+    return {
+        source = {
+            id = source.id ~= nil and tostring(source.id) or nil,
+        },
+        meta = meta,
+    }
+end
+
+function Parsers.parseSetSourceMetasResponse(response_body)
+    local payload, _, err = json.decode(response_body, 1, nil)
+    if err then
+        return nil, "Invalid response from Suwayomi server."
+    end
+
+    local meta_nodes = payload and payload.data and payload.data.setSourceMetas and payload.data.setSourceMetas.metas
+    if type(meta_nodes) ~= "table" then
+        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
+        return nil, graph_error or "Suwayomi server did not update source metadata."
+    end
+
+    local meta = {}
+    for _, raw_meta in ipairs(meta_nodes) do
+        local parsed = parseMetaNode(raw_meta)
+        if parsed then
+            table.insert(meta, parsed)
+        end
+    end
+
+    return {
+        meta = meta,
+    }
+end
+
+function Parsers.isSourceMetadataFieldError(response_body)
+    local payload = json.decode(response_body, 1, nil)
+    if type(payload) ~= "table" or type(payload.errors) ~= "table" then
+        return false
+    end
+
+    for _, graph_error in ipairs(payload.errors) do
+        local message = tostring(graph_error and graph_error.message or "")
+        local mentions_metadata = message:match("meta") or message:match("setSourceMetas")
+        local looks_like_schema_error = message:match("Cannot query field")
+            or message:match("Unknown field")
+            or message:match("FieldUndefined")
+        if mentions_metadata and looks_like_schema_error then
+            return true
+        end
+    end
+    return false
+end
+
 function Parsers.parseExtensionsResponse(response_body)
     local payload, _, err = json.decode(response_body, 1, nil)
     if err then

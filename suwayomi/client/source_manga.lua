@@ -1,6 +1,6 @@
 -- Boundary: source manga browse flow.
 --
--- Responsibility: render source modes/results, manage cancellable source manga loading, and refresh browse rows.
+-- Responsibility: render source modes/results, manage saved filters and cancellable source manga loading, and refresh browse rows.
 -- Owned state: installed methods only; runtime state remains on SuwayomiClient instances.
 -- Dependencies: SuwayomiClient core helpers and injected runtime services.
 -- External data: validated by the moved methods before UI rendering or worker use.
@@ -8,8 +8,13 @@
 local util = require("suwayomi/client/util")
 local SourceFilters = require("suwayomi/source_filters")
 local I18n = require("suwayomi/i18n")
+local json = require("dkjson")
 local copyOptions = util.copyOptions
 local trim = util.trim
+local SAVED_SEARCHES_META_KEY = "webUI_savedSearches"
+local SAVED_FILTERS_UNSUPPORTED_MESSAGE = "Saved filters are not supported by this server."
+local SAVED_FILTERS_UNSUPPORTED_ERROR = "__suwayomi_saved_filters_unsupported__"
+local SAVED_FILTERS_INVALID_METADATA_ERROR = "__suwayomi_saved_filters_invalid_metadata__"
 
 local M = {}
 
@@ -222,6 +227,255 @@ function SuwayomiClient:clearSourceFilterDraft(credentials, source)
     end
 end
 
+local function findSourceMetaValue(meta, key)
+    for _, entry in ipairs(type(meta) == "table" and meta or {}) do
+        if type(entry) == "table" and entry.key == key then
+            return entry.value
+        end
+    end
+    return nil
+end
+
+local function decodeSavedSearches(value)
+    if type(value) ~= "string" or value == "" then
+        return {}
+    end
+    local decoded, _, err = json.decode(value, 1, nil)
+    if err or type(decoded) ~= "table" then
+        return nil, SAVED_FILTERS_INVALID_METADATA_ERROR
+    end
+    return decoded
+end
+
+local function sourceSavedFiltersUnsupported(error_text)
+    return error_text == SAVED_FILTERS_UNSUPPORTED_ERROR
+        or error_text == SAVED_FILTERS_UNSUPPORTED_MESSAGE
+end
+
+local function sourceSavedFiltersInvalidMetadata(error_text)
+    return error_text == SAVED_FILTERS_INVALID_METADATA_ERROR
+end
+
+local function removeSavedFilterByName(entries, name)
+    local kept = {}
+    for _, entry in ipairs(type(entries) == "table" and entries or {}) do
+        if entry.name ~= name then
+            table.insert(kept, entry)
+        end
+    end
+    return kept
+end
+
+local function savedFilterNameExists(entries, name)
+    for _, entry in ipairs(type(entries) == "table" and entries or {}) do
+        if entry.name == name then
+            return true
+        end
+    end
+    return false
+end
+
+local function redactSavedFilterErrorDetail(detail)
+    local secret_value = "[^%s,;]+"
+    local header_value = "[^,]+"
+    detail = detail:gsub("https?://[^%s]+", "<redacted>")
+    detail = detail:gsub("[A-Za-z]:[\\/][^,]+", "<redacted>")
+    detail = detail:gsub("/[^,]+", "<redacted>")
+    detail = detail:gsub(
+        "([Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]%s*[:=]%s*)" .. header_value,
+        "%1<redacted>"
+    )
+    detail = detail:gsub("([Cc][Oo][Oo][Kk][Ii][Ee]%s*[:=]%s*)" .. header_value, "%1<redacted>")
+
+    local credential_patterns = {
+        "([Tt][Oo][Kk][Ee][Nn]%s*[:=]%s*)" .. secret_value,
+        "([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]%s*[:=]%s*)" .. secret_value,
+        "([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]%s+)" .. secret_value,
+        "([Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]%s*:%s*)" .. secret_value,
+        "([Cc][Oo][Oo][Kk][Ii][Ee]%s*[:=]%s*)" .. secret_value,
+        "([Ss][Ee][Cc][Rr][Ee][Tt]%s*[:=]%s*)" .. secret_value,
+        "([Ss][Ee][Cc][Rr][Ee][Tt]%s+)" .. secret_value,
+    }
+    for _, pattern in ipairs(credential_patterns) do
+        detail = detail:gsub(pattern, "%1<redacted>")
+    end
+
+    return detail
+end
+
+local function normalizeSavedFilterErrorDetail(error_text)
+    local detail = trim(error_text)
+    if detail == "" then
+        return nil
+    end
+    detail = redactSavedFilterErrorDetail(detail)
+    detail = detail:gsub("%s+", " ")
+    if #detail > 180 then
+        detail = detail:sub(1, 177) .. "..."
+    end
+    return detail
+end
+
+local function appendSavedFilterErrorDetail(fallback, error_text)
+    local detail = normalizeSavedFilterErrorDetail(error_text)
+    if not detail then
+        return fallback
+    end
+    local prefix = tostring(fallback or ""):gsub("[%.。]$", "")
+    if prefix == "" then
+        return detail
+    end
+    return prefix .. ": " .. detail
+end
+
+function SuwayomiClient:showSavedFilterFailure(error_text, fallback)
+    if sourceSavedFiltersUnsupported(error_text) then
+        self.plugin:showMessage(I18n.t("Saved filters are not supported by this server."))
+        return
+    end
+    if sourceSavedFiltersInvalidMetadata(error_text) then
+        self.plugin:showMessage(
+            appendSavedFilterErrorDetail(fallback, I18n.t("Saved filters metadata is not valid JSON."))
+        )
+        return
+    end
+    self.plugin:showMessage(appendSavedFilterErrorDetail(fallback, error_text))
+end
+
+function SuwayomiClient:loadSourceSavedFilterState(credentials, source)
+    if not self.api or not self.api.fetchSourceMetadata then
+        return nil, SAVED_FILTERS_UNSUPPORTED_ERROR
+    end
+    local result = self.api.fetchSourceMetadata(credentials, source and source.id)
+    if not result or not result.ok then
+        return nil, result and result.error or I18n.t("Could not load saved filters.")
+    end
+
+    local saved_searches, decode_error = decodeSavedSearches(findSourceMetaValue(result.meta, SAVED_SEARCHES_META_KEY))
+    if not saved_searches then
+        return nil, decode_error
+    end
+    return {
+        entries = SourceFilters.normalizeSavedSearches(saved_searches),
+    }
+end
+
+function SuwayomiClient:writeSourceSavedFilterEntries(credentials, source, entries, failure_message)
+    if not self.api or not self.api.setSourceSavedSearches then
+        self:showSavedFilterFailure(SAVED_FILTERS_UNSUPPORTED_ERROR, failure_message)
+        return false
+    end
+    local payload = json.encode(SourceFilters.savedSearchesToMap(entries))
+    local result = self.api.setSourceSavedSearches(credentials, source and source.id, payload)
+    if not result or not result.ok then
+        self:showSavedFilterFailure(result and result.error, failure_message)
+        return false
+    end
+    return true
+end
+
+function SuwayomiClient:showSaveSourceFilterPrompt(credentials, source, draft)
+    if not self.ui.showSavedFilterNamePrompt then
+        self.plugin:showMessage(I18n.t("Could not save saved filter."))
+        return
+    end
+    draft = SourceFilters.normalizeDraft(draft)
+    return self.ui.showSavedFilterNamePrompt("", function(name)
+        name = trim(name)
+        if name == "" then
+            self.plugin:showMessage(I18n.t("Filter name"))
+            return
+        end
+        local state, load_error = self:loadSourceSavedFilterState(credentials, source)
+        local repaired_invalid_metadata = false
+        if not state then
+            if sourceSavedFiltersInvalidMetadata(load_error) then
+                state = { entries = {} }
+                repaired_invalid_metadata = true
+            else
+                self:showSavedFilterFailure(load_error, I18n.t("Could not save saved filter."))
+                return
+            end
+        end
+        local save = function()
+            local entries = removeSavedFilterByName(state.entries, name)
+            local normalized = SourceFilters.normalizeDraft(draft)
+            normalized.name = name
+            table.insert(entries, normalized)
+            if self:writeSourceSavedFilterEntries(credentials, source, entries, I18n.t("Could not save saved filter.")) then
+                if repaired_invalid_metadata then
+                    self.plugin:showMessage(
+                        I18n.t("Saved filter saved. Invalid saved filters metadata was replaced.")
+                    )
+                else
+                    self.plugin:showMessage(I18n.t("Saved filter saved."))
+                end
+            end
+        end
+        if savedFilterNameExists(state.entries, name) and self.ui.showOverwriteSavedFilterConfirm then
+            return self.ui.showOverwriteSavedFilterConfirm(name, save)
+        end
+        return save()
+    end)
+end
+
+function SuwayomiClient:deleteSourceSavedFilter(credentials, source, schema, entry, menu)
+    local state, load_error = self:loadSourceSavedFilterState(credentials, source)
+    if not state then
+        self:showSavedFilterFailure(load_error, I18n.t("Could not delete saved filter."))
+        return
+    end
+    local entries = removeSavedFilterByName(state.entries, entry and entry.name)
+    if self:writeSourceSavedFilterEntries(credentials, source, entries, I18n.t("Could not delete saved filter.")) then
+        self.plugin:showMessage(I18n.t("Saved filter deleted."))
+        return self:renderSavedSourceFilters(credentials, source, schema, entries, menu)
+    end
+end
+
+function SuwayomiClient:confirmDeleteSourceSavedFilter(credentials, source, schema, entry, menu)
+    if self.ui.showDeleteSavedFilterConfirm then
+        return self.ui.showDeleteSavedFilterConfirm(entry, function()
+            return self:deleteSourceSavedFilter(credentials, source, schema, entry, menu)
+        end)
+    end
+    return self:deleteSourceSavedFilter(credentials, source, schema, entry, menu)
+end
+
+function SuwayomiClient:renderSavedSourceFilters(credentials, source, schema, entries, existing_menu)
+    if not self.ui.showSavedFiltersMenu then
+        self.plugin:showMessage(I18n.t("Could not load saved filters."))
+        return
+    end
+    local title = self:getSourceDisplayName(source) .. " - " .. I18n.t("Saved filters")
+    local menu_options = copyOptions({}, self:getTitleBarMenuOptions({
+        title = title,
+    }))
+    menu_options.title = title
+    local menu
+    local function selectSavedFilter(entry)
+        return self:applySourceFilterDraft(credentials, source, schema, entry)
+    end
+    menu_options.on_delete = function(entry)
+        return self:confirmDeleteSourceSavedFilter(credentials, source, schema, entry, menu)
+    end
+    if existing_menu and self.ui.updateSavedFiltersMenu then
+        menu = existing_menu
+        self.ui.updateSavedFiltersMenu(existing_menu, entries, selectSavedFilter, menu_options)
+        return existing_menu
+    end
+    menu = self.ui.showSavedFiltersMenu(entries, selectSavedFilter, menu_options)
+    return self:trackScreen("saved-filters", menu)
+end
+
+function SuwayomiClient:showSavedSourceFilters(credentials, source, schema)
+    local state, load_error = self:loadSourceSavedFilterState(credentials, source)
+    if not state then
+        self:showSavedFilterFailure(load_error, I18n.t("Could not load saved filters."))
+        return
+    end
+    return self:renderSavedSourceFilters(credentials, source, schema, state.entries)
+end
+
 function SuwayomiClient:isCurrentSourceFilterLoad(state)
     return state
         and self._active_source_filter_load == state
@@ -328,6 +582,8 @@ function SuwayomiClient:openSourceFilterEditor(credentials, source, schema, draf
                 { id = "apply_source_filters", text = I18n.t("Apply filters") },
                 { id = "reset_source_filters", text = I18n.t("Reset filters") },
                 { id = "source_filter_search_text", text = I18n.t("Search text") },
+                { id = "save_source_filter", text = I18n.t("Save filter") },
+                { id = "saved_source_filters", text = I18n.t("Saved filters") },
             },
             onSelect = function(action, menu)
                 local action_id = action and action.id
@@ -342,6 +598,10 @@ function SuwayomiClient:openSourceFilterEditor(credentials, source, schema, draf
                     return self:openSourceFilterEditor(credentials, source, schema, { query = "", filters = {} })
                 elseif action_id == "source_filter_search_text" then
                     return self:showSourceFilterSearchPrompt(source, schema, current_draft, credentials)
+                elseif action_id == "save_source_filter" then
+                    return self:showSaveSourceFilterPrompt(credentials, source, current_draft)
+                elseif action_id == "saved_source_filters" then
+                    return self:showSavedSourceFilters(credentials, source, schema)
                 end
             end,
         }),
@@ -354,6 +614,12 @@ function SuwayomiClient:openSourceFilterEditor(credentials, source, schema, draf
         end,
         on_search_text = function(next_draft)
             return self:showSourceFilterSearchPrompt(source, schema, next_draft or draft, credentials)
+        end,
+        on_save_filter = function(next_draft)
+            return self:showSaveSourceFilterPrompt(credentials, source, next_draft or draft)
+        end,
+        on_saved_filters = function()
+            return self:showSavedSourceFilters(credentials, source, schema)
         end,
     })
     return self:trackScreen("source-filters", editor)

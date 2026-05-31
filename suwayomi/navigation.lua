@@ -56,10 +56,6 @@ function Navigator:_wrapCloseCallback(entry)
             return nil
         end
 
-        if navigator:isCurrent(widget) then
-            navigator:pop(widget)
-        end
-
         if original_close_callback then
             return original_close_callback(...)
         end
@@ -73,7 +69,7 @@ function Navigator:_wrapCloseCallback(entry)
     entry.original_on_close = original_on_close
     widget.onClose = function(...)
         if navigator.closing_widgets[widget] then
-            return original_on_close(...)
+            return nil
         end
 
         if navigator:isCurrent(widget) then
@@ -132,9 +128,23 @@ end
 function Navigator:closeAll()
     while #self.entries > 0 do
         local entry = removeEntry(self.entries, #self.entries)
-        restoreCallback(entry)
+        local widget = entry.widget
+        self.closing_widgets[widget] = true
+        local close_ok, close_err = true, nil
         if self.ui_manager and self.ui_manager.close then
-            self.ui_manager:close(entry.widget)
+            close_ok, close_err = pcall(self.ui_manager.close, self.ui_manager, widget)
+        end
+        local callback_ok, callback_err = true, nil
+        if entry.original_close_callback then
+            callback_ok, callback_err = pcall(entry.original_close_callback)
+        end
+        restoreCallback(entry)
+        self.closing_widgets[widget] = nil
+        if not close_ok then
+            error(close_err)
+        end
+        if not callback_ok then
+            error(callback_err)
         end
     end
 end

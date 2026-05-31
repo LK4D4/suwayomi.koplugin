@@ -545,6 +545,8 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("tx:Apply filters", shown_dialog.item_table[11].text)
         assert.are.equal("tx:Reset filters", shown_dialog.item_table[12].text)
         assert.are.equal("tx:Search text", shown_dialog.item_table[13].text)
+        assert.are.equal("tx:Save filter", shown_dialog.item_table[14].text)
+        assert.are.equal("tx:Saved filters", shown_dialog.item_table[15].text)
 
         local editor = shown_dialog
         shown_dialog.item_table[2].callback()
@@ -609,6 +611,8 @@ describe("suwayomi/ui/browse", function()
 
         editor.item_table[12].callback()
         editor.item_table[13].callback()
+        editor.item_table[14].callback()
+        editor.item_table[15].callback()
         assert.is_true(reset)
         assert.is_true(search_text)
     end)
@@ -662,6 +666,85 @@ describe("suwayomi/ui/browse", function()
         assert.are.equal("tx:Apply filters", shown_dialog.item_table[5].text)
         assert.are.equal("tx:Reset filters", shown_dialog.item_table[6].text)
         assert.are.equal("tx:Search text", shown_dialog.item_table[7].text)
+        assert.are.equal("tx:Save filter", shown_dialog.item_table[8].text)
+        assert.are.equal("tx:Saved filters", shown_dialog.item_table[9].text)
+    end)
+
+    it("shows saved-filter list, save prompt, and delete confirmations", function()
+        local browse = require("suwayomi/ui/browse")
+        local applied
+        local deleted
+        local saved_name
+
+        browse.showSavedFiltersMenu({
+            { name = "Mixed", query = "frieren", filters = { { position = 1 } } },
+        }, function(entry)
+            applied = entry
+        end, {
+            title = "MangaDex - Saved filters",
+            title_bar_left_icon = "appbar.menu",
+            on_title_bar_left_tap = function() end,
+            on_title_bar_left_hold = function() end,
+            on_delete = function(entry)
+                deleted = entry
+            end,
+        })
+
+        assert.are.equal("MangaDex - Saved filters", shown_dialog.title)
+        assert.are.equal("appbar.menu", shown_dialog.title_bar_left_icon)
+        assert.is_function(shown_dialog.on_title_bar_left_tap)
+        assert.is_function(shown_dialog.on_title_bar_left_hold)
+        assert.are.equal("Mixed", shown_dialog.item_table[1].text)
+        assert.are.equal("frieren", shown_dialog.item_table[1].subtitle)
+        assert.are.equal("tx:Apply saved filter", shown_dialog.item_table[1].mandatory)
+        shown_dialog.item_table[1].callback()
+        assert.are.equal("Mixed", applied.name)
+        shown_dialog.onMenuHold(nil, shown_dialog.item_table[1])
+        assert.are.equal("Mixed", deleted.name)
+        browse.updateSavedFiltersMenu(shown_dialog, {
+            { name = "Keep", query = "one", filters = {} },
+        }, function(entry)
+            applied = entry
+        end, {
+            title = "MangaDex - Saved filters",
+            title_bar_left_icon = "appbar.menu",
+        })
+        assert.are.equal("MangaDex - Saved filters", shown_dialog.title)
+        assert.are.equal("Keep", shown_dialog.item_table[1].text)
+        shown_dialog.item_table[1].callback()
+        assert.are.equal("Keep", applied.name)
+
+        browse.showSavedFiltersMenu({}, function() end)
+        assert.are.equal("tx:No saved filters.", shown_dialog.item_table[1].text)
+        assert.is_false(shown_dialog.item_table[1].select_enabled)
+
+        browse.showSavedFilterNamePrompt("Old", function(name)
+            saved_name = name
+        end)
+        assert.are.equal("tx:Save current filter", shown_dialog.title)
+        assert.are.equal("tx:Filter name", shown_dialog.fields[1].hint)
+        assert.are.equal("Old", shown_dialog.fields[1].text)
+        shown_dialog.getFields = function()
+            return { " Favorite " }
+        end
+        shown_dialog.buttons[1][2].callback()
+        assert.are.equal(" Favorite ", saved_name)
+
+        browse.showDeleteSavedFilterConfirm({ name = "Mixed" }, function()
+            deleted = true
+        end)
+        assert.are.equal('tx:Delete saved filter "Mixed"?', shown_dialog.text)
+        assert.are.equal("tx:Delete saved filter", shown_dialog.ok_text)
+        shown_dialog.ok_callback()
+        assert.is_true(deleted)
+
+        browse.showOverwriteSavedFilterConfirm("Mixed", function()
+            deleted = "overwrite"
+        end)
+        assert.are.equal('tx:Overwrite saved filter "Mixed"?', shown_dialog.text)
+        assert.are.equal("tx:Save filter", shown_dialog.ok_text)
+        shown_dialog.ok_callback()
+        assert.are.equal("overwrite", deleted)
     end)
 
     it("omits source filter fallback action rows when title callbacks are present", function()

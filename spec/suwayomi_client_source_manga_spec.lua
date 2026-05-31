@@ -5,11 +5,24 @@ local I18nMarker = require("spec/support/i18n_marker")
 
 describe("suwayomi/client source manga flows", function()
     local marker_installed = false
+    local localized_i18n_installed = false
+    local previous_i18n_preload
+    local previous_i18n_loaded
+    local previous_i18n_loaded_present
 
     after_each(function()
         if marker_installed then
             I18nMarker.uninstall()
             marker_installed = false
+        end
+        if localized_i18n_installed then
+            package.preload["suwayomi/i18n"] = previous_i18n_preload
+            if previous_i18n_loaded_present then
+                package.loaded["suwayomi/i18n"] = previous_i18n_loaded
+            else
+                package.loaded["suwayomi/i18n"] = nil
+            end
+            localized_i18n_installed = false
         end
         helper.clearClientModules()
     end)
@@ -17,6 +30,21 @@ describe("suwayomi/client source manga flows", function()
     local newClient = helper.newClient
     local buildSourceMangaSubprocessFake = helper.buildSourceMangaSubprocessFake
     local buildChapterCountSubprocessFake = helper.buildChapterCountSubprocessFake
+
+    local function installLocalizedI18n(translations)
+        previous_i18n_preload = package.preload["suwayomi/i18n"]
+        previous_i18n_loaded = package.loaded["suwayomi/i18n"]
+        previous_i18n_loaded_present = package.loaded["suwayomi/i18n"] ~= nil
+        package.preload["suwayomi/i18n"] = function()
+            return {
+                t = function(text)
+                    return translations[text] or tostring(text or "")
+                end,
+            }
+        end
+        package.loaded["suwayomi/i18n"] = nil
+        localized_i18n_installed = true
+    end
 
     it("translates source manga loading chrome and mode titles", function()
         I18nMarker.install()
@@ -283,6 +311,591 @@ describe("suwayomi/client source manga flows", function()
                 { position = 1, type = "selectState", state = 1 },
             },
         }, saved_draft)
+    end)
+
+    it("saves the current source filter draft to server metadata after overwrite confirmation", function()
+        local json = require("dkjson")
+        local captured_title_options
+        local name_prompt
+        local overwrite_prompt
+        local saved_payload
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function(_, source_id)
+                    assert.are.equal("s1", source_id)
+                    return {
+                        ok = true,
+                        meta = {
+                            {
+                                key = "webUI_savedSearches",
+                                value = [[{"Favorite":{"query":"old","filters":[]}}]],
+                            },
+                        },
+                    }
+                end,
+                setSourceSavedSearches = function(_, source_id, saved_searches_json)
+                    assert.are.equal("s1", source_id)
+                    saved_payload = json.decode(saved_searches_json)
+                    return {
+                        ok = true,
+                        meta = {},
+                    }
+                end,
+            },
+            ui = {
+                showSourceFilterEditor = function()
+                    return { name = "filter-editor" }
+                end,
+                showSavedFilterNamePrompt = function(_, onSave)
+                    name_prompt = onSave
+                end,
+                showOverwriteSavedFilterConfirm = function(name, onConfirm)
+                    overwrite_prompt = { name = name, onConfirm = onConfirm }
+                end,
+            },
+            capture_title_options = function(menu_options)
+                captured_title_options = menu_options
+            end,
+        })
+
+        client:openSourceFilterEditor({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+        }, {
+            query = "frieren",
+            filters = {
+                { position = 1, type = "checkBoxState", state = true },
+            },
+        })
+        captured_title_options.onSelect({
+            id = "save_source_filter",
+        }, {
+            suwayomi_source_filter_draft = {
+                query = "frieren",
+                filters = {
+                    { position = 1, type = "checkBoxState", state = true },
+                },
+            },
+        })
+
+        name_prompt("Favorite")
+        assert.are.equal("Favorite", overwrite_prompt.name)
+        overwrite_prompt.onConfirm()
+
+        assert.are.equal("frieren", saved_payload.Favorite.query)
+        assert.are.same({
+            { position = 1, type = "checkBoxState", state = true },
+        }, saved_payload.Favorite.filters)
+        assert.are.same({ "Saved filter saved." }, state.shown_messages)
+    end)
+
+    it("loads saved filters and applies the selected entry through the source search path", function()
+        local subprocess_job, started = buildSourceMangaSubprocessFake()
+        local shown_saved_filters
+        local select_saved_filter
+        local client = newClient({
+            subprocess_job = subprocess_job,
+            source_manga_worker = {},
+            chapter_count_worker = "disabled",
+            ffi_util = {},
+            ui_manager = {},
+            api = {
+                fetchSourceMetadata = function()
+                    return {
+                        ok = true,
+                        meta = {
+                            {
+                                key = "webUI_savedSearches",
+                                value = [[{"Mixed":{"query":"frieren","filters":[{"position":1,"type":"checkBoxState","state":true}]}}]],
+                            },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showSavedFiltersMenu = function(entries, onSelect)
+                    shown_saved_filters = entries
+                    select_saved_filter = onSelect
+                    return { name = "saved-filters" }
+                end,
+                showMangaMenu = function()
+                    return { name = "loading-menu" }
+                end,
+            },
+        })
+
+        client:showSavedSourceFilters({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+        })
+        select_saved_filter(shown_saved_filters[1])
+
+        assert.are.equal("Mixed", shown_saved_filters[1].name)
+        assert.are.same({
+            type = "SEARCH",
+            query = "frieren",
+            page = 1,
+            filters = {
+                { position = 0, checkBoxState = true },
+            },
+            filter_draft = {
+                query = "frieren",
+                filters = {
+                    { position = 1, type = "checkBoxState", state = true },
+                },
+            },
+            filter_schema = {
+                { type = "CheckBoxFilter", name = "Completed", default = false },
+            },
+        }, started[1].browse_options)
+    end)
+
+    it("keeps the title menu available in the saved filters list for Close plugin", function()
+        local captured_title_options
+        local saved_filters_options
+        local title_tap = function() end
+        local title_hold = function() end
+        local client = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return {
+                        ok = true,
+                        meta = {
+                            {
+                                key = "webUI_savedSearches",
+                                value = [[{"Mixed":{"query":"frieren","filters":[]}}]],
+                            },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showSavedFiltersMenu = function(_, _, options)
+                    saved_filters_options = options
+                    return { name = "saved-filters" }
+                end,
+            },
+            capture_title_options = function(menu_options)
+                captured_title_options = menu_options
+            end,
+            title_menu_options = {
+                title_bar_left_icon = "appbar.menu",
+                on_title_bar_left_tap = title_tap,
+                on_title_bar_left_hold = title_hold,
+            },
+        })
+
+        client:showSavedSourceFilters({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {
+            { type = "CheckBoxFilter", name = "Completed", default = false },
+        })
+
+        assert.are.equal("MangaDex - Saved filters", captured_title_options.title)
+        assert.are.equal("MangaDex - Saved filters", saved_filters_options.title)
+        assert.are.equal("appbar.menu", saved_filters_options.title_bar_left_icon)
+        assert.are.equal(title_tap, saved_filters_options.on_title_bar_left_tap)
+        assert.are.equal(title_hold, saved_filters_options.on_title_bar_left_hold)
+        assert.is_function(saved_filters_options.on_delete)
+    end)
+
+    it("deletes saved filters after confirmation", function()
+        local json = require("dkjson")
+        local menu_open_count = 0
+        local tracked_count = 0
+        local updated_menu
+        local updated_entries
+        local delete_saved_filter
+        local delete_prompt
+        local saved_payload
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return {
+                        ok = true,
+                        meta = {
+                            {
+                                key = "webUI_savedSearches",
+                                value = [[{"Keep":{"query":"one","filters":[]},"Drop":{"query":"two","filters":[]}}]],
+                            },
+                        },
+                    }
+                end,
+                setSourceSavedSearches = function(_, _, saved_searches_json)
+                    saved_payload = json.decode(saved_searches_json)
+                    return {
+                        ok = true,
+                        meta = {},
+                    }
+                end,
+            },
+            ui = {
+                showSavedFiltersMenu = function(_, _, options)
+                    menu_open_count = menu_open_count + 1
+                    delete_saved_filter = options.on_delete
+                    return { name = "saved-filters" }
+                end,
+                updateSavedFiltersMenu = function(menu, entries)
+                    updated_menu = menu
+                    updated_entries = entries
+                end,
+                showDeleteSavedFilterConfirm = function(entry, onConfirm)
+                    delete_prompt = { entry = entry, onConfirm = onConfirm }
+                end,
+            },
+            trackSuwayomiScreen = function()
+                tracked_count = tracked_count + 1
+            end,
+        })
+
+        client:showSavedSourceFilters({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {})
+        delete_saved_filter({ name = "Drop", query = "two", filters = {} })
+        assert.are.equal("Drop", delete_prompt.entry.name)
+        delete_prompt.onConfirm()
+
+        assert.is_nil(saved_payload.Drop)
+        assert.are.equal("one", saved_payload.Keep.query)
+        assert.are.same({ "Saved filter deleted." }, state.shown_messages)
+        assert.are.equal(1, menu_open_count)
+        assert.are.equal(1, tracked_count)
+        assert.are.equal("saved-filters", updated_menu.name)
+        assert.are.equal(1, #updated_entries)
+        assert.are.equal("Keep", updated_entries[1].name)
+    end)
+
+    it("shows saved-filter unsupported and load failure messages without raw metadata", function()
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return {
+                        ok = false,
+                        error = "Saved filters are not supported by this server.",
+                    }
+                end,
+            },
+            ui = {
+                showSavedFiltersMenu = function()
+                    return { name = "saved-filters" }
+                end,
+            },
+        })
+
+        client:showSavedSourceFilters({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {})
+
+        assert.are.same({ "Saved filters are not supported by this server." }, state.shown_messages)
+    end)
+
+    it("shows localized saved-filter unsupported messages without generic fallback details", function()
+        installLocalizedI18n({
+            ["Saved filters are not supported by this server."] = "Сервер не поддерживает сохранённые фильтры.",
+            ["Could not load saved filters."] = "Не удалось загрузить сохранённые фильтры.",
+        })
+
+        local client, state = newClient({
+            api = {},
+            ui = {
+                showSavedFiltersMenu = function()
+                    return { name = "saved-filters" }
+                end,
+            },
+        })
+
+        client:showSavedSourceFilters({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {})
+
+        assert.are.same({
+            "Сервер не поддерживает сохранённые фильтры.",
+        }, state.shown_messages)
+    end)
+
+    it("shows saved-filter load failure details", function()
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return {
+                        ok = false,
+                        error = "Cannot query field \"meta\" on type \"SourceType\".",
+                    }
+                end,
+            },
+            ui = {
+                showSavedFiltersMenu = function()
+                    return { name = "saved-filters" }
+                end,
+            },
+        })
+
+        client:showSavedSourceFilters({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {})
+
+        assert.are.same({
+            'Could not load saved filters: Cannot query field "meta" on type "SourceType".',
+        }, state.shown_messages)
+    end)
+
+    it("shows localized saved-filter metadata decode failures with a useful reason", function()
+        installLocalizedI18n({
+            ["Could not load saved filters."] = "Не удалось загрузить сохранённые фильтры.",
+            ["Saved filters metadata is not valid JSON."] = "Метаданные сохранённых фильтров не являются корректным JSON.",
+        })
+
+        local menu_opened = false
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return {
+                        ok = true,
+                        meta = {
+                            {
+                                key = "webUI_savedSearches",
+                                value = "{not-json",
+                            },
+                        },
+                    }
+                end,
+            },
+            ui = {
+                showSavedFiltersMenu = function()
+                    menu_opened = true
+                    return { name = "saved-filters" }
+                end,
+            },
+        })
+
+        client:showSavedSourceFilters({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {})
+
+        assert.is_false(menu_opened)
+        assert.are.same({
+            "Не удалось загрузить сохранённые фильтры: Метаданные сохранённых фильтров не являются корректным JSON.",
+        }, state.shown_messages)
+    end)
+
+    it("repairs invalid saved-filter metadata when saving a new filter", function()
+        local json = require("dkjson")
+        local name_prompt
+        local saved_payload
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return {
+                        ok = true,
+                        meta = {
+                            {
+                                key = "webUI_savedSearches",
+                                value = "{not-json",
+                            },
+                        },
+                    }
+                end,
+                setSourceSavedSearches = function(_, source_id, saved_searches_json)
+                    assert.are.equal("s1", source_id)
+                    saved_payload = json.decode(saved_searches_json)
+                    return {
+                        ok = true,
+                        meta = {},
+                    }
+                end,
+            },
+            ui = {
+                showSavedFilterNamePrompt = function(_, onSave)
+                    name_prompt = onSave
+                end,
+            },
+        })
+
+        client:showSaveSourceFilterPrompt({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {
+            query = "frieren",
+            filters = {
+                { position = 1, type = "checkBoxState", state = true },
+            },
+        })
+
+        name_prompt("Recovered")
+
+        assert.are.equal("frieren", saved_payload.Recovered.query)
+        assert.are.same({
+            { position = 1, type = "checkBoxState", state = true },
+        }, saved_payload.Recovered.filters)
+        assert.are.same({
+            "Saved filter saved. Invalid saved filters metadata was replaced.",
+        }, state.shown_messages)
+    end)
+
+    it("does not repair arbitrary API errors that look like invalid saved-filter metadata", function()
+        local name_prompt
+        local write_called = false
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return {
+                        ok = false,
+                        error = "Saved filters metadata is not valid JSON.",
+                    }
+                end,
+                setSourceSavedSearches = function()
+                    write_called = true
+                    return {
+                        ok = true,
+                        meta = {},
+                    }
+                end,
+            },
+            ui = {
+                showSavedFilterNamePrompt = function(_, onSave)
+                    name_prompt = onSave
+                end,
+            },
+        })
+
+        client:showSaveSourceFilterPrompt({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, { query = "frieren", filters = {} })
+
+        name_prompt("Recovered")
+
+        assert.is_false(write_called)
+        assert.are.same({
+            "Could not save saved filter: Saved filters metadata is not valid JSON.",
+        }, state.shown_messages)
+    end)
+
+    it("keeps unrelated not-supported saved-filter errors detailed", function()
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return {
+                        ok = false,
+                        error = "Search is not supported by this source.",
+                    }
+                end,
+            },
+            ui = {
+                showSavedFiltersMenu = function()
+                    return { name = "saved-filters" }
+                end,
+            },
+        })
+
+        client:showSavedSourceFilters({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {})
+
+        assert.are.same({
+            "Could not load saved filters: Search is not supported by this source.",
+        }, state.shown_messages)
+    end)
+
+    it("shows saved-filter save failure details", function()
+        local name_prompt
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return { ok = true, meta = {} }
+                end,
+                setSourceSavedSearches = function()
+                    return { ok = false, error = "Authentication failed." }
+                end,
+            },
+            ui = {
+                showSavedFilterNamePrompt = function(_, onSave)
+                    name_prompt = onSave
+                end,
+            },
+        })
+
+        client:showSaveSourceFilterPrompt({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, { query = "one", filters = {} })
+
+        name_prompt("Mine")
+
+        assert.are.same({
+            "Could not save saved filter: Authentication failed.",
+        }, state.shown_messages)
+    end)
+
+    it("redacts obvious sensitive saved-filter save failure details", function()
+        local name_prompt
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return { ok = true, meta = {} }
+                end,
+                setSourceSavedSearches = function()
+                    return {
+                        ok = false,
+                        error = "Request failed for C:\\Users\\Jane Doe\\AppData\\secret.txt, /sdcard/My Folder/secret.txt, https://private.example/graphql with token=abc.def, Authorization: Bearer aaa.bbb.ccc, Cookie: session=foo.bar; theme=dark, password abc.def, and secret zzz.yyy failed.",
+                    }
+                end,
+            },
+            ui = {
+                showSavedFilterNamePrompt = function(_, onSave)
+                    name_prompt = onSave
+                end,
+            },
+        })
+
+        client:showSaveSourceFilterPrompt({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, { query = "one", filters = {} })
+
+        name_prompt("Mine")
+
+        assert.are.same({
+            "Could not save saved filter: Request failed for <redacted>, <redacted>, <redacted> with token=<redacted>, Authorization: <redacted>, Cookie: <redacted>, password <redacted>, and secret <redacted> failed.",
+        }, state.shown_messages)
+    end)
+
+    it("shows saved-filter delete failure details", function()
+        local client, state = newClient({
+            api = {
+                fetchSourceMetadata = function()
+                    return { ok = true, meta = {} }
+                end,
+                setSourceSavedSearches = function()
+                    return { ok = false, error = "Source metadata write failed." }
+                end,
+            },
+            ui = {
+                showSavedFiltersMenu = function()
+                    return { name = "saved-filters" }
+                end,
+            },
+        })
+
+        client:deleteSourceSavedFilter({ server_url = "https://suwayomi.example" }, {
+            id = "s1",
+            name = "MangaDex",
+        }, {}, { name = "Mine" })
+
+        assert.are.same({
+            "Could not delete saved filter: Source metadata write failed.",
+        }, state.shown_messages)
     end)
 
     it("ignores stale source filter worker results after a newer filter load starts", function()

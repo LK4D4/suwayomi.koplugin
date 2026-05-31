@@ -23,6 +23,7 @@ local LEGACY_EXTENSION_FIELDS = "pkgName name lang versionName versionCode isNsf
 local LEGACY_MANGA_FIELDS = "id title inLibrary initialized thumbnailUrl"
 local LEGACY_REFRESH_MANGA_FIELDS = "id title initialized thumbnailUrl"
 local MANGA_FIELDS = "id title author artist description genre status inLibrary initialized thumbnailUrl"
+local SAVED_SEARCHES_META_KEY = "webUI_savedSearches"
 local SOURCE_FILTER_FIELDS = table.concat({
     "__typename",
     "... on HeaderFilter { name }",
@@ -68,6 +69,36 @@ function Queries._buildSourceFiltersQuery(source_id)
             .. ") { id displayName name filters { "
             .. GROUP_FILTER_FIELDS
             .. " } } }",
+    })
+end
+
+function Queries._buildSourceMetadataQuery(source_id)
+    local encoded_source_id = json.encode(tostring(source_id or ""))
+    return json.encode({
+        query = "query GET_SOURCE_METADATA { source(id: "
+            .. encoded_source_id
+            .. ") { id meta { key value } } }",
+    })
+end
+
+function Queries._buildSetSourceSavedSearchesMutation(source_id, saved_searches_json)
+    return json.encode({
+        query = "mutation SET_SOURCE_METAS($input: SetSourceMetasInput!) { setSourceMetas(input: $input) { metas { key value sourceId } } }",
+        variables = {
+            input = {
+                items = {
+                    {
+                        sourceIds = { tostring(source_id or "") },
+                        metas = {
+                            {
+                                key = SAVED_SEARCHES_META_KEY,
+                                value = tostring(saved_searches_json or "{}"),
+                            },
+                        },
+                    },
+                },
+            },
+        },
     })
 end
 

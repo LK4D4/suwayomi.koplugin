@@ -149,6 +149,63 @@ describe("suwayomi/api/parsers", function()
         ]]))
     end)
 
+    it("parses source metadata and detects unsupported metadata fields", function()
+        local parsed = assert(parsers.parseSourceMetadataResponse([[
+            { "data": { "source": {
+                "id": "s1",
+                "meta": [
+                    { "key": "savedSearches", "value": "{\"Frieren\":{\"query\":\"frieren\",\"filters\":[]}}" },
+                    { "key": "other", "value": "kept raw" },
+                    { "key": 99, "value": 123 },
+                    "bad"
+                ]
+            } } }
+        ]]))
+
+        assert.are.equal("s1", parsed.source.id)
+        assert.are.same({
+            { key = "savedSearches", value = "{\"Frieren\":{\"query\":\"frieren\",\"filters\":[]}}" },
+            { key = "other", value = "kept raw" },
+            { key = "99", value = "123" },
+        }, parsed.meta)
+
+        local malformed, malformed_error = parsers.parseSourceMetadataResponse("{")
+        assert.is_nil(malformed)
+        assert.are.equal("Invalid response from Suwayomi server.", malformed_error)
+
+        local missing, missing_error = parsers.parseSourceMetadataResponse([[{ "data": { "source": null } }]])
+        assert.is_nil(missing)
+        assert.are.equal("Suwayomi server did not return source metadata.", missing_error)
+
+        assert.is_true(parsers.isSourceMetadataFieldError([[
+            { "errors": [ { "message": "Cannot query field \"meta\" on type \"Source\"" } ] }
+        ]]))
+        assert.is_true(parsers.isSourceMetadataFieldError([[
+            { "errors": [ { "message": "Unknown field \"setSourceMetas\"" } ] }
+        ]]))
+        assert.is_false(parsers.isSourceMetadataFieldError([[
+            { "errors": [ { "message": "Authentication failed" } ] }
+        ]]))
+    end)
+
+    it("parses setSourceMetas responses", function()
+        local parsed = assert(parsers.parseSetSourceMetasResponse([[
+            { "data": { "setSourceMetas": {
+                "metas": [
+                    { "key": "savedSearches", "value": "{\"One\":{}}", "sourceId": "s1" }
+                ]
+            } } }
+        ]]))
+
+        assert.are.same({
+            { key = "savedSearches", value = "{\"One\":{}}", source_id = "s1" },
+        }, parsed.meta)
+
+        local invalid, invalid_error = parsers.parseSetSourceMetasResponse([[{ "data": { "setSourceMetas": {} } }]])
+        assert.is_nil(invalid)
+        assert.are.equal("Suwayomi server did not update source metadata.", invalid_error)
+    end)
+
     it("parses manga, library manga, categories, and refresh responses", function()
         local manga, has_next_page = parsers.parseMangaResponse([[
             { "data": { "fetchSourceManga": { "hasNextPage": true, "mangas": [

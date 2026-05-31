@@ -111,11 +111,16 @@ describe("suwayomi/api facade", function()
             "_buildUpdateExtensionMutation",
             "_buildLegacyUpdateExtensionMutation",
             "_buildSourceFiltersQuery",
+            "_buildSourceMetadataQuery",
+            "_buildSetSourceSavedSearchesMutation",
             "parseSourcesResponse",
             "parseExtensionsResponse",
             "parseUpdateExtensionResponse",
             "parseSourceFiltersResponse",
             "isSourceFiltersFieldError",
+            "parseSourceMetadataResponse",
+            "parseSetSourceMetasResponse",
+            "isSourceMetadataFieldError",
             "isOptionalMangaMetadataFieldError",
             "parseMangaResponse",
             "parseLibraryMangaResponse",
@@ -135,6 +140,8 @@ describe("suwayomi/api facade", function()
             "downloadBinary",
             "downloadChapterArchive",
             "fetchSourceFilters",
+            "fetchSourceMetadata",
+            "setSourceSavedSearches",
         }
 
         for _, name in ipairs(names) do
@@ -342,6 +349,42 @@ describe("suwayomi/api facade", function()
         assert.are.equal("Invalid response from Suwayomi server.", malformed.error)
         assert.are.equal("fetchSourceFilters", events[#events].operation)
         assert.are.equal("parse_error", events[#events].event)
+    end)
+
+    it("fetches and updates source saved-search metadata through the facade", function()
+        local request = install_graphql_sequence_stub({
+            {
+                body = [[{"data":{"source":{"id":"s1","meta":[{"key":"webUI_savedSearches","value":"{\"One\":{\"query\":\"frieren\",\"filters\":[]}}"}]}}}]],
+            },
+            {
+                body = [[{"data":{"setSourceMetas":{"metas":[{"key":"webUI_savedSearches","value":"{\"Two\":{}}","sourceId":"s1"}]}}}]],
+            },
+        })
+
+        local fetched = api.fetchSourceMetadata(valid_credentials(), "s1")
+        assert.is_true(fetched.ok)
+        assert.are.equal("s1", fetched.source.id)
+        assert.are.equal("webUI_savedSearches", fetched.meta[1].key)
+        assert.truthy(request.bodies[1]:match("GET_SOURCE_METADATA"))
+
+        local updated = api.setSourceSavedSearches(valid_credentials(), "s1", '{"Two":{}}')
+        assert.is_true(updated.ok)
+        assert.are.equal("s1", updated.meta[1].source_id)
+        assert.truthy(request.bodies[2]:match("SET_SOURCE_METAS"))
+        assert.truthy(request.bodies[2]:match("webUI_savedSearches"))
+        assert.truthy(request.bodies[2]:match('\\"Two\\"'))
+    end)
+
+    it("reports unsupported source metadata without exposing raw schema dumps", function()
+        install_graphql_stub([[{"errors":[{"message":"Cannot query field \"meta\" on type \"SourceType\""}]}]])
+        local unsupported = api.fetchSourceMetadata(valid_credentials(), "s1")
+        assert.is_false(unsupported.ok)
+        assert.are.equal("Saved filters are not supported by this server.", unsupported.error)
+
+        install_graphql_stub([[{"errors":[{"message":"Unknown field \"setSourceMetas\""}]}]])
+        local update_unsupported = api.setSourceSavedSearches(valid_credentials(), "s1", "{}")
+        assert.is_false(update_unsupported.ok)
+        assert.are.equal("Saved filters are not supported by this server.", update_unsupported.error)
     end)
 
     it("fetches manga, library manga, categories, updates library state, and refreshes manga", function()

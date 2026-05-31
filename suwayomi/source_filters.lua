@@ -102,6 +102,41 @@ function SourceFilters.normalizeDraft(draft)
     return normalized
 end
 
+function SourceFilters.normalizeSavedSearches(saved_searches)
+    local normalized = {}
+    if type(saved_searches) ~= "table" then
+        return normalized
+    end
+
+    for name, raw_entry in pairs(saved_searches) do
+        name = tostring(name or "")
+        if name ~= "" and type(raw_entry) == "table" then
+            local draft = SourceFilters.normalizeDraft(raw_entry)
+            draft.name = name
+            table.insert(normalized, draft)
+        end
+    end
+
+    table.sort(normalized, function(left, right)
+        return left.name < right.name
+    end)
+    return normalized
+end
+
+function SourceFilters.savedSearchesToMap(entries)
+    local saved_searches = {}
+    for _, entry in ipairs(type(entries) == "table" and entries or {}) do
+        if type(entry) == "table" and entry.name ~= nil and tostring(entry.name) ~= "" then
+            local draft = SourceFilters.normalizeDraft(entry)
+            saved_searches[tostring(entry.name)] = {
+                query = draft.query,
+                filters = draft.filters,
+            }
+        end
+    end
+    return saved_searches
+end
+
 local function buildOneChange(schema, draft)
     if type(schema) ~= "table" or type(draft) ~= "table" then
         return nil

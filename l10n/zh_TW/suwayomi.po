@@ -117,6 +117,9 @@ msgstr ""
 msgid "Apply filters"
 msgstr ""
 
+msgid "Apply saved filter"
+msgstr ""
+
 msgid "Artist"
 msgstr ""
 
@@ -247,6 +250,9 @@ msgstr ""
 msgid "Could not connect to Suwayomi."
 msgstr ""
 
+msgid "Could not delete saved filter."
+msgstr ""
+
 msgid "Could not delete this chapter from device."
 msgstr ""
 
@@ -268,10 +274,16 @@ msgstr ""
 msgid "Could not load manga."
 msgstr ""
 
+msgid "Could not load saved filters."
+msgstr ""
+
 msgid "Could not load source filters."
 msgstr ""
 
 msgid "Could not retry download."
+msgstr ""
+
+msgid "Could not save saved filter."
 msgstr ""
 
 msgid "Could not start chapter download: %1"
@@ -342,6 +354,12 @@ msgid "Delete from device"
 msgstr ""
 
 msgid "Delete read downloads"
+msgstr ""
+
+msgid "Delete saved filter"
+msgstr ""
+
+msgid "Delete saved filter \"%1\"?"
 msgstr ""
 
 msgid "Delete while reading: %1"
@@ -508,6 +526,9 @@ msgid "Fifth to last read chapter"
 msgstr ""
 
 msgid "Filter"
+msgstr ""
+
+msgid "Filter name"
 msgstr ""
 
 msgid "First unread"
@@ -679,6 +700,9 @@ msgstr ""
 msgid "No results"
 msgstr ""
 
+msgid "No saved filters."
+msgstr ""
+
 msgid "No selected chapters were deleted."
 msgstr ""
 
@@ -725,6 +749,9 @@ msgid "Open first unread"
 msgstr ""
 
 msgid "Open next unread"
+msgstr ""
+
+msgid "Overwrite saved filter \"%1\"?"
 msgstr ""
 
 msgid "Parallel chapter downloads"
@@ -822,6 +849,30 @@ msgid "Retry"
 msgstr ""
 
 msgid "Save"
+msgstr ""
+
+msgid "Save current filter"
+msgstr ""
+
+msgid "Save filter"
+msgstr ""
+
+msgid "Saved filter deleted."
+msgstr ""
+
+msgid "Saved filter saved."
+msgstr ""
+
+msgid "Saved filter saved. Invalid saved filters metadata was replaced."
+msgstr ""
+
+msgid "Saved filters"
+msgstr ""
+
+msgid "Saved filters are not supported by this server."
+msgstr ""
+
+msgid "Saved filters metadata is not valid JSON."
 msgstr ""
 
 msgid "Scanlator filter"

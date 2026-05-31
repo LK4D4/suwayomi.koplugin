@@ -696,6 +696,8 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
             { id = "apply_source_filters", text = I18n.t("Apply filters") },
             { id = "reset_source_filters", text = I18n.t("Reset filters") },
             { id = "source_filter_search_text", text = I18n.t("Search text") },
+            { id = "save_source_filter", text = I18n.t("Save filter") },
+            { id = "saved_source_filters", text = I18n.t("Saved filters") },
         },
         onSelect = function(action)
             local action_id = action and action.id
@@ -705,6 +707,10 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
                 return options.on_reset()
             elseif action_id == "source_filter_search_text" and options.on_search_text then
                 return options.on_search_text(copyDraft(draft))
+            elseif action_id == "save_source_filter" and options.on_save_filter then
+                return options.on_save_filter(copyDraft(draft))
+            elseif action_id == "saved_source_filters" and options.on_saved_filters then
+                return options.on_saved_filters(copyDraft(draft))
             end
         end,
     }
@@ -758,6 +764,22 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
                 end
             end,
         })
+        table.insert(show_options.item_table, {
+            text = I18n.t("Save filter"),
+            callback = function()
+                if options.on_save_filter then
+                    return options.on_save_filter(copyDraft(draft))
+                end
+            end,
+        })
+        table.insert(show_options.item_table, {
+            text = I18n.t("Saved filters"),
+            callback = function()
+                if options.on_saved_filters then
+                    return options.on_saved_filters(copyDraft(draft))
+                end
+            end,
+        })
     end
     show_options.menu_options = menu_options
     if not show_options.on_title_bar_left_hold and title_options.onSelect == nil then
@@ -767,6 +789,125 @@ function BrowseUI.showSourceFilterEditor(source, filters, draft, options)
     end
     menu = getListMenu().show(show_options)
     return menu
+end
+
+local function buildSavedFilterRows(saved_filters, onSelectCallback)
+    local rows = {}
+    for _, entry in ipairs(type(saved_filters) == "table" and saved_filters or {}) do
+        local row = {
+            text = tostring(entry.name or ""),
+            subtitle = entry.query and entry.query ~= "" and entry.query or nil,
+            mandatory = I18n.t("Apply saved filter"),
+            saved_filter = entry,
+        }
+        row.callback = function()
+            if onSelectCallback then
+                return onSelectCallback(entry)
+            end
+        end
+        table.insert(rows, row)
+    end
+    if #rows == 0 then
+        rows[1] = {
+            text = I18n.t("No saved filters."),
+            select_enabled = false,
+        }
+    end
+
+    return rows
+end
+
+function BrowseUI.showSavedFiltersMenu(saved_filters, onSelectCallback, options)
+    options = options or {}
+    local rows = buildSavedFilterRows(saved_filters, onSelectCallback)
+
+    return getListMenu().show{
+        title = options.title or I18n.t("Saved filters"),
+        title_bar_left_icon = options.title_bar_left_icon,
+        item_table = rows,
+        onMenuHold = function(_, row)
+            if row and row.saved_filter and options.on_delete then
+                return options.on_delete(row.saved_filter)
+            end
+            return true
+        end,
+        close_callback = options.close_callback,
+        on_back = options.on_back,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+    }
+end
+
+function BrowseUI.updateSavedFiltersMenu(menu, saved_filters, onSelectCallback, options)
+    if not menu then
+        return
+    end
+    options = options or {}
+    return getListMenu().update(menu, {
+        title = options.title or I18n.t("Saved filters"),
+        title_bar_left_icon = options.title_bar_left_icon,
+        item_table = buildSavedFilterRows(saved_filters, onSelectCallback),
+        close_callback = options.close_callback,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+    })
+end
+
+function BrowseUI.showSavedFilterNamePrompt(current_name, onSaveCallback)
+    local UIManager = require("ui/uimanager")
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = I18n.t("Save current filter"),
+        fields = {
+            {
+                hint = I18n.t("Filter name"),
+                text = current_name or "",
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = I18n.t("Cancel"),
+                    id = "close",
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+                {
+                    text = I18n.t("Save filter"),
+                    is_enter_default = true,
+                    callback = function()
+                        local fields = dialog:getFields()
+                        UIManager:close(dialog)
+                        if onSaveCallback then
+                            onSaveCallback(fields[1] or "")
+                        end
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+    return dialog
+end
+
+function BrowseUI.showDeleteSavedFilterConfirm(entry, onConfirm)
+    return getUI().showConfirm({
+        text = I18n.f('Delete saved filter "%1"?', entry and entry.name or ""),
+        ok_text = I18n.t("Delete saved filter"),
+        cancel_text = I18n.t("Cancel"),
+        ok_callback = onConfirm,
+    })
+end
+
+function BrowseUI.showOverwriteSavedFilterConfirm(name, onConfirm)
+    return getUI().showConfirm({
+        text = I18n.f('Overwrite saved filter "%1"?', name or ""),
+        ok_text = I18n.t("Save filter"),
+        cancel_text = I18n.t("Cancel"),
+        ok_callback = onConfirm,
+    })
 end
 
 function BrowseUI.showExtensionSearchPrompt(currentQuery, onSearchCallback)

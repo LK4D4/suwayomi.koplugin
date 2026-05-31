@@ -88,4 +88,84 @@ describe("suwayomi/source_filters", function()
         assert.are.equal(1, draft.filters[3].group_change.position)
         assert.are.equal(2, draft.filters[3].group_change.state)
     end)
+
+    it("normalizes WebUI saved searches and drops invalid entries", function()
+        local saved = SourceFilters.normalizeSavedSearches({
+            ["Mixed"] = {
+                query = "frieren",
+                filters = {
+                    { position = "1", type = "checkBoxState", state = true },
+                    { position = 0, type = "textState", state = "bad" },
+                },
+            },
+            ["Text only"] = {
+                query = 123,
+            },
+            ["Filter only"] = {
+                filters = {
+                    { position = "2", type = "textState", state = "Abe" },
+                },
+            },
+            [""] = {
+                query = "ignored",
+            },
+            Bad = "ignored",
+        })
+
+        assert.are.same({
+            {
+                name = "Filter only",
+                query = "",
+                filters = {
+                    { position = 2, type = "textState", state = "Abe" },
+                },
+            },
+            {
+                name = "Mixed",
+                query = "frieren",
+                filters = {
+                    { position = 1, type = "checkBoxState", state = true },
+                },
+            },
+            {
+                name = "Text only",
+                query = "123",
+                filters = {},
+            },
+        }, saved)
+    end)
+
+    it("encodes normalized saved searches by name", function()
+        local encoded = SourceFilters.savedSearchesToMap({
+            {
+                name = "One",
+                query = "frieren",
+                filters = {
+                    { position = 1, type = "checkBoxState", state = true },
+                },
+            },
+            {
+                name = "Two",
+                query = "",
+                filters = {},
+            },
+            {
+                name = "",
+                query = "ignored",
+            },
+        })
+
+        assert.are.same({
+            One = {
+                query = "frieren",
+                filters = {
+                    { position = 1, type = "checkBoxState", state = true },
+                },
+            },
+            Two = {
+                query = "",
+                filters = {},
+            },
+        }, encoded)
+    end)
 end)

@@ -126,6 +126,9 @@ msgstr "Будь-який"
 msgid "Apply filters"
 msgstr "Застосувати фільтри"
 
+msgid "Apply saved filter"
+msgstr ""
+
 msgid "Artist"
 msgstr "Художник"
 
@@ -257,6 +260,9 @@ msgstr "Продовжити"
 msgid "Could not connect to Suwayomi."
 msgstr "Не вдалося під'єднатися до Suwayomi."
 
+msgid "Could not delete saved filter."
+msgstr ""
+
 msgid "Could not delete this chapter from device."
 msgstr "Не вдалося видалити цей розділ із пристрою."
 
@@ -278,11 +284,17 @@ msgstr "Не вдалося завантажити категорії біблі
 msgid "Could not load manga."
 msgstr "Не вдалося завантажити манґу."
 
+msgid "Could not load saved filters."
+msgstr ""
+
 msgid "Could not load source filters."
 msgstr "Не вдалося завантажити фільтри джерела."
 
 msgid "Could not retry download."
 msgstr "Не вдалося повторити завантаження."
+
+msgid "Could not save saved filter."
+msgstr ""
 
 msgid "Could not start chapter download: %1"
 msgstr "Не вдалося почати завантаження розділу: %1"
@@ -355,6 +367,12 @@ msgstr "Видалити з пристрою"
 
 msgid "Delete read downloads"
 msgstr "Видалити прочитані завантаження"
+
+msgid "Delete saved filter"
+msgstr ""
+
+msgid "Delete saved filter \"%1\"?"
+msgstr ""
 
 msgid "Delete while reading: %1"
 msgstr "Видаляти під час читання: %1"
@@ -524,6 +542,9 @@ msgstr "П'ятий з кінця прочитаний розділ"
 
 msgid "Filter"
 msgstr "Фільтр"
+
+msgid "Filter name"
+msgstr ""
 
 msgid "First unread"
 msgstr "Перший непрочитаний"
@@ -696,6 +717,9 @@ msgstr "Немає постера"
 msgid "No results"
 msgstr "Немає результатів"
 
+msgid "No saved filters."
+msgstr ""
+
 msgid "No selected chapters were deleted."
 msgstr "Жоден вибраний розділ не видалено."
 
@@ -743,6 +767,9 @@ msgstr "Відкрити перший непрочитаний"
 
 msgid "Open next unread"
 msgstr "Відкрити наступний непрочитаний"
+
+msgid "Overwrite saved filter \"%1\"?"
+msgstr ""
 
 msgid "Parallel chapter downloads"
 msgstr "Паралельні завантаження розділів"
@@ -853,6 +880,30 @@ msgstr "Повторити"
 
 msgid "Save"
 msgstr "Зберегти"
+
+msgid "Save current filter"
+msgstr ""
+
+msgid "Save filter"
+msgstr ""
+
+msgid "Saved filter deleted."
+msgstr ""
+
+msgid "Saved filter saved."
+msgstr ""
+
+msgid "Saved filter saved. Invalid saved filters metadata was replaced."
+msgstr ""
+
+msgid "Saved filters"
+msgstr ""
+
+msgid "Saved filters are not supported by this server."
+msgstr ""
+
+msgid "Saved filters metadata is not valid JSON."
+msgstr ""
 
 msgid "Scanlator filter"
 msgstr "Фільтр сканлейтора"

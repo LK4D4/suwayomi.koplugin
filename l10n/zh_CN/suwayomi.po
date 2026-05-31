@@ -108,6 +108,9 @@ msgstr "任意"
 msgid "Apply filters"
 msgstr "应用筛选"
 
+msgid "Apply saved filter"
+msgstr ""
+
 msgid "Artist"
 msgstr "画师"
 
@@ -237,6 +240,9 @@ msgstr "继续"
 msgid "Could not connect to Suwayomi."
 msgstr "无法连接到 Suwayomi。"
 
+msgid "Could not delete saved filter."
+msgstr ""
+
 msgid "Could not delete this chapter from device."
 msgstr "无法从设备删除此章节。"
 
@@ -258,11 +264,17 @@ msgstr "无法加载书架分类。"
 msgid "Could not load manga."
 msgstr "无法加载漫画。"
 
+msgid "Could not load saved filters."
+msgstr ""
+
 msgid "Could not load source filters."
 msgstr "无法加载源筛选器。"
 
 msgid "Could not retry download."
 msgstr "无法重试下载。"
+
+msgid "Could not save saved filter."
+msgstr ""
 
 msgid "Could not start chapter download: %1"
 msgstr "无法开始章节下载：%1"
@@ -331,6 +343,12 @@ msgstr "从设备删除"
 
 msgid "Delete read downloads"
 msgstr "删除已读下载"
+
+msgid "Delete saved filter"
+msgstr ""
+
+msgid "Delete saved filter \"%1\"?"
+msgstr ""
 
 msgid "Delete while reading: %1"
 msgstr "阅读时删除：%1"
@@ -494,6 +512,9 @@ msgstr "倒数第 5 个已读章节"
 
 msgid "Filter"
 msgstr "筛选"
+
+msgid "Filter name"
+msgstr ""
 
 msgid "First unread"
 msgstr "第一个未读章节"
@@ -664,6 +685,9 @@ msgstr "没有封面"
 msgid "No results"
 msgstr "没有结果"
 
+msgid "No saved filters."
+msgstr ""
+
 msgid "No selected chapters were deleted."
 msgstr "未删除选中的章节。"
 
@@ -711,6 +735,9 @@ msgstr "打开第一个未读章节"
 
 msgid "Open next unread"
 msgstr "打开下一个未读章节"
+
+msgid "Overwrite saved filter \"%1\"?"
+msgstr ""
 
 msgid "Parallel chapter downloads"
 msgstr "并行章节下载"
@@ -803,6 +830,30 @@ msgstr "重试"
 
 msgid "Save"
 msgstr "保存"
+
+msgid "Save current filter"
+msgstr ""
+
+msgid "Save filter"
+msgstr ""
+
+msgid "Saved filter deleted."
+msgstr ""
+
+msgid "Saved filter saved."
+msgstr ""
+
+msgid "Saved filter saved. Invalid saved filters metadata was replaced."
+msgstr ""
+
+msgid "Saved filters"
+msgstr ""
+
+msgid "Saved filters are not supported by this server."
+msgstr ""
+
+msgid "Saved filters metadata is not valid JSON."
+msgstr ""
 
 msgid "Scanlator filter"
 msgstr "汉化组筛选器"

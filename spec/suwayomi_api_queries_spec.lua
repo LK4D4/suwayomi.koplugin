@@ -58,6 +58,33 @@ describe("suwayomi/api/queries", function()
         assert.truthy(string_id_payload.query:match('source%(id:%s*"local \\"source\\""%)'))
     end)
 
+    it("builds source metadata queries and saved searches mutations", function()
+        local metadata_payload = decode_request(queries._buildSourceMetadataQuery("2499283573021220255"))
+
+        assert.truthy(metadata_payload.query:match("GET_SOURCE_METADATA"))
+        assert.truthy(metadata_payload.query:match('source%(id:%s*"2499283573021220255"%)'))
+        assert.truthy(metadata_payload.query:match("meta%s*{%s*key%s+value%s*}"))
+        assert.is_nil(metadata_payload.variables)
+
+        local mutation_payload = decode_request(queries._buildSetSourceSavedSearchesMutation("2499283573021220255", '{"One":{}}'))
+
+        assert.truthy(mutation_payload.query:match("SET_SOURCE_METAS"))
+        assert.truthy(mutation_payload.query:match("setSourceMetas"))
+        assert.truthy(mutation_payload.query:match("metas%s*{%s*key%s+value%s+sourceId%s*}"))
+        assert.are.same({
+            input = {
+                items = {
+                    {
+                        sourceIds = { "2499283573021220255" },
+                        metas = {
+                            { key = "webUI_savedSearches", value = '{"One":{}}' },
+                        },
+                    },
+                },
+            },
+        }, mutation_payload.variables)
+    end)
+
     it("builds manga browse queries with normalized input", function()
         local payload = decode_request(queries._buildMangaQuery({
             source_id = "2499283573021220255",
