@@ -1015,9 +1015,8 @@ msgstr "Suwayomi"
 msgid "Suwayomi Chapters"
 msgstr "Главы Suwayomi"
 
-#, fuzzy
-msgid "Suwayomi Client v1.0.5"
-msgstr "Клиент Suwayomi v1.0.4"
+msgid "Suwayomi Client v1.0.6"
+msgstr "Клиент Suwayomi v1.0.6"
 
 msgid "Suwayomi Downloads"
 msgstr "Загрузки Suwayomi"

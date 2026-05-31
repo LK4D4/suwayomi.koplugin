@@ -23,8 +23,8 @@ describe("plugin metadata", function()
         local metadata = require("_meta")
 
         assert.are.equal("suwayomi", metadata.name)
-        assert.are.equal("1.0.5", metadata.version)
-        assert.are.equal("tx:Suwayomi Client v1.0.5", metadata.fullname)
+        assert.are.equal("1.0.6", metadata.version)
+        assert.are.equal("tx:Suwayomi Client v1.0.6", metadata.fullname)
         assert.matches("^tx:Suwayomi client for KOReader", metadata.description)
     end)
 
@@ -34,6 +34,6 @@ describe("plugin metadata", function()
         local ok = handle:close()
 
         assert.is_true(ok)
-        assert.are.equal("suwayomi.koplugin-v1.0.5.zip\n", output)
+        assert.are.equal("suwayomi.koplugin-v1.0.6.zip\n", output)
     end)
 end)
