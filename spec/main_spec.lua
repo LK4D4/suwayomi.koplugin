@@ -213,6 +213,61 @@ describe("suwayomi plugin", function()
         assert.are.equal(1, #runtime.queue_instances)
     end)
 
+    it("processes finished cleanup after download queue recovery on init", function()
+        local plugin = build_plugin()
+        local process = plugin.processFinishedChapterCleanup
+        plugin.processFinishedChapterCleanup = function(self)
+            self.finished_cleanup_process_count = (self.finished_cleanup_process_count or 0) + 1
+            table.insert(runtime.lifecycle_events, "cleanup-process")
+            return process(self)
+        end
+
+        plugin:init()
+
+        assert.are.equal(1, plugin.finished_cleanup_process_count)
+        assert.are.same({ "queue-recover", "cleanup-process" }, runtime.lifecycle_events)
+    end)
+
+    it("schedules finished cleanup from queue status changes without processor reentry", function()
+        local plugin = build_plugin()
+        plugin.finished_cleanup_processing = true
+        plugin.refreshChapterMenu = function() end
+        plugin.refreshDownloadsMenu = function() end
+        local schedule = plugin.scheduleFinishedChapterCleanup
+        plugin.scheduleFinishedChapterCleanup = function(self, delay_seconds)
+            self.finished_cleanup_schedule_count = (self.finished_cleanup_schedule_count or 0) + 1
+            self.finished_cleanup_scheduled_delay = delay_seconds
+            return schedule(self, delay_seconds)
+        end
+        plugin.processFinishedChapterCleanup = function(self)
+            self.unexpected_cleanup_reentry_count = (self.unexpected_cleanup_reentry_count or 0) + 1
+        end
+
+        local queue = plugin:getDownloadQueue()
+        queue.options.onStatusChanged()
+
+        assert.are.equal(1, plugin.finished_cleanup_schedule_count)
+        assert.are.equal(0, plugin.finished_cleanup_scheduled_delay)
+        assert.is_nil(plugin.unexpected_cleanup_reentry_count)
+    end)
+
+    it("reevaluates blocked cleanup before download-directory callbacks", function()
+        local plugin = build_plugin()
+        local events = {}
+        plugin.onFinishedCleanupDownloadDirectoryChanged = function(self)
+            self.finished_cleanup_revalidate_blocked = true
+            table.insert(events, "cleanup-directory-changed")
+        end
+
+        plugin:chooseDownloadDirectory(function()
+            table.insert(events, "caller")
+        end)
+        runtime.directory_chooser_callback("/new/books")
+
+        assert.is_true(plugin.finished_cleanup_revalidate_blocked)
+        assert.are.same({ "cleanup-directory-changed", "caller" }, events)
+    end)
+
     it("wires completed download archives into reader return context", function()
         local plugin = build_plugin()
         local saved_context
@@ -443,6 +498,9 @@ describe("suwayomi plugin", function()
 
         assert.is_function(runtime.api_debug_logger)
         assert.are.equal(50, plugin.read_sync_batch_size)
+        assert.are.equal(5, plugin.finished_cleanup_retry_delay_seconds)
+        assert.are.equal(300, plugin.finished_cleanup_max_retry_delay_seconds)
+        assert.are.equal(25, plugin.finished_cleanup_batch_size)
         assert.are.equal("plugin_init", runtime.debug_events[1].operation)
         assert.are.equal("start", runtime.debug_events[1].event)
         assert.are.equal("plugin_init", runtime.debug_events[2].operation)
@@ -462,6 +520,7 @@ describe("suwayomi plugin", function()
             require("suwayomi/chapters/context"),
             require("suwayomi/chapters/menu"),
             require("suwayomi/chapters/actions"),
+            require("suwayomi/chapters/finished_cleanup"),
             require("suwayomi/downloads/controller"),
             require("suwayomi/readsync/ledger"),
             require("suwayomi/readsync/koreader_metadata"),

@@ -1,7 +1,7 @@
 -- Boundary: ReadSyncController.
 --
 -- Responsibility: Owns read-sync worker scheduling, result application, manual sync, and document-close sync.
--- Owned state: Coordinates ledger, KOReader metadata, downloads cleanup, and subprocess result files.
+-- Owned state: Coordinates ledger, KOReader metadata, and subprocess result files.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and plugin i18n facade.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
@@ -26,26 +26,8 @@ end
 
 local Methods = {}
 
-local function mangaFromLedgerEntry(entry)
-    if type(entry) ~= "table" or not entry.manga_id then
-        return nil
-    end
-    return {
-        id = tostring(entry.manga_id),
-        title = entry.manga_title or tostring(entry.manga_id),
-    }
-end
-
-local function chapterFromLedgerEntry(entry)
-    if type(entry) ~= "table" or not entry.chapter_id then
-        return nil
-    end
-    return {
-        id = tostring(entry.chapter_id),
-        name = entry.chapter_name or tostring(entry.chapter_id),
-        path = entry.path,
-        is_read = true,
-    }
+local function validId(value)
+    return type(value) == "string" and value ~= ""
 end
 
 function Methods:getReadSyncResultPath()
@@ -293,7 +275,7 @@ end
 
 function Methods:onCloseDocument()
     local document_path = self:getCurrentDocumentPath()
-    if not document_path or not self:isCurrentDocumentFinished() then
+    if type(document_path) ~= "string" or document_path == "" or not self:isCurrentDocumentFinished() then
         return
     end
 
@@ -302,12 +284,14 @@ function Methods:onCloseDocument()
         if entry.path == document_path then
             local already_read = entry.read == true
             local marked = self:markLedgerEntryRead(entry)
-            if (marked or already_read) and self.deleteFinishedChaptersWhileReading then
-                local manga = mangaFromLedgerEntry(entry)
-                local chapter = chapterFromLedgerEntry(entry)
-                if manga and chapter then
-                    self:deleteFinishedChaptersWhileReading(manga, chapter)
-                end
+            local settings = SuwayomiSettings:loadDeleteChaptersSettings()
+            local cleanup_enabled = tonumber(settings and settings.delete_finished_while_reading) or 0
+            if (marked or already_read) and cleanup_enabled > 0
+                and validId(entry.manga_id) and validId(entry.chapter_id)
+                and type(entry.path) == "string" and entry.path ~= ""
+                and self.recordFinishedChapter
+            then
+                self:recordFinishedChapter(entry)
             end
             return
         end

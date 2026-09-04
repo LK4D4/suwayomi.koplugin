@@ -462,8 +462,12 @@ function Methods:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
     local choices = { 0, 1, 2, 3, 4, 5 }
     local function onSelect(value)
         local settings = self:loadDeleteChaptersSettings()
+        local previous_value = settings.delete_finished_while_reading
         settings.delete_finished_while_reading = value
         SuwayomiSettings:saveDeleteChaptersSettings(settings)
+        if previous_value ~= value and self.onFinishedCleanupSettingChanged then
+            self:onFinishedCleanupSettingChanged(previous_value, value)
+        end
         self:refreshSettingsMenu(touchmenu_instance)
     end
 

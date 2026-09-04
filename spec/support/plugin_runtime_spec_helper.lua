@@ -46,6 +46,7 @@ local MODULES_TO_CLEAR = {
     "suwayomi/chapters/local_downloads",
     "suwayomi/chapters/delete_actions",
     "suwayomi/chapters/read_actions",
+    "suwayomi/chapters/finished_cleanup",
     "suwayomi/downloads/controller",
     "suwayomi/readsync/ledger",
     "suwayomi/readsync/koreader_metadata",
@@ -87,6 +88,14 @@ function Helper.install(options)
         debug_events = {},
         api_debug_logger = nil,
         closed_widgets = {},
+        lifecycle_events = {},
+        queue_status_callbacks = {},
+        scheduled = {},
+        finished_cleanup_journal = {
+            version = 1,
+            next_sequence = 1,
+            mangas = {},
+        },
         reader_menu_order = options.reader_menu_order or {
             main = { "history", "open_previous_document" },
         },
@@ -126,6 +135,9 @@ function Helper.install(options)
             isSubProcessDone = function()
                 return true
             end,
+            realpath = function(path)
+                return path
+            end,
         }
     end
 
@@ -143,7 +155,9 @@ function Helper.install(options)
                     callback()
                 end
             end,
-            scheduleIn = function() end,
+            scheduleIn = function(_, delay, callback)
+                table.insert(state.scheduled, { delay = delay, callback = callback })
+            end,
             setDirty = function() end,
             forceRePaint = function() end,
         }
@@ -209,9 +223,11 @@ function Helper.install(options)
 
             function instance:recover()
                 self.recovered = true
+                table.insert(state.lifecycle_events, "queue-recover")
             end
 
             table.insert(state.queue_instances, instance)
+            table.insert(state.queue_status_callbacks, queue_options.onStatusChanged)
             return instance
         end
 
@@ -245,6 +261,10 @@ function Helper.install(options)
                 table.insert(state.home_downloads_labels, text)
                 return true
             end,
+            showDirectoryChooser = function(callback, start_dir)
+                state.directory_chooser_callback = callback
+                state.directory_chooser_start_dir = start_dir
+            end,
         }
     end
 
@@ -261,11 +281,36 @@ function Helper.install(options)
             loadDownloadDirectory = function()
                 return options.download_directory or "/books"
             end,
+            saveDownloadDirectory = function(_, path)
+                options.download_directory = path
+                return path
+            end,
             loadDownloadQueue = function()
                 return {}
             end,
             saveDownloadQueue = function(_, jobs)
                 return jobs
+            end,
+            loadDeleteChaptersSettings = function()
+                return options.delete_chapters_settings or {
+                    delete_after_mark_read = false,
+                    delete_finished_while_reading = 0,
+                }
+            end,
+            loadFinishedChapterCleanupJournal = function()
+                return state.finished_cleanup_journal
+            end,
+            saveFinishedChapterCleanupJournal = function(_, journal)
+                state.finished_cleanup_journal = journal
+                return journal
+            end,
+            clearFinishedChapterCleanupJournal = function()
+                state.finished_cleanup_journal = {
+                    version = 1,
+                    next_sequence = 1,
+                    mangas = {},
+                }
+                return state.finished_cleanup_journal
             end,
             loadChapterLedger = function()
                 return {}
@@ -285,6 +330,9 @@ function Helper.install(options)
 
     package.preload["suwayomi/debug"] = function()
         return {
+            now = function()
+                return 100
+            end,
             log = function(event)
                 table.insert(state.debug_events, event)
             end,

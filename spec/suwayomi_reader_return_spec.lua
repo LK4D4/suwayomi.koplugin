@@ -449,6 +449,26 @@ describe("suwayomi/reader_return", function()
         assert.are.equal("library", state.shown_options.reader_return_close_target.kind)
     end)
 
+    it("schedules finished cleanup before starting the reader-return request", function()
+        local plugin = build_plugin({
+            contexts = {
+                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1",
+                    manga_title = "Manga",
+                },
+            },
+        })
+        plugin.scheduleFinishedChapterCleanup = function(_, delay_seconds)
+            table.insert(state.events, "cleanup-schedule:" .. tostring(delay_seconds))
+        end
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+
+        assert.are.equal("cleanup-schedule:0", state.events[1])
+        assert.are.equal("network-request", state.events[2])
+    end)
+
     it("uses fresh manga library state when returning to the chapter list", function()
         local plugin = build_plugin({
             contexts = {

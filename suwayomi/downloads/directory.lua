@@ -131,6 +131,9 @@ function Methods:chooseDownloadDirectory(callback, options)
         if not (options and options.suppress_saved_message) then
             self:showMessage(I18n.t("Suwayomi download directory saved."))
         end
+        if self.onFinishedCleanupDownloadDirectoryChanged then
+            self:onFinishedCleanupDownloadDirectoryChanged()
+        end
         runCallback(callback, saved_path, options)
     end, self:getDownloadDirectoryChooserStartDir())
 end

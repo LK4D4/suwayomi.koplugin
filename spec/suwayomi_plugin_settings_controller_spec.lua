@@ -66,6 +66,13 @@ local function installController(options)
         saved_category_behavior = options.category_behavior or "automatic",
         credentials = options.credentials or { server_url = "https://suwayomi.example" },
         download_directory = options.download_directory or "",
+        finished_cleanup_journal = options.finished_cleanup_journal or {
+            mangas = {},
+        },
+        cleanup_setting_changes = {},
+        cleanup_cancel_count = 0,
+        cleanup_process_count = 0,
+        cleanup_delete_count = 0,
     }
 
     package.preload.gettext = function()
@@ -181,6 +188,7 @@ local function installController(options)
             end,
             showDeleteFinishedWhileReadingMenu = function(menu_options)
                 state.delete_finished_menu_options = menu_options
+                state.delete_finished_menu = menu_options
                 return { name = "delete-finished-menu" }
             end,
             updateDeleteFinishedWhileReadingMenu = function(menu, menu_options)
@@ -268,6 +276,18 @@ local function installController(options)
     end
     function plugin:pluralize(value, singular, plural)
         return value == 1 and singular or plural
+    end
+    function plugin:onFinishedCleanupSettingChanged(previous_value, current_value)
+        table.insert(state.cleanup_setting_changes, {
+            previous_value = previous_value,
+            current_value = current_value,
+        })
+        if current_value <= 0 then
+            state.cleanup_cancel_count = state.cleanup_cancel_count + 1
+            state.finished_cleanup_journal = { mangas = {} }
+        elseif previous_value <= 0 or current_value < previous_value then
+            state.cleanup_process_count = state.cleanup_process_count + 1
+        end
     end
     state.touchmenu = {
         updateItems = function()
@@ -1172,5 +1192,72 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.same({}, state.messages)
         assert.is_nil(state.unexpected_delete_finished_menu_update)
         assert.are.equal(2, state.refresh_count)
+    end)
+
+    it("disables cleanup by cancelling work and clearing finished history", function()
+        local plugin, state = installController({
+            delete_chapters_settings = {
+                delete_after_mark_read = false,
+                delete_finished_while_reading = 2,
+            },
+            finished_cleanup_journal = {
+                mangas = { m1 = { records = { { chapter_id = "c1" } } } },
+            },
+        })
+
+        plugin:showDeleteFinishedWhileReadingDialog(state.touchmenu)
+        state.delete_finished_menu.onSelect(0)
+
+        assert.are.equal(1, state.cleanup_cancel_count)
+        assert.are.same({}, state.finished_cleanup_journal.mangas)
+        assert.are.same({ { previous_value = 2, current_value = 0 } }, state.cleanup_setting_changes)
+    end)
+
+    it("processes retention decreases but not increases", function()
+        local increasing_plugin, increasing_state = installController({
+            delete_chapters_settings = {
+                delete_after_mark_read = false,
+                delete_finished_while_reading = 2,
+            },
+        })
+        increasing_plugin:showDeleteFinishedWhileReadingDialog(increasing_state.touchmenu)
+        increasing_state.delete_finished_menu.onSelect(4)
+
+        assert.are.equal(0, increasing_state.cleanup_process_count)
+        assert.are.equal(0, increasing_state.cleanup_delete_count)
+
+        local decreasing_plugin, decreasing_state = installController({
+            delete_chapters_settings = {
+                delete_after_mark_read = false,
+                delete_finished_while_reading = 4,
+            },
+        })
+        decreasing_plugin:showDeleteFinishedWhileReadingDialog(decreasing_state.touchmenu)
+        decreasing_state.delete_finished_menu.onSelect(2)
+
+        assert.are.equal(1, decreasing_state.cleanup_process_count)
+        assert.are.equal(0, decreasing_state.cleanup_delete_count)
+    end)
+
+    it("re-enables cleanup from empty history", function()
+        local plugin, state = installController({
+            delete_chapters_settings = {
+                delete_after_mark_read = false,
+                delete_finished_while_reading = 1,
+            },
+            finished_cleanup_journal = {
+                mangas = { m1 = { records = { { chapter_id = "c1" } } } },
+            },
+        })
+
+        plugin:showDeleteFinishedWhileReadingDialog(state.touchmenu)
+        state.delete_finished_menu.onSelect(0)
+        plugin:showDeleteFinishedWhileReadingDialog(state.touchmenu)
+        state.delete_finished_menu.onSelect(2)
+
+        assert.are.same({}, state.finished_cleanup_journal.mangas)
+        assert.are.equal(1, state.cleanup_cancel_count)
+        assert.are.equal(1, state.cleanup_process_count)
+        assert.are.equal(0, state.cleanup_delete_count)
     end)
 end)

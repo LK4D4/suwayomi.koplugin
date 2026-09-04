@@ -411,6 +411,9 @@ function Methods:returnToSuwayomiChapters(context)
         return false
     end
 
+    if self.scheduleFinishedChapterCleanup then
+        self:scheduleFinishedChapterCleanup(0)
+    end
     return self:startReaderReturnChapterRequest(context)
 end
 

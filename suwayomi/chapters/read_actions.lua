@@ -98,6 +98,9 @@ function Methods:markChapterUnread(manga, chapter, options)
     else
         self:upsertChapterLedgerEntry(manga, chapter, updates)
     end
+    if self.cancelFinishedChapter then
+        self:cancelFinishedChapter(manga.id, chapter.id)
+    end
 
     if self.current_chapter_context and self.current_chapter_context.chapters then
         for _, current in ipairs(self.current_chapter_context.chapters) do

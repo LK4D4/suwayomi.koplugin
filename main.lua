@@ -26,6 +26,7 @@ local MangaController = require("suwayomi/manga/controller")
 local ChapterContext = require("suwayomi/chapters/context")
 local ChapterMenu = require("suwayomi/chapters/menu")
 local ChapterActions = require("suwayomi/chapters/actions")
+local FinishedChapterCleanup = require("suwayomi/chapters/finished_cleanup")
 local DownloadsController = require("suwayomi/downloads/controller")
 local ReadSyncLedger = require("suwayomi/readsync/ledger")
 local KoreaderMetadata = require("suwayomi/readsync/koreader_metadata")
@@ -43,6 +44,9 @@ local SuwayomiPlugin = WidgetContainer:extend{
     read_sync_failure_delay_seconds = 5,
     read_sync_max_failure_delay_seconds = 300,
     read_sync_watchdog_timeout_seconds = 60,
+    finished_cleanup_retry_delay_seconds = 5,
+    finished_cleanup_max_retry_delay_seconds = 300,
+    finished_cleanup_batch_size = 25,
     source_fetch_poll_interval_seconds = 0.5,
     source_cache_refresh_delay_seconds = 0.1,
     source_fetch_watchdog_timeout_seconds = 60,
@@ -67,6 +71,7 @@ function SuwayomiPlugin:createDownloadQueue()
             return SuwayomiSettings:load()
         end,
         onStatusChanged = function()
+            self:scheduleFinishedChapterCleanup(0)
             if self.chapter_menu_refresh_suppressed and self.chapter_menu_refresh_suppressed > 0 then
                 self.pending_chapter_menu_refresh = true
                 return
@@ -230,6 +235,7 @@ function SuwayomiPlugin:init()
     self.selected_chapters = self.selected_chapters or {}
     self.selection_mode = self.selection_mode == true
     self:getDownloadQueue():recover()
+    self:processFinishedChapterCleanup()
     if self.ui and self.ui.menu then
         self.ui.menu:registerToMainMenu(self)
     end
@@ -248,6 +254,7 @@ local CONTROLLER_MODULES = {
     ChapterContext,
     ChapterMenu,
     ChapterActions,
+    FinishedChapterCleanup,
     DownloadsController,
     ReadSyncLedger,
     KoreaderMetadata,

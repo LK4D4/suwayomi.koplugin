@@ -155,6 +155,7 @@ describe("suwayomi/chapters/actions", function()
             refreshes = {},
             saved_ledgers = {},
             metadata_updates = {},
+            cleanup_cancellations = {},
             scheduled_count = 0,
             getDownloadQueue = function(self)
                 return self.queue
@@ -225,6 +226,12 @@ describe("suwayomi/chapters/actions", function()
             end,
             schedulePendingReadSync = function(self)
                 self.scheduled_count = self.scheduled_count + 1
+            end,
+            cancelFinishedChapter = function(self, manga_id, chapter_id)
+                table.insert(self.cleanup_cancellations, {
+                    manga_id = manga_id,
+                    chapter_id = chapter_id,
+                })
             end,
             applyMangaKeepNextUnreadDownloadsPolicy = function(self, target_manga)
                 self.keep_next_policy_manga = target_manga
@@ -1135,6 +1142,7 @@ describe("suwayomi/chapters/actions", function()
         assert.is_true(plugin.ledger["m1:c1"].pending_read_sync)
         assert.is_false(plugin.ledger["m1:c1"].pending_read_state)
         assert.is_false(plugin.current_chapter_context.chapters[1].is_read)
+        assert.are.same({ { manga_id = "m1", chapter_id = "c1" } }, plugin.cleanup_cancellations)
         assert.are.equal(1, #plugin.refreshes)
         assert.are.equal(1, plugin.scheduled_count)
     end)

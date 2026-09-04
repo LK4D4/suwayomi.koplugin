@@ -31,7 +31,9 @@ local function buildPlugin(controller, options)
         read_sync_batch_size = options.read_sync_batch_size or 2,
         read_sync_poll_interval_seconds = options.read_sync_poll_interval_seconds or 0.1,
         read_sync_watchdog_timeout_seconds = options.read_sync_watchdog_timeout_seconds or 30,
-        deleted_finished = {},
+        recorded_finished = {},
+        finished_journal_flushes = 0,
+        delete_calls = {},
     }
     for name, method in pairs(controller.methods) do
         plugin[name] = method
@@ -100,8 +102,13 @@ local function buildPlugin(controller, options)
     function plugin:isCurrentDocumentFinished()
         return options.current_document_finished == true
     end
+    function plugin:recordFinishedChapter(entry)
+        table.insert(self.recorded_finished, entry)
+        self.finished_journal_flushes = self.finished_journal_flushes + 1
+        return true
+    end
     function plugin:deleteFinishedChaptersWhileReading(manga, chapter)
-        table.insert(self.deleted_finished, { manga = manga, chapter = chapter })
+        table.insert(self.delete_calls, { manga = manga, chapter = chapter })
         return 1
     end
     return plugin
@@ -170,6 +177,12 @@ local function installController(options)
                     return options.loadCredentials()
                 end
                 return options.credentials or { server_url = "https://suwayomi.example" }
+            end,
+            loadDeleteChaptersSettings = function()
+                return {
+                    delete_finished_while_reading = options.delete_finished_while_reading == nil
+                        and 2 or options.delete_finished_while_reading,
+                }
             end,
         }
     end
@@ -510,43 +523,40 @@ describe("suwayomi/readsync/controller", function()
         assert.are.equal(1, #state.scheduled)
     end)
 
-    it("runs delete-while-reading cleanup after a finished document marks read", function()
+    it("records finished cleanup from a fresh reader instance without chapter context", function()
         local controller = installController()
         local plugin = buildPlugin(controller, {
-            current_document_path = "/books/Frieren/Ch. 2.cbz",
+            current_document_path = "/downloads/source/manga/c2.cbz",
             current_document_finished = true,
             ledger = {
                 ["m1:c2"] = {
                     manga_id = "m1",
-                    manga_title = "Frieren",
                     chapter_id = "c2",
-                    chapter_name = "Ch. 2",
-                    path = "/books/Frieren/Ch. 2.cbz",
+                    path = "/downloads/source/manga/c2.cbz",
                     read = false,
                 },
             },
         })
+        plugin.current_chapter_context = nil
 
         plugin:onCloseDocument()
 
-        assert.are.equal("m1", plugin.deleted_finished[1].manga.id)
-        assert.are.equal("Frieren", plugin.deleted_finished[1].manga.title)
-        assert.are.equal("c2", plugin.deleted_finished[1].chapter.id)
-        assert.are.equal("Ch. 2", plugin.deleted_finished[1].chapter.name)
+        assert.are.equal("c2", plugin.recorded_finished[1].chapter_id)
+        assert.is_true(plugin:loadChapterLedger()["m1:c2"].pending_read_sync)
+        assert.are.equal(1, plugin.finished_journal_flushes)
+        assert.are.equal(0, #plugin.delete_calls)
     end)
 
-    it("runs delete-while-reading cleanup for already-read finished documents", function()
+    it("records already-read finished documents without rewriting the ledger", function()
         local controller = installController()
         local plugin = buildPlugin(controller, {
-            current_document_path = "/books/Frieren/Ch. 3.cbz",
+            current_document_path = "/downloads/source/manga/c3.cbz",
             current_document_finished = true,
             ledger = {
                 ["m1:c3"] = {
                     manga_id = "m1",
-                    manga_title = "Frieren",
                     chapter_id = "c3",
-                    chapter_name = "Ch. 3",
-                    path = "/books/Frieren/Ch. 3.cbz",
+                    path = "/downloads/source/manga/c3.cbz",
                     read = true,
                 },
             },
@@ -554,7 +564,101 @@ describe("suwayomi/readsync/controller", function()
 
         plugin:onCloseDocument()
 
-        assert.are.equal("c3", plugin.deleted_finished[1].chapter.id)
+        assert.are.equal("c3", plugin.recorded_finished[1].chapter_id)
         assert.are.equal(0, #plugin.saved_ledgers)
+        assert.are.equal(0, #plugin.delete_calls)
+    end)
+
+    it("keeps read sync scheduling when finished cleanup is disabled", function()
+        local controller, state = installController({ delete_finished_while_reading = 0 })
+        local plugin = buildPlugin(controller, {
+            current_document_path = "/downloads/source/manga/c4.cbz",
+            current_document_finished = true,
+            ledger = {
+                ["m1:c4"] = {
+                    manga_id = "m1",
+                    chapter_id = "c4",
+                    path = "/downloads/source/manga/c4.cbz",
+                    read = false,
+                },
+            },
+        })
+
+        plugin:onCloseDocument()
+
+        assert.is_true(plugin:loadChapterLedger()["m1:c4"].pending_read_sync)
+        assert.are.equal(1, #state.scheduled)
+        assert.are.equal(0, #plugin.recorded_finished)
+        assert.are.equal(0, #plugin.delete_calls)
+    end)
+
+    it("records native open-next close events without chapter context", function()
+        local controller = installController()
+        local plugin = buildPlugin(controller, {
+            current_document_path = "/downloads/source/manga/c5.cbz",
+            current_document_finished = true,
+            ledger = {
+                ["m1:c5"] = {
+                    manga_id = "m1",
+                    chapter_id = "c5",
+                    path = "/downloads/source/manga/c5.cbz",
+                    read = false,
+                },
+            },
+        })
+        plugin.current_chapter_context = nil
+
+        plugin:onCloseDocument()
+
+        assert.are.equal("c5", plugin.recorded_finished[1].chapter_id)
+        assert.are.equal(0, #plugin.delete_calls)
+    end)
+
+    it("does not record unfinished, unmatched, or invalid ledger entries", function()
+        local controller = installController()
+        local cases = {
+            {
+                current_document_path = "/downloads/source/manga/c6.cbz",
+                current_document_finished = false,
+                ledger = {
+                    ["m1:c6"] = { manga_id = "m1", chapter_id = "c6", path = "/downloads/source/manga/c6.cbz", read = false },
+                },
+            },
+            {
+                current_document_path = "/downloads/source/manga/other.cbz",
+                current_document_finished = true,
+                ledger = {
+                    ["m1:c6"] = { manga_id = "m1", chapter_id = "c6", path = "/downloads/source/manga/c6.cbz", read = false },
+                },
+            },
+            {
+                current_document_path = "",
+                current_document_finished = true,
+                ledger = {
+                    ["m1:c6"] = { manga_id = "m1", chapter_id = "c6", path = "", read = false },
+                },
+            },
+            {
+                current_document_path = "/downloads/source/manga/c6.cbz",
+                current_document_finished = true,
+                ledger = {
+                    ["m1:c6"] = { manga_id = "", chapter_id = "c6", path = "/downloads/source/manga/c6.cbz", read = false },
+                },
+            },
+            {
+                current_document_path = "/downloads/source/manga/c6.cbz",
+                current_document_finished = true,
+                ledger = {
+                    ["m1:c6"] = { manga_id = "m1", chapter_id = "", path = "/downloads/source/manga/c6.cbz", read = false },
+                },
+            },
+        }
+
+        for _, options in ipairs(cases) do
+            local plugin = buildPlugin(controller, options)
+            plugin:onCloseDocument()
+            assert.are.equal(0, #plugin.recorded_finished)
+            assert.are.equal(0, #plugin.delete_calls)
+        end
     end)
 end)
