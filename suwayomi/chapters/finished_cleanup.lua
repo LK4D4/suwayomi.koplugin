@@ -161,6 +161,16 @@ local function reportPending(self, reasons, summary)
     self:showMessage(message)
 end
 
+local function notifyCompatibility(self, error_code)
+    if self.finished_cleanup_compatibility_notification == error_code then
+        return
+    end
+    self.finished_cleanup_compatibility_notification = error_code
+    self:showMessage(I18n.t(
+        "Automatic chapter cleanup is paused because its saved data uses an unsupported version."
+    ))
+end
+
 function Methods:recordFinishedChapter(entry)
     if cleanupSetting() <= 0 then
         return false, "disabled"
@@ -192,6 +202,8 @@ function Methods:recordFinishedChapter(entry)
     })
     journal.next_sequence = journal.next_sequence + 1
     SuwayomiSettings:saveFinishedChapterCleanupJournal(journal)
+    self.finished_cleanup_cursor = nil
+    self.finished_cleanup_traversal_retry_at = nil
     self:scheduleFinishedChapterCleanup(0)
     return true
 end
@@ -211,28 +223,46 @@ function Methods:cancelFinishedChapter(manga_id, chapter_id)
     return removed
 end
 
-function Methods:scheduleFinishedChapterCleanup(delay_seconds)
+local function scheduleFinishedChapterCleanup(self, delay_seconds)
+    delay_seconds = math.max(0, tonumber(delay_seconds) or 0)
+    local deadline = SuwayomiDebug.now() + delay_seconds
     if self.finished_cleanup_scheduled then
-        return false
+        if self.finished_cleanup_scheduled_deadline
+            and self.finished_cleanup_scheduled_deadline <= deadline
+        then
+            return false
+        end
+        self:cancelFinishedChapterCleanup()
     end
     self.finished_cleanup_scheduled = true
+    self.finished_cleanup_scheduled_deadline = deadline
     local generation = self.finished_cleanup_generation or 0
     self.finished_cleanup_scheduled_generation = generation
-    UIManager:scheduleIn(delay_seconds or 0, function()
+    UIManager:scheduleIn(delay_seconds, function()
         if generation ~= (self.finished_cleanup_generation or 0) then
             return
         end
         self.finished_cleanup_scheduled = nil
+        self.finished_cleanup_scheduled_deadline = nil
         self.finished_cleanup_scheduled_generation = nil
         self:processFinishedChapterCleanup()
     end)
     return true
 end
 
+function Methods:scheduleFinishedChapterCleanup(delay_seconds)
+    if (tonumber(delay_seconds) or 0) <= 0 then
+        self.finished_cleanup_cursor = nil
+        self.finished_cleanup_traversal_retry_at = nil
+    end
+    return scheduleFinishedChapterCleanup(self, delay_seconds)
+end
+
 function Methods:cancelFinishedChapterCleanup()
     local scheduled = self.finished_cleanup_scheduled == true
     self.finished_cleanup_generation = (self.finished_cleanup_generation or 0) + 1
     self.finished_cleanup_scheduled = nil
+    self.finished_cleanup_scheduled_deadline = nil
     self.finished_cleanup_scheduled_generation = nil
     return scheduled
 end
@@ -241,17 +271,29 @@ function Methods:onFinishedCleanupSettingChanged(previous_value, current_value)
     previous_value = tonumber(previous_value) or 0
     current_value = tonumber(current_value) or 0
     if current_value <= 0 then
-        SuwayomiSettings:clearFinishedChapterCleanupJournal()
         self:cancelFinishedChapterCleanup()
+        self.finished_cleanup_cursor = nil
+        self.finished_cleanup_traversal_retry_at = nil
         self.finished_cleanup_notification_state = nil
         self.finished_cleanup_retry_reasons = nil
+        local _journal, error_code = SuwayomiSettings:loadFinishedChapterCleanupJournal()
+        if error_code then
+            notifyCompatibility(self, error_code)
+            return false
+        end
+        SuwayomiSettings:clearFinishedChapterCleanupJournal()
+        self.finished_cleanup_compatibility_notification = nil
     elseif previous_value <= 0 or current_value < previous_value then
+        self.finished_cleanup_cursor = nil
+        self.finished_cleanup_traversal_retry_at = nil
         self:scheduleFinishedChapterCleanup(0)
     end
 end
 
 function Methods:onFinishedCleanupDownloadDirectoryChanged()
     self.finished_cleanup_revalidate_blocked = true
+    self.finished_cleanup_cursor = nil
+    self.finished_cleanup_traversal_retry_at = nil
     return self:scheduleFinishedChapterCleanup(0)
 end
 
@@ -312,21 +354,34 @@ local function clearRetryReason(self, manga_id, chapter_id)
     end
 end
 
+local function recordIsAfterCursor(record, cursor)
+    if record.sequence ~= cursor.sequence then
+        return record.sequence > cursor.sequence
+    end
+    return record.chapter_id > cursor.chapter_id
+end
+
 local function processFinishedChapterCleanup(self, summary)
     if self.finished_cleanup_scheduled then
         self:cancelFinishedChapterCleanup()
     end
 
-    local setting = cleanupSetting()
-    if setting <= 0 then
-        SuwayomiSettings:clearFinishedChapterCleanupJournal()
-        return summary
-    end
-
     local journal, error_code = SuwayomiSettings:loadFinishedChapterCleanupJournal()
     if error_code then
         summary.compatibility_error = error_code
+        self.finished_cleanup_cursor = nil
+        self.finished_cleanup_traversal_retry_at = nil
+        notifyCompatibility(self, error_code)
         logTransition("compatibility", error_code, 1)
+        return summary
+    end
+    self.finished_cleanup_compatibility_notification = nil
+
+    local setting = cleanupSetting()
+    if setting <= 0 then
+        SuwayomiSettings:clearFinishedChapterCleanupJournal()
+        self.finished_cleanup_cursor = nil
+        self.finished_cleanup_traversal_retry_at = nil
         return summary
     end
 
@@ -347,14 +402,25 @@ local function processFinishedChapterCleanup(self, summary)
 
     local now = SuwayomiDebug.now()
     local reasons = {}
-    local earliest_retry
+    local earliest_retry = self.finished_cleanup_traversal_retry_at
     local needs_follow_up = false
     local revalidate_blocked = self.finished_cleanup_revalidate_blocked == true
+    local cursor = self.finished_cleanup_cursor
     for _, manga_id in ipairs(manga_ids) do
+        local cursor_skips_manga = cursor and (
+            manga_id < cursor.manga_id
+            or (manga_id == cursor.manga_id and cursor.manga_done == true)
+        )
+        if not cursor_skips_manga then
         local manga = journal.mangas[manga_id]
         sortRecords(manga.records)
         local candidate_count = math.max(0, #manga.records - (setting - 1))
         local index = 1
+        if cursor and cursor.manga_id == manga_id and cursor.manga_done ~= true then
+            while index <= candidate_count and not recordIsAfterCursor(manga.records[index], cursor) do
+                index = index + 1
+            end
+        end
         local stop_manga = false
         while index <= candidate_count and not stop_manga do
             if summary.processed >= max_candidates then
@@ -363,6 +429,11 @@ local function processFinishedChapterCleanup(self, summary)
             end
 
             local record = manga.records[index]
+            self.finished_cleanup_cursor = {
+                manga_id = manga_id,
+                sequence = record.sequence,
+                chapter_id = record.chapter_id,
+            }
             summary.processed = summary.processed + 1
             local chapter_id = tostring(record.chapter_id)
             local ledger_entry = findLedgerEntry(ledger, manga_id, chapter_id)
@@ -377,28 +448,26 @@ local function processFinishedChapterCleanup(self, summary)
                 end
                 saveJournal(journal)
                 logTransition("converged", "unread", 1)
+            elseif not self:chapterArchiveExists(record.path) then
+                clearMatchingLedgerPath(self, ledger, ledger_entry, record.path)
+                table.remove(manga.records, index)
+                candidate_count = candidate_count - 1
+                summary.missing = summary.missing + 1
+                clearRetryReason(self, manga_id, chapter_id)
+                if #manga.records == 0 then
+                    journal.mangas[manga_id] = nil
+                end
+                saveJournal(journal)
+                logTransition("converged", "missing", 1)
             elseif ledger_entry.path and ledger_entry.path ~= record.path then
                 rejectCandidate(journal, record, "path_mismatch", summary, reasons)
                 clearRetryReason(self, manga_id, chapter_id)
                 index = index + 1
             elseif record.blocked_reason == "unsafe_path" and not revalidate_blocked then
-                if not self:chapterArchiveExists(record.path) then
-                    clearMatchingLedgerPath(self, ledger, ledger_entry, record.path)
-                    table.remove(manga.records, index)
-                    candidate_count = candidate_count - 1
-                    summary.missing = summary.missing + 1
-                    clearRetryReason(self, manga_id, chapter_id)
-                    if #manga.records == 0 then
-                        journal.mangas[manga_id] = nil
-                    end
-                    saveJournal(journal)
-                    logTransition("converged", "missing", 1)
-                else
-                    summary.rejected = summary.rejected + 1
-                    addReason(reasons, "unsafe_path")
-                    logTransition("paused", "unsafe_path", 1)
-                    index = index + 1
-                end
+                summary.rejected = summary.rejected + 1
+                addReason(reasons, "unsafe_path")
+                logTransition("paused", "unsafe_path", 1)
+                index = index + 1
             elseif record.retry_after > now then
                 summary.deferred = summary.deferred + 1
                 summary.retrying = summary.retrying + 1
@@ -428,17 +497,6 @@ local function processFinishedChapterCleanup(self, summary)
                     earliest_retry = not earliest_retry and retry_after
                         or math.min(earliest_retry, retry_after)
                     stop_manga = true
-                elseif not self:chapterArchiveExists(record.path) then
-                    clearMatchingLedgerPath(self, ledger, ledger_entry, record.path)
-                    table.remove(manga.records, index)
-                    candidate_count = candidate_count - 1
-                    summary.missing = summary.missing + 1
-                    clearRetryReason(self, manga_id, chapter_id)
-                    if #manga.records == 0 then
-                        journal.mangas[manga_id] = nil
-                    end
-                    saveJournal(journal)
-                    logTransition("converged", "missing", 1)
                 else
                     local root = resolvedPath(SuwayomiSettings:loadDownloadDirectory())
                     local candidate = resolvedPath(record.path)
@@ -499,6 +557,11 @@ local function processFinishedChapterCleanup(self, summary)
                 end
             end
         end
+        if needs_follow_up then
+            break
+        end
+        self.finished_cleanup_cursor = { manga_id = manga_id, manga_done = true }
+        end
     end
 
     for _, manga in pairs(journal.mangas or {}) do
@@ -506,12 +569,15 @@ local function processFinishedChapterCleanup(self, summary)
     end
     reportPending(self, reasons, summary)
     if needs_follow_up then
-        self:scheduleFinishedChapterCleanup(0)
-    elseif earliest_retry then
-        self:scheduleFinishedChapterCleanup(math.max(0, earliest_retry - now))
-    end
-    if not needs_follow_up then
+        self.finished_cleanup_traversal_retry_at = earliest_retry
+        scheduleFinishedChapterCleanup(self, 0)
+    else
+        self.finished_cleanup_cursor = nil
+        self.finished_cleanup_traversal_retry_at = nil
         self.finished_cleanup_revalidate_blocked = nil
+        if earliest_retry then
+            scheduleFinishedChapterCleanup(self, math.max(0, earliest_retry - now))
+        end
     end
     return summary
 end

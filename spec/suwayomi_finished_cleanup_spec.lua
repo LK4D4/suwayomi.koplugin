@@ -473,6 +473,10 @@ describe("suwayomi/chapters/finished_cleanup", function()
         assert.are.equal("unsupported_version", summary.compatibility_error)
         assert.are.same(journal, plugin.state.journal)
         assert.are.equal(0, plugin.state.save_count)
+        assert.are.equal(1, #plugin.messages)
+        assert.is_nil(plugin.messages[1]:match("version = 9"))
+        plugin:processFinishedChapterCleanup()
+        assert.are.equal(1, #plugin.messages)
     end)
 
     it("logs only redacted cleanup fields", function()
@@ -615,6 +619,106 @@ describe("suwayomi/chapters/finished_cleanup", function()
         record(plugin, "m1", "c1", "/downloads/source/manga/c1.cbz")
         plugin:processFinishedChapterCleanup()
         assert.are.equal(2, #plugin.messages)
+    end)
+
+    it("carries the bounded cursor past blocked records instead of spinning", function()
+        local plugin = buildPlugin({ setting = 1, batch_size = 2 })
+        record(plugin, "m1", "c1", "/private/m1/c1.cbz")
+        record(plugin, "m1", "c2", "/private/m1/c2.cbz")
+        record(plugin, "m1", "c3", "/private/m1/c3.cbz")
+        record(plugin, "m2", "c1", "/downloads/source/m2/c1.cbz")
+        plugin:cancelFinishedChapterCleanup()
+
+        local first = plugin:processFinishedChapterCleanup()
+        assert.are.equal(2, first.processed)
+        assert.are.equal(0, first.deleted)
+        assert.are.equal(0, plugin.state.scheduled[#plugin.state.scheduled].delay)
+
+        plugin.state.scheduled[#plugin.state.scheduled].callback()
+        assert.is_nil(journalRecord(plugin, "m2", "c1"))
+        assert.are.equal(1, #plugin.delete_calls)
+        assert.is_false(plugin.finished_cleanup_scheduled == true)
+    end)
+
+    it("finishes bounded traversal before scheduling the earliest waiting retry", function()
+        local waiting_path_1 = "/downloads/source/m1/c1.cbz"
+        local waiting_path_2 = "/downloads/source/m2/c1.cbz"
+        local ready_path = "/downloads/source/m3/c1.cbz"
+        local plugin = buildPlugin({
+            setting = 1,
+            now = 100,
+            batch_size = 2,
+            journal = { version = 1, next_sequence = 4, mangas = {
+                m1 = { records = { { chapter_id = "c1", path = waiting_path_1,
+                    sequence = 1, retry_count = 1, retry_after = 300 } } },
+                m2 = { records = { { chapter_id = "c1", path = waiting_path_2,
+                    sequence = 2, retry_count = 1, retry_after = 250 } } },
+                m3 = { records = { { chapter_id = "c1", path = ready_path,
+                    sequence = 3, retry_count = 0, retry_after = 0 } } },
+            } },
+            ledger = {
+                ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = waiting_path_1, read = true },
+                ["m2:c1"] = { manga_id = "m2", chapter_id = "c1", path = waiting_path_2, read = true },
+                ["m3:c1"] = { manga_id = "m3", chapter_id = "c1", path = ready_path, read = true },
+            },
+            existing = { [waiting_path_1] = true, [waiting_path_2] = true, [ready_path] = true },
+        })
+
+        plugin:processFinishedChapterCleanup()
+        assert.are.equal(0, plugin.state.scheduled[#plugin.state.scheduled].delay)
+        plugin.state.scheduled[#plugin.state.scheduled].callback()
+        assert.is_nil(journalRecord(plugin, "m3", "c1"))
+        assert.are.equal(150, plugin.state.scheduled[#plugin.state.scheduled].delay)
+    end)
+
+    it("preserves an unsupported journal even while cleanup is disabled", function()
+        local journal = { version = 9, opaque = { keep = true } }
+        local plugin = buildPlugin({ setting = 0, journal = journal, journal_error = "unsupported_version" })
+        local summary = plugin:processFinishedChapterCleanup()
+        assert.are.equal("unsupported_version", summary.compatibility_error)
+        assert.are.same(journal, plugin.state.journal)
+        assert.are.equal(0, plugin.state.save_count)
+        assert.are.equal(1, #plugin.messages)
+    end)
+
+    it("converges a missing old path before rejecting a changed ledger path", function()
+        local old_path = "/downloads/source/manga/old.cbz"
+        local new_path = "/downloads/source/manga/new.cbz"
+        local plugin = buildPlugin({ setting = 1 })
+        record(plugin, "m1", "c1", old_path, { exists = false })
+        plugin.ledger["m1:c1"].path = new_path
+
+        local summary = plugin:processFinishedChapterCleanup()
+
+        assert.are.equal(1, summary.missing)
+        assert.are.equal(0, summary.rejected)
+        assert.is_nil(journalRecord(plugin, "m1", "c1"))
+        assert.are.equal(new_path, plugin.ledger["m1:c1"].path)
+        assert.are.equal(0, #plugin.delete_calls)
+    end)
+
+    it("replaces a later cleanup timer with an earlier request", function()
+        local path = "/downloads/source/manga/c1.cbz"
+        local plugin = buildPlugin({
+            setting = 1,
+            journal = { version = 1, next_sequence = 2, mangas = { m1 = { records = {
+                { chapter_id = "c1", path = path, sequence = 1, retry_count = 0, retry_after = 0 },
+            } } } },
+            ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path, read = true } },
+            existing = { [path] = true },
+        })
+
+        assert.is_true(plugin:scheduleFinishedChapterCleanup(300))
+        assert.is_true(plugin:scheduleFinishedChapterCleanup(0))
+        assert.is_false(plugin:scheduleFinishedChapterCleanup(10))
+        assert.are.same({ 300, 0 }, {
+            plugin.state.scheduled[1].delay,
+            plugin.state.scheduled[2].delay,
+        })
+        plugin.state.scheduled[1].callback()
+        assert.are.equal(0, #plugin.delete_calls)
+        plugin.state.scheduled[2].callback()
+        assert.are.equal(1, #plugin.delete_calls)
     end)
 
     it("does not reenter an active processor", function()
