@@ -60,6 +60,7 @@ local MANGA_KEEP_NEXT_UNREAD_DOWNLOAD_LIMITS = {
     [10] = true,
     [50] = true,
 }
+local FINISHED_CLEANUP_VERSION = 1
 
 local function copyTable(source)
     local target = {}
@@ -67,6 +68,77 @@ local function copyTable(source)
         target[key] = value
     end
     return target
+end
+
+local function emptyFinishedCleanupJournal()
+    return { version = FINISHED_CLEANUP_VERSION, next_sequence = 1, mangas = {} }
+end
+
+local function finiteNonNegative(value)
+    value = tonumber(value)
+    if not value or value ~= value or value == math.huge or value == -math.huge or value < 0 then
+        return nil
+    end
+    return value
+end
+
+local function tablesEqual(left, right)
+    if type(left) ~= type(right) then return false end
+    if type(left) ~= "table" then return left == right end
+    for key, value in pairs(left) do
+        if not tablesEqual(value, right[key]) then return false end
+    end
+    for key in pairs(right) do
+        if left[key] == nil then return false end
+    end
+    return true
+end
+
+local function normalizeFinishedCleanupJournal(value)
+    if type(value) ~= "table" then
+        return emptyFinishedCleanupJournal(), true
+    end
+    if value.version ~= nil and value.version ~= FINISHED_CLEANUP_VERSION then
+        return value, false, "unsupported_version"
+    end
+
+    local normalized = emptyFinishedCleanupJournal()
+    local max_sequence = 0
+    if type(value.mangas) == "table" then
+        for manga_key, manga in pairs(value.mangas) do
+            local key = type(manga_key) == "string" and manga_key or tostring(manga_key)
+            if key ~= "" and type(manga) == "table" and type(manga.records) == "table" then
+                local by_chapter = {}
+                for _, record in pairs(manga.records) do
+                    if type(record) == "table" and type(record.chapter_id) == "string"
+                        and record.chapter_id ~= "" and type(record.path) == "string" and record.path ~= "" then
+                        local sequence = finiteNonNegative(record.sequence)
+                        local retry_count = finiteNonNegative(record.retry_count)
+                        local retry_after = finiteNonNegative(record.retry_after)
+                        if sequence and retry_count and retry_after then
+                            local accepted = { chapter_id = record.chapter_id, path = record.path,
+                                sequence = sequence, retry_count = retry_count, retry_after = retry_after }
+                            local previous = by_chapter[record.chapter_id]
+                            if not previous or sequence > previous.sequence then
+                                by_chapter[record.chapter_id] = accepted
+                            end
+                            if sequence > max_sequence then max_sequence = sequence end
+                        end
+                    end
+                end
+                local records = {}
+                for _, record in pairs(by_chapter) do table.insert(records, record) end
+                table.sort(records, function(left, right)
+                    if left.sequence == right.sequence then return left.chapter_id < right.chapter_id end
+                    return left.sequence < right.sequence
+                end)
+                if #records > 0 then normalized.mangas[key] = { records = records } end
+            end
+        end
+    end
+    local next_sequence = finiteNonNegative(value.next_sequence) or 1
+    normalized.next_sequence = math.max(1, next_sequence, max_sequence + 1)
+    return normalized, not tablesEqual(value, normalized)
 end
 
 local function toStringOrDefault(value, default)
@@ -561,6 +633,33 @@ function SuwayomiSettings:saveChapterLedger(ledger)
     local normalized = self:normalizeChapterLedger(ledger)
     self:open():saveSetting("chapter_ledger", normalized):flush()
     return normalized
+end
+
+function SuwayomiSettings:normalizeFinishedChapterCleanupJournal(value)
+    return normalizeFinishedCleanupJournal(value)
+end
+
+function SuwayomiSettings:loadFinishedChapterCleanupJournal()
+    local raw = self:open():readSetting("finished_chapter_cleanup", nil)
+    local journal, changed, error_code = normalizeFinishedCleanupJournal(raw)
+    if error_code then return journal, error_code end
+    if changed then
+        self:open():saveSetting("finished_chapter_cleanup", journal):flush()
+    end
+    return journal
+end
+
+function SuwayomiSettings:saveFinishedChapterCleanupJournal(journal)
+    local normalized, _, error_code = normalizeFinishedCleanupJournal(journal)
+    if error_code then return normalized, error_code end
+    self:open():saveSetting("finished_chapter_cleanup", normalized):flush()
+    return normalized
+end
+
+function SuwayomiSettings:clearFinishedChapterCleanupJournal()
+    local journal = emptyFinishedCleanupJournal()
+    self:open():saveSetting("finished_chapter_cleanup", journal):flush()
+    return journal
 end
 
 function SuwayomiSettings:loadReaderReturnContexts()

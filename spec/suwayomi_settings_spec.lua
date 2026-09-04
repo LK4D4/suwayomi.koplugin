@@ -113,6 +113,78 @@ describe("suwayomi/settings", function()
         assert.are.equal("basic_auth", stored_data.credentials.auth_method)
     end)
 
+    it("loads an empty versioned finished cleanup journal by default", function()
+        local settings = require("suwayomi/settings")
+        assert.are.same({ version = 1, next_sequence = 1, mangas = {} },
+            settings:loadFinishedChapterCleanupJournal())
+    end)
+
+    it("normalizes and deduplicates finished cleanup records without truncating them", function()
+        stored_data.finished_chapter_cleanup = {
+            version = 1,
+            next_sequence = 1,
+            mangas = {
+                m1 = { records = {
+                    { chapter_id = "c1", path = "/downloads/c1.cbz", sequence = 2, retry_count = 3, retry_after = 10 },
+                    { chapter_id = "c1", path = "/downloads/new-c1.cbz", sequence = 4, retry_count = 0, retry_after = 0 },
+                    { chapter_id = "c2", path = "/downloads/c2.cbz", sequence = 3, retry_count = 0, retry_after = 0 },
+                } },
+            },
+        }
+        local journal = require("suwayomi/settings"):loadFinishedChapterCleanupJournal()
+        assert.are.equal(5, journal.next_sequence)
+        assert.are.equal(2, #journal.mangas.m1.records)
+        assert.are.equal("/downloads/new-c1.cbz", journal.mangas.m1.records[2].path)
+    end)
+
+    it("preserves an unknown finished cleanup journal version", function()
+        local raw = { version = 9, opaque = { keep = true } }
+        stored_data.finished_chapter_cleanup = raw
+        local journal, err = require("suwayomi/settings"):loadFinishedChapterCleanupJournal()
+        assert.are.equal(raw, journal)
+        assert.are.equal("unsupported_version", err)
+        assert.is_false(flushed)
+    end)
+
+    it("drops invalid journal records, normalizes keys, and keeps unknown fields out", function()
+        stored_data.finished_chapter_cleanup = {
+            version = 1, next_sequence = -2, extra = true, mangas = {
+                [7] = { records = {
+                    { chapter_id = "", path = "/bad", sequence = 1, retry_count = 0, retry_after = 0 },
+                    { chapter_id = "ok", path = "/ok", sequence = 2, retry_count = -1, retry_after = 0 },
+                    { chapter_id = "ok", path = "/ok", sequence = 2, retry_count = 1, retry_after = 0, unknown = true },
+                    { chapter_id = "later", path = "/later", sequence = 3, retry_count = 0, retry_after = 0 },
+                    { chapter_id = "nan", path = "/nan", sequence = 0 / 0, retry_count = 0, retry_after = 0 },
+                } },
+                empty = { records = "nope" },
+                [""] = { records = {} },
+            },
+        }
+        local settings = require("suwayomi/settings")
+        local journal = settings:loadFinishedChapterCleanupJournal()
+        assert.are.same({ "ok", "later" }, { journal.mangas["7"].records[1].chapter_id,
+            journal.mangas["7"].records[2].chapter_id })
+        assert.is_nil(journal.mangas["7"].records[1].unknown)
+        assert.is_true(flushed)
+    end)
+
+    it("does not truncate large valid journals and flushes saves and clears", function()
+        local records = {}
+        for index = 1, 120 do
+            records[index] = { chapter_id = "c" .. index, path = "/c" .. index,
+                sequence = index, retry_count = 0, retry_after = 0 }
+        end
+        local settings = require("suwayomi/settings")
+        local saved = settings:saveFinishedChapterCleanupJournal({ version = 1,
+            next_sequence = 1, mangas = { m = { records = records } } })
+        assert.are.equal(120, #saved.mangas.m.records)
+        assert.is_true(flushed)
+        flushed = false
+        local cleared = settings:clearFinishedChapterCleanupJournal()
+        assert.are.same({ version = 1, next_sequence = 1, mangas = {} }, cleared)
+        assert.is_true(flushed)
+    end)
+
     it("loads source languages with english enabled by default", function()
         local settings = require("suwayomi/settings")
         local source_languages = settings:loadSourceLanguages()
