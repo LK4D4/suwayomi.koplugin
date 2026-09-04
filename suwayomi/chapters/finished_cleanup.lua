@@ -130,12 +130,16 @@ local function addReason(reasons, reason)
     reasons[reason] = (reasons[reason] or 0) + 1
 end
 
-local function reportPending(self, reasons, summary)
+local function reportPending(self, reasons)
     local keys = {}
     local count = 0
+    local rejected = 0
     for reason, reason_count in pairs(reasons) do
         table.insert(keys, reason)
         count = count + reason_count
+        if reason == "unsafe_path" or reason == "path_mismatch" then
+            rejected = rejected + reason_count
+        end
     end
     if count == 0 then
         self.finished_cleanup_notification_state = nil
@@ -151,9 +155,9 @@ local function reportPending(self, reasons, summary)
     end
 
     local message
-    if summary.rejected > 0 and summary.retrying == 0 then
+    if rejected > 0 and rejected == count then
         message = I18n.f("Automatic chapter cleanup paused for %1 unsafe files.", count)
-    elseif summary.rejected == 0 then
+    elseif rejected == 0 then
         message = I18n.f("Automatic chapter cleanup will retry %1 files.", count)
     else
         message = I18n.f("Automatic chapter cleanup has %1 pending files.", count)
@@ -204,6 +208,7 @@ function Methods:recordFinishedChapter(entry)
     SuwayomiSettings:saveFinishedChapterCleanupJournal(journal)
     self.finished_cleanup_cursor = nil
     self.finished_cleanup_traversal_retry_at = nil
+    self.finished_cleanup_traversal_reasons = nil
     self:scheduleFinishedChapterCleanup(0)
     return true
 end
@@ -254,6 +259,7 @@ function Methods:scheduleFinishedChapterCleanup(delay_seconds)
     if (tonumber(delay_seconds) or 0) <= 0 then
         self.finished_cleanup_cursor = nil
         self.finished_cleanup_traversal_retry_at = nil
+        self.finished_cleanup_traversal_reasons = nil
     end
     return scheduleFinishedChapterCleanup(self, delay_seconds)
 end
@@ -274,6 +280,7 @@ function Methods:onFinishedCleanupSettingChanged(previous_value, current_value)
         self:cancelFinishedChapterCleanup()
         self.finished_cleanup_cursor = nil
         self.finished_cleanup_traversal_retry_at = nil
+        self.finished_cleanup_traversal_reasons = nil
         self.finished_cleanup_notification_state = nil
         self.finished_cleanup_retry_reasons = nil
         local _journal, error_code = SuwayomiSettings:loadFinishedChapterCleanupJournal()
@@ -286,6 +293,7 @@ function Methods:onFinishedCleanupSettingChanged(previous_value, current_value)
     elseif previous_value <= 0 or current_value < previous_value then
         self.finished_cleanup_cursor = nil
         self.finished_cleanup_traversal_retry_at = nil
+        self.finished_cleanup_traversal_reasons = nil
         self:scheduleFinishedChapterCleanup(0)
     end
 end
@@ -294,6 +302,7 @@ function Methods:onFinishedCleanupDownloadDirectoryChanged()
     self.finished_cleanup_revalidate_blocked = true
     self.finished_cleanup_cursor = nil
     self.finished_cleanup_traversal_retry_at = nil
+    self.finished_cleanup_traversal_reasons = nil
     return self:scheduleFinishedChapterCleanup(0)
 end
 
@@ -371,6 +380,7 @@ local function processFinishedChapterCleanup(self, summary)
         summary.compatibility_error = error_code
         self.finished_cleanup_cursor = nil
         self.finished_cleanup_traversal_retry_at = nil
+        self.finished_cleanup_traversal_reasons = nil
         notifyCompatibility(self, error_code)
         logTransition("compatibility", error_code, 1)
         return summary
@@ -382,6 +392,7 @@ local function processFinishedChapterCleanup(self, summary)
         SuwayomiSettings:clearFinishedChapterCleanupJournal()
         self.finished_cleanup_cursor = nil
         self.finished_cleanup_traversal_retry_at = nil
+        self.finished_cleanup_traversal_reasons = nil
         return summary
     end
 
@@ -401,7 +412,7 @@ local function processFinishedChapterCleanup(self, summary)
     end
 
     local now = SuwayomiDebug.now()
-    local reasons = {}
+    local reasons = self.finished_cleanup_traversal_reasons or {}
     local earliest_retry = self.finished_cleanup_traversal_retry_at
     local needs_follow_up = false
     local revalidate_blocked = self.finished_cleanup_revalidate_blocked == true
@@ -567,13 +578,15 @@ local function processFinishedChapterCleanup(self, summary)
     for _, manga in pairs(journal.mangas or {}) do
         summary.remaining = summary.remaining + #(manga.records or {})
     end
-    reportPending(self, reasons, summary)
     if needs_follow_up then
         self.finished_cleanup_traversal_retry_at = earliest_retry
+        self.finished_cleanup_traversal_reasons = reasons
         scheduleFinishedChapterCleanup(self, 0)
     else
+        reportPending(self, reasons)
         self.finished_cleanup_cursor = nil
         self.finished_cleanup_traversal_retry_at = nil
+        self.finished_cleanup_traversal_reasons = nil
         self.finished_cleanup_revalidate_blocked = nil
         if earliest_retry then
             scheduleFinishedChapterCleanup(self, math.max(0, earliest_retry - now))

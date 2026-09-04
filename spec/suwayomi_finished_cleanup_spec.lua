@@ -671,6 +671,26 @@ describe("suwayomi/chapters/finished_cleanup", function()
         assert.are.equal(150, plugin.state.scheduled[#plugin.state.scheduled].delay)
     end)
 
+    it("reports mixed failures once per completed multi-batch traversal", function()
+        local plugin = buildPlugin({ setting = 1, now = 100, batch_size = 2, delete_state = "delete_failed" })
+        record(plugin, "m1", "c1", "/private/m1/c1.cbz")
+        record(plugin, "m1", "c2", "/private/m1/c2.cbz")
+        record(plugin, "m2", "c1", "/downloads/source/m2/c1.cbz")
+        plugin:cancelFinishedChapterCleanup()
+
+        plugin:processFinishedChapterCleanup()
+        assert.are.equal(0, #plugin.messages)
+        plugin.state.scheduled[#plugin.state.scheduled].callback()
+        assert.are.equal(1, #plugin.messages)
+        assert.is_not_nil(plugin.messages[1]:match("3"))
+
+        plugin.state.now = 105
+        plugin.state.scheduled[#plugin.state.scheduled].callback()
+        assert.are.equal(1, #plugin.messages)
+        plugin.state.scheduled[#plugin.state.scheduled].callback()
+        assert.are.equal(1, #plugin.messages)
+    end)
+
     it("preserves an unsupported journal even while cleanup is disabled", function()
         local journal = { version = 9, opaque = { keep = true } }
         local plugin = buildPlugin({ setting = 0, journal = journal, journal_error = "unsupported_version" })
