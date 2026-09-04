@@ -195,10 +195,10 @@ function Methods:markLedgerEntryRead(entry)
     ledger_entry.pending_read_sync = true
     ledger_entry.pending_read_state = true
     self:markCurrentContextChapterReadFromLedger(ledger_entry)
-    self:saveChapterLedger(ledger)
+    local saved_ledger = self:saveChapterLedger(ledger)
 
     self:schedulePendingReadSync()
-    return true
+    return true, saved_ledger[key] or ledger_entry
 end
 
 

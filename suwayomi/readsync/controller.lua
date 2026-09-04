@@ -283,15 +283,16 @@ function Methods:onCloseDocument()
     for _, entry in pairs(ledger) do
         if entry.path == document_path then
             local already_read = entry.read == true
-            local marked = self:markLedgerEntryRead(entry)
+            local marked, saved_entry = self:markLedgerEntryRead(entry)
+            local finished_entry = saved_entry or entry
             local settings = SuwayomiSettings:loadDeleteChaptersSettings()
             local cleanup_enabled = tonumber(settings and settings.delete_finished_while_reading) or 0
             if (marked or already_read) and cleanup_enabled > 0
-                and validId(entry.manga_id) and validId(entry.chapter_id)
-                and type(entry.path) == "string" and entry.path ~= ""
+                and validId(finished_entry.manga_id) and validId(finished_entry.chapter_id)
+                and type(finished_entry.path) == "string" and finished_entry.path ~= ""
                 and self.recordFinishedChapter
             then
-                self:recordFinishedChapter(entry)
+                self:recordFinishedChapter(finished_entry)
             end
             return
         end

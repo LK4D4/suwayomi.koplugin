@@ -6,6 +6,17 @@
 
 local Helper = {}
 
+local function clone(value)
+    if type(value) ~= "table" then
+        return value
+    end
+    local result = {}
+    for key, item in pairs(value) do
+        result[clone(key)] = clone(item)
+    end
+    return result
+end
+
 local MODULES_TO_CLEAR = {
     "main",
     "dispatcher",
@@ -15,6 +26,7 @@ local MODULES_TO_CLEAR = {
     "ui/widget/infomessage",
     "ui/widget/container/widgetcontainer",
     "ui/elements/reader_menu_order",
+    "apps/reader/readerui",
     "suwayomi/api",
     "suwayomi/subprocess/job",
     "suwayomi/client",
@@ -91,10 +103,14 @@ function Helper.install(options)
         lifecycle_events = {},
         queue_status_callbacks = {},
         scheduled = {},
-        finished_cleanup_journal = {
+        chapter_ledger = clone(options.chapter_ledger or {}),
+        finished_cleanup_journal = clone(options.finished_cleanup_journal or {
             version = 1,
             next_sequence = 1,
             mangas = {},
+        }),
+        reader_ui = {
+            instance = options.reader_ui_instance,
         },
         reader_menu_order = options.reader_menu_order or {
             main = { "history", "open_previous_document" },
@@ -298,11 +314,11 @@ function Helper.install(options)
                 }
             end,
             loadFinishedChapterCleanupJournal = function()
-                return state.finished_cleanup_journal
+                return clone(state.finished_cleanup_journal)
             end,
             saveFinishedChapterCleanupJournal = function(_, journal)
-                state.finished_cleanup_journal = journal
-                return journal
+                state.finished_cleanup_journal = clone(journal)
+                return clone(journal)
             end,
             clearFinishedChapterCleanupJournal = function()
                 state.finished_cleanup_journal = {
@@ -313,10 +329,11 @@ function Helper.install(options)
                 return state.finished_cleanup_journal
             end,
             loadChapterLedger = function()
-                return {}
+                return clone(state.chapter_ledger)
             end,
             saveChapterLedger = function(_, ledger)
-                return ledger
+                state.chapter_ledger = clone(ledger)
+                return clone(ledger)
             end,
             loadReaderReturnContexts = function()
                 return options.reader_return_contexts or {}
@@ -341,6 +358,10 @@ function Helper.install(options)
 
     package.preload["ui/elements/reader_menu_order"] = function()
         return state.reader_menu_order
+    end
+
+    package.preload["apps/reader/readerui"] = function()
+        return state.reader_ui
     end
 
     package.preload.datastorage = function()

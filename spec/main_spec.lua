@@ -228,6 +228,43 @@ describe("suwayomi plugin", function()
         assert.are.same({ "queue-recover", "cleanup-process" }, runtime.lifecycle_events)
     end)
 
+    it("records the freshly persisted read entry when a finished document closes", function()
+        local path = "/downloads/source/manga/c1.cbz"
+        runtime_helper.teardown()
+        runtime = runtime_helper.install({
+            chapter_ledger = {
+                ["m1:c1"] = {
+                    manga_id = "m1",
+                    chapter_id = "c1",
+                    path = path,
+                    read = false,
+                },
+            },
+            delete_chapters_settings = {
+                delete_after_mark_read = false,
+                delete_finished_while_reading = 1,
+            },
+        })
+        local plugin = build_plugin({
+            ui = {
+                document = { file = path },
+                doc_settings = {
+                    readSetting = function(_, key)
+                        if key == "summary" then
+                            return { status = "complete" }
+                        end
+                    end,
+                },
+            },
+        })
+
+        plugin:onCloseDocument()
+
+        assert.is_true(runtime.chapter_ledger["m1:c1"].read)
+        assert.is_true(runtime.chapter_ledger["m1:c1"].pending_read_sync)
+        assert.are.equal("c1", runtime.finished_cleanup_journal.mangas.m1.records[1].chapter_id)
+    end)
+
     it("schedules finished cleanup from queue status changes without processor reentry", function()
         local plugin = build_plugin()
         plugin.finished_cleanup_processing = true
@@ -249,6 +286,58 @@ describe("suwayomi plugin", function()
         assert.are.equal(1, plugin.finished_cleanup_schedule_count)
         assert.are.equal(0, plugin.finished_cleanup_scheduled_delay)
         assert.is_nil(plugin.unexpected_cleanup_reentry_count)
+    end)
+
+    it("defers a FileManager cleanup timer after ReaderUI opens the candidate", function()
+        local path = "/downloads/source/manga/c1.cbz"
+        runtime_helper.teardown()
+        runtime = runtime_helper.install({
+            chapter_ledger = {
+                ["m1:c1"] = {
+                    manga_id = "m1",
+                    chapter_id = "c1",
+                    path = path,
+                    read = true,
+                },
+            },
+            finished_cleanup_journal = {
+                version = 1,
+                next_sequence = 2,
+                mangas = {
+                    m1 = {
+                        records = {
+                            { chapter_id = "c1", path = path, sequence = 1, retry_count = 0, retry_after = 0 },
+                        },
+                    },
+                },
+            },
+            delete_chapters_settings = {
+                delete_after_mark_read = false,
+                delete_finished_while_reading = 1,
+            },
+            download_directory = "/downloads",
+        })
+        local plugin = build_plugin()
+        local delete_calls = {}
+        plugin.chapterArchiveExists = function(_, candidate)
+            return candidate == path
+        end
+        plugin.getDownloadQueue = function()
+            return { getStatus = function() end }
+        end
+        plugin.deleteChapterFromDeviceWithOptions = function(_, manga, chapter)
+            table.insert(delete_calls, { manga = manga, chapter = chapter })
+            return true, "deleted"
+        end
+
+        plugin:scheduleFinishedChapterCleanup(0)
+        runtime.reader_ui.instance = { document = { file = path } }
+        runtime.scheduled[1].callback()
+
+        local record = runtime.finished_cleanup_journal.mangas.m1.records[1]
+        assert.are.equal(0, #delete_calls)
+        assert.are.equal(1, record.retry_count)
+        assert.are.equal(105, record.retry_after)
     end)
 
     it("reevaluates blocked cleanup before download-directory callbacks", function()
