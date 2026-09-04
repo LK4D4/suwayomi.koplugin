@@ -134,6 +134,20 @@ msgstr ""
 msgid "Automatic"
 msgstr ""
 
+msgid "Automatic chapter cleanup has %1 pending files."
+msgstr ""
+
+msgid ""
+"Automatic chapter cleanup is paused because its saved data uses an "
+"unsupported version."
+msgstr ""
+
+msgid "Automatic chapter cleanup paused for %1 unsafe files."
+msgstr ""
+
+msgid "Automatic chapter cleanup will retry %1 files."
+msgstr ""
+
 msgid "Available"
 msgstr ""
 
