@@ -878,123 +878,49 @@ describe("suwayomi/chapters/actions", function()
         )
     end)
 
-    it("deletes the configured finished chapter offset while reading", function()
-        local chapters = {
-            { id = "c1", name = "Chapter 1", is_read = true },
-            { id = "c2", name = "Chapter 2", is_read = true },
-            { id = "c3", name = "Chapter 3", is_read = true },
-        }
-        local plugin = build_plugin({
-            delete_chapters_settings = {
-                delete_after_mark_read = false,
-                delete_finished_while_reading = 2,
+    local manual_delete_contract_cases = {
+        {
+            name = "downloading",
+            options = { queue = { status = { ["m1:c1"] = { state = "downloading" } } } },
+            expected_ok = false,
+            expected_state = "downloading",
+        },
+        {
+            name = "queued",
+            options = { cancelled = true },
+            expected_ok = false,
+            expected_state = "queued",
+        },
+        {
+            name = "missing",
+            options = {},
+            expected_ok = false,
+            expected_state = "missing",
+        },
+        {
+            name = "deleted",
+            options = { existing = { ["/downloads/Manga/Chapter 1.cbz"] = true } },
+            expected_ok = true,
+            expected_state = "deleted",
+        },
+        {
+            name = "delete_failed",
+            options = {
+                existing = { ["/downloads/Manga/Chapter 1.cbz"] = true },
+                remove_results = { ["/downloads/Manga/Chapter 1.cbz"] = false },
             },
-            existing = {
-                ["/downloads/Manga/Chapter 1.cbz"] = true,
-                ["/downloads/Manga/Chapter 2.cbz"] = true,
-                ["/downloads/Manga/Chapter 3.cbz"] = true,
-            },
-            current_chapter_context = {
-                manga = manga,
-                chapters = chapters,
-            },
-            ledger = {
-                ["m1:c1"] = {
-                    manga_id = "m1",
-                    chapter_id = "c1",
-                    path = "/downloads/Manga/Chapter 1.cbz",
-                    read = true,
-                },
-                ["m1:c2"] = {
-                    manga_id = "m1",
-                    chapter_id = "c2",
-                    path = "/downloads/Manga/Chapter 2.cbz",
-                    read = true,
-                },
-                ["m1:c3"] = {
-                    manga_id = "m1",
-                    chapter_id = "c3",
-                    path = "/downloads/Manga/Chapter 3.cbz",
-                    read = true,
-                },
-            },
-        })
-
-        assert.are.equal(1, plugin:deleteFinishedChaptersWhileReading(manga, chapters[3]))
-
-        assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.ledger["m1:c1"].path)
-        assert.is_nil(plugin.ledger["m1:c2"].path)
-        assert.are.equal("/downloads/Manga/Chapter 3.cbz", plugin.ledger["m1:c3"].path)
-        assert.are.same({
-            "/downloads/Manga/Chapter 2.cbz",
-            "/downloads/Manga/Chapter 2.cbz.sdr/metadata.lua",
-            "/downloads/Manga/Chapter 2.cbz.sdr/metadata.lua.old",
-            "/downloads/Manga/Chapter 2.cbz.sdr",
-        }, removed_paths)
-        assert.are.same({}, plugin.messages)
-    end)
-
-    it("uses the ledger path for delete-while-reading cleanup", function()
-        local plugin = build_plugin({
-            delete_chapters_settings = {
-                delete_after_mark_read = false,
-                delete_finished_while_reading = 1,
-            },
-            existing = {
-                ["/downloads/Local source/Manga/Chapter 1.cbz"] = true,
-            },
-            ledger = {
-                ["m1:c1"] = {
-                    manga_id = "m1",
-                    chapter_id = "c1",
-                    path = "/downloads/Local source/Manga/Chapter 1.cbz",
-                    read = true,
-                },
-            },
-        })
-
-        assert.are.equal(1, plugin:deleteFinishedChaptersWhileReading(manga, chapter))
-
-        assert.is_nil(plugin.ledger["m1:c1"].path)
-        assert.are.same({
-            "/downloads/Local source/Manga/Chapter 1.cbz",
-            "/downloads/Local source/Manga/Chapter 1.cbz.sdr/metadata.lua",
-            "/downloads/Local source/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
-            "/downloads/Local source/Manga/Chapter 1.cbz.sdr",
-        }, removed_paths)
-    end)
-
-    it("does not use stale chapter context from a different manga for delete-while-reading", function()
-        local plugin = build_plugin({
-            delete_chapters_settings = {
-                delete_after_mark_read = false,
-                delete_finished_while_reading = 2,
-            },
-            existing = {
-                ["/downloads/Manga/Chapter 10.cbz"] = true,
-            },
-            current_chapter_context = {
-                manga = { id = "other", title = "Other manga" },
-                chapters = {
-                    { id = "c9", name = "Chapter 9", is_read = true },
-                    { id = "c10", name = "Chapter 10", is_read = true },
-                },
-            },
-            ledger = {
-                ["m1:c10"] = {
-                    manga_id = "m1",
-                    chapter_id = "c10",
-                    path = "/downloads/Manga/Chapter 10.cbz",
-                    read = true,
-                },
-            },
-        })
-
-        assert.are.equal(0, plugin:deleteFinishedChaptersWhileReading(manga, { id = "c10", name = "Chapter 10" }))
-
-        assert.are.equal("/downloads/Manga/Chapter 10.cbz", plugin.ledger["m1:c10"].path)
-        assert.are.same({}, removed_paths)
-    end)
+            expected_ok = false,
+            expected_state = "delete_failed",
+        },
+    }
+    for _, case in ipairs(manual_delete_contract_cases) do
+        it("preserves the manual " .. case.name .. " result state", function()
+            local plugin = build_plugin(case.options)
+            local ok, state = plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+            assert.are.equal(case.expected_ok, ok)
+            assert.are.equal(case.expected_state, state)
+        end)
+    end
 
     it("marks a downloaded chapter read and schedules sync by default", function()
         local plugin = build_plugin({

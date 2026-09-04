@@ -208,6 +208,26 @@ describe("suwayomi/settings", function()
         assert.are.equal(2, journal.mangas.m.records[1].retry_count)
     end)
 
+    it("persists only the supported unsafe-path cleanup block reason", function()
+        stored_data.finished_chapter_cleanup = { version = 1, next_sequence = 4, mangas = { m1 = { records = {
+            { chapter_id = "unsafe", path = "/outside/unsafe.cbz", sequence = 1,
+                retry_count = 0, retry_after = 0, blocked_reason = "unsafe_path" },
+            { chapter_id = "mismatch", path = "/outside/mismatch.cbz", sequence = 2,
+                retry_count = 0, retry_after = 0, blocked_reason = "path_mismatch" },
+            { chapter_id = "other", path = "/outside/other.cbz", sequence = 3,
+                retry_count = 0, retry_after = 0, blocked_reason = true },
+        } } } }
+
+        local settings = require("suwayomi/settings")
+        local journal = settings:loadFinishedChapterCleanupJournal()
+
+        assert.are.equal("unsafe_path", journal.mangas.m1.records[1].blocked_reason)
+        assert.is_nil(journal.mangas.m1.records[2].blocked_reason)
+        assert.is_nil(journal.mangas.m1.records[3].blocked_reason)
+        local saved = settings:saveFinishedChapterCleanupJournal(journal)
+        assert.are.equal("unsafe_path", saved.mangas.m1.records[1].blocked_reason)
+    end)
+
     it("loads source languages with english enabled by default", function()
         local settings = require("suwayomi/settings")
         local source_languages = settings:loadSourceLanguages()
