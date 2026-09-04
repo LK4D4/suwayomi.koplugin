@@ -68,6 +68,8 @@ Open **Suwayomi** from KOReader's **Search** menu. The hub has the main actions:
 
 Tap a manga to open actions, then open its chapters. Tap a chapter to open, download, delete the local file, or change read state. For a new device, use **Mark this and previous as read** on your current reading position, then queue a small **Download next** batch or enable a **Download ahead** buffer.
 
+Transient network failures are retried in the background with increasing delays. Retries resume after the device wakes; permanent failures remain visible under **Downloads** without interrupting reading with one message per chapter.
+
 Downloaded files use this layout:
 
 ```text
@@ -88,7 +90,7 @@ This release focuses on KOReader-local reading. It does not edit source preferen
 | Cannot connect | Check server URL from the device, Basic Auth credentials, and whether Suwayomi is running. |
 | Source is missing | Install or update the source from **Browse**; also check **Show NSFW sources** in Browse settings. |
 | Search times out | Try a source-specific Popular or Latest list, or retry with a narrower search term. |
-| Chapter will not download | Open **Downloads** to inspect failed jobs, then retry or clear the failed entry. |
+| Chapter will not download | Wait for background network retries, then open **Downloads** to inspect, retry, or clear any failed entry. |
 
 ## Development
 

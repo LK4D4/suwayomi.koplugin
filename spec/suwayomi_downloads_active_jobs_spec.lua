@@ -229,7 +229,7 @@ describe("suwayomi/downloads/active_jobs", function()
             active_job = function(manga, chapter)
                 return context.queue:getActiveJob(context.queue:getKey(manga, chapter))
             end,
-            write_progress = function(manga, chapter, state, current, total, path, error_message)
+            write_progress = function(manga, chapter, state, current, total, path, error_message, retryable)
                 local progress_path = context.queue:buildProgressPath(manga, chapter, "/books")
                 local handle = assert(io.open(progress_path, "w"))
                 handle:write("state=", tostring(state or ""), "\n")
@@ -238,6 +238,9 @@ describe("suwayomi/downloads/active_jobs", function()
                 handle:write("path=", tostring(path or ""), "\n")
                 if error_message then
                     handle:write("error=", tostring(error_message), "\n")
+                end
+                if retryable ~= nil then
+                    handle:write("retryable=", retryable == true and "true" or "false", "\n")
                 end
                 handle:close()
             end,
@@ -459,13 +462,135 @@ describe("suwayomi/downloads/active_jobs", function()
         context.write_progress(manga, chapter, "downloading", 1, 5, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz")
         table.remove(context.scheduled, 1).callback()
         local save_count_after_change = context.save_count()
+        local status_changes_after_change = context.status_changes()
 
         context.advance(1)
         table.remove(context.scheduled, 1).callback()
 
         assert.are.equal(save_count_after_change, context.save_count())
+        assert.are.equal(status_changes_after_change, context.status_changes())
         assert.are.equal(101, context.saved_queue()[1].last_progress_at)
         assert.are.equal(101, context.saved_queue()[1].progress.updated_at)
+    end)
+
+    it("retries a transient worker failure after a staggered delay", function()
+        local context = build_queue({
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        table.remove(context.scheduled, 1).callback()
+        context.write_progress(manga, chapter, "failed", 2, 5, "", "network timeout", true)
+        table.remove(context.scheduled, 1).callback()
+
+        local persisted = context.saved_queue()[1]
+        assert.are.equal("queued", persisted.state)
+        assert.are.equal(1, persisted.retry_count)
+        assert.is_true(persisted.retry_at >= 105)
+        assert.is_true(persisted.retry_at <= 109)
+        assert.are.equal(2, persisted.progress.current)
+        assert.is_true(persisted.progress.retryable)
+        assert.are.equal("queued", context.queue:getStatus(manga, chapter).state)
+        assert.is_nil(context.active_job(manga, chapter))
+        assert.are.same({}, context.messages)
+
+        context.advance(persisted.retry_at - 100)
+        table.remove(context.scheduled, 1).callback()
+
+        assert.is_nil(context.active_job(manga, chapter))
+        assert.are.equal(1, context.scheduled[1].delay)
+
+        context.set_subprocess_done(1234, true)
+        context.advance(1)
+        table.remove(context.scheduled, 1).callback()
+
+        assert.is_not_nil(context.active_job(manga, chapter))
+        assert.are.equal(1, context.active_job(manga, chapter).retry_count)
+    end)
+
+    it("marks a retryable worker failure terminal after retry exhaustion", function()
+        local context = build_queue({
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        table.remove(context.scheduled, 1).callback()
+        context.active_job(manga, chapter).retry_count = #context.queue.RETRY_DELAYS_SECONDS
+        context.write_progress(manga, chapter, "failed", 2, 5, "", "network timeout", true)
+        table.remove(context.scheduled, 1).callback()
+
+        assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.are.equal("failed", context.queue:getStatus(manga, chapter).state)
+        assert.is_nil(context.active_job(manga, chapter))
+        assert.are.same({}, context.messages)
+    end)
+
+    it("keeps reaping a terminated worker after canceling its delayed retry", function()
+        local context = build_queue({
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
+
+        context.queue:enqueue(manga, chapter, "/books")
+        table.remove(context.scheduled, 1).callback()
+        context.write_progress(manga, chapter, "failed", 0, 5, "", "network timeout", true)
+        table.remove(context.scheduled, 1).callback()
+        local retry_at = context.saved_queue()[1].retry_at
+
+        assert.is_true(context.queue:cancelPending(manga, chapter))
+        assert.are.same({}, context.saved_queue())
+        assert.is_nil(context.queue:getStatus(manga, chapter))
+        assert.is_true(context.queue.active_job_lifecycle.terminating_pids[1234])
+
+        context.advance(retry_at - 100)
+        table.remove(context.scheduled, 1).callback()
+        assert.are.equal(1, context.scheduled[1].delay)
+
+        context.set_subprocess_done(1234, true)
+        context.advance(1)
+        table.remove(context.scheduled, 1).callback()
+
+        assert.is_nil(context.queue.active_job_lifecycle.terminating_pids[1234])
+        assert.are.equal(0, context.download_calls())
+    end)
+
+    it("pauses fresh queued work while one transient retry probes the network", function()
+        local context = build_queue({
+            max_active_chapters = 1,
+            subprocess_done = false,
+            skip_subprocess_callback = true,
+        })
+        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local chapters = {
+            { id = "398", name = "Official_Vol. 1 Ch. 1" },
+            { id = "399", name = "Official_Vol. 1 Ch. 2" },
+        }
+
+        context.queue:enqueueBatch(manga, chapters, "/books")
+        table.remove(context.scheduled, 1).callback()
+        context.write_progress(manga, chapters[1], "failed", 0, 5, "", "network timeout", true)
+        table.remove(context.scheduled, 1).callback()
+
+        assert.is_nil(context.active_job(manga, chapters[1]))
+        assert.is_nil(context.active_job(manga, chapters[2]))
+        assert.are.equal(chapters[2].id, context.queue.items[1].chapter.id)
+        assert.are.equal(chapters[1].id, context.queue.items[2].chapter.id)
+
+        local retry_at = context.saved_queue()[1].retry_at
+        context.set_subprocess_done(1234, true)
+        context.advance(retry_at - 100)
+        table.remove(context.scheduled, 1).callback()
+
+        assert.is_not_nil(context.active_job(manga, chapters[1]))
+        assert.is_nil(context.active_job(manga, chapters[2]))
     end)
 
     it("backfills a completed active slot while another chapter keeps downloading", function()
@@ -605,7 +730,7 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.same({}, context.archive_ready_calls)
     end)
 
-    it("translates fallback startup and missing-archive failures while keeping raw worker errors raw", function()
+    it("records translated fallback failures and raw worker errors without interrupting reading", function()
         installMarker()
         local startup = build_queue()
         local manga = { id = "m1", title = "Sousou no Frieren" }
@@ -619,8 +744,9 @@ describe("suwayomi/downloads/active_jobs", function()
 
         assert.are.equal(
             "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): tx:Could not start chapter download: tx:unknown error",
-            startup.messages[#startup.messages]
+            startup.saved_queue()[1].progress.error
         )
+        assert.are.same({}, startup.messages)
 
         local missing_archive = build_queue()
         missing_archive.queue:enqueue(manga, chapter, "/books")
@@ -628,8 +754,9 @@ describe("suwayomi/downloads/active_jobs", function()
 
         assert.are.equal(
             "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): tx:Chapter download finished but the archive is missing.",
-            missing_archive.messages[#missing_archive.messages]
+            missing_archive.saved_queue()[1].progress.error
         )
+        assert.are.same({}, missing_archive.messages)
 
         local worker_failure = build_queue({
             downloader = {
@@ -655,8 +782,9 @@ describe("suwayomi/downloads/active_jobs", function()
 
         assert.are.equal(
             "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): network timeout",
-            worker_failure.messages[#worker_failure.messages]
+            worker_failure.saved_queue()[1].progress.error
         )
+        assert.are.same({}, worker_failure.messages)
     end)
 
     it("persists chapter details when the downloader reports failure", function()
@@ -692,7 +820,7 @@ describe("suwayomi/downloads/active_jobs", function()
             error = message,
             updated_at = 100,
         }, context.saved_queue()[1].progress)
-        assert.are.equal(message, context.messages[#context.messages])
+        assert.are.same({}, context.messages)
     end)
 
     it("removes partial archives when an active job is canceled", function()
@@ -716,7 +844,7 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.is_true(path_was_removed(progress_path))
     end)
 
-    it("backfills an active slot after canceling an active download", function()
+    it("backfills an active slot after the canceled worker exits", function()
         local context = build_queue({
             max_active_chapters = 1,
             subprocess_done = false,
@@ -735,13 +863,21 @@ describe("suwayomi/downloads/active_jobs", function()
 
         assert.is_true(cancelled)
         assert.is_nil(context.queue:getStatus(manga, chapters[1]))
-        assert.are.equal("downloading", context.queue:getStatus(manga, chapters[2]).state)
+        assert.are.equal("queued", context.queue:getStatus(manga, chapters[2]).state)
         assert.is_nil(context.active_job(manga, chapters[1]))
-        assert.is_not_nil(context.active_job(manga, chapters[2]))
+        assert.is_nil(context.active_job(manga, chapters[2]))
         assert.are.same({ 1234 }, context.terminated_pids)
+
+        context.set_subprocess_done(1234, true)
+        context.advance(1)
+        while not context.active_job(manga, chapters[2]) do
+            table.remove(context.scheduled, 1).callback()
+        end
+
+        assert.is_not_nil(context.active_job(manga, chapters[2]))
     end)
 
-    it("marks the active job failed when the watchdog expires", function()
+    it("requeues an active job with backoff when the watchdog expires", function()
         local context = build_queue({
             subprocess_done = false,
             skip_subprocess_callback = true,
@@ -751,27 +887,29 @@ describe("suwayomi/downloads/active_jobs", function()
         context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
         table.remove(context.scheduled, 1).callback()
 
-        context.advance((30 * 60) + 1)
+        context.advance(context.queue.WATCHDOG_TIMEOUT_SECONDS + 1)
         table.remove(context.scheduled, 1).callback()
 
         assert.are.same({ 1234 }, context.terminated_pids)
-        assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.are.equal("queued", context.saved_queue()[1].state)
+        assert.are.equal(1, context.saved_queue()[1].retry_count)
+        local watchdog_time = 100 + context.queue.WATCHDOG_TIMEOUT_SECONDS + 1
+        assert.is_true(context.saved_queue()[1].retry_at >= watchdog_time + 5)
+        assert.is_true(context.saved_queue()[1].retry_at <= watchdog_time + 9)
         assert.are.same({
-            state = "failed",
+            state = "queued",
             current = 0,
             total = 0,
-            error = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): Chapter download timed out.",
-            updated_at = 1901,
+            error = "Chapter download timed out.",
+            retryable = true,
+            updated_at = watchdog_time,
         }, context.saved_queue()[1].progress)
-        assert.are.equal(
-            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): Chapter download timed out.",
-            context.messages[#context.messages]
-        )
+        assert.are.same({}, context.messages)
         assert.is_true(path_was_removed(chapter_path .. ".part"))
         assert.is_true(path_was_removed(chapter_path .. ".direct.part"))
     end)
 
-    it("translates the watchdog timeout failure", function()
+    it("translates the queued watchdog retry detail", function()
         installMarker()
         local context = build_queue({
             subprocess_done = false,
@@ -781,13 +919,14 @@ describe("suwayomi/downloads/active_jobs", function()
         context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
         table.remove(context.scheduled, 1).callback()
 
-        context.advance((30 * 60) + 1)
+        context.advance(context.queue.WATCHDOG_TIMEOUT_SECONDS + 1)
         table.remove(context.scheduled, 1).callback()
 
         assert.are.equal(
-            "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): tx:Chapter download timed out.",
-            context.messages[#context.messages]
+            "tx:Chapter download timed out.",
+            context.saved_queue()[1].progress.error
         )
+        assert.are.same({}, context.messages)
     end)
 
     it("does not time out an active job that is still reporting progress", function()
@@ -801,7 +940,7 @@ describe("suwayomi/downloads/active_jobs", function()
         context.queue:enqueue(manga, chapter, "/books")
         table.remove(context.scheduled, 1).callback()
 
-        context.advance((30 * 60) - 1)
+        context.advance(context.queue.WATCHDOG_TIMEOUT_SECONDS - 1)
         context.write_progress(manga, chapter, "downloading", 1, 2, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz")
         table.remove(context.scheduled, 1).callback()
 

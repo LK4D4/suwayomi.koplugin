@@ -878,6 +878,46 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_paths[1])
     end)
 
+    it("preserves delayed transient retries across recovery", function()
+        local context = build_queue({
+            mark_archive_exists_after_download = true,
+            saved_queue = {
+                {
+                    key = "m1:398",
+                    state = "queued",
+                    download_directory = "/books",
+                    manga = { id = "m1", title = "Sousou no Frieren" },
+                    chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" },
+                    retry_count = 2,
+                    retry_at = 130,
+                    progress = {
+                        state = "queued",
+                        current = 3,
+                        total = 10,
+                        error = "network is unreachable",
+                        retryable = true,
+                    },
+                },
+            },
+        })
+
+        context.queue:recover()
+        assert.are.equal(2, context.queue.items[1].retry_count)
+        assert.are.equal(130, context.queue.items[1].retry_at)
+        assert.are.equal(2, context.saved_queue()[1].retry_count)
+        table.remove(context.scheduled, 1).callback()
+
+        assert.are.equal(0, context.download_calls())
+        assert.are.equal(30, context.scheduled[1].delay)
+
+        context.advance(30)
+        table.remove(context.scheduled, 1).callback()
+        context.run_scheduled()
+
+        assert.are.equal(1, context.download_calls())
+        assert.are.same({}, context.saved_queue())
+    end)
+
     it("treats scalar persisted queue data as empty during recovery", function()
         local context = build_queue({
             saved_queue = "legacy-queue",

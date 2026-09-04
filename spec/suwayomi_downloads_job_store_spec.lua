@@ -46,7 +46,11 @@ describe("suwayomi/downloads/job_store", function()
             { id = "398", name = "Official_Vol. 1 Ch. 1", chapter_number = 1, source_order = 7 },
             "/books",
             "queued",
-            { progress = { state = "queued", current = "2", total = "5" } }
+            {
+                retry_count = "2",
+                retry_at = "120",
+                progress = { state = "queued", current = "2", total = "5", retryable = "true" },
+            }
         )
 
         assert.are.same({
@@ -64,10 +68,13 @@ describe("suwayomi/downloads/job_store", function()
                 chapter_number = 1,
                 source_order = 7,
             },
+            retry_count = 2,
+            retry_at = 120,
             progress = {
                 state = "queued",
                 current = 2,
                 total = 5,
+                retryable = true,
             },
         }, job)
     end)

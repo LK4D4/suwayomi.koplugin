@@ -15,12 +15,23 @@ local ProgressFile = require("suwayomi/downloads/progress_file")
 local ActiveJobs = {}
 ActiveJobs.__index = ActiveJobs
 
+local function retryJitterSeconds(key, retry_count)
+    local key_text = tostring(key or "")
+    local hash = tonumber(retry_count) or 0
+    for index = 1, #key_text do
+        hash = (hash + key_text:byte(index)) % 5
+    end
+    return hash
+end
+
 function ActiveJobs:new(options)
     options = options or {}
     local active_jobs = {
         queue = options.queue,
         jobs = options.jobs or {},
         poll_scheduled = false,
+        retry_wakeup_at = nil,
+        terminating_pids = {},
     }
     setmetatable(active_jobs, self)
     return active_jobs
@@ -69,8 +80,8 @@ function ActiveJobs:schedulePoll()
     end)
 end
 
-function ActiveJobs:writeProgressFallback(progress_path, state, current, total, path, error_message)
-    return ProgressFile.writeFallback(progress_path, state, current, total, path, error_message)
+function ActiveJobs:writeProgressFallback(progress_path, state, current, total, path, error_message, retryable)
+    return ProgressFile.writeFallback(progress_path, state, current, total, path, error_message, retryable)
 end
 
 function ActiveJobs:runDownloaderJob(queued)
@@ -88,7 +99,15 @@ function ActiveJobs:runDownloaderJob(queued)
     local result = queued.downloader:startChapterDownload(queued.credentials, queued.download_directory, queued.manga, queued.chapter)
     if not result.ok or result.skipped then
         local state = result.skipped and "skipped" or (result.ok and "downloaded" or "failed")
-        self:writeProgressFallback(queued.progress_path, state, result.ok and 1 or 0, result.ok and 1 or 0, result.path, result.error)
+        self:writeProgressFallback(
+            queued.progress_path,
+            state,
+            result.ok and 1 or 0,
+            result.ok and 1 or 0,
+            result.path,
+            result.error,
+            result.retryable
+        )
         return
     end
 
@@ -100,7 +119,8 @@ function ActiveJobs:runDownloaderJob(queued)
             result.current,
             result.total,
             result.path,
-            result.error
+            result.error,
+            result.retryable
         )
     until not result.ok or result.done
 end
@@ -123,6 +143,7 @@ function ActiveJobs:startQueuedJob(queued)
     queue:upsertPersistentJob(queue:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading", {
         started_at = queued.started_at,
         last_progress_at = queued.last_progress_at,
+        retry_count = queued.retry_count,
         progress = {
             state = "downloading",
             current = 0,
@@ -153,7 +174,7 @@ function ActiveJobs:startQueuedJob(queued)
                 updated_at = queue.now(),
             },
         }))
-        queue.onMessage(message)
+        queue:notifyDownloadFailure(message)
         return false
     end
 
@@ -175,8 +196,58 @@ function ActiveJobs:process()
         started_at = socket.gettime()
     end
     local started_count = 0
+    local earliest_retry_at
+    local terminating_pending = false
+    for pid in pairs(self.terminating_pids) do
+        if queue.ffi_util.isSubProcessDone(pid) then
+            self.terminating_pids[pid] = nil
+        else
+            earliest_retry_at = queue.now() + 1
+            terminating_pending = true
+        end
+    end
     while self:getCount() < queue.max_active_chapters do
-        local queued = table.remove(queue.items, 1)
+        if terminating_pending then
+            break
+        end
+        local active_retry = false
+        for _key, active in pairs(self.jobs or {}) do
+            if (tonumber(active.retry_count) or 0) > 0 then
+                active_retry = true
+                break
+            end
+        end
+        if active_retry then
+            break
+        end
+
+        local ready_retry_index
+        local ready_fresh_index
+        local delayed_retry_at
+        local current_time = queue.now()
+        for index, item in ipairs(queue.items or {}) do
+            local retry_ready = not item.retry_at or item.retry_at <= current_time
+            if retry_ready and item.previous_pid and self.terminating_pids[item.previous_pid] then
+                item.retry_at = current_time + 1
+                retry_ready = false
+            elseif retry_ready then
+                item.previous_pid = nil
+            end
+            if (tonumber(item.retry_count) or 0) > 0 then
+                if retry_ready and not ready_retry_index then
+                    ready_retry_index = index
+                elseif not retry_ready and (not delayed_retry_at or item.retry_at < delayed_retry_at) then
+                    delayed_retry_at = item.retry_at
+                end
+            elseif retry_ready and not ready_fresh_index then
+                ready_fresh_index = index
+            end
+        end
+        if delayed_retry_at and (not earliest_retry_at or delayed_retry_at < earliest_retry_at) then
+            earliest_retry_at = delayed_retry_at
+        end
+        local ready_index = ready_retry_index or (not delayed_retry_at and ready_fresh_index)
+        local queued = ready_index and table.remove(queue.items, ready_index) or nil
         if not queued then
             break
         end
@@ -184,6 +255,10 @@ function ActiveJobs:process()
         if self:startQueuedJob(queued) then
             started_count = started_count + 1
         end
+    end
+
+    if earliest_retry_at then
+        self:scheduleRetryWakeup(earliest_retry_at)
     end
 
     self:schedulePoll()
@@ -201,6 +276,76 @@ function ActiveJobs:process()
     })
 end
 
+function ActiveJobs:scheduleRetryWakeup(retry_at)
+    if self.retry_wakeup_at and self.retry_wakeup_at <= retry_at then
+        return
+    end
+    self.retry_wakeup_at = retry_at
+    local delay = math.max(0, retry_at - self.queue.now())
+    self.queue.ui_manager:scheduleIn(delay, function()
+        if self.retry_wakeup_at ~= retry_at then
+            return
+        end
+        self.retry_wakeup_at = nil
+        self:process()
+    end)
+end
+
+function ActiveJobs:scheduleTransientRetry(active, progress)
+    local queue = self.queue
+    local retry_count = (tonumber(active.retry_count) or 0) + 1
+    local base_retry_delay = queue.RETRY_DELAYS_SECONDS[retry_count]
+    local retry_delay = base_retry_delay and (base_retry_delay + retryJitterSeconds(active.key, retry_count))
+    if not retry_delay then
+        return false
+    end
+
+    self:terminateJob(active)
+    self:removeJob(active)
+    if queue.cleanupInterruptedDownload then
+        queue:cleanupInterruptedDownload(active)
+    end
+    os.remove(active.progress_path)
+
+    local retry_at = queue.now() + retry_delay
+    local queued = {
+        key = active.key,
+        download_directory = active.download_directory,
+        manga = active.manga,
+        chapter = active.chapter,
+        downloader = active.downloader,
+        retry_count = retry_count,
+        retry_at = retry_at,
+        previous_pid = active.pid,
+    }
+    table.insert(queue.items, queued)
+    queue:setStatus(active.manga, active.chapter, {
+        state = "queued",
+        retry_count = retry_count,
+        retry_at = retry_at,
+    })
+    queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "queued", {
+        retry_count = retry_count,
+        retry_at = retry_at,
+        progress = {
+            state = "queued",
+            current = progress and progress.current or active.last_progress_current or 0,
+            total = progress and progress.total or active.last_progress_total or 0,
+            error = progress and progress.error or active.last_progress_error,
+            retryable = true,
+            updated_at = queue.now(),
+        },
+    }))
+    queue:logDebug({
+        operation = "downloadQueue.retry",
+        event = "scheduled",
+        key = active.key,
+        retry_count = retry_count,
+        retry_delay_seconds = retry_delay,
+    })
+    return true
+end
+
 function ActiveJobs:terminateJob(active)
     local queue = self.queue
     if not active or not active.pid then
@@ -209,6 +354,7 @@ function ActiveJobs:terminateJob(active)
     if queue and queue.ffi_util and queue.ffi_util.terminateSubProcess then
         pcall(queue.ffi_util.terminateSubProcess, active.pid)
     end
+    self.terminating_pids[active.pid] = true
 end
 
 function ActiveJobs:finishWithFailure(active, message)
@@ -233,7 +379,7 @@ function ActiveJobs:finishWithFailure(active, message)
             updated_at = queue.now(),
         },
     }))
-    queue.onMessage(failure_message)
+    queue:notifyDownloadFailure(failure_message)
 end
 
 function ActiveJobs:finishWithCancel(active, options)
@@ -270,35 +416,50 @@ function ActiveJobs:recordProgress(active, progress)
         return
     end
 
-    if progress.current ~= active.last_progress_current or progress.state ~= active.last_progress_state then
+    local changed = progress.current ~= active.last_progress_current
+        or progress.total ~= active.last_progress_total
+        or progress.state ~= active.last_progress_state
+    if changed then
         active.last_progress_at = queue.now()
         active.last_progress_current = progress.current
         active.last_progress_total = progress.total
         active.last_progress_path = progress.path
         active.last_progress_error = progress.error
         active.last_progress_state = progress.state
-        queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, progress.state, {
-            started_at = active.started_at,
-            last_progress_at = active.last_progress_at,
-            progress = {
+        if not (progress.state == "failed" and progress.retryable == true) then
+            queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, progress.state, {
+                started_at = active.started_at,
+                last_progress_at = active.last_progress_at,
+                retry_count = active.retry_count,
+                progress = {
+                    state = progress.state,
+                    current = progress.current,
+                    total = progress.total,
+                    path = progress.path,
+                    error = progress.error,
+                    retryable = progress.retryable,
+                    updated_at = active.last_progress_at,
+                },
+            }))
+            queue:setStatus(active.manga, active.chapter, {
                 state = progress.state,
                 current = progress.current,
                 total = progress.total,
-                path = progress.path,
-                error = progress.error,
-                updated_at = active.last_progress_at,
-            },
-        }))
+            })
+        end
     end
-    queue:setStatus(active.manga, active.chapter, {
-        state = progress.state,
-        current = progress.current,
-        total = progress.total,
-    })
 end
 
 function ActiveJobs:finishFromProgress(active, progress)
     local queue = self.queue
+    if progress and progress.state == "failed" and progress.retryable == true
+        and self:scheduleTransientRetry(active, progress)
+    then
+        return
+    end
+    if active.pid then
+        self.terminating_pids[active.pid] = true
+    end
     self:removeJob(active)
     os.remove(active.progress_path)
     if progress and (progress.state == "downloaded" or progress.state == "skipped") then
@@ -322,7 +483,7 @@ function ActiveJobs:finishFromProgress(active, progress)
                     updated_at = active.last_progress_at or queue.now(),
                 },
             }))
-            queue.onMessage(message)
+            queue:notifyDownloadFailure(message)
             return
         end
         queue:removePersistentJob(active.key or queue:getKey(active.manga, active.chapter))
@@ -348,6 +509,11 @@ function ActiveJobs:finishFromProgress(active, progress)
             active.chapter,
             progress.error or I18n.t("Chapter download failed.")
         )
+        queue:setStatus(active.manga, active.chapter, {
+            state = "failed",
+            current = progress.current,
+            total = progress.total,
+        })
         queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
             started_at = active.started_at,
             last_progress_at = active.last_progress_at or queue.now(),
@@ -360,7 +526,7 @@ function ActiveJobs:finishFromProgress(active, progress)
                 updated_at = active.last_progress_at or queue.now(),
             },
         }))
-        queue.onMessage(message)
+        queue:notifyDownloadFailure(message)
     end
 end
 
@@ -394,7 +560,7 @@ function ActiveJobs:finishWithoutProgress(active)
             updated_at = queue.now(),
         },
     }))
-    queue.onMessage(message)
+    queue:notifyDownloadFailure(message)
 end
 
 function ActiveJobs:poll()
@@ -423,7 +589,16 @@ function ActiveJobs:poll()
             -- The worker may have died without writing terminal progress. The
             -- watchdog converts that silent active state into a recoverable
             -- failed job instead of leaving a permanent "downloading" row.
-            self:finishWithFailure(active, I18n.t("Chapter download timed out."))
+            if not self:scheduleTransientRetry(active, {
+                state = "failed",
+                current = active.last_progress_current or 0,
+                total = active.last_progress_total or 0,
+                path = active.last_progress_path,
+                error = I18n.t("Chapter download timed out."),
+                retryable = true,
+            }) then
+                self:finishWithFailure(active, I18n.t("Chapter download timed out."))
+            end
         else
             local done = queue.ffi_util.isSubProcessDone(active.pid)
             local terminal = progress and (progress.state == "downloaded" or progress.state == "skipped" or progress.state == "failed")

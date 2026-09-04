@@ -65,10 +65,13 @@ function ProgressFile.read(progress_path)
     if status.total then
         status.total = tonumber(status.total)
     end
+    if status.retryable ~= nil then
+        status.retryable = status.retryable == "true"
+    end
     return status
 end
 
-function ProgressFile.writeFallback(progress_path, state, current, total, path, error_message)
+function ProgressFile.writeFallback(progress_path, state, current, total, path, error_message, retryable)
     -- Polling reads this file from another code path, so write a full temp file
     -- before renaming it into place to avoid observing partial key/value state.
     local tmp_path = tostring(progress_path or "") .. ".tmp"
@@ -82,6 +85,9 @@ function ProgressFile.writeFallback(progress_path, state, current, total, path, 
     handle:write("path=", lineSafe(path), "\n")
     if error_message then
         handle:write("error=", lineSafe(error_message), "\n")
+    end
+    if retryable ~= nil then
+        handle:write("retryable=", retryable == true and "true" or "false", "\n")
     end
     handle:close()
     if not os.rename(tmp_path, progress_path) then

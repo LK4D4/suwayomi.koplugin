@@ -19,11 +19,12 @@ local DownloadQueue = {}
 DownloadQueue.__index = DownloadQueue
 
 DownloadQueue.POLL_INTERVAL_SECONDS = 0.5
-DownloadQueue.WATCHDOG_TIMEOUT_SECONDS = 30 * 60
+DownloadQueue.WATCHDOG_TIMEOUT_SECONDS = 35 * 60
 DownloadQueue.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS = 58
 DownloadQueue.MAX_ACTIVE_CHAPTERS = 2
 DownloadQueue.MIN_ACTIVE_CHAPTERS = 1
 DownloadQueue.MAX_SUPPORTED_ACTIVE_CHAPTERS = 4
+DownloadQueue.RETRY_DELAYS_SECONDS = { 5, 15, 30, 60, 120, 300 }
 
 function DownloadQueue:normalizeActiveChapterLimit(value)
     local limit = tonumber(value) or self.MAX_ACTIVE_CHAPTERS
@@ -213,6 +214,16 @@ end
 function DownloadQueue:setStatus(manga, chapter, status)
     self.statuses[self:getKey(manga, chapter)] = status
     self.onStatusChanged()
+end
+
+function DownloadQueue:notifyDownloadFailure(message)
+    -- Background downloads expose failures in the Downloads screen. Avoid
+    -- interrupting reading with one dialog per failed chapter.
+    self:logDebug({
+        operation = "downloadQueue.failure",
+        event = "recorded",
+        error = message,
+    })
 end
 
 function DownloadQueue:getTargetChapterPath(job)
@@ -442,6 +453,8 @@ function DownloadQueue:recoverInterruptedJob(job)
     local recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued", {
         started_at = job.started_at,
         last_progress_at = job.last_progress_at,
+        retry_count = job.retry_count,
+        retry_at = job.retry_at,
         recovery = {
             reason = "interrupted",
             recovered_at = self.now(),
@@ -484,7 +497,11 @@ function DownloadQueue:recover()
             if job.state == "downloading" then
                 recovered = self:recoverInterruptedJob(job)
             else
-                recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued")
+                recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued", {
+                    retry_count = job.retry_count,
+                    retry_at = job.retry_at,
+                    progress = job.progress,
+                })
             end
             local key = recovered.key or self:getKey(recovered.manga, recovered.chapter)
             if seen_recovered_keys[key] then
@@ -504,8 +521,14 @@ function DownloadQueue:recover()
                     manga = recovered.manga,
                     chapter = recovered.chapter,
                     downloader = self.downloader,
+                    retry_count = recovered.retry_count,
+                    retry_at = recovered.retry_at,
                 })
-                self:setStatus(recovered.manga, recovered.chapter, { state = "queued" })
+                self:setStatus(recovered.manga, recovered.chapter, {
+                    state = "queued",
+                    retry_count = recovered.retry_count,
+                    retry_at = recovered.retry_at,
+                })
                 should_process = true
             end
         elseif job.manga and job.chapter and job.state == "failed" then

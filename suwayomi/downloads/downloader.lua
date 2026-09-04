@@ -137,7 +137,7 @@ function Downloader:cleanupPartialFile(path)
     return true
 end
 
-function Downloader:failAndCleanup(message, chapter_path, writer)
+function Downloader:failAndCleanup(message, chapter_path, writer, retryable)
     if writer then
         local closed, close_error = self:closeArchiveWriter(writer)
         if not closed and close_error and close_error ~= "" then
@@ -148,6 +148,7 @@ function Downloader:failAndCleanup(message, chapter_path, writer)
     local result = {
         ok = false,
         error = message,
+        retryable = retryable == true,
     }
     if not cleanup_ok then
         result.cleanup_error = cleanup_error
@@ -478,7 +479,10 @@ function Downloader:downloadDirectChapterArchive(credentials, download_directory
     end)
     if not archive_result.ok then
         self:cleanupPartialFile(partial_path)
-        return nil
+        if archive_result.status_code == 404 or archive_result.error == "Chapter archive not found." then
+            return nil
+        end
+        return archive_result
     end
     if (archive_result.bytes or 0) <= 0
         or not self:isArchiveContentType(archive_result.content_type)
@@ -491,7 +495,7 @@ function Downloader:downloadDirectChapterArchive(credentials, download_directory
     return self:finalizePartialArchive(partial_path, chapter_path, self:findExistingChapterPath(download_directory, manga, chapter))
 end
 
-function Downloader:writeProgress(progress_path, state, current, total, path, error_message)
+function Downloader:writeProgress(progress_path, state, current, total, path, error_message, retryable)
     if not progress_path or progress_path == "" then
         return
     end
@@ -508,6 +512,9 @@ function Downloader:writeProgress(progress_path, state, current, total, path, er
     handle:write("path=", ProgressFile.lineSafe(path), "\n")
     if error_message then
         handle:write("error=", ProgressFile.lineSafe(error_message), "\n")
+    end
+    if retryable ~= nil then
+        handle:write("retryable=", retryable == true and "true" or "false", "\n")
     end
     handle:close()
     if not os.rename(tmp_path, progress_path) then
@@ -532,7 +539,11 @@ function Downloader:startChapterDownload(credentials, download_directory, manga,
         return SuwayomiAPI.fetchChapterPages(credentials, chapter.id)
     end)
     if not page_result.ok then
-        return { ok = false, error = page_result.error }
+        return {
+            ok = false,
+            error = page_result.error,
+            retryable = isRetryableResult(page_result),
+        }
     end
     if #page_result.pages == 0 then
         return { ok = false, error = "Suwayomi server did not return chapter pages." }
@@ -666,7 +677,11 @@ function Downloader:downloadNextPage(job)
         return SuwayomiAPI.downloadBinary(job.credentials, job.pages[next_index])
     end)
     if not binary.ok then
-        return self:failAndCleanup(binary.error, job.partial_path, job.writer)
+        local result = self:failAndCleanup(binary.error, job.partial_path, job.writer, isRetryableResult(binary))
+        result.current = job.current
+        result.total = #job.pages
+        result.path = job.chapter_path
+        return result
     end
     local valid_page, validation_error = self:validatePage(binary)
     if not valid_page then
@@ -734,7 +749,8 @@ function Downloader:downloadChapterWithProgress(credentials, download_directory,
             direct_result.ok and 1 or 0,
             direct_result.ok and 1 or 0,
             direct_result.path,
-            direct_result.error
+            direct_result.error,
+            direct_result.retryable
         )
         return direct_result
     end
@@ -747,7 +763,8 @@ function Downloader:downloadChapterWithProgress(credentials, download_directory,
             start_result.ok and 1 or 0,
             start_result.ok and 1 or 0,
             start_result.path,
-            start_result.error
+            start_result.error,
+            start_result.retryable
         )
         return start_result
     end
@@ -756,7 +773,15 @@ function Downloader:downloadChapterWithProgress(credentials, download_directory,
     repeat
         result = self:downloadNextPage(start_result.job)
         if not result.ok then
-            self:writeProgress(progress_path, "failed", 0, start_result.total, start_result.path, result.error)
+            self:writeProgress(
+                progress_path,
+                "failed",
+                result.current or (start_result.job and start_result.job.current) or 0,
+                result.total or start_result.total,
+                result.path or start_result.path,
+                result.error,
+                result.retryable
+            )
             return result
         end
         self:writeProgress(

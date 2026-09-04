@@ -14,10 +14,13 @@ local REQUEST_TIMEOUT_SECONDS = 15
 local RESPONSE_TOTAL_TIMEOUT_SECONDS = 30
 local MAX_GRAPHQL_RESPONSE_BYTES = 8 * 1024 * 1024
 local MAX_BINARY_RESPONSE_BYTES = 32 * 1024 * 1024
+local MAX_CHAPTER_ARCHIVE_RESPONSE_BYTES = 512 * 1024 * 1024
+local CHAPTER_ARCHIVE_TOTAL_TIMEOUT_SECONDS = 10 * 60
 local RESPONSE_TIMEOUT_ERROR = "response timeout"
 local RESPONSE_TOO_LARGE_ERROR = "response too large"
 
 Transport.MAX_BINARY_RESPONSE_BYTES = MAX_BINARY_RESPONSE_BYTES
+Transport.MAX_CHAPTER_ARCHIVE_RESPONSE_BYTES = MAX_CHAPTER_ARCHIVE_RESPONSE_BYTES
 
 -- LuaJIT on KOReader does not guarantee a standalone base64 helper, so this
 -- tiny encoder keeps Basic Auth construction self-contained and testable.
@@ -122,13 +125,21 @@ local function formatReachabilityError(code)
 end
 
 local function isRetryableTransportCode(code)
-    return code == "wantread"
-        or code == "wantwrite"
-        or code == "timeout"
-        or code == "closed"
-        or code == "connection reset"
-        or code == "connection refused"
-        or code == RESPONSE_TIMEOUT_ERROR
+    local normalized = tostring(code or ""):lower()
+    return normalized == "wantread"
+        or normalized == "wantwrite"
+        or normalized == "timeout"
+        or normalized == "closed"
+        or normalized == RESPONSE_TIMEOUT_ERROR
+        or normalized:match("timed? ?out") ~= nil
+        or normalized:match("connection.*reset") ~= nil
+        or normalized:match("connection.*refused") ~= nil
+        or normalized:match("network.*unreachable") ~= nil
+        or normalized:match("network.*down") ~= nil
+        or normalized:match("no route to host") ~= nil
+        or normalized:match("host.*not.*found") ~= nil
+        or normalized:match("name or service not known") ~= nil
+        or normalized:match("host or service not provided") ~= nil
 end
 
 local function isRetryableHttpStatus(code)
@@ -262,6 +273,7 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
         return {
             ok = false,
             error = formatReachabilityError(code),
+            retryable = isRetryableTransportCode(code),
         }
     end
 
@@ -270,6 +282,7 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
         return {
             ok = false,
             error = formatReachabilityError(code),
+            retryable = isRetryableTransportCode(code),
         }
     end
 
@@ -283,6 +296,8 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
     return {
         ok = false,
         error = error_message[code] or "Could not reach the Suwayomi server.",
+        retryable = isRetryableHttpStatus(code),
+        status_code = code,
     }
 end
 
@@ -418,7 +433,8 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
     local tail_bytes = ""
     local write_error
     local started_at = now()
-    local max_bytes = request_options.max_bytes or MAX_BINARY_RESPONSE_BYTES
+    local max_bytes = request_options.max_bytes or MAX_CHAPTER_ARCHIVE_RESPONSE_BYTES
+    local total_timeout_seconds = request_options.total_timeout_seconds or CHAPTER_ARCHIVE_TOTAL_TIMEOUT_SECONDS
 
     local ok, code, response_headers = client.request{
         url = request_url,
@@ -426,7 +442,7 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
         headers = headers,
         sink = function(chunk)
             if chunk then
-                if now() - started_at > RESPONSE_TOTAL_TIMEOUT_SECONDS then
+                if now() - started_at > total_timeout_seconds then
                     write_error = RESPONSE_TIMEOUT_ERROR
                     return nil, write_error
                 end
@@ -454,7 +470,7 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
             end
             return 1
         end,
-        timeout = REQUEST_TIMEOUT_SECONDS,
+        timeout = request_options.timeout_seconds or REQUEST_TIMEOUT_SECONDS,
     }
     handle:close()
 

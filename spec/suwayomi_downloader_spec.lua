@@ -1366,6 +1366,53 @@ describe("suwayomi/downloads/downloader", function()
         assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", renamed_to)
     end)
 
+    it("defers page fallback when the direct archive stays transiently unavailable", function()
+        local direct_attempts = 0
+        local fetched_pages = false
+        package.preload.socket = function()
+            return { sleep = function() end }
+        end
+        package.preload["suwayomi/api"] = function()
+            return {
+                downloadChapterArchive = function()
+                    direct_attempts = direct_attempts + 1
+                    return { ok = false, error = "network is unreachable", retryable = true }
+                end,
+                fetchChapterPages = function()
+                    fetched_pages = true
+                    return { ok = true, pages = { "/page/0" } }
+                end,
+            }
+        end
+        package.preload.lfs = function()
+            return {
+                attributes = function() return nil end,
+                mkdir = function() return true end,
+            }
+        end
+        package.preload["ffi/archiver"] = function() return {} end
+        package.preload["ffi/util"] = function()
+            return {
+                joinPath = function(base, segment)
+                    return base:gsub("/+$", "") .. "/" .. segment
+                end,
+            }
+        end
+
+        local downloader = require("suwayomi/downloads/downloader")
+        local result = downloader:downloadChapter(
+            { server_url = "https://suwayomi.example" },
+            "/books",
+            { title = "Sousou no Frieren" },
+            { id = "398", name = "Official_Vol. 1 Ch. 1" }
+        )
+
+        assert.is_false(result.ok)
+        assert.is_true(result.retryable)
+        assert.are.equal(3, direct_attempts)
+        assert.is_false(fetched_pages)
+    end)
+
     it("keeps direct archive scratch cleanup failures from blocking page fallback", function()
         local direct_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part"
         local page_partial_path = "/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part"

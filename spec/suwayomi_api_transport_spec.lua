@@ -158,6 +158,7 @@ describe("suwayomi/api/transport", function()
         local failed = transport.performGraphQLRequest({ server_url = "http://suwayomi.example" }, "{}", "failure")
         assert.are.equal(false, failed.ok)
         assert.are.equal("Could not reach the Suwayomi server: connection refused", failed.error)
+        assert.is_true(failed.retryable)
     end)
 
     it("maps transient TLS wait errors to a user-facing timeout", function()
@@ -196,10 +197,14 @@ describe("suwayomi/api/transport", function()
     it("maps GraphQL HTTP statuses and non-numeric status strings", function()
         install_ltn12()
         local statuses = {
-            { code = 401, error = "Authentication failed." },
-            { code = 403, error = "Authentication failed." },
-            { code = 404, error = "Suwayomi GraphQL endpoint not found." },
-            { code = "closed", error = "Could not reach the Suwayomi server: closed" },
+            { code = 400, error = "Could not reach the Suwayomi server.", retryable = false },
+            { code = 401, error = "Authentication failed.", retryable = false },
+            { code = 403, error = "Authentication failed.", retryable = false },
+            { code = 404, error = "Suwayomi GraphQL endpoint not found.", retryable = false },
+            { code = 408, error = "Could not reach the Suwayomi server.", retryable = true },
+            { code = 429, error = "Could not reach the Suwayomi server.", retryable = true },
+            { code = 500, error = "Could not reach the Suwayomi server.", retryable = true },
+            { code = "closed", error = "Could not reach the Suwayomi server: closed", retryable = true },
         }
 
         for _, status in ipairs(statuses) do
@@ -215,6 +220,7 @@ describe("suwayomi/api/transport", function()
             local result = transport.performGraphQLRequest(valid_credentials(), "{}", "status")
             assert.are.equal(false, result.ok)
             assert.are.equal(status.error, result.error)
+            assert.are.equal(status.retryable, result.retryable)
         end
     end)
 
@@ -383,6 +389,20 @@ describe("suwayomi/api/transport", function()
         }, "/api/v1/manga/85/chapter/1/page/0")
         assert.are.equal(false, transport_error.ok)
         assert.are.equal("Could not reach the Suwayomi server: network timeout", transport_error.error)
+        assert.is_true(transport_error.retryable)
+
+        package.loaded["socket.http"] = nil
+        package.preload["socket.http"] = function()
+            return {
+                request = function()
+                    return nil, "host or service not provided, or not known"
+                end,
+            }
+        end
+        local dns_error = transport.downloadBinary({
+            server_url = "http://suwayomi.example",
+        }, "/api/v1/manga/85/chapter/1/page/0")
+        assert.is_true(dns_error.retryable)
 
         package.loaded["socket.http"] = nil
         package.preload["socket.http"] = function()
@@ -449,7 +469,10 @@ describe("suwayomi/api/transport", function()
             }
         end
 
-        local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path)
+        local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path, nil, {
+            total_timeout_seconds = 30,
+            timeout_seconds = 42,
+        })
         assert.are.equal(true, result.ok)
         assert.are.equal(target_path, result.path)
         assert.are.equal(11, result.bytes)
@@ -459,6 +482,7 @@ describe("suwayomi/api/transport", function()
         assert.are.equal("PK\003\004archive", result.tail_bytes)
         assert.are.equal("https://suwayomi.example/api/v1/chapter/398/download?markAsRead=false", request.url)
         assert.are.equal("Basic YWxpY2U6c2VjcmV0", request.headers.Authorization)
+        assert.are.equal(42, request.timeout)
 
         os.remove(target_path)
         package.loaded["ssl.https"] = nil
@@ -476,6 +500,10 @@ describe("suwayomi/api/transport", function()
         assert.are.equal(false, failed.ok)
         assert.are.equal("Chapter archive not found.", failed.error)
         assert.is_nil(io.open(target_path, "rb"))
+    end)
+
+    it("uses a separate large response budget for chapter archives", function()
+        assert.is_true(transport.MAX_CHAPTER_ARCHIVE_RESPONSE_BYTES > transport.MAX_BINARY_RESPONSE_BYTES)
     end)
 
     it("marks only transient archive HTTP statuses as retryable", function()
@@ -574,7 +602,9 @@ describe("suwayomi/api/transport", function()
             }
         end
 
-        local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path)
+        local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path, nil, {
+            total_timeout_seconds = 30,
+        })
 
         assert.are.equal(false, result.ok)
         assert.are.equal("Connection timed out while downloading chapter archive.", result.error)

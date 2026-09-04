@@ -101,7 +101,7 @@ describe("suwayomi/downloads/progress_file", function()
     end)
 
     it("writes fallback progress through a temporary file before renaming", function()
-        progress_file.writeFallback("/books/.suwayomi_progress_m1_398.txt", "failed", 2, 5, "/books/chapter.cbz", "boom")
+        progress_file.writeFallback("/books/.suwayomi_progress_m1_398.txt", "failed", 2, 5, "/books/chapter.cbz", "boom", true)
 
         assert.are.same({
             {
@@ -116,6 +116,7 @@ describe("suwayomi/downloads/progress_file", function()
             total = 5,
             path = "/books/chapter.cbz",
             error = "boom",
+            retryable = true,
         }, progress_file.read("/books/.suwayomi_progress_m1_398.txt"))
     end)
 

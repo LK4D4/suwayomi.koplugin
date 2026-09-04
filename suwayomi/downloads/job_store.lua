@@ -97,6 +97,9 @@ function JobStore:normalizeProgress(progress)
     if progress.error ~= nil then
         normalized.error = tostring(progress.error)
     end
+    if progress.retryable ~= nil then
+        normalized.retryable = progress.retryable == true or progress.retryable == "true"
+    end
     if progress.updated_at ~= nil then
         normalized.updated_at = tonumber(progress.updated_at) or progress.updated_at
     end
@@ -185,6 +188,12 @@ function JobStore:buildJob(manga, chapter, download_directory, state, details)
     if details.last_progress_at ~= nil then
         job.last_progress_at = tonumber(details.last_progress_at) or details.last_progress_at
     end
+    if details.retry_count ~= nil then
+        job.retry_count = math.max(0, math.floor(tonumber(details.retry_count) or 0))
+    end
+    if details.retry_at ~= nil then
+        job.retry_at = tonumber(details.retry_at)
+    end
     local progress = self:normalizeProgress(details.progress)
     if progress then
         job.progress = progress
@@ -255,6 +264,8 @@ function JobStore:copySnapshotJob(job, state)
         download_directory = job.download_directory,
         manga = job.manga,
         chapter = job.chapter,
+        retry_count = job.retry_count,
+        retry_at = job.retry_at,
     }
     local progress = self:normalizeProgress(job.progress)
     if progress then
