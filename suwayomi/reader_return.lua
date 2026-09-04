@@ -238,17 +238,16 @@ local function readerDocumentPath(owner)
     if type(owner) ~= "table" then
         return nil
     end
-    local document = owner.document or (owner.ui and owner.ui.document)
+    local document = owner.document
     return owner.document_path
         or owner.document_pathname
-        or (owner.ui and (owner.ui.document_path or owner.ui.document_pathname))
         or (document and (document.file or document.filename or document.path))
 end
 
 function Methods:getCurrentReaderDocumentPath()
     local ok_reader, ReaderUI = pcall(require, "apps/reader/readerui")
     local active_path = ok_reader and ReaderUI and readerDocumentPath(ReaderUI.instance)
-    return active_path or readerDocumentPath(self)
+    return active_path or readerDocumentPath(self.ui)
 end
 
 function Methods:getReaderReturnContextForPath(path)

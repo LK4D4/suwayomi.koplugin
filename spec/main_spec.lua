@@ -340,6 +340,72 @@ describe("suwayomi plugin", function()
         assert.are.equal(105, record.retry_after)
     end)
 
+    it("ignores a closed reader's retained document when later cleanup timers run", function()
+        local path = "/downloads/source/manga/c1.cbz"
+        local reader_ui = { document = { file = path } }
+        runtime_helper.teardown()
+        runtime = runtime_helper.install({
+            reader_ui_instance = reader_ui,
+            chapter_ledger = {
+                ["m1:c1"] = {
+                    manga_id = "m1",
+                    chapter_id = "c1",
+                    path = path,
+                    read = true,
+                },
+            },
+            finished_cleanup_journal = {
+                version = 1,
+                next_sequence = 2,
+                mangas = {
+                    m1 = {
+                        records = {
+                            { chapter_id = "c1", path = path, sequence = 1, retry_count = 0, retry_after = 0 },
+                        },
+                    },
+                },
+            },
+            delete_chapters_settings = {
+                delete_after_mark_read = false,
+                delete_finished_while_reading = 1,
+            },
+            download_directory = "/downloads",
+        })
+        local retained_document = reader_ui.document
+        local retained_reader = build_plugin({ ui = reader_ui, document = retained_document })
+        local filemanager = build_plugin()
+        local delete_calls = {}
+        local queue = { getStatus = function() end }
+        local function installCleanupBoundary(plugin, owner)
+            plugin.chapterArchiveExists = function(_, candidate)
+                return candidate == path
+            end
+            plugin.getDownloadQueue = function()
+                return queue
+            end
+            plugin.deleteChapterFromDeviceWithOptions = function(_, manga, chapter)
+                table.insert(delete_calls, { owner = owner, manga = manga, chapter = chapter })
+                return true, "deleted"
+            end
+        end
+        installCleanupBoundary(retained_reader, "reader")
+        installCleanupBoundary(filemanager, "filemanager")
+
+        retained_reader:scheduleFinishedChapterCleanup(0)
+        local reader_timer = runtime.scheduled[1].callback
+        reader_ui.document = nil
+        runtime.reader_ui.instance = nil
+        filemanager:scheduleFinishedChapterCleanup(0)
+        local filemanager_timer = runtime.scheduled[2].callback
+
+        reader_timer()
+        filemanager_timer()
+
+        assert.are.equal(1, #delete_calls)
+        assert.is_nil(runtime.finished_cleanup_journal.mangas.m1)
+        assert.are.equal(2, #runtime.scheduled)
+    end)
+
     it("reevaluates blocked cleanup before download-directory callbacks", function()
         local plugin = build_plugin()
         local events = {}
