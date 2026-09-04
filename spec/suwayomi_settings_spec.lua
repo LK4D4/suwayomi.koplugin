@@ -185,6 +185,29 @@ describe("suwayomi/settings", function()
         assert.is_true(flushed)
     end)
 
+    it("merges manga records when numeric and string keys normalize to the same key", function()
+        stored_data.finished_chapter_cleanup = { version = 1, mangas = {
+            [7] = { records = {{ chapter_id = "numeric", path = "/numeric", sequence = 1,
+                retry_count = 0, retry_after = 0 }} },
+            ["7"] = { records = {{ chapter_id = "string", path = "/string", sequence = 2,
+                retry_count = 0, retry_after = 0 }} },
+        } }
+        local journal = require("suwayomi/settings"):loadFinishedChapterCleanupJournal()
+        assert.are.equal(2, #journal.mangas["7"].records)
+    end)
+
+    it("chooses equal-sequence duplicate chapter state deterministically", function()
+        local settings = require("suwayomi/settings")
+        local journal = settings:normalizeFinishedChapterCleanupJournal({ version = 1, mangas = {
+            m = { records = {
+                { chapter_id = "same", path = "/z-path", sequence = 4, retry_count = 0, retry_after = 0 },
+                { chapter_id = "same", path = "/a-path", sequence = 4, retry_count = 2, retry_after = 9 },
+            } },
+        } })
+        assert.are.equal("/a-path", journal.mangas.m.records[1].path)
+        assert.are.equal(2, journal.mangas.m.records[1].retry_count)
+    end)
+
     it("loads source languages with english enabled by default", function()
         local settings = require("suwayomi/settings")
         local source_languages = settings:loadSourceLanguages()

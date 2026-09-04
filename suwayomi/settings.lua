@@ -105,10 +105,11 @@ local function normalizeFinishedCleanupJournal(value)
     local normalized = emptyFinishedCleanupJournal()
     local max_sequence = 0
     if type(value.mangas) == "table" then
+        local manga_records = {}
         for manga_key, manga in pairs(value.mangas) do
             local key = type(manga_key) == "string" and manga_key or tostring(manga_key)
             if key ~= "" and type(manga) == "table" and type(manga.records) == "table" then
-                local by_chapter = {}
+                manga_records[key] = manga_records[key] or {}
                 for _, record in pairs(manga.records) do
                     if type(record) == "table" and type(record.chapter_id) == "string"
                         and record.chapter_id ~= "" and type(record.path) == "string" and record.path ~= "" then
@@ -116,24 +117,32 @@ local function normalizeFinishedCleanupJournal(value)
                         local retry_count = finiteNonNegative(record.retry_count)
                         local retry_after = finiteNonNegative(record.retry_after)
                         if sequence and retry_count and retry_after then
-                            local accepted = { chapter_id = record.chapter_id, path = record.path,
-                                sequence = sequence, retry_count = retry_count, retry_after = retry_after }
-                            local previous = by_chapter[record.chapter_id]
-                            if not previous or sequence > previous.sequence then
-                                by_chapter[record.chapter_id] = accepted
-                            end
+                            table.insert(manga_records[key], { chapter_id = record.chapter_id, path = record.path,
+                                sequence = sequence, retry_count = retry_count, retry_after = retry_after })
                             if sequence > max_sequence then max_sequence = sequence end
                         end
                     end
                 end
-                local records = {}
-                for _, record in pairs(by_chapter) do table.insert(records, record) end
-                table.sort(records, function(left, right)
-                    if left.sequence == right.sequence then return left.chapter_id < right.chapter_id end
-                    return left.sequence < right.sequence
-                end)
-                if #records > 0 then normalized.mangas[key] = { records = records } end
             end
+        end
+        for key, candidates in pairs(manga_records) do
+            local by_chapter = {}
+            for _, candidate in ipairs(candidates) do
+                local previous = by_chapter[candidate.chapter_id]
+                if not previous or candidate.sequence > previous.sequence
+                    or (candidate.sequence == previous.sequence and (candidate.path < previous.path
+                        or (candidate.path == previous.path and (candidate.retry_count < previous.retry_count
+                            or (candidate.retry_count == previous.retry_count and candidate.retry_after < previous.retry_after))))) then
+                    by_chapter[candidate.chapter_id] = candidate
+                end
+            end
+            local records = {}
+            for _, record in pairs(by_chapter) do table.insert(records, record) end
+            table.sort(records, function(left, right)
+                if left.sequence == right.sequence then return left.chapter_id < right.chapter_id end
+                return left.sequence < right.sequence
+            end)
+            if #records > 0 then normalized.mangas[key] = { records = records } end
         end
     end
     local next_sequence = finiteNonNegative(value.next_sequence) or 1
