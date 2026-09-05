@@ -1,6 +1,6 @@
 -- Boundary: FinishedChapterCleanup.
 --
--- Responsibility: Persist finished-chapter order and process retention-based local cleanup.
+-- Responsibility: Persist finished-chapter order, process retention-based local cleanup, and refresh changed download views per batch.
 -- Owned state: Per-plugin processing, scheduling, retry, and notification state.
 -- Dependencies: Plugin ledger/delete methods, settings, UIManager, filesystem path resolution, debug, and i18n.
 -- External data: Journal, ledger, queue, and filesystem paths are revalidated before deletion.
@@ -103,6 +103,34 @@ local function clearMatchingLedgerPath(self, ledger, entry, path)
     entry.path = nil
     self:saveChapterLedger(ledger)
     return true
+end
+
+local function convergeMissingDownload(self, ledger, entry, manga_id, chapter_id, path, changed_mangas)
+    if entry.path and entry.path ~= path then
+        return
+    end
+    clearMatchingLedgerPath(self, ledger, entry, path)
+    local queue = self:getDownloadQueue()
+    local manga, chapter = { id = manga_id }, { id = chapter_id }
+    local status = queue:getStatus(manga, chapter)
+    if status and status.state ~= "queued" and status.state ~= "downloading" then
+        queue:clearStatus(manga, chapter, { quiet = true })
+    end
+    changed_mangas[manga_id] = true
+end
+
+local function refreshChangedDownloadViews(self, changed_mangas)
+    if not next(changed_mangas) then return end
+    local context = self.current_chapter_context
+    local menu = self.current_chapter_menu
+    if menu and context and context.manga and changed_mangas[tostring(context.manga.id)]
+        and (not self.isSuwayomiScreenActive or self:isSuwayomiScreenActive(menu))
+    then
+        -- Full rebuild replaces cached download status. Never reuse the batch ledger:
+        -- rebuilding can reconcile metadata and write a newer ledger itself.
+        self:refreshChapterMenu()
+    end
+    if self.refreshDownloadsMenu then self:refreshDownloadsMenu() end
 end
 
 local function retryDelay(retry_count)
@@ -402,6 +430,7 @@ local function recordIsAfterCursor(record, cursor)
 end
 
 local function processFinishedChapterCleanup(self, summary)
+    local changed_mangas = {}
     if self.finished_cleanup_scheduled then
         self:cancelFinishedChapterCleanup()
     end
@@ -493,7 +522,7 @@ local function processFinishedChapterCleanup(self, summary)
                 saveJournal(journal)
                 logTransition("converged", "unread", 1)
             elseif archive_exists == false and not archive_error then
-                clearMatchingLedgerPath(self, ledger, ledger_entry, record.path)
+                convergeMissingDownload(self, ledger, ledger_entry, manga_id, chapter_id, record.path, changed_mangas)
                 table.remove(manga.records, index)
                 candidate_count = candidate_count - 1
                 summary.missing = summary.missing + 1
@@ -581,11 +610,14 @@ local function processFinishedChapterCleanup(self, summary)
                         )
                         if state == "deleted" or state == "missing" or (ok and state == nil) then
                             if state == "missing" then
-                                clearMatchingLedgerPath(self, ledger, ledger_entry, record.path)
+                                convergeMissingDownload(
+                                    self, ledger, ledger_entry, manga_id, chapter_id, record.path, changed_mangas
+                                )
                                 summary.missing = summary.missing + 1
                             else
                                 self:saveChapterLedger(ledger)
                                 summary.deleted = summary.deleted + 1
+                                changed_mangas[manga_id] = true
                             end
                             table.remove(manga.records, index)
                             candidate_count = candidate_count - 1
@@ -634,6 +666,9 @@ local function processFinishedChapterCleanup(self, summary)
             scheduleFinishedChapterCleanup(self, math.max(0, earliest_retry - now))
         end
     end
+    -- All durable transitions and continuation decisions precede UI callbacks.
+    -- The outer processing guard remains set until both views finish refreshing.
+    refreshChangedDownloadViews(self, changed_mangas)
     return summary
 end
 

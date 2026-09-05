@@ -13,6 +13,10 @@ describe("manual read completion integration", function()
         "suwayomi/manga/action_menu", "ui/uimanager", "ffi/util",
         "suwayomi/reader_return", "suwayomi/network/request_job", "apps/reader/readerui",
         "suwayomi/downloads/controller", "suwayomi/ui",
+        "suwayomi/chapters/menu", "suwayomi/downloads/downloader",
+        "suwayomi/downloads/queue", "suwayomi/downloads/active_jobs",
+        "suwayomi/downloads/job_store", "suwayomi/downloads/progress_file",
+        "suwayomi/downloads/status_formatter",
     }
     local saved_modules, saved_preloads
     local function clone(value)
@@ -48,6 +52,8 @@ describe("manual read completion integration", function()
                 return { delete_finished_while_reading = state.setting, delete_after_mark_read = state.immediate }
             end,
             loadDownloadDirectory = function() return "/downloads" end,
+            loadDownloadQueue = function() return clone(state.jobs or {}) end,
+            saveDownloadQueue = function(_, jobs) state.jobs = clone(jobs) end,
             loadChapterLedger = function() return clone(state.ledger) end,
             saveChapterLedger = function(_, ledger)
                 state.ledger = clone(ledger)
@@ -74,10 +80,35 @@ describe("manual read completion integration", function()
             ["suwayomi/i18n"] = {
                 t = function(value) return value end,
                 f = function(value) return value end,
+                join = table.concat,
+                count = function(_, singular) return singular end,
             },
             ["suwayomi/readsync/worker"] = {},
             ["suwayomi/network/request_job"] = {},
-            ["suwayomi/ui"] = {},
+            ["suwayomi/ui"] = {
+                updateChapterMenu = function(menu, options)
+                    if not menu then return end
+                    assert.is_not_true(menu.closed)
+                    menu.chapters = clone(options.chapters)
+                    menu.refreshes = (menu.refreshes or 0) + 1
+                    if state.on_refresh then state.on_refresh() end
+                end,
+                updateDownloadsMenu = function(menu, snapshot)
+                    assert.is_not_true(menu.closed)
+                    menu.snapshot = clone(snapshot)
+                    menu.refreshes = (menu.refreshes or 0) + 1
+                end,
+            },
+            ["suwayomi/downloads/downloader"] = {
+                getTargetPath = function(_, _, _, c) return nil, path(c.id) end,
+                findExistingChapterPath = function(_, _, _, c)
+                    return state.existing[path(c.id)] and path(c.id) or nil
+                end,
+                chapterExists = function(_, value)
+                    if state.on_stat then state.on_stat(value) end
+                    return state.existing[value] == true
+                end,
+            },
             ["apps/reader/readerui"] = {},
         }
         for name, value in pairs(stubs) do
@@ -89,7 +120,7 @@ describe("manual read completion integration", function()
             "suwayomi/chapters/actions", "suwayomi/chapters/context",
             "suwayomi/readsync/ledger", "suwayomi/readsync/koreader_metadata",
             "suwayomi/readsync/controller", "suwayomi/chapters/finished_cleanup",
-            "suwayomi/reader_return",
+            "suwayomi/reader_return", "suwayomi/chapters/menu",
         }) do mixins[#mixins + 1] = require(name).methods end
         local function instance(chapters)
             local plugin = {}
@@ -97,14 +128,16 @@ describe("manual read completion integration", function()
                 for name, method in pairs(methods) do plugin[name] = method end
             end
             plugin.current_chapter_context = { manga = manga, chapters = chapters or {} }
-            plugin.refreshChapterMenu = noop
+            plugin.current_chapter_menu = {}
+            plugin.isSuwayomiScreenActive = function(_, menu) return not menu.closed end
+            plugin.loadKoreaderHistoryPaths = function() return {} end
+            plugin.saveReaderReturnContextsForChapters = nil
+            plugin.isChapterPathFinishedInKoreader = function(_, value)
+                return ((state.metadata[value .. ".lua"] or {}).summary or {}).status == "complete"
+            end
             plugin.schedulePendingReadSync = noop
             plugin.showMessage = noop
             plugin.getChapterDownloadKey = function(_, m, c) return m.id .. ":" .. c.id end
-            plugin.isChapterDownloaded = function(_, _, c)
-                return state.existing[path(c.id)] == true, path(c.id)
-            end
-            plugin.chapterArchiveExists = function(_, value) return state.existing[value] == true end
             plugin.getKoreaderMetadataPathForDocument = function(_, value) return value .. ".lua" end
             plugin.loadKoreaderMetadataTable = function(_, value)
                 return clone(state.metadata[value .. ".lua"] or {}), value .. ".lua"
@@ -120,8 +153,19 @@ describe("manual read completion integration", function()
                 state.removed[#state.removed + 1] = value
                 return true
             end
-            plugin.getDownloadQueue = function()
-                return { getStatus = noop, cancelPending = function() return false end, clearStatus = noop }
+            local queue = require("suwayomi/downloads/queue"):new{
+                settings = settings,
+                downloader = stubs["suwayomi/downloads/downloader"],
+                onStatusChanged = function()
+                    plugin:scheduleFinishedChapterCleanup(0)
+                    plugin:refreshChapterMenu({ quick = true })
+                end,
+            }
+            plugin.getDownloadQueue = function() return queue end
+            local downloads = require("suwayomi/downloads/controller").methods
+            for _, name in ipairs({ "refreshDownloadsMenu", "getDownloadsMenuOptions",
+                "getDownloadsTitleBarOptions", "getDownloadsMenuCallbacks" }) do
+                plugin[name] = downloads[name]
             end
             return plugin
         end
@@ -142,6 +186,312 @@ describe("manual read completion integration", function()
         for _, name in ipairs(modules) do
             package.loaded[name], package.preload[name] = saved_modules[name], saved_preloads[name]
         end
+    end)
+
+    local function runScheduled(state)
+        local scheduled = table.remove(state.scheduled, 1)
+        assert.is_not_nil(scheduled)
+        state.now = state.now + scheduled.delay
+        scheduled.callback()
+    end
+
+    local function assertDownloaded(state, plugin, id, downloaded)
+        assert.equals(downloaded, state.existing[path(id)] == true)
+        assert.equals(downloaded and path(id) or nil, state.ledger["m:" .. id].path)
+        local row
+        for _, item in ipairs(plugin.current_chapter_menu.chapters) do
+            if item.id == id then row = item end
+        end
+        assert.is_not_nil(row)
+        assert.equals(downloaded, row.menu_status:find("Downloaded", 1, true) ~= nil)
+        assert.equals(downloaded and "downloaded" or nil,
+            row._suwayomi_download_status and row._suwayomi_download_status.state)
+    end
+
+    for _, action in ipairs({ "selected", "previous", "explicit" }) do
+        it("clears displayed downloads after scheduled " .. action .. " completion cleanup", function()
+            local state, instance = fixture(3)
+            local chapters = { chapter("A"), chapter("B"), chapter("C"), chapter("D") }
+            local plugin = instance(chapters)
+            plugin:refreshChapterMenu()
+            if action == "selected" then
+                for index = 1, 3 do plugin:toggleChapterSelection(manga, chapters[index]) end
+                assert.equals(3, plugin:markSelectedChaptersRead())
+            elseif action == "previous" then
+                assert.equals(3, plugin:markChaptersBeforeRead(manga, chapters[4]))
+            else
+                for index = 1, 3 do plugin:markChapterRead(manga, chapters[index]) end
+            end
+            assertDownloaded(state, plugin, "A", true)
+            local refreshes = plugin.current_chapter_menu.refreshes
+            runScheduled(state)
+            assert.same({ path("A") }, state.removed)
+            assert.same({ "B", "C" }, records(state))
+            assertDownloaded(state, plugin, "A", false)
+            assertDownloaded(state, plugin, "B", true)
+            assertDownloaded(state, plugin, "C", true)
+            assert.equals(refreshes + 1, plugin.current_chapter_menu.refreshes)
+            assert.equals(4, state.journal.next_sequence)
+            plugin:refreshChapterMenu({ quick = true })
+            assertDownloaded(state, plugin, "A", false)
+        end)
+    end
+
+    it("refreshes once per bounded deletion batch and keeps quick refresh converged", function()
+        local state, instance = fixture(1)
+        local chapters = { chapter("A"), chapter("B"), chapter("C"), chapter("D") }
+        local plugin = instance(chapters)
+        plugin.finished_cleanup_batch_size = 2
+        plugin:markChapterListRead(manga, chapters)
+        local refreshes = plugin.current_chapter_menu.refreshes
+        runScheduled(state)
+        assert.same({ "C", "D" }, records(state))
+        assertDownloaded(state, plugin, "A", false)
+        assertDownloaded(state, plugin, "B", false)
+        assertDownloaded(state, plugin, "C", true)
+        assertDownloaded(state, plugin, "D", true)
+        assert.equals(refreshes + 1, plugin.current_chapter_menu.refreshes)
+        runScheduled(state)
+        assert.same({}, records(state))
+        assert.same({ path("A"), path("B"), path("C"), path("D") }, state.removed)
+        assert.equals(refreshes + 2, plugin.current_chapter_menu.refreshes)
+        plugin:refreshChapterMenu({ quick = true })
+        for _, c in ipairs(chapters) do assertDownloaded(state, plugin, c.id, false) end
+        assert.equals(5, state.journal.next_sequence)
+        assert.same({}, state.scheduled)
+    end)
+
+    for _, status in ipairs({ "downloaded", "failed" }) do
+        it("converges missing archives and obsolete " .. status .. " queue state together", function()
+            local state, instance = fixture(1)
+            local chapters = { chapter("A"), chapter("B") }
+            local plugin = instance(chapters)
+            plugin:markChapterListRead(manga, chapters)
+            local queue = plugin:getDownloadQueue()
+            queue.statuses["m:A"] = { state = status }
+            state.jobs = { queue:buildPersistentJob(manga, chapters[1], "/downloads", status) }
+            plugin.current_downloads_menu = {}
+            plugin:refreshDownloadsMenu()
+            if status == "failed" then assert.equals(1, #plugin.current_downloads_menu.snapshot.failed) end
+            state.existing[path("A")] = nil
+            local refreshes = plugin.current_chapter_menu.refreshes
+            runScheduled(state)
+            assert.same({}, records(state))
+            assert.same({ path("B") }, state.removed)
+            assert.same({}, state.jobs)
+            assert.same({}, plugin.current_downloads_menu.snapshot.failed)
+            assert.equals(2, plugin.current_downloads_menu.refreshes)
+            assert.equals(refreshes + 1, plugin.current_chapter_menu.refreshes)
+            assert.is_nil(queue:getStatus(manga, chapters[1]))
+            plugin:refreshChapterMenu({ quick = true })
+            assertDownloaded(state, plugin, "A", false)
+            assertDownloaded(state, plugin, "B", false)
+            assert.same({}, state.scheduled)
+        end)
+    end
+
+    for _, status in ipairs({ "queued", "downloading" }) do
+        it("preserves " .. status .. " work when its older archive is missing", function()
+            local state, instance = fixture(1)
+            local chapters = { chapter("A") }
+            local plugin = instance(chapters)
+            plugin:markChapterListRead(manga, chapters)
+            local queue = plugin:getDownloadQueue()
+            queue.statuses["m:A"] = { state = status }
+            state.jobs = { queue:buildPersistentJob(manga, chapters[1], "/downloads", status) }
+            state.existing[path("A")] = nil
+            runScheduled(state)
+            assert.same({}, records(state))
+            assert.same({}, state.removed)
+            assert.equals(status, queue:getStatus(manga, chapters[1]).state)
+            assert.equals(status, state.jobs[1].state)
+            assertDownloaded(state, plugin, "A", false)
+            assert.equals(status == "queued" and "Read · Queued" or "Read · Downloading",
+                plugin.current_chapter_menu.chapters[1].menu_status)
+        end)
+    end
+
+    for _, blocked in ipairs({ "current_document", "delete_failed" }) do
+        it("keeps displayed downloads during " .. blocked .. " and refreshes on retry success", function()
+            local state, instance = fixture(1)
+            local plugin = instance({ chapter("A"), chapter("B") })
+            plugin:markChapterListRead(manga, plugin.current_chapter_context.chapters)
+            if blocked == "current_document" then
+                require("apps/reader/readerui").instance = { document = { file = path("A") } }
+            else
+                state.fail_delete = true
+            end
+            local refreshes = plugin.current_chapter_menu.refreshes
+            runScheduled(state)
+            assert.same({ "A", "B" }, records(state))
+            assertDownloaded(state, plugin, "A", true)
+            assertDownloaded(state, plugin, "B", true)
+            assert.equals(refreshes, plugin.current_chapter_menu.refreshes)
+            assert.equals(1, state.journal.mangas.m.records[1].retry_count)
+            assert.equals(105, state.journal.mangas.m.records[1].retry_after)
+            assert.equals(1, plugin:processFinishedChapterCleanup().deferred)
+            assert.equals(refreshes, plugin.current_chapter_menu.refreshes)
+            require("apps/reader/readerui").instance = nil
+            state.fail_delete = false
+            -- Direct processing superseded the first retry timer; its callback is inert.
+            runScheduled(state)
+            runScheduled(state)
+            assert.same({}, records(state))
+            assertDownloaded(state, plugin, "A", false)
+            assertDownloaded(state, plugin, "B", false)
+            assert.equals(refreshes + 1, plugin.current_chapter_menu.refreshes)
+        end)
+    end
+
+    it("does not refresh retained or empty processing", function()
+        local state, instance = fixture(3)
+        local plugin = instance({ chapter("A"), chapter("B") })
+        plugin:markChapterListRead(manga, plugin.current_chapter_context.chapters)
+        local refreshes = plugin.current_chapter_menu.refreshes
+        runScheduled(state)
+        assert.same({ "A", "B" }, records(state))
+        assertDownloaded(state, plugin, "A", true)
+        assertDownloaded(state, plugin, "B", true)
+        assert.equals(refreshes, plugin.current_chapter_menu.refreshes)
+        plugin:cancelFinishedChapter("m", "A")
+        plugin:cancelFinishedChapter("m", "B")
+        assert.equals(0, plugin:processFinishedChapterCleanup().processed)
+        assert.equals(refreshes, plugin.current_chapter_menu.refreshes)
+        assert.same({}, state.removed)
+    end)
+
+    it("refreshes when an archive disappears between validation and deletion", function()
+        local state, instance = fixture(1)
+        local plugin = instance({ chapter("A") })
+        plugin:markChapterRead(manga, chapter("A"))
+        plugin:getDownloadQueue().statuses["m:A"] = { state = "downloaded" }
+        local inspections = 0
+        state.on_stat = function(value)
+            if value ~= path("A") then return end
+            inspections = inspections + 1
+            if inspections == 2 then state.existing[value] = nil end
+        end
+        runScheduled(state)
+        assert.same({}, records(state))
+        assert.same({}, state.removed)
+        assertDownloaded(state, plugin, "A", false)
+        assert.is_nil(plugin:getDownloadQueue():getStatus(manga, chapter("A")))
+        plugin:refreshChapterMenu({ quick = true })
+        assertDownloaded(state, plugin, "A", false)
+    end)
+
+    it("preserves a replacement ledger path and queue status when the old archive is missing", function()
+        local state, instance = fixture(1)
+        local plugin = instance({ chapter("A") })
+        plugin:markChapterRead(manga, chapter("A"))
+        state.ledger["m:A"].path = path("replacement")
+        state.existing[path("replacement")] = true
+        state.existing[path("A")] = nil
+        plugin:getDownloadQueue().statuses["m:A"] = { state = "downloaded" }
+        local refreshes = plugin.current_chapter_menu.refreshes
+        runScheduled(state)
+        assert.same({}, records(state))
+        assert.same({}, state.removed)
+        assert.equals(path("replacement"), state.ledger["m:A"].path)
+        assert.is_true(state.existing[path("replacement")])
+        assert.equals("downloaded", plugin:getDownloadQueue():getStatus(manga, chapter("A")).state)
+        assert.equals(refreshes, plugin.current_chapter_menu.refreshes)
+    end)
+
+    it("does not refresh an unrelated chapter menu after cleanup", function()
+        local state, instance = fixture(1)
+        local plugin = instance({ chapter("A") })
+        plugin:markChapterRead(manga, chapter("A"))
+        plugin.current_chapter_context.manga = { id = "other", title = "Other" }
+        plugin:refreshChapterMenu()
+        local refreshes = plugin.current_chapter_menu.refreshes
+        runScheduled(state)
+        assert.same({}, records(state))
+        assert.same({ path("A") }, state.removed)
+        assert.is_nil(state.ledger["m:A"].path)
+        assert.equals(refreshes, plugin.current_chapter_menu.refreshes)
+    end)
+
+    it("cancels unread journal records without refreshing unchanged downloads", function()
+        local state, instance = fixture(1)
+        local plugin = instance({ chapter("A") })
+        plugin:markChapterRead(manga, chapter("A"))
+        state.ledger["m:A"].read = false
+        local refreshes = plugin.current_chapter_menu.refreshes
+        runScheduled(state)
+        assert.same({}, records(state))
+        assert.same({}, state.removed)
+        assertDownloaded(state, plugin, "A", true)
+        assert.equals(refreshes, plugin.current_chapter_menu.refreshes)
+    end)
+
+    it("commits transitions before refresh and preserves callback writes without recursive cleanup", function()
+        local state, instance = fixture(1)
+        local plugin = instance({ chapter("A"), chapter("B"), chapter("D") })
+        plugin:markChapterListRead(manga, { chapter("A"), chapter("B") })
+        state.on_refresh = function()
+            state.on_refresh = nil
+            assert.same({}, records(state))
+            assertDownloaded(state, plugin, "A", false)
+            assertDownloaded(state, plugin, "B", false)
+            assert.is_true(plugin:processFinishedChapterCleanup().busy)
+            plugin:markChapterRead(manga, chapter("D"), { skip_refresh = true })
+        end
+        runScheduled(state)
+        assert.same({ "D" }, records(state))
+        assert.equals(4, state.journal.next_sequence)
+        assert.is_true(state.ledger["m:D"].read)
+        assert.is_true(state.ledger["m:D"].pending_read_sync)
+        assert.is_nil(state.ledger["m:A"].path)
+        assert.is_nil(state.ledger["m:B"].path)
+        runScheduled(state)
+        assertDownloaded(state, plugin, "D", false)
+        assert.same({}, records(state))
+    end)
+
+    for _, closed in ipairs({ "absent", "closed" }) do
+        it("converges with " .. closed .. " menus and rebuilds on a fresh instance", function()
+            local state, instance = fixture(1)
+            local plugin = instance({ chapter("A") })
+            plugin:markChapterRead(manga, chapter("A"))
+            local old_menu = plugin.current_chapter_menu
+            local refreshes = old_menu.refreshes
+            old_menu.closed = true
+            plugin.current_downloads_menu = { closed = true }
+            if closed == "absent" then
+                plugin.current_chapter_menu = nil
+                plugin.current_downloads_menu = nil
+                plugin.current_chapter_context = nil
+            end
+            runScheduled(state)
+            assert.same({}, records(state))
+            assert.same({ path("A") }, state.removed)
+            assert.is_nil(state.ledger["m:A"].path)
+            assert.equals(refreshes, old_menu.refreshes)
+            plugin = instance({ { id = "A", name = "A", is_read = true } })
+            plugin:refreshChapterMenu()
+            assertDownloaded(state, plugin, "A", false)
+            plugin:refreshChapterMenu({ quick = true })
+            assertDownloaded(state, plugin, "A", false)
+        end)
+    end
+
+    it("refreshes the fresh processor instance after restart without touching its closed predecessor", function()
+        local state, instance = fixture(3)
+        local plugin = instance({ chapter("A"), chapter("B"), chapter("C") })
+        plugin:markChapterListRead(manga, plugin.current_chapter_context.chapters)
+        local old_menu = plugin.current_chapter_menu
+        old_menu.closed = true
+        state.scheduled = {}
+        local fresh = instance(clone(plugin.current_chapter_context.chapters))
+        fresh:refreshChapterMenu()
+        fresh:scheduleFinishedChapterCleanup(0)
+        runScheduled(state)
+        assert.same({ "B", "C" }, records(state))
+        assertDownloaded(state, fresh, "A", false)
+        assertDownloaded(state, fresh, "B", true)
+        assertDownloaded(state, fresh, "C", true)
+        assert.equals(1, old_menu.refreshes)
     end)
 
     it("keeps mixed manual and reader completions across a fresh plugin instance", function()
@@ -174,6 +524,7 @@ describe("manual read completion integration", function()
                 plugin:toggleChapterSelection(manga, chapters[3])
                 plugin:toggleChapterSelection(manga, chapters[1])
                 plugin:toggleChapterSelection(manga, chapters[2])
+                state.events = {}
                 plugin:markSelectedChaptersRead()
             else
                 plugin:markChaptersBeforeRead(manga, chapters[4])
@@ -208,7 +559,7 @@ describe("manual read completion integration", function()
 
     it("immediate deletion wins and cancels an older completion record", function()
         local state, instance = fixture()
-        local plugin = instance()
+        local plugin = instance({ chapter("A") })
         plugin:markChapterRead(manga, chapter("A"))
         assert.same({ "A" }, records(state))
         state.immediate = true
@@ -217,11 +568,15 @@ describe("manual read completion integration", function()
         assert.same({}, records(state))
         assert.is_nil(state.ledger["m:A"].path)
         assert.is_true(state.ledger["m:A"].pending_read_sync)
+        assertDownloaded(state, plugin, "A", false)
+        local refreshes = plugin.current_chapter_menu.refreshes
+        runScheduled(state)
+        assert.equals(refreshes, plugin.current_chapter_menu.refreshes)
     end)
 
     it("immediate bulk deletion leaves no completion records or downloaded ledger paths", function()
         local state, instance = fixture()
-        local plugin = instance()
+        local plugin = instance({ chapter("A"), chapter("B") })
         plugin:markChapterListRead(manga, { chapter("A"), chapter("B") })
         assert.same({ "A", "B" }, records(state))
         state.immediate = true
@@ -232,6 +587,8 @@ describe("manual read completion integration", function()
         assert.is_nil(state.ledger["m:B"].path)
         assert.is_true(state.ledger["m:A"].read)
         assert.is_true(state.ledger["m:B"].read)
+        assertDownloaded(state, plugin, "A", false)
+        assertDownloaded(state, plugin, "B", false)
     end)
     it("journals failed immediate deletion for durable cleanup retry", function()
         local state, instance = fixture(1)
