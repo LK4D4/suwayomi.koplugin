@@ -306,6 +306,30 @@ describe("suwayomi/downloads/downloader", function()
         package.preload.socket = nil
     end)
 
+    it("distinguishes archive absence from failed filesystem inspection", function()
+        package.loaded["suwayomi/downloads/downloader"] = nil
+        package.loaded["suwayomi/fs"] = nil
+        package.loaded.lfs = nil
+        local downloader = loadDownloaderForZipValidation()
+        local fs = require("suwayomi/fs")
+        for _, code in ipairs({ 13, 5 }) do
+            fs.attributes = function() return nil, "inspection failed", code end
+            local exists, reason = downloader:chapterExists("/downloads/chapter.cbz")
+            assert.is_nil(exists)
+            assert.are.equal("stat_failed", reason)
+        end
+        for _, code in ipairs({ 2, 20 }) do
+            fs.attributes = function() return nil, "missing", code end
+            local exists, reason = downloader:chapterExists("/downloads/chapter.cbz")
+            assert.is_false(exists)
+            assert.is_nil(reason)
+        end
+        fs.attributes = function() return "directory" end
+        local exists, reason = downloader:chapterExists("/downloads/chapter.cbz")
+        assert.is_false(exists)
+        assert.are.equal("not_file", reason)
+    end)
+
     it("rejects direct archives when local and central sizes disagree", function()
         local forged_zip = buildForgedLocalSizeMismatchZip()
         local downloader = loadDownloaderForZipValidation()

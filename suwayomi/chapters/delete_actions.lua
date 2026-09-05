@@ -38,6 +38,12 @@ end
 
 function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
     options = options or {}
+    local function deletionFailed()
+        if not options.quiet_delete_failed then
+            self:showMessage(I18n.t("Could not delete this chapter from device."))
+        end
+        return false, "delete_failed"
+    end
     local status = self:getDownloadQueue():getStatus(manga, chapter)
     if status and status.state == "downloading" then
         if not options.quiet_active then
@@ -54,12 +60,15 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
         return false, "downloading"
     end
 
-    local downloaded, chapter_path
+    local downloaded, chapter_path, inspection_error
     if options.chapter_path then
         chapter_path = options.chapter_path
-        downloaded = self:chapterArchiveExists(chapter_path)
+        downloaded, inspection_error = self:chapterArchiveExists(chapter_path)
     else
         downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
+    end
+    if inspection_error or downloaded == nil then
+        return deletionFailed()
     end
     if not downloaded or not chapter_path then
         if not options.quiet_missing then
@@ -68,13 +77,13 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
         return false, cancelled and "queued" or "missing"
     end
 
-    local metadata_path = self:getKoreaderMetadataPathForDocument(chapter_path)
-    local removed = self:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
+    local resolved, metadata_path, metadata_paths = pcall(self.getKoreaderMetadataPathForDocument, self, chapter_path)
+    if not resolved or not metadata_path then
+        return deletionFailed()
+    end
+    local removed = self:removeChapterArchiveAndSidecars(chapter_path, metadata_paths or metadata_path)
     if not removed then
-        if not options.quiet_delete_failed then
-            self:showMessage(I18n.t("Could not delete this chapter from device."))
-        end
-        return false, "delete_failed"
+        return deletionFailed()
     end
 
     local ledger = options.ledger or self:loadChapterLedger()

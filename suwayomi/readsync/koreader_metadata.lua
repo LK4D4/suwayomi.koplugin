@@ -1,8 +1,8 @@
 -- Boundary: KoreaderMetadata.
 --
--- Responsibility: Owns KOReader sidecar metadata and history helpers.
+-- Responsibility: Resolves KOReader sidecar locations and owns bounded metadata/history helpers.
 -- Owned state: Accepts filesystem paths from downloaded chapters/current documents and validates table/file state before trusting it.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
+-- Dependencies: Suwayomi settings, KOReader DocSettings location APIs, and the filesystem adapter.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local SuwayomiSettings = require("suwayomi/settings")
@@ -40,12 +40,66 @@ function Methods:getKoreaderMetadataPathForDocument(document_path)
         return nil
     end
 
-    local base_path = document_path:match("^(.*)%.[^%.%/]+$")
-    if not base_path then
-        return nil
-    end
+    local DocSettings = require("docsettings")
+    local metadata_path = DocSettings:findSidecarFile(document_path)
 
-    return base_path .. ".sdr/metadata.lua"
+    local filename = DocSettings.getSidecarFilename(document_path)
+    local preferred_path = DocSettings:getSidecarDir(document_path) .. "/" .. filename
+    local fs = require("suwayomi/fs")
+    local function inspectMode(path)
+        local mode, message, code = fs.attributes(path, "mode")
+        -- KOReader's finder discards stat errors. Only missing paths are safe
+        -- to treat as absent; keep other failures visible to cleanup retries.
+        if not mode and (message or code) and code ~= 2 and code ~= 20 then
+            error("cannot inspect KOReader metadata", 0)
+        end
+        return mode
+    end
+    -- findSidecarFile ignores backups. Return their primary path so cleanup can
+    -- remove both files without opening DocSettings (which can delete bad data).
+    local paths = { preferred_path }
+    local locations = { "doc", "dir" }
+    local hash_enabled = DocSettings.isHashLocationEnabled()
+    if DocSettings.getSidecarStorage then
+        local hash_root = DocSettings.getSidecarStorage("hash")
+        if hash_root then
+            -- KOReader caches failed root inspections as disabled.
+            local hash_mode = inspectMode(hash_root)
+            hash_enabled = hash_enabled or hash_mode == "directory"
+        end
+    end
+    if hash_enabled then
+        locations[#locations + 1] = "hash"
+    end
+    for _, location in ipairs(locations) do
+        local directory = DocSettings:getSidecarDir(document_path, location)
+        -- Hashing failure silently falls back to document storage in KOReader.
+        -- Preserve the archive until its actual hash sidecar can be resolved.
+        if location == "hash" and directory == DocSettings:getSidecarDir(document_path, "doc") then
+            error("cannot resolve KOReader hash metadata", 0)
+        end
+        paths[#paths + 1] = directory .. "/" .. filename
+    end
+    if DocSettings.getHistoryPath then
+        paths[#paths + 1] = DocSettings:getHistoryPath(document_path)
+    end
+    if metadata_path then
+        paths[#paths + 1] = metadata_path
+    end
+    local existing_path
+    local cleanup_paths, seen = {}, {}
+    for _, path in ipairs(paths) do
+        if not seen[path] then
+            seen[path] = true
+            cleanup_paths[#cleanup_paths + 1] = path
+            local primary_exists = inspectMode(path) == "file"
+            local backup_exists = inspectMode(path .. ".old") == "file"
+            if primary_exists or backup_exists then
+                existing_path = existing_path or path
+            end
+        end
+    end
+    return metadata_path or existing_path or preferred_path, cleanup_paths
 end
 
 
@@ -73,10 +127,13 @@ end
 
 
 function Methods:loadKoreaderMetadataTable(chapter_path)
-    local metadata_path = self:getKoreaderMetadataPathForDocument(chapter_path)
     local metadata = {
         doc_path = chapter_path,
     }
+    local resolved, metadata_path = pcall(self.getKoreaderMetadataPathForDocument, self, chapter_path)
+    if not resolved then
+        return metadata, nil
+    end
 
     local content = readBoundedLuaFile(metadata_path)
     if not content then
@@ -204,7 +261,8 @@ end
 
 
 function Methods:isChapterPathFinishedInKoreader(chapter_path)
-    return self:isKoreaderMetadataFinished(self:getKoreaderMetadataPathForDocument(chapter_path))
+    local resolved, metadata_path = pcall(self.getKoreaderMetadataPathForDocument, self, chapter_path)
+    return resolved and self:isKoreaderMetadataFinished(metadata_path) or false
 end
 
 

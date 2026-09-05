@@ -1,6 +1,6 @@
 -- Boundary: ChapterLocalDownloads.
 --
--- Responsibility: Resolve device-local chapter archive paths and remove local archive sidecars.
+-- Responsibility: Resolve device-local chapter paths and remove managed sidecars before their archive.
 -- Owned state: None; settings and downloader modules remain the source of truth.
 -- Dependencies: Suwayomi settings and downloader path helpers.
 -- External data: Download directory, manga/chapter metadata, and filesystem paths are treated as untrusted boundary inputs.
@@ -63,16 +63,20 @@ function Methods:chapterArchiveExists(chapter_path)
     return SuwayomiDownloader:chapterExists(chapter_path)
 end
 
-function Methods:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
-    os.remove(chapter_path)
-    local SuwayomiDownloader = require("suwayomi/downloads/downloader")
-    if SuwayomiDownloader:chapterExists(chapter_path) then
-        return false
-    end
+local function removeFile(path)
+    local removed, _message, code = os.remove(path)
+    -- ENOENT/ENOTDIR are already absent; permission and IO failures must retry.
+    return removed == true or code == 2 or code == 20
+end
 
-    if metadata_path then
-        os.remove(metadata_path)
-        os.remove(metadata_path .. ".old")
+function Methods:removeChapterArchiveAndSidecars(chapter_path, metadata_paths)
+    -- Keep the archive until metadata removal succeeds. A failed attempt or
+    -- restart can still resolve hash-based sidecars from the original archive.
+    if type(metadata_paths) ~= "table" then metadata_paths = { metadata_paths } end
+    for _, metadata_path in ipairs(metadata_paths) do
+        if not removeFile(metadata_path) or not removeFile(metadata_path .. ".old") then
+            return false
+        end
         local metadata_dir = metadata_path:match("^(.*)/[^/]+$")
         if metadata_dir then
             -- KOReader creates a `.sdr` sidecar directory. This intentionally
@@ -81,7 +85,7 @@ function Methods:removeChapterArchiveAndSidecars(chapter_path, metadata_path)
             os.remove(metadata_dir)
         end
     end
-    return true
+    return removeFile(chapter_path)
 end
 
 ChapterLocalDownloads.methods = Methods

@@ -324,6 +324,65 @@ describe("suwayomi/chapters/finished_cleanup", function()
         assert.is_nil(journalRecord(restarted, "m1", "c1"))
     end)
 
+    it("retries actual sidecar removal after restart before deleting the archive", function()
+        local path = "/downloads/source/manga/c1.cbz"
+        local metadata_path = "/settings/hash/ab/book.sdr/metadata.cbz.lua"
+        local sidecars = { [metadata_path] = true, [metadata_path .. ".old"] = true }
+        local fail_backup = true
+        local plugin = buildPlugin({ setting = 1 })
+        record(plugin, "m1", "c1", path)
+        local old_remove = os.remove
+        local old_delete = package.loaded["suwayomi/chapters/delete_actions"]
+        local old_local = package.loaded["suwayomi/chapters/local_downloads"]
+        package.loaded["suwayomi/chapters/delete_actions"] = nil
+        package.loaded["suwayomi/chapters/local_downloads"] = nil
+        local delete_methods = require("suwayomi/chapters/delete_actions").methods
+        local local_methods = require("suwayomi/chapters/local_downloads").methods
+        local function installBoundary(subject)
+            subject.deleteChapterFromDeviceWithOptions = delete_methods.deleteChapterFromDeviceWithOptions
+            subject.removeChapterArchiveAndSidecars = local_methods.removeChapterArchiveAndSidecars
+            subject.getChapterLedgerKey = function() return "m1:c1" end
+            subject.getKoreaderMetadataPathForDocument = function()
+                -- Hash metadata must still be discoverable from the archive.
+                assert.is_true(subject.existing[path])
+                return metadata_path
+            end
+            subject.getDownloadQueue = function() return {
+                getStatus = function() end, cancelPending = function() return false end,
+                clearStatus = function() end,
+            } end
+        end
+        os.remove = function(candidate)
+            if candidate == metadata_path .. ".old" and fail_backup then
+                return nil, "Permission denied", 13
+            end
+            if candidate == path then plugin.existing[path] = nil; return true end
+            if sidecars[candidate] then sidecars[candidate] = nil; return true end
+            return nil, "No such file or directory", 2
+        end
+        local ok, err = pcall(function()
+            installBoundary(plugin)
+            assert.are.equal(1, plugin:processFinishedChapterCleanup().retrying)
+            assert.is_true(plugin.existing[path])
+            assert.is_nil(sidecars[metadata_path])
+            assert.is_true(sidecars[metadata_path .. ".old"])
+            assert.are.equal(105, journalRecord(plugin, "m1", "c1").retry_after)
+            plugin = buildPlugin({ setting = 1, now = 105,
+                journal = plugin.state.journal, ledger = plugin.ledger, existing = plugin.existing })
+            fail_backup = false
+            installBoundary(plugin)
+            assert.are.equal(1, plugin:processFinishedChapterCleanup().deleted)
+            assert.is_nil(plugin.existing[path])
+            assert.is_nil(sidecars[metadata_path .. ".old"])
+            assert.is_nil(plugin.ledger["m1:c1"].path)
+            assert.is_nil(journalRecord(plugin, "m1", "c1"))
+        end)
+        os.remove = old_remove
+        package.loaded["suwayomi/chapters/delete_actions"] = old_delete
+        package.loaded["suwayomi/chapters/local_downloads"] = old_local
+        assert.is_true(ok, err)
+    end)
+
     it("cancels cleanup intent when the ledger chapter becomes unread", function()
         local plugin = buildPlugin({ setting = 1 })
         record(plugin, "m1", "c1", "/downloads/source/manga/c1.cbz")
@@ -332,6 +391,53 @@ describe("suwayomi/chapters/finished_cleanup", function()
         assert.are.equal(1, summary.cancelled)
         assert.is_nil(journalRecord(plugin, "m1", "c1"))
         assert.are.equal(0, #plugin.delete_calls)
+    end)
+
+    it("removes unread retained records before retrying older finished chapters", function()
+        local plugin = buildPlugin({ setting = 3, delete_state = "delete_failed" })
+        record(plugin, "m1", "c1", "/downloads/source/manga/c1.cbz")
+        record(plugin, "m1", "c2", "/downloads/source/manga/c2.cbz")
+        record(plugin, "m1", "c3", "/downloads/source/manga/c3.cbz")
+        plugin:processFinishedChapterCleanup()
+        -- Server reconciliation changes the ledger without the manual unread callback.
+        plugin.ledger["m1:c3"].read = nil
+        plugin.delete_state = "deleted"
+        plugin.state.now = 105
+        local summary = plugin:processFinishedChapterCleanup()
+        assert.are.equal(1, summary.cancelled)
+        assert.are.equal(0, summary.deleted)
+        assert.are.equal(1, #plugin.delete_calls)
+        assert.is_nil(journalRecord(plugin, "m1", "c3"))
+        assert.is_not_nil(journalRecord(plugin, "m1", "c1"))
+        assert.is_not_nil(journalRecord(plugin, "m1", "c2"))
+    end)
+
+    it("keeps archive inspection failures pending across restart", function()
+        local path = "/downloads/source/manga/c1.cbz"
+        local plugin = buildPlugin({ setting = 1 })
+        record(plugin, "m1", "c1", path)
+        plugin.chapterArchiveExists = function() return nil, "stat_failed" end
+        local summary = plugin:processFinishedChapterCleanup()
+        assert.are.equal(0, summary.missing)
+        assert.are.equal(1, summary.retrying)
+        assert.are.equal(path, plugin.ledger["m1:c1"].path)
+        assert.are.equal(105, journalRecord(plugin, "m1", "c1").retry_after)
+        local restarted = buildPlugin({ setting = 1, now = 105,
+            journal = plugin.state.journal, ledger = plugin.ledger, existing = plugin.existing })
+        assert.are.equal(1, restarted:processFinishedChapterCleanup().deleted)
+    end)
+
+    it("retries temporary realpath failures instead of permanently blocking the archive", function()
+        local path = "/downloads/source/manga/c1.cbz"
+        local plugin = buildPlugin({ setting = 1, realpaths = { [path] = false } })
+        record(plugin, "m1", "c1", path)
+        local summary = plugin:processFinishedChapterCleanup()
+        assert.are.equal(1, summary.retrying)
+        assert.are.equal(0, summary.rejected)
+        assert.is_nil(journalRecord(plugin, "m1", "c1").blocked_reason)
+        plugin.state.realpaths[path] = path
+        plugin.state.now = 105
+        assert.are.equal(1, plugin:processFinishedChapterCleanup().deleted)
     end)
 
     it("converges a missing archive and clears only its matching ledger path", function()

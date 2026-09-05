@@ -323,7 +323,7 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", chapter_path)
     end)
 
-    it("removes a chapter archive and KOReader sidecars in the current order", function()
+    it("removes KOReader sidecars before the archive so interrupted cleanup can retry", function()
         local plugin = build_plugin()
 
         plugin:removeChapterArchiveAndSidecars(
@@ -332,12 +332,33 @@ describe("suwayomi/chapters/actions", function()
         )
 
         assert.are.same({
-            "/downloads/Manga/Chapter 1.cbz",
             "/downloads/Manga/Chapter 1.sdr/metadata.lua",
             "/downloads/Manga/Chapter 1.sdr/metadata.lua.old",
             "/downloads/Manga/Chapter 1.sdr",
+            "/downloads/Manga/Chapter 1.cbz",
         }, removed_paths)
     end)
+
+    for _, suffix in ipairs({ "", ".old" }) do
+        it("keeps the archive and ledger until sidecar " .. suffix .. " removal succeeds", function()
+            local path = "/downloads/Manga/Chapter 1.cbz"
+            local metadata_path = path .. ".sdr/metadata.lua"
+            local options = { existing = { [path] = true },
+                remove_results = { [metadata_path .. suffix] = false },
+                ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", read = true, path = path } } }
+            local plugin, queue = build_plugin(options)
+            local ok, state = plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+            assert.is_false(ok)
+            assert.are.equal("delete_failed", state)
+            assert.is_true(downloader.existing[path])
+            assert.are.equal(path, plugin.ledger["m1:c1"].path)
+            assert.are.equal(0, #queue.cleared)
+            options.remove_results[metadata_path .. suffix] = nil
+            assert.is_true(plugin:deleteChapterFromDeviceWithOptions(manga, chapter))
+            assert.is_nil(downloader.existing[path])
+            assert.is_nil(plugin.ledger["m1:c1"].path)
+        end)
+    end
 
     it("refuses to delete a chapter that is currently downloading", function()
         local plugin = build_plugin({
@@ -354,6 +375,62 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal("downloading", state)
         assert.are.same({ "This chapter is downloading. Wait for it to finish before deleting it." }, plugin.messages)
         assert.are.same({}, removed_paths)
+    end)
+
+    it("does not report missing when the deletion boundary cannot inspect the archive", function()
+        local plugin = build_plugin()
+        plugin.chapterArchiveExists = function() return nil, "stat_failed" end
+        local ok, state = plugin:deleteChapterFromDeviceWithOptions(manga, chapter, {
+            chapter_path = "/downloads/Manga/Chapter 1.cbz",
+        })
+        assert.is_false(ok)
+        assert.are.equal("delete_failed", state)
+        assert.are.equal(0, #removed_paths)
+    end)
+
+    it("leaves the archive intact when metadata path resolution fails", function()
+        local path = "/downloads/Manga/Chapter 1.cbz"
+        local plugin = build_plugin({ existing = { [path] = true } })
+        plugin.getKoreaderMetadataPathForDocument = function() error("temporary IO failure") end
+        local ok, state = plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+        assert.is_false(ok)
+        assert.are.equal("delete_failed", state)
+        assert.is_true(downloader.existing[path])
+        assert.are.equal(0, #removed_paths)
+    end)
+
+    it("accepts absent sidecars while preserving unrelated files in their directory", function()
+        local plugin = build_plugin()
+        local path = "/downloads/Manga/Chapter 1.cbz"
+        local metadata_path = "/downloads/Manga/Chapter 1.sdr/metadata.cbz.lua"
+        local remove = os.remove
+        os.remove = function(candidate)
+            if candidate == metadata_path or candidate == metadata_path .. ".old" then
+                return nil, "No such file or directory", 2
+            elseif candidate == "/downloads/Manga/Chapter 1.sdr" then
+                return nil, "Directory not empty", 39
+            end
+            return remove(candidate)
+        end
+        assert.is_true(plugin:removeChapterArchiveAndSidecars(path, metadata_path))
+        assert.are.same({ path }, removed_paths)
+    end)
+
+    it("keeps the archive until metadata in every KOReader location is removed", function()
+        local path = "/downloads/Manga/Chapter 1.cbz"
+        local primary = "/downloads/Manga/Chapter 1.sdr/metadata.cbz.lua"
+        local alternate = "/settings/Chapter 1.sdr/metadata.cbz.lua"
+        local options = { existing = { [path] = true }, remove_results = { [alternate] = false } }
+        local plugin = build_plugin(options)
+        plugin.getKoreaderMetadataPathForDocument = function() return primary, { primary, alternate } end
+        local ok, state = plugin:deleteChapterFromDeviceWithOptions(manga, chapter)
+        assert.is_false(ok)
+        assert.are.equal("delete_failed", state)
+        assert.is_true(downloader.existing[path])
+        options.remove_results[alternate] = nil
+        assert.is_true(plugin:deleteChapterFromDeviceWithOptions(manga, chapter))
+        assert.is_nil(downloader.existing[path])
+        assert.are.equal(path, removed_paths[#removed_paths])
     end)
 
     it("cancels a pending queue entry before reporting a missing archive", function()
@@ -489,10 +566,10 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(1, #plugin.saved_ledgers)
         assert.are.equal(1, #queue.cleared)
         assert.are.same({
-            "/downloads/Manga/Chapter 1.cbz",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
             "/downloads/Manga/Chapter 1.cbz.sdr",
+            "/downloads/Manga/Chapter 1.cbz",
         }, removed_paths)
     end)
 
@@ -530,10 +607,10 @@ describe("suwayomi/chapters/actions", function()
 
         assert.is_nil(plugin.ledger["m1:c1"])
         assert.are.same({
-            "/downloads/Manga/Chapter 1.cbz",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
             "/downloads/Manga/Chapter 1.cbz.sdr",
+            "/downloads/Manga/Chapter 1.cbz",
         }, removed_paths)
     end)
 
@@ -647,14 +724,14 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(true, plugin.selection_cleared)
         assert.are.same({ "bulk deleted=2 missing=0 active=0" }, plugin.messages)
         assert.are.same({
-            "/downloads/Manga/Chapter 1.cbz",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
             "/downloads/Manga/Chapter 1.cbz.sdr",
-            "/downloads/Manga/Chapter 2.cbz",
+            "/downloads/Manga/Chapter 1.cbz",
             "/downloads/Manga/Chapter 2.cbz.sdr/metadata.lua",
             "/downloads/Manga/Chapter 2.cbz.sdr/metadata.lua.old",
             "/downloads/Manga/Chapter 2.cbz.sdr",
+            "/downloads/Manga/Chapter 2.cbz",
         }, removed_paths)
     end)
 
@@ -773,10 +850,10 @@ describe("suwayomi/chapters/actions", function()
         assert.is_nil(plugin.ledger["m1:c1"].path)
         assert.are.equal("/downloads/Manga/Chapter 3.cbz", plugin.ledger["m1:c3"].path)
         assert.are.same({
-            "/downloads/Manga/Chapter 1.cbz",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
             "/downloads/Manga/Chapter 1.cbz.sdr",
+            "/downloads/Manga/Chapter 1.cbz",
         }, removed_paths)
         assert.are.equal(1, #plugin.refreshes)
     end)
@@ -974,10 +1051,10 @@ describe("suwayomi/chapters/actions", function()
 
         assert.is_nil(plugin.ledger["m1:c1"].path)
         assert.are.same({
-            "/downloads/Manga/Chapter 1.cbz",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
             "/downloads/Manga/Chapter 1.cbz.sdr",
+            "/downloads/Manga/Chapter 1.cbz",
         }, removed_paths)
         assert.are.same({}, plugin.messages)
     end)

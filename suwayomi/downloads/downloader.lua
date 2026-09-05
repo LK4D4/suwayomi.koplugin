@@ -97,7 +97,14 @@ function Downloader:getDirectPartialPath(chapter_path)
 end
 
 function Downloader:chapterExists(chapter_path)
-    return lfs.attributes(chapter_path, "mode") == "file"
+    local mode, message, code = lfs.attributes(chapter_path, "mode")
+    if mode then
+        return mode == "file", mode ~= "file" and "not_file" or nil
+    end
+    if message and code ~= 2 and code ~= 20 then
+        return nil, "stat_failed"
+    end
+    return false
 end
 
 function Downloader:ensureDirectory(path)

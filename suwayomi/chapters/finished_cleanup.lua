@@ -363,6 +363,37 @@ local function clearRetryReason(self, manga_id, chapter_id)
     end
 end
 
+local function pruneUnreadRecords(self, journal, ledger, summary)
+    -- Retained entries must be revalidated too: server reconciliation does not
+    -- run the manual mark-unread callback that cancels journal records.
+    local read_chapters = {}
+    for _, entry in pairs(ledger) do
+        if entry.read == true then
+            local manga_id = tostring(entry.manga_id or "")
+            read_chapters[manga_id] = read_chapters[manga_id] or {}
+            read_chapters[manga_id][tostring(entry.chapter_id or "")] = true
+        end
+    end
+    for manga_id, manga in pairs(journal.mangas) do
+        local records = {}
+        for _, record in ipairs(manga.records) do
+            local chapter_id = record.chapter_id
+            if read_chapters[manga_id] and read_chapters[manga_id][chapter_id] then
+                records[#records + 1] = record
+            else
+                clearRetryReason(self, manga_id, chapter_id)
+                summary.cancelled = summary.cancelled + 1
+            end
+        end
+        manga.records = records
+        if #manga.records == 0 then journal.mangas[manga_id] = nil end
+    end
+    if summary.cancelled > 0 then
+        saveJournal(journal)
+        logTransition("converged", "unread", summary.cancelled)
+    end
+end
+
 local function recordIsAfterCursor(record, cursor)
     if record.sequence ~= cursor.sequence then
         return record.sequence > cursor.sequence
@@ -397,6 +428,7 @@ local function processFinishedChapterCleanup(self, summary)
     end
 
     local ledger = self:loadChapterLedger()
+    pruneUnreadRecords(self, journal, ledger, summary)
     local manga_ids = {}
     local total_records = 0
     for manga_id, manga in pairs(journal.mangas or {}) do
@@ -448,6 +480,7 @@ local function processFinishedChapterCleanup(self, summary)
             summary.processed = summary.processed + 1
             local chapter_id = tostring(record.chapter_id)
             local ledger_entry = findLedgerEntry(ledger, manga_id, chapter_id)
+            local archive_exists, archive_error = self:chapterArchiveExists(record.path)
 
             if not ledger_entry or ledger_entry.read ~= true then
                 table.remove(manga.records, index)
@@ -459,7 +492,7 @@ local function processFinishedChapterCleanup(self, summary)
                 end
                 saveJournal(journal)
                 logTransition("converged", "unread", 1)
-            elseif not self:chapterArchiveExists(record.path) then
+            elseif archive_exists == false and not archive_error then
                 clearMatchingLedgerPath(self, ledger, ledger_entry, record.path)
                 table.remove(manga.records, index)
                 candidate_count = candidate_count - 1
@@ -495,7 +528,9 @@ local function processFinishedChapterCleanup(self, summary)
                     { id = manga_id }, { id = chapter_id, path = record.path }
                 )
                 local transient_reason
-                if current_path == record.path then
+                if archive_error or archive_exists == nil then
+                    transient_reason = "stat_failed"
+                elseif current_path == record.path then
                     transient_reason = "current_document"
                 elseif queue_status and (queue_status.state == "queued" or queue_status.state == "downloading") then
                     transient_reason = queue_status.state
@@ -512,7 +547,14 @@ local function processFinishedChapterCleanup(self, summary)
                     local root = resolvedPath(SuwayomiSettings:loadDownloadDirectory())
                     local candidate = resolvedPath(record.path)
                     local current = current_path and resolvedPath(current_path) or nil
-                    if not isStrictDescendant(root, candidate) then
+                    if not root or not candidate or (current_path and not current) then
+                        local retry_after = retryCandidate(
+                            self, journal, manga_id, record, "realpath_failed", now, summary, reasons
+                        )
+                        earliest_retry = not earliest_retry and retry_after
+                            or math.min(earliest_retry, retry_after)
+                        stop_manga = true
+                    elseif not isStrictDescendant(root, candidate) then
                         rejectCandidate(journal, record, "unsafe_path", summary, reasons)
                         clearRetryReason(self, manga_id, chapter_id)
                         index = index + 1
