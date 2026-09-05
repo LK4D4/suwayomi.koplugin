@@ -1,6 +1,6 @@
 -- Boundary: ChapterReadActions.
 --
--- Responsibility: Mark chapters read/unread and coordinate local metadata, ledger, and read-sync side effects.
+-- Responsibility: Mark chapters read/unread and coordinate metadata, persisted ledger, explicit completion, and read-sync side effects.
 -- Owned state: Mutates current chapter context and settings-backed read ledger through plugin methods.
 -- Dependencies: Plugin mixin methods and Suwayomi debug timing.
 -- External data: Manga/chapter tables may come from API responses or cached UI state and are matched by stable ids.
@@ -33,10 +33,11 @@ function Methods:markChapterRead(manga, chapter, options)
         pending_read_sync = true,
         pending_read_state = true,
     }
+    local entry
     if options.ledger then
-        self:upsertChapterLedgerEntryInLedger(options.ledger, manga, chapter, updates)
+        entry = self:upsertChapterLedgerEntryInLedger(options.ledger, manga, chapter, updates)
     else
-        self:upsertChapterLedgerEntry(manga, chapter, updates)
+        entry = self:upsertChapterLedgerEntry(manga, chapter, updates)
     end
 
     if self.current_chapter_context and self.current_chapter_context.chapters then
@@ -52,6 +53,17 @@ function Methods:markChapterRead(manga, chapter, options)
         deleted_after_mark_read = self:deleteChaptersAfterManualMarkRead(manga, { chapter }, {
             ledger = options.ledger,
         })
+    end
+    if downloaded and chapter_path and deleted_after_mark_read == 0 and self.recordFinishedChapter then
+        if options.finished_entries then
+            -- The bulk caller publishes these only after saving its shared ledger.
+            table.insert(options.finished_entries, entry)
+        else
+            if options.ledger then
+                self:saveChapterLedger(options.ledger)
+            end
+            self:recordFinishedChapter(entry)
+        end
     end
     if not options.skip_refresh then
         self:refreshChapterMenu()
@@ -140,9 +152,11 @@ function Methods:markChapterListRead(manga, chapters)
     end
 
     local ledger = self:loadChapterLedger()
+    local finished_entries = {}
     for _, current in ipairs(chapters) do
         self:markChapterRead(manga, current, {
             ledger = ledger,
+            finished_entries = finished_entries,
             skip_refresh = true,
             skip_schedule = true,
             skip_keep_policy = true,
@@ -151,6 +165,10 @@ function Methods:markChapterListRead(manga, chapters)
 
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
+    -- Publish in list order only after the entire batch is durable.
+    for _, entry in ipairs(finished_entries) do
+        self:recordFinishedChapter(entry)
+    end
     self:schedulePendingReadSync()
     if self.applyMangaKeepNextUnreadDownloadsPolicy then
         self:applyMangaKeepNextUnreadDownloadsPolicy(manga)

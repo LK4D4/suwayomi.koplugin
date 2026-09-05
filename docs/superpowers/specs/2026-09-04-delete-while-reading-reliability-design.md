@@ -263,3 +263,15 @@ Existing users keep their configured delete-while-reading value. Cleanup begins 
 - Disabling cleanup cancels pending automatic deletion.
 - Automatic cleanup never deletes the currently open document or any path outside the configured plugin-managed download directory.
 - Failures remain visible without exposing user data.
+
+## Amendment: Explicit Plugin Mark-Read Completion (2026-09-05)
+
+Explicit plugin **Mark as read**, selected-chapter mark-read, and previous-chapter mark-read actions record downloaded chapters in the same durable completion journal as KOReader **Mark as finished**. Recording remains conditional on delete-while-reading being enabled. Repeating an explicit action assigns a new sequence, matching reread completion semantics.
+
+Bulk actions use the existing visible chapter-list order, first to last. Selection click order does not matter. Previous-chapter actions use the visible prefix before the target, excluding the target. The last downloaded chapter processed is newest. This follows `getSelectedChapters` and `getChaptersBefore`; no additional sorting by chapter number, source order, ID, or metadata is introduced.
+
+Persist read-ledger updates before publishing completion records or scheduling their cleanup. Bulk actions collect completion entries and publish them only after saving the entire ledger batch. Use the existing processor for retention, restart recovery, retries, managed-path validation, and current-document protection.
+
+**Delete after manual mark-read** takes precedence over retention: attempt the existing immediate deletion first. Successfully deleted chapters have any prior completion record cancelled and receive no new record. If immediate deletion does not succeed, a downloaded chapter still enters normal retention-based cleanup; this does not create a separate immediate-delete retry policy.
+
+Cleanup-disabled behavior and explicit unread cancellation remain unchanged. Non-downloaded chapters, historical read state, metadata scans, and server read reconciliation do not create completion events. No completion history is reconstructed.

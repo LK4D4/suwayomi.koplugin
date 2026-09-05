@@ -485,9 +485,11 @@ function Methods:markSelectedChaptersRead()
     end
 
     local ledger = self:loadChapterLedger()
+    local finished_entries = {}
     for _index, chapter in ipairs(chapters) do
         self:markChapterRead(manga, chapter, {
             ledger = ledger,
+            finished_entries = finished_entries,
             skip_refresh = true,
             skip_schedule = true,
             skip_keep_policy = true,
@@ -497,6 +499,9 @@ function Methods:markSelectedChaptersRead()
     self:clearChapterSelection(true)
     self:refreshChapterMenu({ ledger = ledger })
     self:saveChapterLedger(ledger)
+    for _, entry in ipairs(finished_entries) do
+        self:recordFinishedChapter(entry)
+    end
     self:schedulePendingReadSync()
     if self.applyMangaKeepNextUnreadDownloadsPolicy then
         self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
