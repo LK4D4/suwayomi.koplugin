@@ -557,7 +557,7 @@ describe("manual read completion integration", function()
         assert.same({ path("B") }, state.removed)
     end)
 
-    it("immediate deletion wins and cancels an older completion record", function()
+    it("immediate deletion wins and preserves a new pathless completion record", function()
         local state, instance = fixture()
         local plugin = instance({ chapter("A") })
         plugin:markChapterRead(manga, chapter("A"))
@@ -565,7 +565,8 @@ describe("manual read completion integration", function()
         state.immediate = true
         plugin:markChapterRead(manga, chapter("A"))
         assert.same({ path("A") }, state.removed)
-        assert.same({}, records(state))
+        assert.same({ "A" }, records(state))
+        assert.is_nil(state.journal.mangas.m.records[1].path)
         assert.is_nil(state.ledger["m:A"].path)
         assert.is_true(state.ledger["m:A"].pending_read_sync)
         assertDownloaded(state, plugin, "A", false)
@@ -574,7 +575,7 @@ describe("manual read completion integration", function()
         assert.equals(refreshes, plugin.current_chapter_menu.refreshes)
     end)
 
-    it("immediate bulk deletion leaves no completion records or downloaded ledger paths", function()
+    it("immediate bulk deletion preserves completion records without downloaded paths", function()
         local state, instance = fixture()
         local plugin = instance({ chapter("A"), chapter("B") })
         plugin:markChapterListRead(manga, { chapter("A"), chapter("B") })
@@ -582,7 +583,8 @@ describe("manual read completion integration", function()
         state.immediate = true
         plugin:markChapterListRead(manga, { chapter("A"), chapter("B") })
         assert.same({ path("A"), path("B") }, state.removed)
-        assert.same({}, records(state))
+        assert.same({ "A", "B" }, records(state))
+        for _, record in ipairs(state.journal.mangas.m.records) do assert.is_nil(record.path) end
         assert.is_nil(state.ledger["m:A"].path)
         assert.is_nil(state.ledger["m:B"].path)
         assert.is_true(state.ledger["m:A"].read)
@@ -602,19 +604,99 @@ describe("manual read completion integration", function()
         assert.same({}, records(state))
     end)
 
-    it("does not enroll disabled or non-downloaded chapters and cancels unread", function()
+    it("excludes disabled actions but includes non-downloaded chapters and cancels unread", function()
         local state, instance = fixture(0)
         local plugin = instance()
         plugin:markChapterRead(manga, chapter("A"))
         assert.same({}, records(state))
         state.setting = 3
         plugin:markChapterRead(manga, chapter("missing"))
-        assert.same({}, records(state))
+        assert.same({ "missing" }, records(state))
         plugin:markChapterRead(manga, chapter("B"))
-        assert.same({ "B" }, records(state))
+        assert.same({ "missing", "B" }, records(state))
         plugin:markChapterUnread(manga, chapter("B"))
+        assert.same({ "missing" }, records(state))
+        plugin:markChapterUnread(manga, chapter("missing"))
         assert.same({}, records(state))
         assert.is_false(state.ledger["m:B"].read)
+    end)
+
+    for _, action in ipairs({ "single", "selected", "previous" }) do
+        it("advances mixed " .. action .. " completions and retains pathless positions across restart", function()
+            local state, instance = fixture(3)
+            state.existing[path("C")] = nil
+            local chapters = { chapter("A"), chapter("B"), chapter("C"), chapter("D") }
+            local plugin = instance(chapters)
+            if action == "single" then
+                for index = 1, 3 do plugin:markChapterRead(manga, chapters[index]) end
+            elseif action == "selected" then
+                for index = 3, 1, -1 do plugin:toggleChapterSelection(manga, chapters[index]) end
+                plugin:markSelectedChaptersRead()
+            else
+                plugin:markChaptersBeforeRead(manga, chapters[4])
+            end
+            assert.same({ "A", "B", "C" }, records(state))
+            assert.is_nil(state.journal.mangas.m.records[3].path)
+            for _, event in ipairs(state.events) do
+                if event.kind == "journal" then
+                    assert.is_true(event.ledger["m:A"].read)
+                    if action ~= "single" then
+                        assert.is_true(event.ledger["m:B"].read)
+                        assert.is_true(event.ledger["m:C"].read)
+                    end
+                end
+            end
+            plugin = instance(chapters)
+            plugin:processFinishedChapterCleanup()
+            assert.same({ path("A") }, state.removed)
+            assert.same({ "B", "C" }, records(state))
+            plugin:processFinishedChapterCleanup()
+            assert.same({ "B", "C" }, records(state))
+            plugin:markChapterRead(manga, chapter("D"))
+            plugin:processFinishedChapterCleanup()
+            assert.same({ path("A"), path("B") }, state.removed)
+            assert.same({ "C", "D" }, records(state))
+        end)
+    end
+
+    for _, immediate in ipairs({ false, true }) do
+        it("never deletes a later download from an older pathless completion, immediate=" .. tostring(immediate), function()
+            local state, instance = fixture(3)
+            state.immediate = immediate
+            if not immediate then state.existing[path("A")] = nil end
+            local plugin = instance()
+            plugin:markChapterRead(manga, chapter("A"))
+            assert.same({ "A" }, records(state))
+            assert.is_nil(state.journal.mangas.m.records[1].path)
+            state.immediate = false
+            state.existing[path("A")] = true
+            plugin:upsertChapterLedgerEntry(manga, chapter("A"), { path = path("A") })
+            plugin:markChapterListRead(manga, { chapter("B"), chapter("C") })
+            plugin = instance()
+            plugin:processFinishedChapterCleanup()
+            assert.same({ "B", "C" }, records(state))
+            assert.is_true(state.existing[path("A")])
+            assert.equals(path("A"), state.ledger["m:A"].path)
+            assert.equals(immediate and 1 or 0, #state.removed)
+            -- Only a new explicit completion may capture the later download.
+            plugin:markChapterRead(manga, chapter("A"))
+            assert.equals(path("A"), state.journal.mangas.m.records[3].path)
+        end)
+    end
+
+    it("moves repeated pathless completion newest and cancels it when marked unread", function()
+        local state, instance = fixture(3)
+        local plugin = instance()
+        state.existing[path("A")] = nil
+        -- A stale ledger path must not become deletion eligibility.
+        plugin:upsertChapterLedgerEntry(manga, chapter("A"), { path = path("A") })
+        for _, id in ipairs({ "A", "B", "C", "A" }) do plugin:markChapterRead(manga, chapter(id)) end
+        assert.same({ "B", "C", "A" }, records(state))
+        assert.is_nil(state.journal.mangas.m.records[3].path)
+        plugin:markChapterUnread(manga, chapter("A"))
+        plugin:processFinishedChapterCleanup()
+        assert.same({ "B", "C" }, records(state))
+        assert.same({}, state.removed)
     end)
 
     it("server read reconciliation never creates completion events", function()

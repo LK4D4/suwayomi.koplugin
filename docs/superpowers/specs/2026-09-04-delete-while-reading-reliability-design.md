@@ -92,7 +92,7 @@ Persist only fields required for cleanup. Do not store manga titles, chapter tit
 Normalize all loaded data before use:
 
 - Preserve an unknown journal version unchanged, pause processing, and expose a non-sensitive compatibility error. Never overwrite unknown-version data with an empty journal.
-- Require non-empty manga ID, chapter ID, and path strings.
+- Require non-empty manga ID and chapter ID strings. The optional path must be a non-empty string when present; nil represents completion without deletion eligibility. Existing version 1 records remain valid, and unsupported versions remain untouched.
 - Require finite non-negative numeric sequence, retry count, and retry time values.
 - Deduplicate records by manga ID and chapter ID, keeping the newest valid sequence.
 - Do not discard otherwise valid records because the journal is large. Bound work per processing pass, continue remaining work later, and report abnormal size through redacted diagnostics.
@@ -266,12 +266,20 @@ Existing users keep their configured delete-while-reading value. Cleanup begins 
 
 ## Amendment: Explicit Plugin Mark-Read Completion (2026-09-05)
 
-Explicit plugin **Mark as read**, selected-chapter mark-read, and previous-chapter mark-read actions record downloaded chapters in the same durable completion journal as KOReader **Mark as finished**. Recording remains conditional on delete-while-reading being enabled. Repeating an explicit action assigns a new sequence, matching reread completion semantics.
+Explicit plugin **Mark as read**, selected-chapter mark-read, and previous-chapter mark-read actions record every explicitly marked chapter, downloaded or not, in the same durable completion journal as KOReader **Mark as finished**. Recording remains conditional on delete-while-reading being enabled. Repeating an explicit action assigns a new sequence, matching reread completion semantics.
 
-Bulk actions use the existing visible chapter-list order, first to last. Selection click order does not matter. Previous-chapter actions use the visible prefix before the target, excluding the target. The last downloaded chapter processed is newest. This follows `getSelectedChapters` and `getChaptersBefore`; no additional sorting by chapter number, source order, ID, or metadata is introduced.
+Bulk actions use the existing visible chapter-list order, first to last. Selection click order does not matter. Previous-chapter actions use the visible prefix before the target, excluding the target. The last chapter processed is newest, regardless of download state. This follows `getSelectedChapters` and `getChaptersBefore`; no additional sorting by chapter number, source order, ID, or metadata is introduced.
 
 Persist read-ledger updates before publishing completion records or scheduling their cleanup. Bulk actions collect completion entries and publish them only after saving the entire ledger batch. Use the existing processor for retention, restart recovery, retries, managed-path validation, and current-document protection.
 
-**Delete after manual mark-read** takes precedence over retention: attempt the existing immediate deletion first. Successfully deleted chapters have any prior completion record cancelled and receive no new record. If immediate deletion does not succeed, a downloaded chapter still enters normal retention-based cleanup; this does not create a separate immediate-delete retry policy.
+**Delete after manual mark-read** takes precedence over retention: attempt the existing immediate deletion first. Successfully deleted chapters receive a new completion record without a path, superseding any prior completion position. If immediate deletion does not succeed, a downloaded chapter still enters normal retention-based cleanup; this does not create a separate immediate-delete retry policy.
 
-Cleanup-disabled behavior and explicit unread cancellation remain unchanged. Non-downloaded chapters, historical read state, metadata scans, and server read reconciliation do not create completion events. No completion history is reconstructed.
+Cleanup-disabled behavior and explicit unread cancellation remain unchanged. Historical read state, metadata scans, and server read reconciliation do not create completion events. No completion history is reconstructed.
+
+### Completion history and deletion eligibility
+
+Completion snapshots contain stable IDs, read state, and an optional path captured only when the chapter is downloaded and immediate deletion did not succeed. Never use a generated target path or stale ledger path for a non-downloaded completion. Bulk snapshots remain independent of ledger objects that menu refresh or reconciliation can change before publication.
+
+A pathless completion occupies the same retention position as a downloaded completion across settings reloads and restarts. Once displaced, retire it without filesystem inspection, deletion, ledger changes, or queue changes. Never attach a later download to an older pathless record, even at the same path used before immediate deletion. Only a new explicit completion can capture that later file. Equal-sequence duplicate records prefer a pathless record conservatively.
+
+For Third to last, downloaded A and B followed by non-downloaded C make A eligible for deferred deletion; B and C remain retained. Immediate manual deletion can remove a retained file but does not remove its completion position. Marking any chapter unread cancels both its completion position and pending cleanup.

@@ -1,6 +1,6 @@
 -- Boundary: ChapterDeleteActions.
 --
--- Responsibility: Delete device-local archives, coordinate queue/ledger cleanup, and cancel completed manual cleanup intents.
+-- Responsibility: Delete device-local archives and coordinate queue/ledger cleanup independently of completion history.
 -- Owned state: Mutates plugin queue status and settings-backed read ledger through injected plugin methods.
 -- Dependencies: Plugin mixin methods, local download helpers, settings, and i18n.
 -- External data: Queue state, ledger entries, and filesystem paths are checked before destructive cleanup.
@@ -139,9 +139,6 @@ function Methods:deleteChaptersAfterManualMarkRead(manga, chapters, options)
         })
         if ok then
             deleted = deleted + 1
-            if self.cancelFinishedChapter then
-                self:cancelFinishedChapter(manga.id, chapter.id)
-            end
         end
     end
     return deleted

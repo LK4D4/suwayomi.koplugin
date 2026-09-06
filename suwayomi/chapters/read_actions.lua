@@ -54,15 +54,23 @@ function Methods:markChapterRead(manga, chapter, options)
             ledger = options.ledger,
         })
     end
-    if downloaded and chapter_path and deleted_after_mark_read == 0 and self.recordFinishedChapter then
+    if self.recordFinishedChapter then
+        -- Capture eligibility now: ledger paths can be stale or changed by a
+        -- later download, immediate deletion, or the bulk menu refresh.
+        local completion = {
+            manga_id = entry.manga_id,
+            chapter_id = entry.chapter_id,
+            read = entry.read,
+            path = downloaded and deleted_after_mark_read == 0 and chapter_path or nil,
+        }
         if options.finished_entries then
             -- The bulk caller publishes these only after saving its shared ledger.
-            table.insert(options.finished_entries, entry)
+            table.insert(options.finished_entries, completion)
         else
             if options.ledger then
                 self:saveChapterLedger(options.ledger)
             end
-            self:recordFinishedChapter(entry)
+            self:recordFinishedChapter(completion)
         end
     end
     if not options.skip_refresh then

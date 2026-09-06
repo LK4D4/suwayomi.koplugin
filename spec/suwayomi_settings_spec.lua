@@ -137,6 +137,25 @@ describe("suwayomi/settings", function()
         assert.are.equal("/downloads/new-c1.cbz", journal.mangas.m1.records[2].path)
     end)
 
+    it("persists pathless completion order and safely deduplicates mixed paths on reload", function()
+        local settings = require("suwayomi/settings")
+        settings:saveFinishedChapterCleanupJournal({ version = 1, next_sequence = 1, mangas = {
+            m = { records = {
+                { chapter_id = "A", path = "/A", sequence = 1, retry_count = 0, retry_after = 0 },
+                { chapter_id = "B", sequence = 2, retry_count = 0, retry_after = 0 },
+                { chapter_id = "B", path = "/B", sequence = 2, retry_count = 0, retry_after = 0 },
+                { chapter_id = "bad", path = false, sequence = 3, retry_count = 0, retry_after = 0 },
+                { chapter_id = "empty", path = "", sequence = 4, retry_count = 0, retry_after = 0 },
+            } },
+        } })
+        package.loaded["suwayomi/settings"] = nil
+        local journal = require("suwayomi/settings"):loadFinishedChapterCleanupJournal()
+        assert.equals(3, journal.next_sequence)
+        assert.equals(2, #journal.mangas.m.records)
+        assert.equals("B", journal.mangas.m.records[2].chapter_id)
+        assert.is_nil(journal.mangas.m.records[2].path)
+    end)
+
     it("preserves an unknown finished cleanup journal version", function()
         local raw = { version = 9, opaque = { keep = true } }
         stored_data.finished_chapter_cleanup = raw

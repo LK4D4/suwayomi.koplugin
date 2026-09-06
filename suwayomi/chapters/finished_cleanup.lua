@@ -209,7 +209,7 @@ function Methods:recordFinishedChapter(entry)
     end
     if type(entry) ~= "table" or entry.read ~= true
         or not validId(entry.manga_id) or not validId(entry.chapter_id)
-        or type(entry.path) ~= "string" or entry.path == ""
+        or (entry.path ~= nil and (type(entry.path) ~= "string" or entry.path == ""))
     then
         if type(entry) == "table" and entry.read == false and entry.manga_id and entry.chapter_id then
             self:cancelFinishedChapter(entry.manga_id, entry.chapter_id)
@@ -509,7 +509,10 @@ local function processFinishedChapterCleanup(self, summary)
             summary.processed = summary.processed + 1
             local chapter_id = tostring(record.chapter_id)
             local ledger_entry = findLedgerEntry(ledger, manga_id, chapter_id)
-            local archive_exists, archive_error = self:chapterArchiveExists(record.path)
+            local archive_exists, archive_error
+            if record.path then
+                archive_exists, archive_error = self:chapterArchiveExists(record.path)
+            end
 
             if not ledger_entry or ledger_entry.read ~= true then
                 table.remove(manga.records, index)
@@ -521,6 +524,14 @@ local function processFinishedChapterCleanup(self, summary)
                 end
                 saveJournal(journal)
                 logTransition("converged", "unread", 1)
+            elseif not record.path then
+                -- A completion without a captured file only occupies retention.
+                -- Never attach it to a download that appeared after completion.
+                table.remove(manga.records, index)
+                candidate_count = candidate_count - 1
+                clearRetryReason(self, manga_id, chapter_id)
+                if #manga.records == 0 then journal.mangas[manga_id] = nil end
+                saveJournal(journal)
             elseif archive_exists == false and not archive_error then
                 convergeMissingDownload(self, ledger, ledger_entry, manga_id, chapter_id, record.path, changed_mangas)
                 table.remove(manga.records, index)

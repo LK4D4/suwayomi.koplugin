@@ -112,7 +112,8 @@ local function normalizeFinishedCleanupJournal(value)
                 manga_records[key] = manga_records[key] or {}
                 for _, record in pairs(manga.records) do
                     if type(record) == "table" and type(record.chapter_id) == "string"
-                        and record.chapter_id ~= "" and type(record.path) == "string" and record.path ~= "" then
+                        and record.chapter_id ~= ""
+                        and (record.path == nil or (type(record.path) == "string" and record.path ~= "")) then
                         local sequence = finiteNonNegative(record.sequence)
                         local retry_count = finiteNonNegative(record.retry_count)
                         local retry_after = finiteNonNegative(record.retry_after)
@@ -134,7 +135,7 @@ local function normalizeFinishedCleanupJournal(value)
             for _, candidate in ipairs(candidates) do
                 local previous = by_chapter[candidate.chapter_id]
                 if not previous or candidate.sequence > previous.sequence
-                    or (candidate.sequence == previous.sequence and (candidate.path < previous.path
+                    or (candidate.sequence == previous.sequence and ((candidate.path or "") < (previous.path or "")
                         or (candidate.path == previous.path and (candidate.retry_count < previous.retry_count
                             or (candidate.retry_count == previous.retry_count and candidate.retry_after < previous.retry_after))))) then
                     by_chapter[candidate.chapter_id] = candidate
