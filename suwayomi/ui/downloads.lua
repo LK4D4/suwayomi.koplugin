@@ -158,6 +158,9 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
             or I18n.t("Downloading")
         table.insert(menu_table, {
             text = formatDownloadJobLabel(job),
+            -- Job actions open overlays; native selection must not run the
+            -- hub's close callback and detach its live status updates.
+            keep_menu_open = true,
             mandatory = prefix,
             callback = callbacks.onSelectActive and function(menu)
                 callbacks.onSelectActive(job, menu)
@@ -169,6 +172,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
     for _, job in ipairs(snapshot.queued or {}) do
         table.insert(menu_table, {
             text = formatDownloadJobLabel(job),
+            keep_menu_open = true,
             mandatory = job.retry_at and I18n.t("Retry scheduled") or queued_label,
             subtitle = job.retry_at and StatusFormatter.formatRetryTime(job.retry_at) or nil,
             callback = function(menu)
@@ -183,6 +187,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
     for _, job in ipairs(snapshot.failed or {}) do
         table.insert(menu_table, {
             text = formatDownloadJobLabel(job),
+            keep_menu_open = true,
             subtitle = formatFailedDownloadText(job),
             mandatory = failed_label,
             callback = function(menu)

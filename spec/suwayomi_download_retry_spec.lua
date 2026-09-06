@@ -9,6 +9,17 @@ describe("download retry across live menus", function()
         "suwayomi/downloads/job_store", "suwayomi/downloads/status_formatter",
         "ui/widget/textviewer",
     }
+    local widget_modules = {
+        "ui/bidi", "ffi/blitbuffer", "ui/font", "ui/geometry", "ui/gesturerange", "ui/size",
+        "ui/widget/container/centercontainer", "ui/widget/container/framecontainer",
+        "ui/widget/container/inputcontainer", "ui/widget/container/leftcontainer",
+        "ui/widget/container/rightcontainer", "ui/widget/container/underlinecontainer",
+        "ui/widget/horizontalgroup", "ui/widget/horizontalspan", "ui/widget/imagewidget",
+        "ui/widget/overlapgroup", "ui/widget/verticalgroup", "ui/widget/verticalspan",
+        "ui/widget/textboxwidget", "ui/widget/textwidget", "ui/widget/menu",
+        "suwayomi/ui/thumbnail_cache", "suwayomi/ui/thumbnail_worker",
+    }
+    for _, name in ipairs(widget_modules) do table.insert(extra_modules, name) end
     local plugin, queue, stack, scheduled, saved, ui, home, downloads_menu, chapters_menu
     local manga = { id = "retry-manga", title = "Retry manga" }
     local chapter = { id = "retry-chapter", name = "Retry chapter" }
@@ -80,6 +91,7 @@ describe("download retry across live menus", function()
         clearExtras()
         stack, scheduled, saved = {}, {}, "[]"
         package.preload["suwayomi/downloads/queue"] = nil
+        package.preload["suwayomi/navigation"] = nil
         local settings = require("suwayomi/settings")
         local json = require("dkjson")
         settings.loadDownloadQueue = function() return json.decode(saved) end
@@ -109,12 +121,30 @@ describe("download retry across live menus", function()
                 return options
             end }
         end
-        package.preload["suwayomi/ui/list_menu"] = function()
-            return {
-                show = function(options) ui:show(options); return options end,
-                update = function(menu, options) menu.item_table = options.item_table end,
-            }
+        for _, name in ipairs(widget_modules) do
+            package.preload[name] = function()
+                return { extend = function(_, definition) return definition end }
+            end
         end
+        package.preload["ui/font"] = function() return { getFace = function() return {} end } end
+        package.preload["ui/widget/menu"] = function()
+            return { new = function(_, options)
+                function options:onMenuChoice(item) if item.callback then item.callback() end end
+                -- KOReader Menu dispatch calls close_callback after selecting a
+                -- leaf, even though the widget itself can remain on screen.
+                function options:onMenuSelect(item)
+                    if item.select_enabled == false then return true end
+                    self:onMenuChoice(item)
+                    if self.close_callback then self.close_callback() end
+                    return true
+                end
+                function options:onClose() ui:close(self) end
+                return options
+            end }
+        end
+        local list_menu = require("suwayomi/ui/list_menu")
+        -- Keep real show/update/install/dispatch; substitute only painting.
+        list_menu.updateItems = function() end
         local facade = require("suwayomi/ui")
         for name, method in pairs(require("suwayomi/ui/downloads")) do facade[name] = method end
         local rows = require("suwayomi/ui/list_rows")
@@ -152,7 +182,7 @@ describe("download retry across live menus", function()
         it("retries from " .. origin .. " details and updates both existing menus", function()
             showScreens()
             if origin == "Downloads" then
-                downloads_menu.item_table[1].callback()
+                downloads_menu:onMenuSelect(downloads_menu.item_table[1])
             else
                 chapters_menu.item_table[1].callback()
                 selectAction("download_error")
@@ -163,6 +193,7 @@ describe("download retry across live menus", function()
             assert.are.equal(before, #stack)
             assert.are.equal(1, #queue.items)
             assertStatus("queued", "Queued")
+            assert.are.equal(downloads_menu, plugin.current_downloads_menu)
             queue:process()
             assertStatus("downloading", "Downloading")
         end)
@@ -191,16 +222,67 @@ describe("download retry across live menus", function()
         assertStatus("downloading", "Downloading")
     end)
 
+    for _, state in ipairs({ "queued", "downloading", "scheduled" }) do
+        it("keeps Downloads tracked after dismissing " .. state .. " job actions", function()
+            showScreens()
+            queue:retryFailed(queue:getKey(manga, chapter))
+            if state ~= "queued" then queue:process() end
+            if state == "scheduled" then
+                queue.active_job_lifecycle:scheduleTransientRetry(
+                    queue:getActiveJob(queue:getKey(manga, chapter)), { error = full_error })
+            end
+            downloads_menu:onMenuSelect(downloads_menu.item_table[1])
+            if state == "scheduled" then
+                selectAction("download_error")
+                assert.is_truthy(stack[#stack].text:find(full_error, 1, true))
+                click("close")
+                assert.are.equal("Retry scheduled", downloads_menu.item_table[1].mandatory)
+                assert.is_truthy(queue:findPersistentJob(queue:getKey(manga, chapter)).retry_at)
+            else
+                ui:close(stack[#stack])
+            end
+            assert.are.equal(downloads_menu, plugin.current_downloads_menu)
+            assert.are.equal(downloads_menu, stack[#stack])
+            if state == "queued" then
+                queue:process()
+                assertStatus("downloading", "Downloading")
+            elseif state == "downloading" then
+                queue.active_job_lifecycle:finishWithFailure(
+                    queue:getActiveJob(queue:getKey(manga, chapter)), full_error)
+                assert.are.equal("Failed", downloads_menu.item_table[1].mandatory)
+                assert.are.equal("Failed", chapters_menu.item_table[1].mandatory)
+                assert.are.equal(1, queue:getFailedCount())
+                assert.are.equal("Downloads · 1 failed", home.actions[3].text)
+            end
+            downloads_menu:onClose()
+            assert.is_nil(plugin.current_downloads_menu)
+            assert.is_false(plugin:isSuwayomiScreenActive(downloads_menu))
+        end)
+    end
+
     it("closes details without changing the origin or the complete stored error", function()
         showScreens()
         for _, origin in ipairs({ "downloads", "chapters" }) do
             local before = #stack
-            if origin == "downloads" then downloads_menu.item_table[1].callback()
+            if origin == "downloads" then downloads_menu:onMenuSelect(downloads_menu.item_table[1])
             else plugin:showChapterDownloadError(manga, chapter) end
             click("close")
             assert.are.equal(before, #stack)
+            assert.are.equal(downloads_menu, plugin.current_downloads_menu)
             assert.are.equal(full_error, queue:findPersistentJob(queue:getKey(manga, chapter)).progress.error)
         end
+    end)
+
+    it("still clears failures and replaces Downloads through native selection", function()
+        showScreens()
+        downloads_menu:onMenuSelect(downloads_menu.item_table[2])
+        assert.are.equal(0, queue:getFailedCount())
+        assert.is_nil(queue:getStatus(manga, chapter))
+        assert.are.equal("Downloads", home.actions[3].text)
+        assert.are_not.equal(downloads_menu, plugin.current_downloads_menu)
+        assert.are.equal("No downloads queued.", plugin.current_downloads_menu.item_table[3].text)
+        assert.are.equal(plugin.current_downloads_menu, stack[#stack])
+        for _, widget in ipairs(stack) do assert.are_not.equal(downloads_menu, widget) end
     end)
 
     it("keeps ordinary queued and scheduled retry actions distinct from terminal Retry", function()
