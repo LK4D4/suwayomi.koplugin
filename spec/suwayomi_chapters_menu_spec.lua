@@ -336,8 +336,8 @@ describe("suwayomi/chapters/menu", function()
         end
 
         for _, case in ipairs({
-            { status = { state = "failed", error = "Page request failed" }, primary = "download", has_error = true },
-            { status = { state = "failed" }, primary = "download", has_error = true },
+            { status = { state = "failed", error = "Page request failed" }, primary = "retry_download", has_error = true },
+            { status = { state = "failed" }, primary = "retry_download", has_error = true },
             { status = { state = "queued", retry_at = 123, error = "Connection failed" }, primary = "cancel_download", has_error = true },
             { status = { state = "queued", retry_at = 123 }, primary = "cancel_download", has_error = true },
             { status = { state = "queued" }, primary = "cancel_download", has_error = false },
@@ -355,6 +355,10 @@ describe("suwayomi/chapters/menu", function()
             end
 
             assert.is_table(actions_by_id[case.primary])
+            if case.primary == "retry_download" then
+                assert.are.equal("tx:Retry", actions_by_id.retry_download.text)
+                assert.is_nil(actions_by_id.download)
+            end
             assert.is_table(actions_by_id.mark_read)
             assert.is_table(actions_by_id.mark_previous_read)
             if case.has_error then

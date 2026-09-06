@@ -124,6 +124,25 @@ function Methods:getDownloadsMenuOptions(snapshot)
 end
 
 
+function Methods:retryDownloadJob(job)
+    local ok, state = self:getDownloadQueue():retryFailed(job and job.key)
+    if not ok then
+        self:showMessage(state == "missing" and I18n.t("Download is no longer failed.")
+            or I18n.t("Could not retry download."))
+    end
+    -- Rejected stale actions emit no queue notification. Rebuild chapter rows
+    -- from current state instead of retaining cached failure labels.
+    if self.refreshChapterMenu then
+        self:refreshChapterMenu()
+    end
+    self:refreshDownloadsMenu()
+    if self.refreshHomeDownloads then
+        self:refreshHomeDownloads()
+    end
+    return ok, state
+end
+
+
 function Methods:showDownloadJobError(job)
     local queue = self:getDownloadQueue()
     local current = job and queue:findPersistentJob(job.key)
@@ -137,12 +156,7 @@ function Methods:showDownloadJobError(job)
         -- Scheduled retries remain automatic. A stale Retry button must check
         -- the live queue again after the reader dismisses the details.
         onRetry = current.state == "failed" and function()
-            local ok, state = queue:retryFailed(current.key)
-            if not ok then
-                self:showMessage(state == "missing" and I18n.t("Download is no longer failed.")
-                    or I18n.t("Could not retry download."))
-            end
-            self:refreshDownloadsMenu()
+            return self:retryDownloadJob(current)
         end or nil,
     })
 end

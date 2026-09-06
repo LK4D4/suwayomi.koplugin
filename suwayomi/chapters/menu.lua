@@ -275,6 +275,8 @@ function Methods:getChapterActions(manga, chapter)
         table.insert(actions, { id = "cancel_download", text = I18n.t("Cancel download"), destructive = true })
     elseif downloaded then
         table.insert(actions, { id = "open", text = I18n.c("chapter action", "Open") })
+    elseif status and status.state == "failed" then
+        table.insert(actions, { id = "retry_download", text = I18n.t("Retry") })
     else
         table.insert(actions, { id = "download", text = I18n.c("chapter action", "Download") })
     end

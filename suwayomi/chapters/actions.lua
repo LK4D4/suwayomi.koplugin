@@ -83,6 +83,9 @@ function Methods:performChapterAction(manga, chapter, action_id)
         self:enqueueChapterDownload(manga, chapter)
         return true
     end
+    if action_id == "retry_download" then
+        return self:retryDownloadJob({ key = self:getDownloadQueue():getKey(manga, chapter) })
+    end
     if action_id == "cancel_download" then
         return self:cancelChapterDownload(manga, chapter)
     end
