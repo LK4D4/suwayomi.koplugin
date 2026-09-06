@@ -14,7 +14,11 @@ Single, selected, and previous-chapter mark-read actions will share private impl
 - Share private per-chapter processing and batch finalization. Keep each operation's ledger and completion buffer local to that operation. Bulk callers must no longer coordinate these through `markChapterRead` options.
 - Preserve tested single-call options as compatibility behavior, including refresh/sync/keep-policy suppression and a supplied ledger. A supplied ledger must be saved before a single completion is published. Compatibility handling must not become the mechanism for internal batching.
 
-## Ordering constraints
+## Follow-up ordering decision
+
+[Accepted ADR-0003](0003-durable-manual-delete-intent.md) revises the destructive-action ordering for deletion after manual mark-read. Capture archive/job targets and commit read-ledger changes plus manual-delete intent before cancellation or file removal. Retain this ADR's module boundary, visible completion order, pathless eligibility, selected-menu clearing, and durable reconciliation of non-target visible chapters. The original sequence below records the behavior this coordination refactor preserved; its immediate-delete phase must not be carried into the durable manual-delete implementation.
+
+## Original ordering constraints
 
 For a non-empty selected or previous-chapter batch:
 
