@@ -80,8 +80,9 @@ local function installController(options)
                 state.confirm_options = confirm_options
                 return { name = "confirm-dialog" }
             end,
-            showDownloadErrorDetails = function(error_message)
-                state.error_details = error_message
+            showDownloadErrorDetails = function(job, details_options)
+                state.error_details = job.progress and job.progress.error
+                state.error_details_options = details_options
             end,
         }
     end
@@ -105,6 +106,16 @@ local function installController(options)
     function queue:retryFailed(key)
         self.retried_key = key
         return options.retry_ok ~= false
+    end
+    function queue:findPersistentJob(key)
+        for _, state_name in ipairs({ "failed", "queued", "active" }) do
+            for _, job in ipairs(self.snapshot[state_name]) do
+                if job.key == key then
+                    job.state = state_name == "active" and "downloading" or state_name
+                    return job
+                end
+            end
+        end
     end
     function queue:cancelPending(manga, chapter)
         self.cancelled = { manga = manga, chapter = chapter }
@@ -381,7 +392,7 @@ describe("suwayomi/downloads/controller", function()
         assert.is_nil(state.updated_downloads_menu)
     end)
 
-    it("opens failed download actions before retrying", function()
+    it("opens failed download details directly and retries without closing Downloads", function()
         local queue = {
             snapshot = {
                 active = {},
@@ -395,26 +406,15 @@ describe("suwayomi/downloads/controller", function()
         local menu = plugin:showDownloads()
 
         state.downloads_menu_callbacks.onSelectFailed(queue.snapshot.failed[1], menu)
-        assert.are.equal("Download actions", state.actions_menu_options.title)
-        assert.are.equal("Retry", state.actions_menu_options.actions[1].text)
-        assert.are.equal("Error details", state.actions_menu_options.actions[2].text)
-        assert.are.equal("Close", state.actions_menu_options.actions[3].text)
+        assert.is_nil(state.actions_menu_options)
+        assert.are.equal("Frieren / Ch. 1", state.error_details_options.context)
         assert.is_nil(queue.retried_key)
 
-        state.actions_menu_callback(state.actions_menu_options.actions[1])
+        state.error_details_options.onRetry()
         assert.are.equal("m1:c1", queue.retried_key)
-        assert.are.equal(menu, state.closed_menus[1])
-        assert.are.equal(2, state.downloads_count)
-        assert.are.same({}, state.messages)
-
-        queue.retried_key = nil
-        state.downloads_count = 0
-        state.closed_menus = {}
-        state.actions_menu_callback(state.actions_menu_options.actions[3])
-        assert.is_nil(queue.retried_key)
-        assert.is_nil(queue.clear_failed_count)
-        assert.are.equal(0, state.downloads_count)
         assert.are.same({}, state.closed_menus)
+        assert.are.equal(1, state.downloads_count)
+        assert.are.equal(menu, state.updated_downloads_menu)
         assert.are.same({}, state.messages)
 
         state.downloads_menu_callbacks.onClearFailed(menu)
@@ -422,7 +422,7 @@ describe("suwayomi/downloads/controller", function()
         assert.are.same({}, state.messages)
     end)
 
-    it("translates failed download action labels while keeping job titles raw", function()
+    it("translates retry failure feedback while keeping job context raw", function()
         installMarker()
         local job = {
             key = "m1:c1",
@@ -442,16 +442,13 @@ describe("suwayomi/downloads/controller", function()
 
         plugin:showFailedDownloadActions(job, { name = "downloads-menu" })
 
-        assert.are.equal("tx:Download actions", state.actions_menu_options.title)
-        assert.are.equal("tx:Retry", state.actions_menu_options.actions[1].text)
-        assert.are.equal("tx:Error details", state.actions_menu_options.actions[2].text)
-        assert.are.equal("tx:Close", state.actions_menu_options.actions[3].text)
+        assert.are.equal("Frieren / Chapter 1", state.error_details_options.context)
 
-        state.actions_menu_callback(state.actions_menu_options.actions[1])
+        state.error_details_options.onRetry()
         assert.are.equal("tx:Could not retry download.", state.messages[#state.messages])
     end)
 
-    it("opens the complete stored error only when details are selected", function()
+    it("opens the complete stored error only when the failed row is selected", function()
         local error_message = string.rep("A long download error with more detail.\n", 200) .. "final detail"
         local job = { key = "m1:c1", progress = { error = error_message } }
         local plugin, state = installController({
@@ -460,16 +457,6 @@ describe("suwayomi/downloads/controller", function()
         local menu = plugin:showDownloads()
         assert.is_nil(state.error_details)
         state.downloads_menu_callbacks.onSelectFailed(job, menu)
-        assert.is_nil(state.error_details)
-
-        local details_action
-        for _, action in ipairs(state.actions_menu_options.actions) do
-            if action.id == "error_details" then
-                details_action = action
-            end
-        end
-        assert.is_not_nil(details_action)
-        state.actions_menu_callback(details_action)
 
         assert.are.equal(error_message, state.error_details)
         assert.is_nil(plugin.queue.retried_key)

@@ -124,30 +124,35 @@ function Methods:getDownloadsMenuOptions(snapshot)
 end
 
 
-function Methods:showFailedDownloadActions(job, menu)
-    if not SuwayomiUI.showChapterActionsMenu then
-        return
+function Methods:showDownloadJobError(job)
+    local queue = self:getDownloadQueue()
+    local current = job and queue:findPersistentJob(job.key)
+    if not current or not (current.state == "failed" or (current.state == "queued" and current.retry_at)) then
+        self:showMessage(I18n.t("Download error is no longer available."))
+        return false
     end
 
-    SuwayomiUI.showChapterActionsMenu({
-        title = I18n.t("Download actions"),
-        actions = {
-            { id = "retry", text = I18n.t("Retry") },
-            { id = "error_details", text = I18n.t("Error details") },
-            { id = "close", text = I18n.t("Close") },
-        },
-    }, function(action)
-        if action and action.id == "retry" then
-            local ok = self:getDownloadQueue():retryFailed(job.key)
-            self:closeMenu(menu)
+    return SuwayomiUI.showDownloadErrorDetails(current, {
+        context = self:getDownloadJobTitle(current),
+        -- Scheduled retries remain automatic. A stale Retry button must check
+        -- the live queue again after the reader dismisses the details.
+        onRetry = current.state == "failed" and function()
+            local ok, state = queue:retryFailed(current.key)
             if not ok then
-                self:showMessage(I18n.t("Could not retry download."))
+                self:showMessage(state == "missing" and I18n.t("Download is no longer failed.")
+                    or I18n.t("Could not retry download."))
             end
-            self:showDownloads()
-        elseif action and action.id == "error_details" then
-            SuwayomiUI.showDownloadErrorDetails(job and job.progress and job.progress.error)
-        end
-    end)
+            self:refreshDownloadsMenu()
+        end or nil,
+    })
+end
+
+function Methods:showFailedDownloadActions(job)
+    return self:showDownloadJobError(job)
+end
+
+function Methods:showChapterDownloadError(manga, chapter)
+    return self:showDownloadJobError({ key = self:getDownloadQueue():getKey(manga, chapter) })
 end
 
 function Methods:getDownloadsMenuCallbacks()
@@ -216,12 +221,17 @@ function Methods:showQueuedDownloadActions(job, menu)
     if self:canOpenDownloadJobChapterList(job) then
         table.insert(actions, { id = "open_chapter_list", text = I18n.t("Open chapter list") })
     end
+    if job.retry_at then
+        table.insert(actions, { id = "download_error", text = I18n.t("Download error") })
+    end
 
     SuwayomiUI.showChapterActionsMenu({
         title = self:getDownloadJobTitle(job),
         actions = actions,
     }, function(action)
-        if action and action.id == "cancel_queued" then
+        if action and action.id == "download_error" then
+            self:showDownloadJobError(job)
+        elseif action and action.id == "cancel_queued" then
             local cancelled, state = self:getDownloadQueue():cancelPending(job.manga, job.chapter)
             self:closeMenu(menu)
             if not cancelled then

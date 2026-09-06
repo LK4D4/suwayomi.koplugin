@@ -11,6 +11,7 @@ describe("suwayomi/ui/downloads", function()
         updated_dialog = nil
 
         package.loaded["suwayomi/ui/downloads"] = nil
+        package.loaded["suwayomi/downloads/status_formatter"] = nil
         package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/ui/list_menu"] = nil
         package.loaded["suwayomi/ui/menu_utils"] = nil
@@ -122,7 +123,8 @@ describe("suwayomi/ui/downloads", function()
         assert.are.equal("Queued", rows[2].mandatory)
         assert.are.equal("Chainsaw Man / Ch. 205", rows[3].text)
         assert.are.equal("Failed", rows[3].mandatory)
-        assert.are.equal(long_error, rows[3].subtitle)
+        assert.is_true(#rows[3].subtitle < 110)
+        assert.is_truthy(rows[3].subtitle:find("server returned", 1, true))
         assert.are.equal("Clear failed", rows[4].text)
     end)
 
@@ -151,6 +153,15 @@ describe("suwayomi/ui/downloads", function()
         assert.is_false(rows[2].select_enabled)
         assert.is_false(rows[3].select_enabled)
         assert.is_false(rows[4].select_enabled)
+    end)
+
+    it("shortens multiline Unicode errors without splitting characters or changing the stored error", function()
+        local downloads = require("suwayomi/ui/downloads")
+        local error_message = string.rep("猫", 101) .. "\n\nlast detail"
+        local failed = { key = "m1:c1", progress = { error = error_message } }
+        local rows = downloads.buildDownloadsMenuTable({ failed = { failed } })
+        assert.are.equal(string.rep("猫", 99) .. "…", rows[1].subtitle)
+        assert.are.equal(error_message, failed.progress.error)
     end)
 
     it("routes empty-state labels and queue summary through i18n", function()

@@ -278,6 +278,9 @@ function Methods:getChapterActions(manga, chapter)
     else
         table.insert(actions, { id = "download", text = I18n.c("chapter action", "Download") })
     end
+    if status and (status.state == "failed" or (status.state == "queued" and status.retry_at)) then
+        table.insert(actions, { id = "download_error", text = I18n.t("Download error") })
+    end
 
     if chapter.is_read == true then
         table.insert(actions, { id = "mark_unread", text = I18n.t("Mark as unread") })

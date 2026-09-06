@@ -143,6 +143,7 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
     for action_index = 1, #(options.actions or {}) do
         local action = options.actions[action_index]
         table.insert(row, {
+            id = action.id,
             text = action.text,
             callback = function()
                 if action.close_before_select ~= false then
@@ -171,9 +172,21 @@ function SuwayomiUI.showHomeDialog(options, onSelectCallback)
     dialog = ButtonDialog:new{
         title = options.title or I18n.t("Suwayomi"),
         buttons = buttons,
+        tap_close_callback = options.onClose,
     }
     UIManager:show(dialog)
     return dialog
+end
+
+function SuwayomiUI.updateHomeDownloadsLabel(dialog, text)
+    local button = dialog and dialog.getButtonById and dialog:getButtonById("downloads")
+    if not button or not button.setText then
+        return false
+    end
+    button:setText(text, button.width)
+    local UIManager = require("ui/uimanager")
+    UIManager:setDirty(dialog, "ui")
+    return true
 end
 
 local function formatActionButtonText(action)

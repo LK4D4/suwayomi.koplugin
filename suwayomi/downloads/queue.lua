@@ -176,9 +176,23 @@ function DownloadQueue:findPersistentJob(key, state)
     return self.job_store:find(key, state)
 end
 
+function DownloadQueue:getFailedCount()
+    local count = 0
+    for _, job in ipairs(self:loadPersistentJobs()) do
+        if job.state == "failed" then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 function DownloadQueue:retryFailed(key)
     local job = self:findPersistentJob(key, "failed")
     if not job or not job.manga or not job.chapter or not job.download_directory then
+        return false, "missing"
+    end
+    local status = self:getStatus(job.manga, job.chapter)
+    if self:getActiveJob(key) or (status and status.state ~= "failed") then
         return false, "missing"
     end
     return self:enqueue(job.manga, job.chapter, job.download_directory)
@@ -523,12 +537,13 @@ function DownloadQueue:recover()
                     downloader = self.downloader,
                     retry_count = recovered.retry_count,
                     retry_at = recovered.retry_at,
+                    progress = recovered.progress,
                 })
-                self:setStatus(recovered.manga, recovered.chapter, {
+                self.statuses[key] = {
                     state = "queued",
                     retry_count = recovered.retry_count,
                     retry_at = recovered.retry_at,
-                })
+                }
                 should_process = true
             end
         elseif job.manga and job.chapter and job.state == "failed" then
@@ -544,12 +559,13 @@ function DownloadQueue:recover()
                 self.statuses[job.key or self:getKey(job.manga, job.chapter)] = nil
             else
                 table.insert(recovered_jobs, job)
-                self:setStatus(job.manga, job.chapter, { state = "failed" })
+                self.statuses[job.key or self:getKey(job.manga, job.chapter)] = { state = "failed" }
             end
         end
     end
 
     self:savePersistentJobs(recovered_jobs)
+    self.onStatusChanged()
     if should_process then
         self.ui_manager:scheduleIn(0, function()
             self:process()
@@ -578,7 +594,6 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
 
     local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued")
     self:upsertPersistentJob(persistent_job)
-    self:setStatus(manga, chapter, { state = "queued" })
     table.insert(self.items, {
         key = persistent_job.key,
         download_directory = download_directory,
@@ -586,6 +601,7 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
         chapter = chapter,
         downloader = self.downloader,
     })
+    self:setStatus(manga, chapter, { state = "queued" })
 
     self.ui_manager:scheduleIn(0, function()
         self:process()

@@ -317,6 +317,56 @@ describe("suwayomi/chapters/menu", function()
         assert.is_true(active_actions[1].destructive)
     end)
 
+    it("offers translated download errors for failures and waiting retries while preserving chapter actions", function()
+        helper.stubControllerDependencies()
+        Marker.install()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local plugin = {
+            isChapterDownloaded = function()
+                return false
+            end,
+            getChapterDownloadStatus = function(_, _, chapter)
+                return chapter.download_status
+            end,
+        }
+        for name, method in pairs(ChapterMenu.methods) do
+            plugin[name] = method
+        end
+
+        for _, case in ipairs({
+            { status = { state = "failed", error = "Page request failed" }, primary = "download", has_error = true },
+            { status = { state = "failed" }, primary = "download", has_error = true },
+            { status = { state = "queued", retry_at = 123, error = "Connection failed" }, primary = "cancel_download", has_error = true },
+            { status = { state = "queued", retry_at = 123 }, primary = "cancel_download", has_error = true },
+            { status = { state = "queued" }, primary = "cancel_download", has_error = false },
+            { status = { state = "downloading", error = "Old failure" }, primary = "cancel_download", has_error = false },
+            { primary = "download", has_error = false },
+        }) do
+            local actions = plugin:getChapterActions({ id = "m1" }, {
+                id = "c1",
+                name = "Chapter 1",
+                download_status = case.status,
+            })
+            local actions_by_id = {}
+            for _, action in ipairs(actions) do
+                actions_by_id[action.id] = action
+            end
+
+            assert.is_table(actions_by_id[case.primary])
+            assert.is_table(actions_by_id.mark_read)
+            assert.is_table(actions_by_id.mark_previous_read)
+            if case.has_error then
+                assert.is_table(actions_by_id.download_error)
+                assert.are.equal("tx:Download error", actions_by_id.download_error.text)
+                assert.is_nil(actions_by_id.download_error.destructive)
+            else
+                assert.is_nil(actions_by_id.download_error)
+            end
+        end
+    end)
+
     it("marks bulk chapter actions that open submenus", function()
         helper.stubControllerDependencies()
         package.loaded["suwayomi/chapters/menu"] = nil

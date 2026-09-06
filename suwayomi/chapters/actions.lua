@@ -86,6 +86,9 @@ function Methods:performChapterAction(manga, chapter, action_id)
     if action_id == "cancel_download" then
         return self:cancelChapterDownload(manga, chapter)
     end
+    if action_id == "download_error" then
+        return self:showChapterDownloadError(manga, chapter)
+    end
     if action_id == "delete" then
         return self:confirmDeleteChapterFromDevice(manga, chapter)
     end

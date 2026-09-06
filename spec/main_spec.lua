@@ -285,6 +285,66 @@ describe("suwayomi plugin", function()
         assert.is_false(plugin:isSuwayomiScreenActive(second))
     end)
 
+    it("refreshes the visible home failure count only when terminal failures change", function()
+        local plugin = build_plugin({ refreshChapterMenu = function() end })
+        local queue = plugin:getDownloadQueue()
+        local failed_count = 0
+        function queue:getFailedCount()
+            return failed_count
+        end
+
+        local dialog = plugin:showHome()
+        assert.are.equal("Downloads", dialog.actions[3].text)
+
+        failed_count = 2
+        queue.options.onStatusChanged()
+        assert.are.equal("Downloads · 2 failed", dialog.actions[3].text)
+        assert.are.equal(dialog, runtime.shown_home_dialog)
+        queue.options.onStatusChanged()
+        assert.are.equal(1, #runtime.home_downloads_labels)
+
+        failed_count = 1
+        plugin:withChapterMenuRefreshSuppressed(function()
+            queue.options.onStatusChanged()
+            assert.are.equal("Downloads · 2 failed", dialog.actions[3].text)
+        end)
+        assert.are.equal("Downloads · 1 failed", dialog.actions[3].text)
+
+        failed_count = 0
+        queue.options.onStatusChanged()
+        assert.are.equal("Downloads", dialog.actions[3].text)
+        assert.are.same({ "Downloads · 2 failed", "Downloads · 1 failed", "Downloads" }, runtime.home_downloads_labels)
+        assert.is_true(plugin:isSuwayomiScreenActive(dialog))
+        assert.are.same({}, runtime.closed_widgets)
+    end)
+
+    it("does not refresh closed home dialogs after download failures change", function()
+        local plugin = build_plugin({ refreshChapterMenu = function() end })
+        local queue = plugin:getDownloadQueue()
+        local failed_count = 1
+        function queue:getFailedCount()
+            return failed_count
+        end
+        local dialog = plugin:showHome()
+        assert.are.equal("Downloads · 1 failed", dialog.actions[3].text)
+
+        dialog.onClose()
+        failed_count = 2
+        queue.options.onStatusChanged()
+
+        assert.are.same({}, runtime.home_downloads_labels)
+        assert.is_nil(plugin.current_home_dialog)
+        assert.is_false(plugin:isSuwayomiScreenActive(dialog))
+
+        local reopened = plugin:showHome()
+        assert.are.equal("Downloads · 2 failed", reopened.actions[3].text)
+        plugin:getNavigation():pop(reopened)
+        failed_count = 0
+        queue.options.onStatusChanged()
+        assert.are.same({}, runtime.home_downloads_labels)
+        assert.is_nil(plugin.current_home_dialog)
+    end)
+
     it("marks plugin closing and cancels active work before closing screens", function()
         local close_callback_saw_closing
         local plugin = build_plugin({

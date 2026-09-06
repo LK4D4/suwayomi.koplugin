@@ -24,6 +24,18 @@ end
 
 local Methods = {}
 
+local function downloadFailureCount(self)
+    local queue = self.getDownloadQueue and self:getDownloadQueue()
+    return queue and queue.getFailedCount and queue:getFailedCount() or 0
+end
+
+local function downloadsActionText(failed_count)
+    if failed_count > 0 then
+        return I18n.count(failed_count, "Downloads · %1 failed", "Downloads · %1 failed")
+    end
+    return I18n.t("Downloads")
+end
+
 local function ensureReaderReturnMenuOrder()
     local ok, reader_menu_order = pcall(require, "ui/elements/reader_menu_order")
     local main_order = ok and reader_menu_order and reader_menu_order.main or nil
@@ -52,7 +64,8 @@ function Methods:showTopLevelScreen(route_id, callback)
 end
 
 
-function Methods:buildHomeActions()
+function Methods:buildHomeActions(failed_count)
+    failed_count = failed_count or downloadFailureCount(self)
     return {
         {
             id = "library",
@@ -74,7 +87,7 @@ function Methods:buildHomeActions()
         },
         {
             id = "downloads",
-            text = I18n.t("Downloads"),
+            text = downloadsActionText(failed_count),
             callback = function()
                 return self:showTopLevelScreen("downloads", function()
                     return self:showDownloads()
@@ -112,10 +125,15 @@ end
 
 
 function Methods:showHome()
+    local failed_count = downloadFailureCount(self)
     local dialog
     dialog = SuwayomiUI.showHomeDialog({
-        actions = self:buildHomeActions(),
+        actions = self:buildHomeActions(failed_count),
         onClose = function()
+            if self.current_home_dialog == dialog then
+                self.current_home_dialog = nil
+                self.current_home_failed_count = nil
+            end
             if self.suwayomi_navigation then
                 self.suwayomi_navigation:pop(dialog)
             end
@@ -125,10 +143,34 @@ function Methods:showHome()
             action.callback()
         end
     end)
+    self.current_home_dialog = dialog
+    self.current_home_failed_count = failed_count
     if dialog and self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("home", dialog)
     end
     return dialog
+end
+
+
+function Methods:refreshHomeDownloads()
+    local dialog = self.current_home_dialog
+    if not dialog or not SuwayomiUI.updateHomeDownloadsLabel then
+        return false
+    end
+    if self.isSuwayomiScreenActive and not self:isSuwayomiScreenActive(dialog) then
+        self.current_home_dialog = nil
+        self.current_home_failed_count = nil
+        return false
+    end
+    local failed_count = downloadFailureCount(self)
+    if failed_count == self.current_home_failed_count then
+        return false
+    end
+    if SuwayomiUI.updateHomeDownloadsLabel(dialog, downloadsActionText(failed_count)) == false then
+        return false
+    end
+    self.current_home_failed_count = failed_count
+    return true
 end
 
 

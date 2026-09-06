@@ -137,6 +137,7 @@ function ActiveJobs:startQueuedJob(queued)
     queued.last_progress_at = queued.started_at
     queued.last_progress_current = nil
     queued.last_progress_state = nil
+    queued.progress = nil
     queued.progress_path = queue:buildProgressPath(queued.manga, queued.chapter, queued.download_directory)
     os.remove(queued.progress_path)
     queued.credentials = queued.credentials or queue:getCredentialsForJob()
@@ -157,7 +158,6 @@ function ActiveJobs:startQueuedJob(queued)
     end)
 
     if not pid then
-        queue:setStatus(queued.manga, queued.chapter, { state = "failed" })
         local message = queue:formatFailureMessage(
             queued.manga,
             queued.chapter,
@@ -174,6 +174,7 @@ function ActiveJobs:startQueuedJob(queued)
                 updated_at = queue.now(),
             },
         }))
+        queue:setStatus(queued.manga, queued.chapter, { state = "failed" })
         queue:notifyDownloadFailure(message)
         return false
     end
@@ -308,23 +309,7 @@ function ActiveJobs:scheduleTransientRetry(active, progress)
     os.remove(active.progress_path)
 
     local retry_at = queue.now() + retry_delay
-    local queued = {
-        key = active.key,
-        download_directory = active.download_directory,
-        manga = active.manga,
-        chapter = active.chapter,
-        downloader = active.downloader,
-        retry_count = retry_count,
-        retry_at = retry_at,
-        previous_pid = active.pid,
-    }
-    table.insert(queue.items, queued)
-    queue:setStatus(active.manga, active.chapter, {
-        state = "queued",
-        retry_count = retry_count,
-        retry_at = retry_at,
-    })
-    queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "queued", {
+    local persistent_job = queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "queued", {
         retry_count = retry_count,
         retry_at = retry_at,
         progress = {
@@ -335,7 +320,25 @@ function ActiveJobs:scheduleTransientRetry(active, progress)
             retryable = true,
             updated_at = queue.now(),
         },
-    }))
+    })
+    local queued = {
+        key = active.key,
+        download_directory = active.download_directory,
+        manga = active.manga,
+        chapter = active.chapter,
+        downloader = active.downloader,
+        retry_count = retry_count,
+        retry_at = retry_at,
+        previous_pid = active.pid,
+        progress = persistent_job.progress,
+    }
+    table.insert(queue.items, queued)
+    queue:upsertPersistentJob(persistent_job)
+    queue:setStatus(active.manga, active.chapter, {
+        state = "queued",
+        retry_count = retry_count,
+        retry_at = retry_at,
+    })
     queue:logDebug({
         operation = "downloadQueue.retry",
         event = "scheduled",
@@ -366,7 +369,6 @@ function ActiveJobs:finishWithFailure(active, message)
         queue:cleanupInterruptedDownload(active)
     end
     os.remove(active.progress_path)
-    queue:setStatus(active.manga, active.chapter, { state = "failed" })
     queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
         started_at = active.started_at,
         last_progress_at = queue.now(),
@@ -379,6 +381,7 @@ function ActiveJobs:finishWithFailure(active, message)
             updated_at = queue.now(),
         },
     }))
+    queue:setStatus(active.manga, active.chapter, { state = "failed" })
     queue:notifyDownloadFailure(failure_message)
 end
 
@@ -470,7 +473,6 @@ function ActiveJobs:finishFromProgress(active, progress)
                 active.chapter,
                 I18n.t("Chapter download finished but the archive is missing.")
             )
-            queue:setStatus(active.manga, active.chapter, { state = "failed" })
             queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
                 started_at = active.started_at,
                 last_progress_at = active.last_progress_at or queue.now(),
@@ -483,6 +485,7 @@ function ActiveJobs:finishFromProgress(active, progress)
                     updated_at = active.last_progress_at or queue.now(),
                 },
             }))
+            queue:setStatus(active.manga, active.chapter, { state = "failed" })
             queue:notifyDownloadFailure(message)
             return
         end
@@ -509,11 +512,6 @@ function ActiveJobs:finishFromProgress(active, progress)
             active.chapter,
             progress.error or I18n.t("Chapter download failed.")
         )
-        queue:setStatus(active.manga, active.chapter, {
-            state = "failed",
-            current = progress.current,
-            total = progress.total,
-        })
         queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
             started_at = active.started_at,
             last_progress_at = active.last_progress_at or queue.now(),
@@ -526,6 +524,11 @@ function ActiveJobs:finishFromProgress(active, progress)
                 updated_at = active.last_progress_at or queue.now(),
             },
         }))
+        queue:setStatus(active.manga, active.chapter, {
+            state = "failed",
+            current = progress.current,
+            total = progress.total,
+        })
         queue:notifyDownloadFailure(message)
     end
 end
@@ -546,7 +549,6 @@ function ActiveJobs:finishWithoutProgress(active)
         return
     end
 
-    queue:setStatus(active.manga, active.chapter, { state = "failed" })
     local message = queue:formatFailureMessage(active.manga, active.chapter, I18n.t("Chapter download failed."))
     queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
         started_at = active.started_at,
@@ -560,6 +562,7 @@ function ActiveJobs:finishWithoutProgress(active)
             updated_at = queue.now(),
         },
     }))
+    queue:setStatus(active.manga, active.chapter, { state = "failed" })
     queue:notifyDownloadFailure(message)
 end
 

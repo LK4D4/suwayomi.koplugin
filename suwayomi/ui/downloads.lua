@@ -9,16 +9,52 @@
 -- retries, cancellation, deletion, and navigation.
 
 local I18n = require("suwayomi/i18n")
+local StatusFormatter = require("suwayomi/downloads/status_formatter")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local DownloadsUI = {}
 
-function DownloadsUI.showDownloadErrorDetails(error_message)
+local function getErrorText(job)
+    local error_message = job and job.progress and job.progress.error
+    if error_message ~= nil and tostring(error_message):find("%S") then
+        return tostring(error_message)
+    end
+    return I18n.t("No error details were recorded.")
+end
+
+function DownloadsUI.showDownloadErrorDetails(job, options)
+    options = options or {}
     local TextViewer = require("ui/widget/textviewer")
     local UIManager = require("ui/uimanager")
-    local viewer = TextViewer:new{
+    local text = options.context or ""
+    if job and job.state == "queued" and job.retry_at then
+        text = text .. "\n\n" .. I18n.t("Retry scheduled") .. "\n" .. StatusFormatter.formatRetryTime(job.retry_at)
+    end
+    if text ~= "" then
+        text = text .. "\n\n"
+    end
+    local viewer
+    viewer = TextViewer:new{
         title = I18n.t("Error details"),
-        text = tostring(error_message or ""),
+        text = text .. getErrorText(job),
+        buttons_table = {{
+            {
+                id = "retry",
+                text = I18n.t("Retry"),
+                enabled = options.onRetry ~= nil,
+                callback = function()
+                    if options.onRetry then
+                        viewer:onClose()
+                        options.onRetry()
+                    end
+                end,
+            },
+            {
+                id = "close",
+                text = I18n.t("Close"),
+                callback = function() viewer:onClose() end,
+            },
+        }},
     }
     UIManager:show(viewer)
     return viewer
@@ -49,11 +85,8 @@ local function formatDownloadProgress(job)
 end
 
 local function formatFailedDownloadText(job)
-    local error_message = job and job.progress and job.progress.error or nil
-    if error_message and error_message ~= "" then
-        return tostring(error_message)
-    end
-    return nil
+    local summary = getErrorText(job):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    return StatusFormatter.shortenChapterTitle(summary, 0, 100)
 end
 
 local function isDownloadsSnapshotEmpty(snapshot)
@@ -136,7 +169,8 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
     for _, job in ipairs(snapshot.queued or {}) do
         table.insert(menu_table, {
             text = formatDownloadJobLabel(job),
-            mandatory = queued_label,
+            mandatory = job.retry_at and I18n.t("Retry scheduled") or queued_label,
+            subtitle = job.retry_at and StatusFormatter.formatRetryTime(job.retry_at) or nil,
             callback = function(menu)
                 if callbacks.onSelectQueued then
                     callbacks.onSelectQueued(job, menu)

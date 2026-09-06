@@ -6,6 +6,8 @@ describe("suwayomi/plugin/home", function()
     after_each(function()
         package.preload["suwayomi/i18n"] = nil
         package.loaded["suwayomi/i18n"] = nil
+        package.preload.gettext = nil
+        package.loaded.gettext = nil
     end)
 
     it("exports the home/menu methods as a controller boundary", function()
@@ -83,5 +85,50 @@ describe("suwayomi/plugin/home", function()
     it("cleans marker i18n stubs between tests", function()
         assert.is_nil(package.preload["suwayomi/i18n"])
         assert.is_nil(package.loaded["suwayomi/i18n"])
+    end)
+
+    it("preserves the actual failure count when a locale uses singular for 21", function()
+        helper.stubControllerDependencies()
+        package.preload.gettext = function()
+            return setmetatable({
+                ngettext = function(singular, plural, count)
+                    if count % 10 == 1 and count % 100 ~= 11 then
+                        return "singular:" .. singular
+                    end
+                    return "plural:" .. plural
+                end,
+            }, {
+                __call = function(_, text)
+                    return "tx:" .. text
+                end,
+            })
+        end
+        package.loaded.gettext = nil
+        package.preload["suwayomi/i18n"] = nil
+        package.loaded["suwayomi/i18n"] = nil
+        package.loaded["suwayomi/plugin/home"] = nil
+        local controller = require("suwayomi/plugin/home")
+        local failed_count = 0
+        local queue = {
+            getFailedCount = function()
+                return failed_count
+            end,
+        }
+        local plugin = {
+            getDownloadQueue = function()
+                return queue
+            end,
+        }
+        for name, method in pairs(controller.methods) do
+            plugin[name] = method
+        end
+
+        assert.are.equal("tx:Downloads", plugin:buildHomeActions()[3].text)
+        failed_count = 1
+        assert.are.equal("singular:Downloads · 1 failed", plugin:buildHomeActions()[3].text)
+        failed_count = 3
+        assert.are.equal("plural:Downloads · 3 failed", plugin:buildHomeActions()[3].text)
+        failed_count = 21
+        assert.are.equal("singular:Downloads · 21 failed", plugin:buildHomeActions()[3].text)
     end)
 end)

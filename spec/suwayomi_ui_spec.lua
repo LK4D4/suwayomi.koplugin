@@ -497,10 +497,12 @@ describe("suwayomi/ui", function()
                 end,
                 setDirty = function(_, widget, callback)
                     events.dirty_widget = widget
-                    if callback then
+                    if type(callback) == "function" then
                         local mode, region = callback()
                         events.dirty_mode = mode
                         events.dirty_region = region
+                    else
+                        events.dirty_mode = callback
                     end
                 end,
             }
@@ -546,12 +548,44 @@ describe("suwayomi/ui", function()
         local error_message = string.rep("First line of error\nNext line of error\n", 200) .. "last detail"
 
         assert.is_function(ui.showDownloadErrorDetails)
-        local viewer = ui.showDownloadErrorDetails(error_message)
+        local viewer = ui.showDownloadErrorDetails({ progress = { error = error_message } }, { context = "Manga / Chapter" })
 
         assert.are.equal(viewer, shown_dialog)
         assert.are.equal("textviewer", viewer.renderer)
         assert.are.equal("tx:Error details", viewer.title)
-        assert.are.equal(error_message, viewer.text)
+        assert.are.equal("Manga / Chapter\n\n" .. error_message, viewer.text)
+        assert.are.equal("tx:Retry", viewer.buttons_table[1][1].text)
+        assert.are.equal("tx:Close", viewer.buttons_table[1][2].text)
+    end)
+
+    it("updates the Downloads home button in place and preserves its callback", function()
+        local ui = require("suwayomi/ui")
+        local selected = false
+        local closed = false
+        local dialog = ui.showHomeDialog({
+            actions = {{ id = "downloads", text = "Downloads", callback = function() selected = true end }},
+            onClose = function() closed = true end,
+        })
+        local button = dialog.buttons[1][1]
+        assert.are.equal("downloads", button.id)
+        button.width = 400
+        function button:setText(text, width)
+            assert.are.equal(400, width)
+            self.text = text
+        end
+        function dialog:getButtonById(id)
+            if button.id == id then return button end
+        end
+        assert.is_true(ui.updateHomeDownloadsLabel(dialog, "Downloads · 3 failed"))
+        assert.are.equal("Downloads · 3 failed", button.text)
+        assert.are.equal(dialog, events.dirty_widget)
+        assert.are.equal("ui", events.dirty_mode)
+        assert.are.equal(dialog, shown_dialog)
+        button.callback()
+        assert.is_true(selected)
+        assert.is_true(closed)
+        assert.are.equal(dialog, closed_dialog)
+        assert.is_function(dialog.tap_close_callback)
     end)
 
     after_each(function()

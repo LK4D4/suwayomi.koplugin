@@ -68,7 +68,9 @@ Open **Suwayomi** from KOReader's **Search** menu. The hub has the main actions:
 
 Tap a manga to open actions, then open its chapters. Tap a chapter to open, download, delete the local file, or change read state. For a new device, use **Mark this and previous as read** on your current reading position, then queue a small **Download next** batch or enable a **Download ahead** buffer.
 
-Transient network failures are retried in the background with increasing delays. Retries resume after the device wakes; permanent failures remain visible under **Downloads** without interrupting reading with one message per chapter. Tap a failed download and choose **Error details** to read the complete stored error in a scrollable viewer.
+Transient network failures are retried in the background with increasing delays. Retries resume after the device wakes; permanent failures remain visible under **Downloads** without interrupting reading. The home entry shows the terminal failure count when nonzero. Failed rows show a short summary; tap one to read the complete stored error with manga/chapter context in a scrollable viewer. **Retry** retries a current failure, and **Close** returns to the same screen. The chapter action menu's **Download error** opens the same details.
+
+Waiting retries show **Retry scheduled** and a fixed next retry date/time in device-local time. Tap the row and choose **Download error**, or use the chapter action menu, to inspect the last error, including after a restart. Queued actions still allow cancellation and opening the chapter list. **Retry** stays disabled while the automatic retry is queued. Times do not count down or cause extra screen refreshes.
 
 Downloaded files use this layout:
 

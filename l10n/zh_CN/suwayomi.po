@@ -378,9 +378,6 @@ msgctxt "chapter action"
 msgid "Download"
 msgstr "下载"
 
-msgid "Download actions"
-msgstr "下载操作"
-
 msgid "Download ahead"
 msgstr "提前下载"
 
@@ -393,6 +390,12 @@ msgstr "下载全部未读"
 msgid "Download directory: %1"
 msgstr "下载目录：%1"
 
+msgid "Download error"
+msgstr "下载错误"
+
+msgid "Download error is no longer available."
+msgstr "下载错误已不可用。"
+
 msgid "Download first unread"
 msgstr "下载第一个未读章节"
 
@@ -404,6 +407,9 @@ msgstr "下载已在进行中。"
 
 msgid "Download is no longer active."
 msgstr "下载不再进行中。"
+
+msgid "Download is no longer failed."
+msgstr "下载已不再处于失败状态。"
 
 msgid "Download is no longer queued."
 msgstr "下载不再排队中。"
@@ -443,6 +449,10 @@ msgstr "正在下载 %1/%2"
 
 msgid "Downloads"
 msgstr "下载"
+
+msgid "Downloads · %1 failed"
+msgid_plural "Downloads · %1 failed"
+msgstr[0] "下载 · %1 项失败"
 
 msgid "Edit filters"
 msgstr "编辑筛选器"
@@ -655,6 +665,9 @@ msgstr "新文件夹"
 msgid "Next page"
 msgstr "下一页"
 
+msgid "Next retry: %1"
+msgstr "下次重试：%1"
+
 msgid "No actions available"
 msgstr "没有可用操作"
 
@@ -666,6 +679,9 @@ msgstr "无可用描述。"
 
 msgid "No downloads queued."
 msgstr "没有排队中的下载。"
+
+msgid "No error details were recorded."
+msgstr "未记录错误详情。"
 
 msgid "No manga in this library category."
 msgstr "此书架分类中没有漫画。"
@@ -830,6 +846,12 @@ msgstr "重置筛选器"
 
 msgid "Retry"
 msgstr "重试"
+
+msgid "Retry scheduled"
+msgstr "已安排重试"
+
+msgid "Retry time unavailable."
+msgstr "重试时间不可用。"
 
 msgid "Save"
 msgstr "保存"

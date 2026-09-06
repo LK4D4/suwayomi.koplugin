@@ -75,6 +75,9 @@ function SuwayomiPlugin:createDownloadQueue()
             if self.refreshDownloadsMenu then
                 self:refreshDownloadsMenu()
             end
+            if self.refreshHomeDownloads then
+                self:refreshHomeDownloads()
+            end
         end,
         onMessage = function(message)
             self:showMessage(message)
@@ -197,6 +200,9 @@ function SuwayomiPlugin:withChapterMenuRefreshSuppressed(callback)
         self:refreshChapterMenu({ quick = true })
         if self.refreshDownloadsMenu then
             self:refreshDownloadsMenu()
+        end
+        if self.refreshHomeDownloads then
+            self:refreshHomeDownloads()
         end
     end
     return result

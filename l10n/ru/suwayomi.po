@@ -407,9 +407,6 @@ msgctxt "chapter action"
 msgid "Download"
 msgstr "Скачать"
 
-msgid "Download actions"
-msgstr "Действия загрузки"
-
 msgid "Download ahead"
 msgstr "Скачать заранее"
 
@@ -422,6 +419,12 @@ msgstr "Скачать все непрочитанные"
 msgid "Download directory: %1"
 msgstr "Папка загрузок: %1"
 
+msgid "Download error"
+msgstr "Ошибка загрузки"
+
+msgid "Download error is no longer available."
+msgstr "Ошибка загрузки больше недоступна."
+
 msgid "Download first unread"
 msgstr "Скачать первую непрочитанную"
 
@@ -433,6 +436,9 @@ msgstr "Загрузка уже выполняется."
 
 msgid "Download is no longer active."
 msgstr "Загрузка больше не активна."
+
+msgid "Download is no longer failed."
+msgstr "Загрузка больше не находится в состоянии ошибки."
 
 msgid "Download is no longer queued."
 msgstr "Загрузка больше не в очереди."
@@ -472,6 +478,12 @@ msgstr "Скачивание %1/%2"
 
 msgid "Downloads"
 msgstr "Загрузки"
+
+msgid "Downloads · %1 failed"
+msgid_plural "Downloads · %1 failed"
+msgstr[0] "Загрузки · %1 ошибка"
+msgstr[1] "Загрузки · %1 ошибки"
+msgstr[2] "Загрузки · %1 ошибок"
 
 msgid "Edit filters"
 msgstr "Изменить фильтры"
@@ -688,6 +700,9 @@ msgstr "Новая папка"
 msgid "Next page"
 msgstr "Следующая страница"
 
+msgid "Next retry: %1"
+msgstr "Следующая попытка: %1"
+
 msgid "No actions available"
 msgstr "Нет доступных действий"
 
@@ -699,6 +714,9 @@ msgstr "Описание недоступно."
 
 msgid "No downloads queued."
 msgstr "Нет загрузок в очереди."
+
+msgid "No error details were recorded."
+msgstr "Подробности ошибки не сохранены."
 
 msgid "No manga in this library category."
 msgstr "В этой категории библиотеки нет манги."
@@ -881,6 +899,12 @@ msgstr "Сбросить фильтры"
 
 msgid "Retry"
 msgstr "Повторить"
+
+msgid "Retry scheduled"
+msgstr "Повтор запланирован"
+
+msgid "Retry time unavailable."
+msgstr "Время повторной попытки недоступно."
 
 msgid "Save"
 msgstr "Сохранить"

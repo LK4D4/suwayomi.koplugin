@@ -51,10 +51,21 @@ describe("suwayomi/downloads/status_formatter", function()
             { id = "399", name = "Official_Vol. 1 Ch. 2" },
             { state = "queued" }
         ))
+        assert.are.equal("Retry scheduled", formatter.formatChapterMenuStatus(
+            { id = "399", name = "Official_Vol. 1 Ch. 2" },
+            { state = "queued", retry_at = 130 }
+        ))
         assert.are.equal("Downloading 2/26", formatter.formatChapterMenuStatus(
             { id = "400", name = "Official_Vol. 1 Ch. 3" },
             { state = "downloading", current = 2, total = 26 }
         ))
+    end)
+
+    it("uses a fixed local retry timestamp and handles missing or invalid timestamps", function()
+        local timestamp = os.time({ year = 2026, month = 9, day = 6, hour = 14, min = 30, sec = 15 })
+        assert.are.equal("Next retry: 2026-09-06 14:30:15", formatter.formatRetryTime(timestamp))
+        assert.are.equal("Retry time unavailable.", formatter.formatRetryTime(nil))
+        assert.are.equal("Retry time unavailable.", formatter.formatRetryTime("unknown"))
     end)
 
     it("routes status labels and templates through i18n", function()
@@ -69,6 +80,13 @@ describe("suwayomi/downloads/status_formatter", function()
         package.loaded["suwayomi/i18n"] = nil
 
         formatter = require("suwayomi/downloads/status_formatter")
+
+        assert.are.equal("tx:Retry scheduled", formatter.formatChapterMenuStatus(
+            { name = "Chapter" }, { state = "queued", retry_at = 130 }
+        ))
+        assert.are.equal("tx:Retry time unavailable.", formatter.formatRetryTime(nil))
+        local timestamp = os.time({ year = 2026, month = 9, day = 6, hour = 14, min = 30, sec = 15 })
+        assert.are.equal("tx:Next retry: 2026-09-06 14:30:15", formatter.formatRetryTime(timestamp))
 
         assert.are.equal("tx:Downloading 2/26", formatter.formatChapterMenuStatus(
             { id = "400", name = "Official_Vol. 1 Ch. 3" },

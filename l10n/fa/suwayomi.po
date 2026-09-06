@@ -392,9 +392,6 @@ msgctxt "chapter action"
 msgid "Download"
 msgstr ""
 
-msgid "Download actions"
-msgstr ""
-
 msgid "Download ahead"
 msgstr ""
 
@@ -407,6 +404,12 @@ msgstr ""
 msgid "Download directory: %1"
 msgstr ""
 
+msgid "Download error"
+msgstr ""
+
+msgid "Download error is no longer available."
+msgstr ""
+
 msgid "Download first unread"
 msgstr ""
 
@@ -417,6 +420,9 @@ msgid "Download is already downloading."
 msgstr ""
 
 msgid "Download is no longer active."
+msgstr ""
+
+msgid "Download is no longer failed."
 msgstr ""
 
 msgid "Download is no longer queued."
@@ -457,6 +463,10 @@ msgstr ""
 
 msgid "Downloads"
 msgstr ""
+
+msgid "Downloads · %1 failed"
+msgid_plural "Downloads · %1 failed"
+msgstr[0] ""
 
 msgid "Edit filters"
 msgstr ""
@@ -670,6 +680,9 @@ msgstr ""
 msgid "Next page"
 msgstr ""
 
+msgid "Next retry: %1"
+msgstr ""
+
 msgid "No actions available"
 msgstr ""
 
@@ -680,6 +693,9 @@ msgid "No description available."
 msgstr ""
 
 msgid "No downloads queued."
+msgstr ""
+
+msgid "No error details were recorded."
 msgstr ""
 
 msgid "No manga in this library category."
@@ -849,6 +865,12 @@ msgid "Reset filters"
 msgstr ""
 
 msgid "Retry"
+msgstr ""
+
+msgid "Retry scheduled"
+msgstr ""
+
+msgid "Retry time unavailable."
 msgstr ""
 
 msgid "Save"

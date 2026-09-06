@@ -542,6 +542,23 @@ describe("suwayomi/chapters/actions", function()
         assert.is_false(called)
     end)
 
+    it("routes chapter download errors to the shared details controller", function()
+        local plugin = build_plugin()
+        local shown
+        local dialog = {}
+        function plugin:showChapterDownloadError(target_manga, target_chapter)
+            shown = { manga = target_manga, chapter = target_chapter }
+            return dialog
+        end
+
+        assert.are.equal(dialog, plugin:performChapterAction(manga, chapter, "download_error"))
+
+        assert.are.equal(manga, shown.manga)
+        assert.are.equal(chapter, shown.chapter)
+        assert.are.same({}, plugin.refreshes)
+        assert.are.same({}, removed_paths)
+    end)
+
     it("cancels chapter downloads from the chapter action menu", function()
         local cancelled
         local plugin = build_plugin({

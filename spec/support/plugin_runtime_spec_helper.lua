@@ -81,6 +81,7 @@ function Helper.install(options)
         registered_actions = {},
         registered_menu_plugin = nil,
         shown_home_dialog = nil,
+        home_downloads_labels = {},
         queue_instances = {},
         client_instances = {},
         debug_events = {},
@@ -234,6 +235,15 @@ function Helper.install(options)
             showHomeDialog = function(dialog_options)
                 state.shown_home_dialog = dialog_options
                 return dialog_options
+            end,
+            updateHomeDownloadsLabel = function(dialog, text)
+                for _, action in ipairs(dialog.actions or {}) do
+                    if action.id == "downloads" then
+                        action.text = text
+                    end
+                end
+                table.insert(state.home_downloads_labels, text)
+                return true
             end,
         }
     end

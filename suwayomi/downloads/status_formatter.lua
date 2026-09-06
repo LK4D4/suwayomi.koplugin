@@ -13,6 +13,19 @@ local StatusFormatter = {}
 
 StatusFormatter.CHAPTER_TITLE_WITH_STATUS_MAX_CHARS = 58
 
+function StatusFormatter.formatRetryTime(retry_at)
+    local timestamp = tonumber(retry_at)
+    local ok, formatted = false, nil
+    if timestamp then
+        -- Use a fixed local date/time; countdowns would repaint continuously on e-ink.
+        ok, formatted = pcall(os.date, "%Y-%m-%d %H:%M:%S", timestamp)
+    end
+    if not ok or not formatted then
+        return I18n.t("Retry time unavailable.")
+    end
+    return I18n.f("Next retry: %1", formatted)
+end
+
 function StatusFormatter.splitUtf8Chars(text)
     local chars = {}
     text = tostring(text or "")
@@ -82,7 +95,7 @@ function StatusFormatter.buildChapterStatusSymbols(chapter, status)
         return symbols
     end
     if status.state == "queued" then
-        table.insert(symbols, I18n.t("Queued"))
+        table.insert(symbols, status.retry_at and I18n.t("Retry scheduled") or I18n.t("Queued"))
         return symbols
     end
     if status.state == "downloading" then
