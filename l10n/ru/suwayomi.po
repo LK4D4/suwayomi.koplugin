@@ -485,6 +485,9 @@ msgstr "Введите поисковый запрос."
 msgid "Error"
 msgstr "Ошибка"
 
+msgid "Error details"
+msgstr "Подробности ошибки"
+
 msgctxt "source filter tri-state"
 msgid "Exclude"
 msgstr "Исключить"

@@ -78,14 +78,14 @@ Browse and Library:
 
 Downloads:
 
-- `suwayomi/downloads/controller.lua`: top-level Downloads hub, active/queued/failed actions, retry/clear/cancel, and downloaded-read reconciliation. Plugin-authored hub chrome, action labels, confirmations, and summaries route through `suwayomi/i18n.lua`; job titles, manga/chapter names, and job keys remain external data.
+- `suwayomi/downloads/controller.lua`: top-level Downloads hub, active/queued/failed actions, error details/retry/clear/cancel, and downloaded-read reconciliation. Error details pass the complete stored error through the UI facade to `suwayomi/ui/downloads.lua`, which opens KOReader's scrollable `TextViewer` only on request. Plugin-authored hub chrome, action labels, confirmations, and summaries route through `suwayomi/i18n.lua`; job titles, manga/chapter names, job keys, and stored errors remain external data.
 - `suwayomi/downloads/directory.lua`: download-directory chooser, summary, persistence callback flow, and default directory probing. Plugin-authored summary/save messages route through `suwayomi/i18n.lua`; directory paths remain external data.
 - `suwayomi/downloads/queue.lua`: public KOReader-local queue facade. Duplicate enqueue messages route through `suwayomi/i18n.lua`; queue keys, persisted state, and progress state remain data.
 - `suwayomi/downloads/active_jobs.lua`: bounded active chapter jobs, subprocess launch, progress polling, watchdog handling, persisted staggered retries for transient failures, and replacement scheduling. Background failures stay in queue state instead of opening one message per chapter. Plugin-authored fallback/startup failure text routes through `suwayomi/i18n.lua`; raw worker errors remain external data.
 - `suwayomi/downloads/job_store.lua`: persisted queue schema, serialization-safe job metadata, duplicate handling, and recovery normalization.
 - `suwayomi/downloads/progress_file.lua`: per-job progress path, read/write format, and fallback progress writing.
 - `suwayomi/downloads/status_formatter.lua`: chapter status symbols and user-facing queue/download status text.
-- `suwayomi/downloads/downloader.lua`: one-chapter download, page validation, ordered CBZ writing, `.part` cleanup, and final rename.
+- `suwayomi/downloads/downloader.lua`: one-chapter download, page validation, ordered CBZ writing, `.part` cleanup, and final rename. The optional archive export falls back to device-local page downloading on HTTP 400 (no server download) or HTTP 404; transient failures retry, while authentication and filesystem failures remain failures.
 
 Chapters and read state:
 

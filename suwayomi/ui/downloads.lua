@@ -1,10 +1,10 @@
 -- Boundary: Downloads hub menu UI.
 --
 -- Responsibility: format active, queued, and failed download rows and
--- wire row callbacks to the downloads controller.
+-- wire row callbacks to the downloads controller and display full error details.
 -- Owned state: none.
--- Dependencies: shared list menu widget, plugin i18n facade, and shared menu
--- utilities.
+-- Dependencies: shared list menu widget, KOReader TextViewer/UIManager, plugin
+-- i18n facade, and shared menu utilities.
 -- External data: queue snapshots are display-only here; controller actions own
 -- retries, cancellation, deletion, and navigation.
 
@@ -12,6 +12,17 @@ local I18n = require("suwayomi/i18n")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local DownloadsUI = {}
+
+function DownloadsUI.showDownloadErrorDetails(error_message)
+    local TextViewer = require("ui/widget/textviewer")
+    local UIManager = require("ui/uimanager")
+    local viewer = TextViewer:new{
+        title = I18n.t("Error details"),
+        text = tostring(error_message or ""),
+    }
+    UIManager:show(viewer)
+    return viewer
+end
 
 local function getListMenu()
     return require("suwayomi/ui/list_menu")

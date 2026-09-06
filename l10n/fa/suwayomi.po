@@ -470,6 +470,9 @@ msgstr ""
 msgid "Error"
 msgstr ""
 
+msgid "Error details"
+msgstr ""
+
 msgctxt "source filter tri-state"
 msgid "Exclude"
 msgstr ""

@@ -133,6 +133,7 @@ describe("suwayomi/ui", function()
         package.preload["ui/widget/textviewer"] = function()
             return {
                 new = function(_, options)
+                    options.renderer = "textviewer"
                     return options
                 end,
             }
@@ -537,6 +538,20 @@ describe("suwayomi/ui", function()
                 end,
             }
         end
+    end)
+
+    it("shows the complete download error in a text viewer through the public facade", function()
+        Marker.install()
+        local ui = require("suwayomi/ui")
+        local error_message = string.rep("First line of error\nNext line of error\n", 200) .. "last detail"
+
+        assert.is_function(ui.showDownloadErrorDetails)
+        local viewer = ui.showDownloadErrorDetails(error_message)
+
+        assert.are.equal(viewer, shown_dialog)
+        assert.are.equal("textviewer", viewer.renderer)
+        assert.are.equal("tx:Error details", viewer.title)
+        assert.are.equal(error_message, viewer.text)
     end)
 
     after_each(function()

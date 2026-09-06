@@ -1208,89 +1208,163 @@ describe("suwayomi/downloads/downloader", function()
         }))
     end)
 
-    it("falls back to page downloads when the direct archive endpoint is unavailable", function()
-        local direct_attempted = false
-        local fetched_pages = false
-        local added_files = {}
-        local renamed_to
+    for _, status_code in ipairs({ 400, 404, 0 }) do
+        for _, entrypoint in ipairs({ "downloadChapter", "downloadChapterWithProgress" }) do
+            it("downloads local pages after archive HTTP " .. status_code .. " through " .. entrypoint, function()
+                local progress_path = os.tmpname()
+                local direct_attempted = false
+                local fetched_pages = false
+                local added_files = {}
+                local renamed_to
 
-        package.preload["suwayomi/api"] = function()
-            return {
-                downloadChapterArchive = function(_, _, target_path)
-                    direct_attempted = true
-                    assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part", target_path)
-                    return { ok = false, error = "Chapter archive not found." }
-                end,
-                fetchChapterPages = function()
-                    fetched_pages = true
+                package.preload["suwayomi/api"] = function()
                     return {
-                        ok = true,
-                        pages = { "/page/0" },
+                        downloadChapterArchive = function(_, _, target_path)
+                            direct_attempted = true
+                            assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.direct.part", target_path)
+                            return {
+                                ok = false,
+                                error = status_code == 0 and "Chapter archive not found." or "Could not download chapter archive.",
+                                status_code = status_code ~= 0 and status_code or nil,
+                                retryable = false,
+                            }
+                        end,
+                        fetchChapterPages = function()
+                            fetched_pages = true
+                            return {
+                                ok = true,
+                                pages = { "/page/0" },
+                            }
+                        end,
+                        downloadBinary = function()
+                            return {
+                                ok = true,
+                                body = "page-one",
+                                content_type = "image/jpeg",
+                            }
+                        end,
                     }
-                end,
-                downloadBinary = function()
+                end
+                package.preload.lfs = function()
                     return {
-                        ok = true,
-                        body = "page-one",
-                        content_type = "image/jpeg",
+                        attributes = function()
+                            return nil
+                        end,
+                        mkdir = function()
+                            return true
+                        end,
                     }
-                end,
-            }
-        end
-        package.preload.lfs = function()
-            return {
-                attributes = function()
-                    return nil
-                end,
-                mkdir = function()
-                    return true
-                end,
-            }
-        end
-        package.preload["ffi/archiver"] = function()
-            return {
-                Writer = {
-                    new = function()
-                        return {
-                            open = function() return true end,
-                            addFileFromMemory = function(_, entry_path, content)
-                                table.insert(added_files, { path = entry_path, content = content })
-                                return true
+                end
+                package.preload["ffi/archiver"] = function()
+                    return {
+                        Writer = {
+                            new = function()
+                                return {
+                                    open = function() return true end,
+                                    addFileFromMemory = function(_, entry_path, content)
+                                        table.insert(added_files, { path = entry_path, content = content })
+                                        return true
+                                    end,
+                                    close = function() end,
+                                }
                             end,
-                            close = function() end,
-                        }
-                    end,
-                },
-            }
-        end
-        package.preload["ffi/util"] = function()
-            return {
-                joinPath = function(base, segment)
-                    if base:sub(-1) == "/" then
-                        return base .. segment
+                        },
+                    }
+                end
+                package.preload["ffi/util"] = function()
+                    return {
+                        joinPath = function(base, segment)
+                            if base:sub(-1) == "/" then
+                                return base .. segment
+                            end
+                            return base .. "/" .. segment
+                        end,
+                    }
+                end
+
+                local original_rename = os.rename
+                os.rename = function(from, to)
+                    if from == progress_path .. ".tmp" then
+                        local source = assert(io.open(from, "r"))
+                        local content = source:read("*a")
+                        source:close()
+                        local target = assert(io.open(to, "w"))
+                        target:write(content)
+                        target:close()
+                        os.remove(from)
+                        return true
                     end
-                    return base .. "/" .. segment
-                end,
-            }
+                    renamed_to = to
+                    return true
+                end
+
+                local downloader = require("suwayomi/downloads/downloader")
+                local result = downloader[entrypoint](downloader, { server_url = "https://suwayomi.example" }, "/books",
+                    { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, progress_path)
+
+                os.rename = original_rename
+
+                local progress_content
+                if entrypoint == "downloadChapterWithProgress" then
+                    local progress_file = assert(io.open(progress_path, "r"))
+                    progress_content = progress_file:read("*a")
+                    progress_file:close()
+                end
+                os.remove(progress_path)
+                assert.is_true(result.ok)
+                if progress_content then
+                    assert.are.equal("state=downloaded\ncurrent=1\ntotal=1\npath=/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz\n", progress_content)
+                end
+                assert.is_true(direct_attempted)
+                assert.is_true(fetched_pages)
+                assert.are.same({ { path = "0001.jpg", content = "page-one" } }, added_files)
+                assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", renamed_to)
+            end)
+
         end
+    end
 
-        local original_rename = os.rename
-        os.rename = function(_from, to)
-            renamed_to = to
-            return true
-        end
+    for _, failure in ipairs({
+        { ok = false, status_code = 401, retryable = false, error = "Authentication required." },
+        { ok = false, status_code = 403, retryable = false, error = "Access denied." },
+        { ok = false, retryable = false, error = "Could not write chapter archive. disk full" },
+    }) do
+        it("does not fall back after archive failure: " .. failure.error, function()
+            local attempts = 0
+            local fetched_pages = false
+            package.preload["suwayomi/api"] = function()
+                return {
+                    downloadChapterArchive = function()
+                        attempts = attempts + 1
+                        return failure
+                    end,
+                    fetchChapterPages = function()
+                        fetched_pages = true
+                        return { ok = true, pages = {} }
+                    end,
+                }
+            end
+            package.preload.lfs = function()
+                return {
+                    attributes = function() return nil end,
+                    mkdir = function() return true end,
+                }
+            end
+            package.preload["ffi/archiver"] = function() return {} end
+            package.preload["ffi/util"] = function()
+                return { joinPath = function(base, segment) return base .. "/" .. segment end }
+            end
+            local downloader = require("suwayomi/downloads/downloader")
+            local result = downloader:downloadChapterWithProgress({}, "/books",
+                { title = "Test manga" }, { id = "398", name = "Test chapter" })
 
-        local downloader = require("suwayomi/downloads/downloader")
-        local result = downloader:downloadChapter({ server_url = "https://suwayomi.example" }, "/books", { title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" })
-
-        os.rename = original_rename
-
-        assert.is_true(result.ok)
-        assert.is_true(direct_attempted)
-        assert.is_true(fetched_pages)
-        assert.are.same({ { path = "0001.jpg", content = "page-one" } }, added_files)
-        assert.are.equal("/books/Unknown source/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz", renamed_to)
-    end)
+            assert.is_false(result.ok)
+            assert.are.equal(failure.error, result.error)
+            assert.is_false(result.retryable)
+            assert.are.equal(1, attempts)
+            assert.is_false(fetched_pages)
+        end)
+    end
 
     it("retries transient direct archive download failures before page fallback", function()
         local archive = buildStoredZip("0001.jpg", "page-one")

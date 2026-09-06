@@ -1,6 +1,6 @@
 -- Boundary: DownloadsController.
 --
--- Responsibility: Owns the Downloads hub UI, retry/cancel actions, download-ahead refills, and downloaded-read reconciliation.
+-- Responsibility: Owns the Downloads hub UI, error-details/retry/cancel actions, download-ahead refills, and downloaded-read reconciliation.
 -- Owned state: Uses the device-local queue only; it must not call Suwayomi server download mutations.
 -- Dependencies: KOReader UI helpers and Suwayomi runtime modules, including the plugin i18n facade.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -133,6 +133,7 @@ function Methods:showFailedDownloadActions(job, menu)
         title = I18n.t("Download actions"),
         actions = {
             { id = "retry", text = I18n.t("Retry") },
+            { id = "error_details", text = I18n.t("Error details") },
             { id = "close", text = I18n.t("Close") },
         },
     }, function(action)
@@ -143,6 +144,8 @@ function Methods:showFailedDownloadActions(job, menu)
                 self:showMessage(I18n.t("Could not retry download."))
             end
             self:showDownloads()
+        elseif action and action.id == "error_details" then
+            SuwayomiUI.showDownloadErrorDetails(job and job.progress and job.progress.error)
         end
     end)
 end

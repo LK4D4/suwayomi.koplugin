@@ -456,6 +456,9 @@ msgstr "请输入搜索内容。"
 msgid "Error"
 msgstr "错误"
 
+msgid "Error details"
+msgstr "错误详情"
+
 msgctxt "source filter tri-state"
 msgid "Exclude"
 msgstr "排除"

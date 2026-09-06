@@ -479,7 +479,9 @@ function Downloader:downloadDirectChapterArchive(credentials, download_directory
     end)
     if not archive_result.ok then
         self:cleanupPartialFile(partial_path)
-        if archive_result.status_code == 404 or archive_result.error == "Chapter archive not found." then
+        -- The optional export returns HTTP 400 when no server-side download exists.
+        if archive_result.status_code == 400 or archive_result.status_code == 404
+            or archive_result.error == "Chapter archive not found." then
             return nil
         end
         return archive_result

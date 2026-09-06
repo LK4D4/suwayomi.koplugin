@@ -484,6 +484,9 @@ msgstr "Введіть пошуковий запит."
 msgid "Error"
 msgstr "Помилка"
 
+msgid "Error details"
+msgstr "Подробиці помилки"
+
 msgctxt "source filter tri-state"
 msgid "Exclude"
 msgstr "Виключити"
