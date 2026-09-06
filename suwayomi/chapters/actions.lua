@@ -471,52 +471,6 @@ function Methods:formatReadDownloadDeleteMessage(deleted, details)
 end
 
 
-function Methods:markSelectedChaptersRead()
-    local started_at = SuwayomiDebug.now()
-    if not self.current_chapter_context then
-        return 0
-    end
-
-    local manga = self.current_chapter_context.manga
-    local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
-    if #chapters == 0 then
-        self:showMessage(I18n.t("No chapters selected."))
-        return 0
-    end
-
-    local ledger = self:loadChapterLedger()
-    local finished_entries = {}
-    for _index, chapter in ipairs(chapters) do
-        self:markChapterRead(manga, chapter, {
-            ledger = ledger,
-            finished_entries = finished_entries,
-            skip_refresh = true,
-            skip_schedule = true,
-            skip_keep_policy = true,
-        })
-    end
-
-    self:clearChapterSelection(true)
-    self:refreshChapterMenu({ ledger = ledger })
-    self:saveChapterLedger(ledger)
-    for _, entry in ipairs(finished_entries) do
-        self:recordFinishedChapter(entry)
-    end
-    self:schedulePendingReadSync()
-    if self.applyMangaKeepNextUnreadDownloadsPolicy then
-        self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
-    end
-    SuwayomiDebug.log({
-        operation = "markSelectedChaptersRead",
-        event = "end",
-        manga_id = manga and manga.id,
-        chapter_count = #chapters,
-        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
-    })
-    return #chapters
-end
-
-
 function Methods:markSelectedChaptersUnread()
     local started_at = SuwayomiDebug.now()
     if not self.current_chapter_context then

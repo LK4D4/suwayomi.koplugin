@@ -89,6 +89,7 @@ describe("manual read completion integration", function()
                 updateChapterMenu = function(menu, options)
                     if not menu then return end
                     assert.is_not_true(menu.closed)
+                    menu.title = options.title
                     menu.chapters = clone(options.chapters)
                     menu.refreshes = (menu.refreshes or 0) + 1
                     if state.on_refresh then state.on_refresh() end
@@ -545,6 +546,102 @@ describe("manual read completion integration", function()
             plugin:processFinishedChapterCleanup()
             assert.same({ path("C") }, state.removed)
             assert.same({ "A", "B" }, records(state))
+        end)
+    end
+
+    for _, action in ipairs({ "selected", "previous" }) do
+        it("persists non-target refresh reconciliation before " .. action .. " completion publication", function()
+            local state, instance = fixture()
+            local chapters = { chapter("A"), chapter("B"), chapter("C") }
+            local plugin = instance(chapters)
+            plugin:refreshChapterMenu()
+            if action == "selected" then
+                plugin:toggleChapterSelection(manga, chapters[1])
+                plugin:toggleChapterSelection(manga, chapters[2])
+                assert.equals("%1 selected", plugin.current_chapter_menu.title)
+                for index = 1, 2 do
+                    local row = plugin.current_chapter_menu.chapters[index]
+                    assert.equals(plugin:addChapterSelectionMarker(""), row.menu_status:sub(1, #"●"))
+                end
+            end
+
+            -- Finish the non-target chapter after selection refreshes, so only
+            -- the mark-read action's full rebuild can reconcile this change.
+            state.metadata[path("C") .. ".lua"] = { summary = { status = "complete" } }
+            assert.is_false(state.ledger["m:C"].read)
+            state.events = {}
+            local refreshes = plugin.current_chapter_menu.refreshes
+            local syncs, keep_policies = 0, 0
+            plugin.schedulePendingReadSync = function() syncs = syncs + 1 end
+            plugin.applyMangaKeepNextUnreadDownloadsPolicy = function(_, target)
+                assert.same(manga, target)
+                keep_policies = keep_policies + 1
+            end
+            if action == "selected" then
+                assert.equals(2, plugin:markSelectedChaptersRead())
+            else
+                assert.equals(2, plugin:markChaptersBeforeRead(manga, chapters[3]))
+            end
+
+            assert.equals(refreshes + 1, plugin.current_chapter_menu.refreshes)
+            assert.equals(1, syncs)
+            assert.equals(1, keep_policies)
+            assert.same({ "A", "B" }, records(state))
+            assert.equals(3, #state.events)
+            assert.equals("ledger", state.events[1].kind)
+            for index, event in ipairs(state.events) do
+                if index > 1 then assert.equals("journal", event.kind) end
+                assert.is_true(event.ledger["m:C"].read)
+                assert.is_true(event.ledger["m:C"].pending_read_sync)
+                assert.equals(path("C"), event.ledger["m:C"].path)
+            end
+            assert.same({}, state.removed)
+            for _, c in ipairs(chapters) do
+                assertDownloaded(state, plugin, c.id, true)
+                assert.is_true(state.ledger["m:" .. c.id].read)
+            end
+            assert.is_true(chapters[3].is_read)
+            assert.is_true(plugin.current_chapter_menu.chapters[3].is_read)
+            assert.is_true(plugin.current_chapter_menu.chapters[3].pending_read_sync)
+            if action == "selected" then
+                assert.equals(0, plugin:getSelectedChapterCount())
+                assert.is_false(plugin.selection_mode)
+                assert.equals("Manga", plugin.current_chapter_menu.title)
+                for _, row in ipairs(plugin.current_chapter_menu.chapters) do
+                    assert.is_nil(row.menu_status:find("●", 1, true))
+                end
+            end
+        end)
+    end
+
+    for _, action in ipairs({ "selected", "previous", "list" }) do
+        it("keeps durable state and displayed downloads unchanged for empty " .. action .. " actions", function()
+            local state, instance = fixture()
+            local chapters = { chapter("A") }
+            local plugin = instance(chapters)
+            plugin:refreshChapterMenu()
+            local ledger = clone(state.ledger)
+            local menu = clone(plugin.current_chapter_menu)
+            state.events = {}
+            local syncs, keep_policies = 0, 0
+            plugin.schedulePendingReadSync = function() syncs = syncs + 1 end
+            plugin.applyMangaKeepNextUnreadDownloadsPolicy = function() keep_policies = keep_policies + 1 end
+            if action == "selected" then
+                assert.equals(0, plugin:markSelectedChaptersRead())
+            elseif action == "previous" then
+                assert.equals(0, plugin:markChaptersBeforeRead(manga, chapters[1]))
+            else
+                assert.equals(0, plugin:markChapterListRead(manga, {}))
+            end
+            assert.same(ledger, state.ledger)
+            assert.same(menu, plugin.current_chapter_menu)
+            assert.same({}, state.events)
+            assert.same({}, state.removed)
+            assert.same({}, records(state))
+            assert.same({}, state.scheduled)
+            assert.equals(0, syncs)
+            assert.equals(0, keep_policies)
+            assertDownloaded(state, plugin, "A", true)
         end)
     end
 

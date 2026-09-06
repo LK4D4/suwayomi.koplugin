@@ -1,11 +1,12 @@
 -- Boundary: ChapterReadActions.
 --
 -- Responsibility: Mark chapters read/unread and coordinate metadata, persisted ledger, explicit completion, and read-sync side effects.
--- Owned state: Mutates current chapter context and settings-backed read ledger through plugin methods.
--- Dependencies: Plugin mixin methods and Suwayomi debug timing.
+-- Owned state: Owns operation-local manual read ledgers and completion buffers; mutates chapter context through plugin methods.
+-- Dependencies: Plugin mixin methods, Suwayomi debug timing, and i18n.
 -- External data: Manga/chapter tables may come from API responses or cached UI state and are matched by stable ids.
 
 local SuwayomiDebug = require("suwayomi/debug")
+local I18n = require("suwayomi/i18n")
 
 local ChapterReadActions = {}
 ChapterReadActions.__index = ChapterReadActions
@@ -19,9 +20,7 @@ end
 
 local Methods = {}
 
-function Methods:markChapterRead(manga, chapter, options)
-    local started_at = SuwayomiDebug.now()
-    options = options or {}
+local function processChapterRead(self, manga, chapter, ledger, skip_delete_after_mark_read)
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
     local metadata_updated = false
     if downloaded and chapter_path then
@@ -34,8 +33,8 @@ function Methods:markChapterRead(manga, chapter, options)
         pending_read_state = true,
     }
     local entry
-    if options.ledger then
-        entry = self:upsertChapterLedgerEntryInLedger(options.ledger, manga, chapter, updates)
+    if ledger then
+        entry = self:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, updates)
     else
         entry = self:upsertChapterLedgerEntry(manga, chapter, updates)
     end
@@ -49,22 +48,33 @@ function Methods:markChapterRead(manga, chapter, options)
         end
     end
     local deleted_after_mark_read = 0
-    if not options.skip_delete_after_mark_read and self.deleteChaptersAfterManualMarkRead then
+    if not skip_delete_after_mark_read and self.deleteChaptersAfterManualMarkRead then
         deleted_after_mark_read = self:deleteChaptersAfterManualMarkRead(manga, { chapter }, {
-            ledger = options.ledger,
+            ledger = ledger,
         })
     end
+    local completion
     if self.recordFinishedChapter then
-        -- Capture eligibility now: ledger paths can be stale or changed by a
-        -- later download, immediate deletion, or the bulk menu refresh.
-        local completion = {
+        -- Capture eligibility before a later download or menu refresh can change it.
+        completion = {
             manga_id = entry.manga_id,
             chapter_id = entry.chapter_id,
             read = entry.read,
             path = downloaded and deleted_after_mark_read == 0 and chapter_path or nil,
         }
+    end
+    return completion, downloaded, metadata_updated, deleted_after_mark_read
+end
+
+function Methods:markChapterRead(manga, chapter, options)
+    local started_at = SuwayomiDebug.now()
+    options = options or {}
+    local completion, downloaded, metadata_updated, deleted_after_mark_read = processChapterRead(
+        self, manga, chapter, options.ledger, options.skip_delete_after_mark_read
+    )
+    if completion then
         if options.finished_entries then
-            -- The bulk caller publishes these only after saving its shared ledger.
+            -- Retain compatibility for callers supplying a completion buffer.
             table.insert(options.finished_entries, completion)
         else
             if options.ledger then
@@ -153,34 +163,38 @@ function Methods:markChapterUnread(manga, chapter, options)
     return true
 end
 
+local function markReadBatch(self, manga, chapters, clear_selection)
+    local ledger = self:loadChapterLedger()
+    local completions = {}
+    for _, chapter in ipairs(chapters) do
+        local completion = processChapterRead(self, manga, chapter, ledger)
+        if completion then
+            completions[#completions + 1] = completion
+        end
+    end
+
+    if clear_selection then
+        self:clearChapterSelection(true)
+    end
+    -- Menu reconciliation can update visible chapters outside this batch.
+    self:refreshChapterMenu({ ledger = ledger })
+    self:saveChapterLedger(ledger)
+    for _, completion in ipairs(completions) do
+        self:recordFinishedChapter(completion)
+    end
+    self:schedulePendingReadSync()
+    if self.applyMangaKeepNextUnreadDownloadsPolicy then
+        self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
+    end
+end
+
 function Methods:markChapterListRead(manga, chapters)
     local started_at = SuwayomiDebug.now()
     if #chapters == 0 then
         return 0
     end
 
-    local ledger = self:loadChapterLedger()
-    local finished_entries = {}
-    for _, current in ipairs(chapters) do
-        self:markChapterRead(manga, current, {
-            ledger = ledger,
-            finished_entries = finished_entries,
-            skip_refresh = true,
-            skip_schedule = true,
-            skip_keep_policy = true,
-        })
-    end
-
-    self:refreshChapterMenu({ ledger = ledger })
-    self:saveChapterLedger(ledger)
-    -- Publish in list order only after the entire batch is durable.
-    for _, entry in ipairs(finished_entries) do
-        self:recordFinishedChapter(entry)
-    end
-    self:schedulePendingReadSync()
-    if self.applyMangaKeepNextUnreadDownloadsPolicy then
-        self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
-    end
+    markReadBatch(self, manga, chapters)
     SuwayomiDebug.log({
         operation = "markChapterListRead",
         event = "end",
@@ -190,6 +204,31 @@ function Methods:markChapterListRead(manga, chapters)
     })
     return #chapters
 end
+
+function Methods:markSelectedChaptersRead()
+    local started_at = SuwayomiDebug.now()
+    if not self.current_chapter_context then
+        return 0
+    end
+
+    local manga = self.current_chapter_context.manga
+    local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
+    if #chapters == 0 then
+        self:showMessage(I18n.t("No chapters selected."))
+        return 0
+    end
+
+    markReadBatch(self, manga, chapters, true)
+    SuwayomiDebug.log({
+        operation = "markSelectedChaptersRead",
+        event = "end",
+        manga_id = manga and manga.id,
+        chapter_count = #chapters,
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
+    })
+    return #chapters
+end
+
 
 function Methods:markChaptersBeforeRead(manga, chapter)
     return self:markChapterListRead(manga, self:getChaptersBefore(chapter))
