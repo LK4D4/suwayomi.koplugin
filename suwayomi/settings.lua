@@ -2,18 +2,20 @@
 --
 -- Responsibility: load, normalize, save, and flush Suwayomi plugin settings from
 -- KOReader's settings directory.
--- Owned state: cached LuaSettings handle and settings file path.
--- Dependencies: datastorage and luasettings.
+-- Owned state: cached LuaSettings handle, settings store, and settings file path.
+-- Dependencies: datastorage, luasettings, and suwayomi/settings/store.
 -- External data: stored settings tables are treated as optional and normalized
 -- before callers consume them.
 
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
+local SettingsStore = require("suwayomi/settings/store")
 local SourceFilters = require("suwayomi/source_filters")
 
 local SuwayomiSettings = {
     settings_file = DataStorage:getSettingsDir() .. "/suwayomi.lua",
     settings = nil,
+    store = nil,
 }
 
 local DEFAULT_CREDENTIALS = {
@@ -327,6 +329,20 @@ function SuwayomiSettings:open()
     return self.settings
 end
 
+function SuwayomiSettings:getStore()
+    if not self.store then
+        self.store = SettingsStore:new({
+            path = self.settings_file,
+            luasettings = self:open(),
+        })
+    end
+    return self.store
+end
+
+function SuwayomiSettings:setStore(store)
+    self.store = store
+end
+
 function SuwayomiSettings:getSettingsDir()
     return DataStorage:getSettingsDir()
 end
@@ -344,17 +360,20 @@ function SuwayomiSettings:normalizeServerURL(server_url)
 end
 
 function SuwayomiSettings:load()
-    return self:normalizeCredentials(self:open():readSetting("credentials", copyTable(DEFAULT_CREDENTIALS)))
+    return self:normalizeCredentials(self:getStore():readKey("credentials", copyTable(DEFAULT_CREDENTIALS)))
 end
 
 function SuwayomiSettings:save(credentials)
     credentials = self:normalizeCredentials(credentials)
-    self:open():saveSetting("credentials", credentials):flush()
+    local ok, err = self:getStore():saveKey("credentials", credentials)
+    if not ok then
+        return nil, err
+    end
     return credentials
 end
 
 function SuwayomiSettings:loadSourceLanguages()
-    return self:open():readSetting("source_languages", copyTable(DEFAULT_SOURCE_LANGUAGES))
+    return self:getStore():readKey("source_languages", copyTable(DEFAULT_SOURCE_LANGUAGES))
 end
 
 function SuwayomiSettings:saveSourceLanguages(source_languages)
@@ -363,7 +382,10 @@ function SuwayomiSettings:saveSourceLanguages(source_languages)
         table.insert(normalized, lang)
     end
 
-    self:open():saveSetting("source_languages", normalized):flush()
+    local ok, err = self:getStore():saveKey("source_languages", normalized)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
@@ -377,13 +399,16 @@ end
 
 function SuwayomiSettings:loadBrowseSettings()
     return self:normalizeBrowseSettings(
-        self:open():readSetting("browse_settings", copyTable(DEFAULT_BROWSE_SETTINGS))
+        self:getStore():readKey("browse_settings", copyTable(DEFAULT_BROWSE_SETTINGS))
     )
 end
 
 function SuwayomiSettings:saveBrowseSettings(browse_settings)
     local normalized = self:normalizeBrowseSettings(browse_settings)
-    self:open():saveSetting("browse_settings", normalized):flush()
+    local ok, err = self:getStore():saveKey("browse_settings", normalized)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
@@ -396,19 +421,22 @@ end
 
 function SuwayomiSettings:loadLibraryCategoryPickerBehavior()
     return self:normalizeLibraryCategoryPickerBehavior(
-        self:open():readSetting("library_category_picker_behavior", DEFAULT_LIBRARY_CATEGORY_PICKER_BEHAVIOR)
+        self:getStore():readKey("library_category_picker_behavior", DEFAULT_LIBRARY_CATEGORY_PICKER_BEHAVIOR)
     )
 end
 
 function SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
     local normalized = self:normalizeLibraryCategoryPickerBehavior(behavior)
-    self:open():saveSetting("library_category_picker_behavior", normalized):flush()
+    local ok, err = self:getStore():saveKey("library_category_picker_behavior", normalized)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
 function SuwayomiSettings:loadSourceCache(credentials_or_url)
     local server_url, auth_identity = self:getSourceCacheScope(credentials_or_url)
-    local cache = self:open():readSetting("source_cache", nil)
+    local cache = self:getStore():readKey("source_cache", nil)
     if type(cache) ~= "table"
         or cache.server_url ~= server_url
         or tostring(cache.auth_identity or "") ~= auth_identity
@@ -432,7 +460,10 @@ function SuwayomiSettings:saveSourceCache(credentials_or_url, sources, updated_a
         table.insert(normalized.sources, source)
     end
 
-    self:open():saveSetting("source_cache", normalized):flush()
+    local ok, err = self:getStore():saveKey("source_cache", normalized)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
@@ -445,7 +476,7 @@ end
 
 function SuwayomiSettings:loadSourceFilterDraft(credentials_or_url, source_id)
     local server_url, auth_identity = self:getSourceCacheScope(credentials_or_url)
-    local drafts = self:open():readSetting("source_filter_drafts", nil)
+    local drafts = self:getStore():readKey("source_filter_drafts", nil)
     if type(drafts) ~= "table"
         or drafts.server_url ~= server_url
         or tostring(drafts.auth_identity or "") ~= auth_identity
@@ -463,7 +494,7 @@ end
 
 local function loadDraftStore(settings, credentials_or_url)
     local server_url, auth_identity = settings:getSourceCacheScope(credentials_or_url)
-    local drafts = settings:open():readSetting("source_filter_drafts", nil)
+    local drafts = settings:getStore():readKey("source_filter_drafts", nil)
     if type(drafts) ~= "table"
         or drafts.server_url ~= server_url
         or tostring(drafts.auth_identity or "") ~= auth_identity
@@ -483,7 +514,10 @@ function SuwayomiSettings:saveSourceFilterDraft(credentials_or_url, source_id, d
     local normalized = SourceFilters.normalizeDraft(draft)
     local drafts = loadDraftStore(self, credentials_or_url)
     drafts.sources[source_key] = normalized
-    self:open():saveSetting("source_filter_drafts", drafts):flush()
+    local ok, err = self:getStore():saveKey("source_filter_drafts", drafts)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
@@ -491,24 +525,30 @@ function SuwayomiSettings:clearSourceFilterDraft(credentials_or_url, source_id)
     local source_key = tostring(source_id or "")
     local drafts = loadDraftStore(self, credentials_or_url)
     drafts.sources[source_key] = nil
-    self:open():saveSetting("source_filter_drafts", drafts):flush()
+    local ok, err = self:getStore():saveKey("source_filter_drafts", drafts)
+    if not ok then
+        return nil, err
+    end
     return emptySourceFilterDraft()
 end
 
 function SuwayomiSettings:loadDownloadDirectory()
-    return normalizeDownloadDirectory(self:open():readSetting("download_directory", DEFAULT_DOWNLOAD_DIRECTORY))
+    return normalizeDownloadDirectory(self:getStore():readKey("download_directory", DEFAULT_DOWNLOAD_DIRECTORY))
 end
 
 function SuwayomiSettings:saveDownloadDirectory(path)
     local normalized = normalizeDownloadDirectory(path)
-    self:open():saveSetting("download_directory", normalized):flush()
+    local ok, err = self:getStore():saveKey("download_directory", normalized)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
 function SuwayomiSettings:loadDownloadQueue()
-    local normalized, changed = self:normalizeDownloadQueue(self:open():readSetting("download_queue", {}))
+    local normalized, changed = self:normalizeDownloadQueue(self:getStore():readKey("download_queue", {}))
     if changed then
-        self:open():saveSetting("download_queue", normalized):flush()
+        self:saveDownloadQueue(normalized)
     end
     return normalized
 end
@@ -547,31 +587,40 @@ end
 
 function SuwayomiSettings:saveDownloadQueue(jobs)
     local normalized = self:normalizeDownloadQueue(jobs)
-    self:open():saveSetting("download_queue", normalized):flush()
+    local ok, err = self:getStore():saveKey("download_queue", normalized)
+    if not ok then
+        return false, err
+    end
     return normalized
 end
 
 function SuwayomiSettings:loadMaxParallelChapterDownloads()
     return self:normalizeMaxParallelChapterDownloads(
-        self:open():readSetting("max_parallel_chapter_downloads", DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS)
+        self:getStore():readKey("max_parallel_chapter_downloads", DEFAULT_MAX_PARALLEL_CHAPTER_DOWNLOADS)
     )
 end
 
 function SuwayomiSettings:saveMaxParallelChapterDownloads(value)
     local normalized = self:normalizeMaxParallelChapterDownloads(value)
-    self:open():saveSetting("max_parallel_chapter_downloads", normalized):flush()
+    local ok, err = self:getStore():saveKey("max_parallel_chapter_downloads", normalized)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
 function SuwayomiSettings:loadDeleteChaptersSettings()
     return self:normalizeDeleteChaptersSettings(
-        self:open():readSetting("delete_chapters_settings", DEFAULT_DELETE_CHAPTERS_SETTINGS)
+        self:getStore():readKey("delete_chapters_settings", DEFAULT_DELETE_CHAPTERS_SETTINGS)
     )
 end
 
 function SuwayomiSettings:saveDeleteChaptersSettings(value)
     local normalized = self:normalizeDeleteChaptersSettings(value)
-    self:open():saveSetting("delete_chapters_settings", normalized):flush()
+    local ok, err = self:getStore():saveKey("delete_chapters_settings", normalized)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
@@ -580,7 +629,7 @@ function SuwayomiSettings:loadMangaKeepNextUnreadDownloads(manga)
     if not key then
         return DEFAULT_MANGA_KEEP_NEXT_UNREAD_DOWNLOADS
     end
-    local limits = self:open():readSetting("manga_keep_next_unread_downloads", {})
+    local limits = self:getStore():readKey("manga_keep_next_unread_downloads", {})
     if type(limits) ~= "table" then
         return DEFAULT_MANGA_KEEP_NEXT_UNREAD_DOWNLOADS
     end
@@ -594,16 +643,21 @@ function SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, limit)
         return normalized
     end
 
-    local limits = self:open():readSetting("manga_keep_next_unread_downloads", {})
+    local limits = self:getStore():readKey("manga_keep_next_unread_downloads", {})
     if type(limits) ~= "table" then
         limits = {}
+    else
+        limits = copyTable(limits)
     end
     if normalized > 0 then
         limits[key] = normalized
     else
         limits[key] = nil
     end
-    self:open():saveSetting("manga_keep_next_unread_downloads", limits):flush()
+    local ok, err = self:getStore():saveKey("manga_keep_next_unread_downloads", limits)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
@@ -612,7 +666,7 @@ function SuwayomiSettings:loadMangaScanlatorFilter(manga)
     if not key then
         return nil
     end
-    local filters = self:open():readSetting("manga_scanlator_filters", {})
+    local filters = self:getStore():readKey("manga_scanlator_filters", {})
     if type(filters) ~= "table" then
         return nil
     end
@@ -626,26 +680,34 @@ function SuwayomiSettings:saveMangaScanlatorFilter(manga, scanlator)
         return normalized
     end
 
-    local filters = self:open():readSetting("manga_scanlator_filters", {})
+    local filters = self:getStore():readKey("manga_scanlator_filters", {})
     if type(filters) ~= "table" then
         filters = {}
+    else
+        filters = copyTable(filters)
     end
     if normalized then
         filters[key] = normalized
     else
         filters[key] = nil
     end
-    self:open():saveSetting("manga_scanlator_filters", filters):flush()
+    local ok, err = self:getStore():saveKey("manga_scanlator_filters", filters)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
 function SuwayomiSettings:loadChapterLedger()
-    return self:normalizeChapterLedger(self:open():readSetting("chapter_ledger", {}))
+    return self:normalizeChapterLedger(self:getStore():readKey("chapter_ledger", {}))
 end
 
 function SuwayomiSettings:saveChapterLedger(ledger)
     local normalized = self:normalizeChapterLedger(ledger)
-    self:open():saveSetting("chapter_ledger", normalized):flush()
+    local ok, err = self:getStore():saveKey("chapter_ledger", normalized)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
@@ -654,11 +716,11 @@ function SuwayomiSettings:normalizeFinishedChapterCleanupJournal(value)
 end
 
 function SuwayomiSettings:loadFinishedChapterCleanupJournal()
-    local raw = self:open():readSetting("finished_chapter_cleanup", nil)
+    local raw = self:getStore():readKey("finished_chapter_cleanup", nil)
     local journal, changed, error_code = normalizeFinishedCleanupJournal(raw)
     if error_code then return journal, error_code end
     if changed then
-        self:open():saveSetting("finished_chapter_cleanup", journal):flush()
+        self:saveFinishedChapterCleanupJournal(journal)
     end
     return journal
 end
@@ -666,18 +728,24 @@ end
 function SuwayomiSettings:saveFinishedChapterCleanupJournal(journal)
     local normalized, _, error_code = normalizeFinishedCleanupJournal(journal)
     if error_code then return normalized, error_code end
-    self:open():saveSetting("finished_chapter_cleanup", normalized):flush()
+    local ok, err = self:getStore():saveKey("finished_chapter_cleanup", normalized)
+    if not ok then
+        return nil, err
+    end
     return normalized
 end
 
 function SuwayomiSettings:clearFinishedChapterCleanupJournal()
     local journal = emptyFinishedCleanupJournal()
-    self:open():saveSetting("finished_chapter_cleanup", journal):flush()
+    local ok, err = self:getStore():saveKey("finished_chapter_cleanup", journal)
+    if not ok then
+        return nil, err
+    end
     return journal
 end
 
 function SuwayomiSettings:loadReaderReturnContexts()
-    local contexts = self:open():readSetting("reader_return_contexts", {})
+    local contexts = self:getStore():readKey("reader_return_contexts", {})
     if type(contexts) ~= "table" then
         return {}
     end
@@ -688,7 +756,10 @@ function SuwayomiSettings:saveReaderReturnContexts(contexts)
     if type(contexts) ~= "table" then
         contexts = {}
     end
-    self:open():saveSetting("reader_return_contexts", contexts):flush()
+    local ok, err = self:getStore():saveKey("reader_return_contexts", contexts)
+    if not ok then
+        return nil, err
+    end
     return contexts
 end
 

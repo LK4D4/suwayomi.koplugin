@@ -135,15 +135,15 @@ function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, st
 end
 
 function DownloadQueue:upsertPersistentJob(job)
-    self.job_store:upsert(job)
+    return self.job_store:upsert(job)
 end
 
 function DownloadQueue:upsertPersistentJobs(new_jobs)
-    self.job_store:upsertMany(new_jobs)
+    return self.job_store:upsertMany(new_jobs)
 end
 
 function DownloadQueue:removePersistentJob(key)
-    self.job_store:remove(key)
+    return self.job_store:remove(key)
 end
 
 function DownloadQueue:copySnapshotJob(job, state)
@@ -215,7 +215,20 @@ function DownloadQueue:clearFailed()
     end
 
     if cleared > 0 then
-        self:savePersistentJobs(remaining)
+        local saved, err = self:savePersistentJobs(remaining)
+        if not saved then
+            -- Restore previous failed statuses on failure
+            for _, job in ipairs(self:loadPersistentJobs()) do
+                if job.state == "failed" then
+                    local key = job.key or (job.manga and job.chapter and self:getKey(job.manga, job.chapter))
+                    if key then
+                        self.statuses[key] = { state = "failed" }
+                    end
+                end
+            end
+            self:notifyDownloadFailure(err or "Failed to clear downloads")
+            return 0, err or "save_failed"
+        end
         self.onStatusChanged()
     end
     return cleared
@@ -325,10 +338,14 @@ function DownloadQueue:cancelPending(manga, chapter)
             table.insert(remaining, item)
         end
     end
-    self.items = remaining
 
     if removed then
-        self:removePersistentJob(key)
+        local ok, err = self:removePersistentJob(key)
+        if not ok then
+            self:notifyDownloadFailure(err or "Failed to remove download job")
+            return false, err or "save_failed"
+        end
+        self.items = remaining
         self.statuses[key] = nil
         self.onStatusChanged()
         return true, "queued"
@@ -353,7 +370,6 @@ function DownloadQueue:cancelQueued()
             table.insert(remaining_items, item)
         end
     end
-    self.items = remaining_items
 
     local remaining_jobs = {}
     for _index, job in ipairs(self:loadPersistentJobs()) do
@@ -368,13 +384,20 @@ function DownloadQueue:cancelQueued()
     end
 
     local canceled = 0
-    for key in pairs(canceled_keys) do
+    for _ in pairs(canceled_keys) do
         canceled = canceled + 1
-        self.statuses[key] = nil
     end
 
     if canceled > 0 then
-        self:savePersistentJobs(remaining_jobs)
+        local saved, err = self:savePersistentJobs(remaining_jobs)
+        if not saved then
+            self:notifyDownloadFailure(err or "Failed to cancel downloads")
+            return 0, err or "save_failed"
+        end
+        self.items = remaining_items
+        for key in pairs(canceled_keys) do
+            self.statuses[key] = nil
+        end
         self.onStatusChanged()
     end
     return canceled
@@ -593,7 +616,12 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
     end
 
     local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued")
-    self:upsertPersistentJob(persistent_job)
+    local ok, err = self:upsertPersistentJob(persistent_job)
+    if not ok then
+        self:notifyDownloadFailure(err or "Failed to persist queued download")
+        return false, err or "save_failed"
+    end
+
     table.insert(self.items, {
         key = persistent_job.key,
         download_directory = download_directory,
@@ -617,13 +645,14 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
     end
     options = options or {}
     local persistent_jobs = {}
+    local candidates = {}
     local queued_count = 0
 
     for _index, chapter in ipairs(chapters or {}) do
         local status = self:getStatus(manga, chapter)
         if status and (status.state == "queued" or status.state == "downloading") then
             if not options.quiet_duplicate then
-            self.onMessage(I18n.t("Chapter download is already in progress."))
+                self.onMessage(I18n.t("Chapter download is already in progress."))
             end
         else
             if status and status.state == "failed" then
@@ -636,13 +665,15 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
 
             local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued")
             table.insert(persistent_jobs, persistent_job)
-            self.statuses[persistent_job.key] = { state = "queued" }
-            table.insert(self.items, {
-                key = persistent_job.key,
-                download_directory = download_directory,
-                manga = manga,
-                chapter = chapter,
-                downloader = self.downloader,
+            table.insert(candidates, {
+                persistent_job = persistent_job,
+                item = {
+                    key = persistent_job.key,
+                    download_directory = download_directory,
+                    manga = manga,
+                    chapter = chapter,
+                    downloader = self.downloader,
+                },
             })
             queued_count = queued_count + 1
         end
@@ -652,7 +683,17 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
         return 0
     end
 
-    self:upsertPersistentJobs(persistent_jobs)
+    local ok, err = self:upsertPersistentJobs(persistent_jobs)
+    if not ok then
+        self:notifyDownloadFailure(err or "Failed to persist queued batch")
+        return 0, err or "save_failed"
+    end
+
+    for _, candidate in ipairs(candidates) do
+        self.statuses[candidate.persistent_job.key] = { state = "queued" }
+        table.insert(self.items, candidate.item)
+    end
+
     self.onStatusChanged()
     self.ui_manager:scheduleIn(0, function()
         self:process()

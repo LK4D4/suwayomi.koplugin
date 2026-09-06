@@ -127,7 +127,11 @@ end
 
 function Methods:chooseDownloadDirectory(callback, options)
     SuwayomiUI.showDirectoryChooser(function(path)
-        local saved_path = SuwayomiSettings:saveDownloadDirectory(path)
+        local saved_path, err = SuwayomiSettings:saveDownloadDirectory(path)
+        if not saved_path then
+            self:showMessage(err or I18n.t("Failed to save settings."))
+            return
+        end
         if not (options and options.suppress_saved_message) then
             self:showMessage(I18n.t("Suwayomi download directory saved."))
         end

@@ -106,7 +106,11 @@ function Methods:showLoginDialog(touchmenu_instance)
     SuwayomiUI.showLoginDialog({
         credentials = SuwayomiSettings:load(),
         onSave = function(credentials)
-            SuwayomiSettings:save(credentials)
+            local saved, err = SuwayomiSettings:save(credentials)
+            if not saved then
+                self:showMessage(err or I18n.t("Failed to save settings."))
+                return
+            end
             self:refreshSettingsMenu(touchmenu_instance)
             UIManager:nextTick(function()
                 self:showMessage(I18n.t("Suwayomi login settings saved."))
@@ -375,7 +379,11 @@ function Methods:toggleBrowseSetting(key, touchmenu_instance)
     end
     local browse_settings = self:loadBrowseSettings()
     browse_settings[key] = not browse_settings[key]
-    SuwayomiSettings:saveBrowseSettings(browse_settings)
+    local saved, err = SuwayomiSettings:saveBrowseSettings(browse_settings)
+    if not saved then
+        self:showMessage(err or I18n.t("Failed to save settings."))
+        return
+    end
     self:refreshSettingsMenu(touchmenu_instance)
 end
 
@@ -392,7 +400,11 @@ end
 function Methods:showParallelDownloadsDialog(touchmenu_instance)
     local choices = { 1, 2, 3, 4 }
     local function onSelect(value)
-        local saved_value = SuwayomiSettings:saveMaxParallelChapterDownloads(value)
+        local saved_value, err = SuwayomiSettings:saveMaxParallelChapterDownloads(value)
+        if not saved_value then
+            self:showMessage(err or I18n.t("Failed to save settings."))
+            return
+        end
         if self.download_queue then
             self.download_queue.max_active_chapters = saved_value
             if self.download_queue.process then
@@ -449,7 +461,11 @@ function Methods:toggleDeleteAfterMarkRead(touchmenu_instance)
     end
     local settings = self:loadDeleteChaptersSettings()
     settings.delete_after_mark_read = not settings.delete_after_mark_read
-    SuwayomiSettings:saveDeleteChaptersSettings(settings)
+    local saved, err = SuwayomiSettings:saveDeleteChaptersSettings(settings)
+    if not saved then
+        self:showMessage(err or I18n.t("Failed to save settings."))
+        return
+    end
     self:refreshSettingsMenu(touchmenu_instance)
 end
 
@@ -464,7 +480,11 @@ function Methods:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
         local settings = self:loadDeleteChaptersSettings()
         local previous_value = settings.delete_finished_while_reading
         settings.delete_finished_while_reading = value
-        SuwayomiSettings:saveDeleteChaptersSettings(settings)
+        local saved, err = SuwayomiSettings:saveDeleteChaptersSettings(settings)
+        if not saved then
+            self:showMessage(err or I18n.t("Failed to save settings."))
+            return
+        end
         if previous_value ~= value and self.onFinishedCleanupSettingChanged then
             self:onFinishedCleanupSettingChanged(previous_value, value)
         end
@@ -498,7 +518,11 @@ function Methods:showLibraryCategoryPickerBehaviorDialog(touchmenu_instance)
 
     local choices = { "automatic", "always", "never" }
     local function onSelect(behavior)
-        SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
+        local saved, err = SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
+        if not saved then
+            self:showMessage(err or I18n.t("Failed to save settings."))
+            return
+        end
         self:refreshSettingsMenu(touchmenu_instance)
     end
 

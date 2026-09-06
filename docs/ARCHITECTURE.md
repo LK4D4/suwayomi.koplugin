@@ -104,7 +104,8 @@ Chapters and read state:
 
 Shared support:
 
-- `suwayomi/settings.lua`: KOReader settings persistence.
+- `suwayomi/settings.lua`: KOReader settings persistence facade.
+- `suwayomi/settings/store.lua`: Atomic settings storage engine with transactional replacement, write-fence protection against torn files, and staging rollback.
 - `suwayomi/paths.lua`: source-scoped download path layout and path segment sanitization.
 - `suwayomi/debug.lua`: opt-in redacted debug logging.
 - `suwayomi/i18n.lua`: plugin-owned wrapper around KOReader gettext and template formatting for runtime UI strings. It loads compiled plugin catalogs from `l10n/<locale>/suwayomi.mo` when KOReader has a matching language, restores KOReader's native gettext state after loading, and intentionally does not persist plugin language settings or translate server-provided manga/source/chapter data.

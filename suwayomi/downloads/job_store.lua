@@ -73,7 +73,11 @@ function JobStore:save(jobs)
     if not self.settings or not self.settings.saveDownloadQueue then
         return normalized
     end
-    return self.settings:saveDownloadQueue(normalized)
+    local saved, err = self.settings:saveDownloadQueue(normalized)
+    if saved == false then
+        return nil, err
+    end
+    return saved or normalized
 end
 
 function JobStore:normalizeProgress(progress)
@@ -220,7 +224,11 @@ function JobStore:upsert(job)
         table.insert(jobs, job)
     end
 
-    self:save(jobs)
+    local saved, err = self:save(jobs)
+    if not saved then
+        return nil, err
+    end
+    return job
 end
 
 function JobStore:upsertMany(new_jobs)
@@ -244,7 +252,11 @@ function JobStore:upsertMany(new_jobs)
         end
     end
 
-    self:save(jobs)
+    local saved, err = self:save(jobs)
+    if not saved then
+        return nil, err
+    end
+    return new_jobs
 end
 
 function JobStore:remove(key)
@@ -254,7 +266,11 @@ function JobStore:remove(key)
             table.insert(remaining, job)
         end
     end
-    self:save(remaining)
+    local saved, err = self:save(remaining)
+    if not saved then
+        return false, err
+    end
+    return true
 end
 
 function JobStore:copySnapshotJob(job, state)
