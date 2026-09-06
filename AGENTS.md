@@ -59,3 +59,17 @@
 - Put detailed architecture in `docs/ARCHITECTURE.md`; add nested `AGENTS.md` files only when a subtree needs different commands or rules.
 - Before editing stale guidance, compare against current source, specs, README, `docs/ARCHITECTURE.md`, and recent commits.
 - Commit messages should be small, imperative, and reviewable. Prefer Conventional Commit subjects when they add useful scan value.
+
+## Agent skills
+
+### Issue tracker
+
+Use GitHub Issues. Before ticket operations, read `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five canonical triage labels. Before triage, read `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use a single-context layout. Before codebase exploration, read `docs/agents/domain.md`.
