@@ -429,7 +429,9 @@ function ActiveJobs:recordProgress(active, progress)
         active.last_progress_path = progress.path
         active.last_progress_error = progress.error
         active.last_progress_state = progress.state
-        if not (progress.state == "failed" and progress.retryable == true) then
+        -- Terminal progress is only an observation until finishFromProgress
+        -- validates the archive and finalizes active and persistent state.
+        if progress.state ~= "downloaded" and progress.state ~= "skipped" and progress.state ~= "failed" then
             queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, progress.state, {
                 started_at = active.started_at,
                 last_progress_at = active.last_progress_at,
@@ -490,6 +492,11 @@ function ActiveJobs:finishFromProgress(active, progress)
             return
         end
         queue:removePersistentJob(active.key or queue:getKey(active.manga, active.chapter))
+        queue:setStatus(active.manga, active.chapter, {
+            state = progress.state,
+            current = progress.current,
+            total = progress.total,
+        })
         queue:notifyChapterArchiveReady(
             active.manga,
             active.chapter,

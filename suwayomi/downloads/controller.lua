@@ -253,13 +253,7 @@ function Methods:showQueuedDownloadActions(job, menu)
             end
             self:showDownloads()
         elseif action and action.id == "open_chapter_list" then
-            self:showMangaActions(job.manga, {
-                onMangaUpdated = function()
-                    if not self.isSuwayomiScreenActive or self:isSuwayomiScreenActive(menu) then
-                        self:showDownloads()
-                    end
-                end,
-            })
+            self:showChaptersForManga(job.manga)
         end
     end)
 end
@@ -280,13 +274,7 @@ function Methods:showActiveDownloadActions(job, menu)
         actions = actions,
     }, function(action)
         if action and action.id == "open_chapter_list" then
-            self:showMangaActions(job.manga, {
-                onMangaUpdated = function()
-                    if not self.isSuwayomiScreenActive or self:isSuwayomiScreenActive(menu) then
-                        self:showDownloads()
-                    end
-                end,
-            })
+            self:showChaptersForManga(job.manga)
         elseif action and action.id == "cancel_download" then
             local cancelled = self:getDownloadQueue():cancelPending(job.manga, job.chapter)
             self:closeMenu(menu)

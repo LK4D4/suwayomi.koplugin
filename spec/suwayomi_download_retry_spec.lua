@@ -21,6 +21,7 @@ describe("download retry across live menus", function()
     }
     for _, name in ipairs(widget_modules) do table.insert(extra_modules, name) end
     local plugin, queue, stack, scheduled, saved, ui, home, downloads_menu, chapters_menu
+    local temporary_paths
     local manga = { id = "retry-manga", title = "Retry manga" }
     local chapter = { id = "retry-chapter", name = "Retry chapter" }
     local full_error = "HTTP 503\n" .. string.rep("Complete error details\n", 80)
@@ -89,13 +90,16 @@ describe("download retry across live menus", function()
     before_each(function()
         runtime_helper.install({ max_parallel_chapter_downloads = 1 })
         clearExtras()
-        stack, scheduled, saved = {}, {}, "[]"
+        stack, scheduled, saved, temporary_paths = {}, {}, "[]", {}
         package.preload["suwayomi/downloads/queue"] = nil
         package.preload["suwayomi/navigation"] = nil
         local settings = require("suwayomi/settings")
         local json = require("dkjson")
         settings.loadDownloadQueue = function() return json.decode(saved) end
         settings.saveDownloadQueue = function(_, jobs) saved = json.encode(jobs) end
+        local ledger = "{}"
+        settings.loadChapterLedger = function() return json.decode(ledger) end
+        settings.saveChapterLedger = function(_, entries) ledger = json.encode(entries) end
         local debug = require("suwayomi/debug")
         debug.now, debug.elapsedMs = function() return 0 end, function() return 0 end
         local downloader = require("suwayomi/downloads/downloader")
@@ -174,9 +178,114 @@ describe("download retry across live menus", function()
     end)
 
     after_each(function()
+        for _, path in ipairs(temporary_paths) do os.remove(path) end
         runtime_helper.teardown()
         clearExtras()
     end)
+
+    for _, terminal in ipairs({ "downloaded", "skipped" }) do
+        for _, remaining in ipairs({ false, true }) do
+            it("finalizes " .. terminal .. " retry before refreshing menus with remaining worker " .. tostring(remaining), function()
+                showScreens()
+                downloads_menu:onMenuSelect(downloads_menu.item_table[1])
+                click("retry")
+                queue:process()
+                assertStatus("downloading", "Downloading")
+                local key = queue:getKey(manga, chapter)
+                local active = queue:getActiveJob(key)
+                active.progress_path = os.tmpname()
+                os.remove(active.progress_path)
+                table.insert(temporary_paths, active.progress_path)
+                local archive = os.tmpname()
+                table.insert(temporary_paths, archive)
+                local handle = assert(io.open(archive, "wb"))
+                handle:write("PK\005\006", string.rep("\0", 18))
+                handle:close()
+                -- The filesystem is an external boundary; check the actual file.
+                queue.downloader.chapterExists = function(_, path)
+                    local file = io.open(path, "rb")
+                    if not file then return false end
+                    file:close()
+                    return true
+                end
+                if remaining then
+                    local other = { id = "other", name = "Other" }
+                    local other_job = queue:buildPersistentJob(manga, other, active.download_directory, "downloading")
+                    other_job.progress_path, other_job.pid = os.tmpname(), 456
+                    table.insert(temporary_paths, other_job.progress_path)
+                    queue:setActiveJob(other_job)
+                    queue:upsertPersistentJob(other_job)
+                end
+                local observed, ready, archive_error = {}, {}, nil
+                local changed, archiveReady = queue.onStatusChanged, queue.onChapterArchiveReady
+                queue.onStatusChanged = function(...)
+                    table.insert(observed, { active = queue:getActiveJob(key), persistent = queue:findPersistentJob(key) })
+                    return changed(...)
+                end
+                queue.onChapterArchiveReady = function(...)
+                    table.insert(ready, { ... })
+                    local ok, result = pcall(archiveReady, ...)
+                    if not ok then archive_error = result end
+                end
+                require("suwayomi/downloads/progress_file").writeFallback(active.progress_path, terminal, 20, 20, archive)
+                queue:poll()
+                assert.are.equal(remaining and 1 or 0, queue:getActiveCount())
+                assert.are.equal(0, #queue.items)
+                assert.is_nil(queue:findPersistentJob(key))
+                assert.are.equal(terminal, queue:getStatus(manga, chapter).state)
+                assert.are.equal("Downloaded", chapters_menu.item_table[1].mandatory)
+                for _, row in ipairs(downloads_menu.item_table) do
+                    assert.is_falsy(row.text and row.text:find("Retry chapter", 1, true))
+                end
+                if not remaining then
+                    assert.are.equal("No downloads queued.", downloads_menu.item_table[3].text)
+                    assert.is_false(queue.active_job_lifecycle.poll_scheduled)
+                else
+                    assert.are.equal("Downloading", downloads_menu.item_table[1].mandatory)
+                    assert.is_true(queue.active_job_lifecycle.poll_scheduled)
+                end
+                assert.are.equal(1, #observed)
+                assert.is_nil(observed[1].active)
+                assert.is_nil(observed[1].persistent)
+                assert.are.equal(1, #ready)
+                assert.are.equal(archive, ready[1][3])
+                assert.is_nil(archive_error)
+                assert.are.equal(archive, plugin:loadChapterLedger()[key].path)
+                assert.are.equal(chapter.id, require("suwayomi/settings"):loadReaderReturnContexts()[archive].chapter_id)
+                assert.are.equal("Downloads", home.actions[3].text)
+                assert.are.equal(0, queue:getFailedCount())
+                assert.are.equal(remaining and 1 or 0, #require("dkjson").decode(saved))
+            end)
+        end
+        it("rejects " .. terminal .. " without an archive before publishing success", function()
+            showScreens()
+            downloads_menu:onMenuSelect(downloads_menu.item_table[1])
+            click("retry")
+            queue:process()
+            local active = queue:getActiveJob(queue:getKey(manga, chapter))
+            active.progress_path = os.tmpname()
+            os.remove(active.progress_path)
+            table.insert(temporary_paths, active.progress_path)
+            local states, ready = {}, false
+            local changed = queue.onStatusChanged
+            queue.onStatusChanged = function(...)
+                table.insert(states, queue:getStatus(manga, chapter).state)
+                return changed(...)
+            end
+            queue.onChapterArchiveReady = function() ready = true end
+            require("suwayomi/downloads/progress_file").writeFallback(active.progress_path, terminal, 20, 20, "/missing.cbz")
+            queue:poll()
+            assert.are.same({ "failed" }, states)
+            assert.is_false(ready)
+            assert.are.equal(0, queue:getActiveCount())
+            assert.are.equal(0, #queue.items)
+            assert.are.equal("failed", queue:findPersistentJob(active.key).state)
+            assert.are.equal("Failed", chapters_menu.item_table[1].mandatory)
+            assert.are.equal("Failed", downloads_menu.item_table[1].mandatory)
+            assert.are.equal("Downloads · 1 failed", home.actions[3].text)
+            assert.is_false(queue.active_job_lifecycle.poll_scheduled)
+        end)
+    end
 
     for _, origin in ipairs({ "Downloads", "chapters" }) do
         it("retries from " .. origin .. " details and updates both existing menus", function()

@@ -27,7 +27,6 @@ local function installController(options)
         closed_menus = {},
         home_count = 0,
         downloads_count = 0,
-        manga_actions = {},
         tracked_screens = {},
     }
 
@@ -170,9 +169,6 @@ local function installController(options)
     function plugin:showDownloads()
         state.downloads_count = state.downloads_count + 1
         return controller.methods.showDownloads(self)
-    end
-    function plugin:showMangaActions(manga, manga_options)
-        table.insert(state.manga_actions, { manga = manga, options = manga_options })
     end
     function plugin:trackSuwayomiScreen(route_id, widget)
         table.insert(state.tracked_screens, { route_id = route_id, widget = widget })
@@ -465,7 +461,7 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(1, state.downloads_count)
     end)
 
-    it("wires queued and active row actions to queue and manga callbacks", function()
+    it("wires queued and active cancellation actions to the queue", function()
         local plugin, state = installController()
         local menu = { name = "downloads-menu" }
         local job = {
@@ -483,17 +479,13 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal(menu, state.closed_menus[#state.closed_menus])
 
         plugin:showActiveDownloadActions(job, menu)
-        state.actions_menu_callback(state.actions_menu_options.actions[1])
-        assert.are.equal(job.manga, state.manga_actions[1].manga)
-        state.manga_actions[1].options.onMangaUpdated()
-        assert.are.equal(2, state.downloads_count)
 
         assert.are.equal("Cancel download", state.actions_menu_options.actions[2].text)
         assert.is_true(state.actions_menu_options.actions[2].destructive)
         state.actions_menu_callback(state.actions_menu_options.actions[2])
         assert.are.equal(job.chapter, plugin.queue.cancelled.chapter)
         assert.are.equal(menu, state.closed_menus[#state.closed_menus])
-        assert.are.equal(3, state.downloads_count)
+        assert.are.equal(2, state.downloads_count)
     end)
 
     it("translates missing queued and active cancel messages", function()
@@ -548,21 +540,6 @@ describe("suwayomi/downloads/controller", function()
         state.actions_menu_callback(state.actions_menu_options.actions[1])
 
         assert.are.equal("tx:Download is already downloading.", state.messages[#state.messages])
-    end)
-
-    it("does not reopen downloads after manga actions if the downloads route is gone", function()
-        local plugin, state = installController({ inactive_downloads_menu = true })
-        local menu = { name = "downloads-menu" }
-        local job = {
-            manga = { id = "m1", title = "Dandadan" },
-            chapter = { id = "c1", name = "Ch. 1" },
-        }
-
-        plugin:showActiveDownloadActions(job, menu)
-        state.actions_menu_callback(state.actions_menu_options.actions[1])
-        state.manga_actions[1].options.onMangaUpdated()
-
-        assert.are.equal(0, state.downloads_count)
     end)
 
     it("reconciles read ledger entries and refills enabled manga keep-next buffers", function()
