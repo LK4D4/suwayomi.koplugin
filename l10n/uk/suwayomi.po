@@ -566,6 +566,9 @@ msgstr[0] "Не вдалося видалити %1 завантаження."
 msgstr[1] "Не вдалося видалити %1 завантаження."
 msgstr[2] "Не вдалося видалити %1 завантажень."
 
+msgid "Failed to save settings."
+msgstr ""
+
 msgid "Fifth to last read chapter"
 msgstr "П'ятий з кінця прочитаний розділ"
 

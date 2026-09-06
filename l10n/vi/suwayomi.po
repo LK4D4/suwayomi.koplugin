@@ -534,6 +534,9 @@ msgid "Failed to delete %1 download."
 msgid_plural "Failed to delete %1 downloads."
 msgstr[0] ""
 
+msgid "Failed to save settings."
+msgstr ""
+
 msgid "Fifth to last read chapter"
 msgstr ""
 
