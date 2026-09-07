@@ -161,6 +161,46 @@ describe("bounded bulk download actions", function()
         assert.is_nil(queue:findPersistentJob("m1:c51"))
     end)
 
+    for _, stale in ipairs({ false, true }) do
+        it("bounds traversal for a large filtered batch, stale " .. tostring(stale), function()
+            local count = 10000
+            settings:saveMangaScanlatorFilter(manga, "Saved group")
+            local items = chapters(count)
+            for index, item in ipairs(items) do item.scanlator = index % 10 == 0 and "Other group" or "Saved group" end
+            openChapters(items)
+            archives["/books/m1-c1.cbz"] = true
+            assert.is_true(queue:enqueue(manga, items[2], "/books"))
+            local visible = plugin.getVisibleChapters
+            local visited = 0
+            function plugin:getVisibleChapters(source)
+                visited = visited + #source
+                assert.is_true(visited <= count * 5, "Batch confirmation must traverse the complete context a bounded number of times")
+                return visible(self, source)
+            end
+            plugin:performMangaAction(manga, "download_all_chapters")
+            local dialog = stack[#stack]
+            assert.is_truthy(dialog.text:find("Queue up to 50 new chapter downloads?", 1, true))
+            assert.is_truthy(dialog.text:find("2 already downloaded or in the download queue.", 1, true))
+            assert.is_truthy(dialog.text:find("8948 eligible chapters left outside this batch.", 1, true))
+            assert.are.equal(1, #storedJobs())
+            if stale then plugin:setCurrentMangaChapterContext(manga, {}) end
+            dialog.ok_callback()
+            local expected = { "c2" }
+            if not stale then
+                for index = 3, count do
+                    if index % 10 ~= 0 then expected[#expected + 1] = "c" .. index end
+                    if #expected == 51 then break end
+                end
+            end
+            local admitted = {}
+            for _, job in ipairs(storedJobs()) do admitted[#admitted + 1] = job.chapter.id end
+            assert.are.same(expected, admitted)
+            assert.is_truthy(messages[#messages]:find(stale and "Queued 0 chapter downloads." or "Queued 50 chapter downloads.", 1, true))
+            assert.is_truthy(messages[#messages]:find(stale and "Skipped 52 chapters." or "Skipped 2 chapters.", 1, true))
+            assert.is_truthy(messages[#messages]:find("8948 eligible chapters left outside this batch.", 1, true))
+        end)
+    end
+
     it("captures capped selection, discloses its limit, and keeps the menu on acceptance", function()
         local items = openChapters(chapters(52))
         plugin:selectAllChapters()

@@ -156,6 +156,15 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
         saved_filter = self:loadMangaScanlatorFilter(manga),
         is_current = self.captureChapterActionGuard and self:captureChapterActionGuard(),
     }
+    local current_ids
+    local context_allowed = not self.suwayomi_host_retired
+    if self.isChapterInCurrentContext and batch.context then
+        context_allowed = context_allowed and self:isCurrentChapterContextForManga(manga)
+        current_ids = {}
+        for _, chapter in ipairs(self:getVisibleChapters(batch.context.chapters)) do
+            current_ids[tostring(chapter.id)] = true
+        end
+    end
     local seen = {}
     local scanlator_filter = batch.saved_filter or batch.filter
     for _index, chapter in ipairs(chapters or {}) do
@@ -163,7 +172,7 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
         if not seen[key] and (not scanlator_filter or self:getChapterScanlator(chapter) == scanlator_filter)
             and not (batch.unread and chapter.is_read == true) then
             seen[key] = true
-            if (self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter))
+            if not context_allowed or (current_ids and not current_ids[tostring(chapter.id)])
                 or not queue:canEnqueue(manga, chapter, download_directory) then
                 batch.skipped = batch.skipped + 1
             elseif #batch.chapters >= batch.limit then

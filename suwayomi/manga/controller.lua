@@ -78,6 +78,16 @@ local function copyOptions(options)
     return copied
 end
 
+local function mangaActionCallback(owner, manga, options)
+    local is_current = owner.captureChapterActionGuard and owner:captureChapterActionGuard()
+    local manga_id = manga and tostring(manga.id or manga.title)
+    return function(action)
+        if owner.suwayomi_host_retired or (is_current and not is_current())
+            or (manga and tostring(manga.id or manga.title) ~= manga_id) then return false end
+        if action and action.id then return owner:performMangaAction(manga, action.id, options) end
+    end
+end
+
 function Methods:attachSourceToManga(manga, source)
     return self:getClient():attachSourceToManga(manga, source)
 end
@@ -467,11 +477,7 @@ function Methods:showMangaActions(manga, options)
     local menu = SuwayomiUI.showMangaActionsMenu({
         title = manga and (manga.title or tostring(manga.id)) or I18n.t("Manga actions"),
         actions = self:getMangaActions(manga),
-    }, function(action)
-        if action then
-            self:performMangaAction(manga, action.id, action_options)
-        end
-    end)
+    }, mangaActionCallback(self, manga, action_options))
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("manga-actions", menu)
     end
@@ -590,11 +596,7 @@ function Methods:showBulkDownloadMangaActions(manga, options)
         on_back = function()
             self:showMangaActions(manga, options)
         end,
-    }, function(action)
-        if action then
-            self:performMangaAction(manga, action.id, options)
-        end
-    end)
+    }, mangaActionCallback(self, manga, options))
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("manga-actions", menu)
     end
@@ -613,11 +615,7 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
         on_back = function()
             self:showMangaActions(manga, options)
         end,
-    }, function(action)
-        if action then
-            self:performMangaAction(manga, action.id, options)
-        end
-    end)
+    }, mangaActionCallback(self, manga, options))
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("manga-actions", menu)
     end
@@ -626,6 +624,7 @@ end
 
 
 function Methods:performMangaAction(manga, action_id, options)
+    if self.suwayomi_host_retired then return false end
     options = options or {}
     if action_id == "open_chapters" then
         self:showChaptersForManga(manga)
@@ -637,11 +636,7 @@ function Methods:performMangaAction(manga, action_id, options)
             info_action_options.refresh_action_menu_after_library_update = true
             local dialog = SuwayomiUI.showMangaInformation(manga, {
                 actions = self:getMangaInformationActions(manga),
-                onAction = function(action)
-                    if action and action.id then
-                        self:performMangaAction(manga, action.id, info_action_options)
-                    end
-                end,
+                onAction = mangaActionCallback(self, manga, info_action_options),
             })
             if dialog and self.trackSuwayomiScreen then
                 self:trackSuwayomiScreen("manga-information", dialog)

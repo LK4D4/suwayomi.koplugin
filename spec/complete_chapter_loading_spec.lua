@@ -25,6 +25,9 @@ describe("complete stored chapter loading", function()
         "suwayomi/downloads/directory", "suwayomi/reader_return",
         "apps/reader/readerui", "apps/filemanager/filemanager",
         "suwayomi/plugin/home", "ui/widget/infomessage",
+        "ui/widget/buttondialog", "ui/widget/confirmbox", "ui/widget/menu", "ui/widget/multiinputdialog",
+        "suwayomi/ui/menu_utils", "suwayomi/ui/browse", "suwayomi/ui/choice_dialogs", "suwayomi/ui/directory",
+        "suwayomi/ui/downloads", "suwayomi/ui/list_rows", "suwayomi/ui/manga_info",
     }
 
     local function clearModules()
@@ -441,6 +444,83 @@ describe("complete stored chapter loading", function()
                     assert.are.equal(ledger, saved_ledger)
                     assert.are.same({}, plugin.current_chapter_menu.chapters)
                 end
+            end)
+        end
+    end
+
+    for _, origin in ipairs({ "manga menu", "manga information", "public dispatch" }) do
+        for _, invalidation in ipairs(origin == "public dispatch" and { "current", "retired host" }
+            or { "current", "retired host", "cancellation", "newer request", "another manga", "manga identity" }) do
+            it("guards loaded first-unread dispatch from " .. origin .. " after " .. invalidation, function()
+                respond = function() return page(nodes(201, 201), 1, false) end
+                plugin:showChaptersForManga(manga)
+                finishRequest()
+                local chapter = plugin.current_chapter_context.chapters[1]
+                local chapter_path = plugin:getChapterPath(manga, chapter)
+                require("suwayomi/downloads/downloader").chapterExists = function(_, path) return path == chapter_path end
+                local return_contexts, return_writes, reader_opens = "{}", 0, {}
+                settings.loadReaderReturnContexts = function() return json.decode(return_contexts) end
+                settings.saveReaderReturnContexts = function(_, contexts)
+                    return_contexts = json.encode(contexts)
+                    return_writes = return_writes + 1
+                    return true
+                end
+                plugin.saveReaderReturnContext = require("suwayomi/reader_return").methods.saveReaderReturnContext
+                package.preload["apps/reader/readerui"] = function()
+                    return { instance = { switchDocument = function(_, path) reader_opens[#reader_opens + 1] = path end },
+                        showReader = function(_, path) reader_opens[#reader_opens + 1] = path end }
+                end
+                local dispatch = function() return plugin:performMangaAction(manga, "open_first_unread") end
+                local facade = require("suwayomi/ui")
+                if origin == "manga information" then
+                    facade.showMangaInformation = function(_, options)
+                        dispatch = function() return options.onAction({ id = "open_first_unread" }) end
+                        return {}
+                    end
+                    plugin:showMangaActions(manga)
+                elseif origin == "manga menu" then
+                    require("spec/support/controller_module_spec_helper").stubControllerDependencies()
+                    package.loaded["suwayomi/ui"], package.preload["suwayomi/ui"] = nil, nil
+                    facade.showMangaActionsMenu = require("suwayomi/ui").showMangaActionsMenu
+                    local dialog = plugin:showMangaActions(manga)
+                    for _, row in ipairs(dialog.buttons) do
+                        for _, button in ipairs(row) do
+                            if button.text == "Open first unread" then button.callback() end
+                        end
+                    end
+                    dispatch = table.remove(scheduled)
+                    assert.is_function(dispatch)
+                end
+                if invalidation == "retired host" then plugin:retireChapterHost()
+                elseif invalidation == "cancellation" then plugin:cancelMangaNetworkRequests()
+                elseif invalidation == "newer request" then plugin:showChaptersForManga(manga)
+                elseif invalidation == "another manga" then
+                    respond = function() return page(nodes(301, 301), 1, false) end
+                    plugin:showChaptersForManga({ id = "18", title = "Other manga" })
+                    finishRequest()
+                elseif invalidation == "manga identity" then manga.id = "18" end
+                local ledger, jobs = saved_ledger, saved_jobs
+                local context, menu = plugin.current_chapter_context, plugin.current_chapter_menu
+                local visible = chapterIds(menu.chapters)
+                local worker_count = #workers
+                dispatch()
+                if invalidation == "current" then
+                    assert.are.same({ chapter_path }, reader_opens)
+                    assert.are.equal(chapter_path, json.decode(saved_ledger)["17:201"].path)
+                    assert.are.equal("201", json.decode(return_contexts)[chapter_path].chapter_id)
+                    assert.are.equal(1, return_writes)
+                else
+                    assert.are.same({}, reader_opens)
+                    assert.are.equal(ledger, saved_ledger)
+                    assert.are.equal("{}", return_contexts)
+                    assert.are.equal(0, return_writes)
+                end
+                assert.are.equal(jobs, saved_jobs)
+                assert.are.same({}, queue:getSnapshot().queued)
+                assert.are.equal(context, plugin.current_chapter_context)
+                assert.are.equal(menu, plugin.current_chapter_menu)
+                assert.are.same(visible, chapterIds(plugin.current_chapter_menu.chapters))
+                assert.are.equal(worker_count, #workers)
             end)
         end
     end
