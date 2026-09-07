@@ -5,6 +5,23 @@ date: 2026-09-06
 
 # Preserve manual-delete intent independently of finish retention
 
+## Amendment: reduced archive-only scope (2026-09-07)
+
+This amendment supersedes the original choices below concerning captured-job cancellation, sidecar/backup removal and per-file manifests, dedicated Downloads management with Retry/Cancel controls, legacy adoption work, and broad retention integration. The original decision remains below as history, not active acceptance criteria. The revised [specification #12](../superpowers/specs/2026-09-06-durable-manual-delete-intent.md) is the single active contract; implementation and device acceptance remain pending.
+
+- Keep existing single, selected, and previous-chapter mark-read selection, filtering, completion order, and read-sync coordination. Commit read state and accepted manual-delete requests through the checked shared store before any destructive work, preserving ADR-0001's ordering amendment.
+- If queued, running, stopping, or finalizing download work owns the chapter at admission, preserve that work and report deletion as busy/not accepted. Mark-read may still succeed. The user must request deletion again after work finishes; an unaccepted request carries no eventual-deletion promise. There is no automatic cancellation or pending cancellation disposition.
+- Accepted requests remove only the verified captured CBZ. Preserve all KOReader sidecars, backups, and other metadata files; explain retained metadata, which is not unfinished deletion work. Independent retention remains separate.
+- Reuse the process service, checked shared store, ownership/identity infrastructure, and total two-second shutdown deadline. Keep durable, quiet retries across navigation, zero subscribers, and restart, with bounded fair processing and no retry-count abandonment. Persist enough archive-removal progress to recover after unlink but before bookkeeping.
+- Revalidate exact archive generation, original managed root, containment, current request revision, live reader, and download ownership before removal. Preserve files when identity, ownership, containment, or persistence is uncertain. Pathname, timestamp, or content hash alone cannot establish replacement identity. Conditional recovery must preserve newer read/pending-sync, path/generation, queue, and reader-return state.
+- Unread revokes remaining manual deletion. A later accepted deliberate download supersedes it in the same checked admission transaction; failed, uncertain, duplicate/no-op, or automatic admission cannot silently revoke it. Automatic work cannot race accepted deletion. Disabling manual deletion stops only new requests; directory changes never retarget accepted ones; confirmed absence grants no authority over future downloads.
+- Use existing chapter status and immediate single/batch summaries for marked-read, removed, pending, busy, and blocked outcomes. No dedicated manual-deletion screen or new pending-deletion Retry/Cancel controls. Existing unread and deliberate-download actions supply revocation; a fresh manual action may authorize a currently proved target.
+- Permit only minimal targeted identity establishment under existing ownership gates. No library scan, historical migration, or inferred historical authorization. Keep unproved original targets blocked. Limit publication, ordinary Delete, and retention changes to the identity/revision coordination needed to prevent stale removal or bookkeeping from harming replacements; retain completion positions, pathless eligibility, and retention policy.
+
+The tradeoff is less automatic convenience and less reclaimed storage: busy deletion requires another action, metadata remains, and unproved targets may remain blocked. Durability and replacement safety are not reduced to a one-shot attempt. The [replacement ticket map](../superpowers/plans/2026-09-06-durable-manual-delete-tickets.md) assigns one implementation and one separate device-acceptance issue, including focused composed and real-filesystem evidence.
+
+## Original decision (2026-09-06; superseded where amended above)
+
 A manual mark-read action with deletion enabled creates its own durable removal request. The current fallback enrolls failures in while-reading cleanup, whose disabled state or retention positions can abandon that request. Keep manual-delete intent independent of retention, bind it to captured archive and job identities, and let the process-wide service recover it.
 
 All 21 policy decisions below and the final shared-understanding review are confirmed. Implementation and acceptance testing remain pending.

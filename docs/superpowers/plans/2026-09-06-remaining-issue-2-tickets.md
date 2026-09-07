@@ -1,6 +1,6 @@
 # Remaining issue-2 audit: specs and implementation tickets
 
-Status: published and verified under the user's authorization to decide autonomously, favor simplicity, and ask no further questions. Three specifications and eight implementation tickets are ready-for-agent. Runtime implementation and device acceptance remain pending.
+Original publication status (2026-09-06; dependency and scope amendments below supersede old manual-deletion routing): published and verified under the user's authorization to decide autonomously, favor simplicity, and ask no further questions. Three specifications and eight implementation tickets are ready-for-agent. Runtime implementation and device acceptance remain pending.
 
 ## Scope and decisions
 
@@ -11,9 +11,9 @@ The September 6 investigation separates four confirmed defects from established 
 | §1: process-wide download ownership | [Spec #3](https://github.com/LK4D4/suwayomi.koplugin/issues/3), ADR-0002 | Existing #4–#11; unchanged. |
 | §2: 200-chapter truncation | [Spec #21](https://github.com/LK4D4/suwayomi.koplugin/issues/21) | [#24](https://github.com/LK4D4/suwayomi.koplugin/issues/24)–[#25](https://github.com/LK4D4/suwayomi.koplugin/issues/25), with device control in C3. |
 | §3: missing completed-close refill | [Spec #22](https://github.com/LK4D4/suwayomi.koplugin/issues/22), ADR-0004 | [#26](https://github.com/LK4D4/suwayomi.koplugin/issues/26)–[#28](https://github.com/LK4D4/suwayomi.koplugin/issues/28), with device control in C3. |
-| §4: lost manual deletion | [Spec #12](https://github.com/LK4D4/suwayomi.koplugin/issues/12), ADR-0003 and ADR-0001 amendment | Existing #13–#20; unchanged. ADR-0001 coordination is included by #15/#18, not a new standalone refactor ticket. |
+| §4: lost manual deletion | [Spec #12](https://github.com/LK4D4/suwayomi.koplugin/issues/12), ADR-0003 and ADR-0001 amendment | [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) and [#37: Verify reduced manual deletion on a device](https://github.com/LK4D4/suwayomi.koplugin/issues/37) supersede #13–#20. Reduced ADR-0003 scope retains ADR-0001 checked ordering. |
 | §5: next/ahead meaning and hidden 50 cap | [Spec #23](https://github.com/LK4D4/suwayomi.koplugin/issues/23) | [#29](https://github.com/LK4D4/suwayomi.koplugin/issues/29)–[#30](https://github.com/LK4D4/suwayomi.koplugin/issues/30). |
-| §5: while-reading repair and retention meaning | Existing #12 / #19 plus controls specification | Preserve current retention policy, add clear labels; C2/C3 and existing #20 acceptance. |
+| §5: while-reading repair and retention meaning | Reduced #12 and replacement implementation plus controls specification | Preserve current retention policy, add clear labels; C2/C3 and [#37: Verify reduced manual deletion on a device](https://github.com/LK4D4/suwayomi.koplugin/issues/37). |
 | §5: transient retries, HTTP 400/404 fallback, error UI repairs | Controls specification regression obligations | C3 preserves checks; no duplicate defect tickets for repaired work. |
 | Remaining device controls, revision provenance, actual crash evidence | Controls specification evidence contract | C3 composes prior acceptance, records demonstrated/failed/unverified outcomes, leaves unproved crash unresolved. |
 
@@ -23,7 +23,7 @@ Simple choices: sequential offset pages with explicit completeness evidence; no 
 
 Successful empty loads replace obsolete context. Relevant read/pending-sync revision changes reject stale fetch results, including synchronization acknowledgments. Endpoint provenance prevents old or unknown archive IDs from silently creating work on a different server.
 
-## Execution contract
+## Original execution contract (2026-09-06)
 
 Published three self-contained specifications and eight vertical implementation tickets, all ready-for-agent. The user explicitly authorized publication and delegated the normal interview/seam/breakdown decisions; no further approval round is required. Every ticket inherits its parent specification, applicable accepted ADRs, repository checks, privacy requirements, and existing ownership/manual-delete prerequisites. Local-only source links are not required to understand the public issue.
 
@@ -35,20 +35,19 @@ Work tickets whose native blockers are complete. Parent specifications and origi
 | --- | --- | --- | --- |
 | P1 / [#24](https://github.com/LK4D4/suwayomi.koplugin/issues/24) | Load every stored chapter before publishing chapter context | None | [#21](https://github.com/LK4D4/suwayomi.koplugin/issues/21): 1, 2, 3, 5, 8, 12, 13, 14, 15, 16, 17, 19, 20 |
 | P2 / [#25](https://github.com/LK4D4/suwayomi.koplugin/issues/25) | Preserve complete chapter selection across reopening and refresh | [#24](https://github.com/LK4D4/suwayomi.koplugin/issues/24) | [#21](https://github.com/LK4D4/suwayomi.koplugin/issues/21): 4, 6, 7, 9, 10, 11, 15, 18, 19, 20 |
-| R1 / [#26](https://github.com/LK4D4/suwayomi.koplugin/issues/26) | Refill download ahead after completed reader close | [#25](https://github.com/LK4D4/suwayomi.koplugin/issues/25), [#16](https://github.com/LK4D4/suwayomi.koplugin/issues/16), [#10](https://github.com/LK4D4/suwayomi.koplugin/issues/10) | [#22](https://github.com/LK4D4/suwayomi.koplugin/issues/22): 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 18, 20, 27, 28, 29, 30, 32, 33, 34 |
+| R1 / [#26](https://github.com/LK4D4/suwayomi.koplugin/issues/26) | Refill download ahead after completed reader close | [#25](https://github.com/LK4D4/suwayomi.koplugin/issues/25), [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36), [#10](https://github.com/LK4D4/suwayomi.koplugin/issues/10) | [#22](https://github.com/LK4D4/suwayomi.koplugin/issues/22): 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 18, 20, 27, 28, 29, 30, 32, 33, 34 |
 | R2 / [#27](https://github.com/LK4D4/suwayomi.koplugin/issues/27) | Recover pending refills through offline operation and restart | [#26](https://github.com/LK4D4/suwayomi.koplugin/issues/26) | [#22](https://github.com/LK4D4/suwayomi.koplugin/issues/22): 4, 5, 21, 22, 23, 27, 29, 30, 32, 33, 34 |
-| R3 / [#28](https://github.com/LK4D4/suwayomi.koplugin/issues/28) | Unify refill triggers and honor current reading choices | [#27](https://github.com/LK4D4/suwayomi.koplugin/issues/27), [#18](https://github.com/LK4D4/suwayomi.koplugin/issues/18) | [#22](https://github.com/LK4D4/suwayomi.koplugin/issues/22): 10, 13, 14, 15, 16, 17, 18, 19, 20, 24, 25, 26, 27, 28, 29, 31, 34 |
+| R3 / [#28](https://github.com/LK4D4/suwayomi.koplugin/issues/28) | Unify refill triggers and honor current reading choices | [#27](https://github.com/LK4D4/suwayomi.koplugin/issues/27), [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) | [#22](https://github.com/LK4D4/suwayomi.koplugin/issues/22): 10, 13, 14, 15, 16, 17, 18, 19, 20, 24, 25, 26, 27, 28, 29, 31, 34 |
 | C1 / [#29](https://github.com/LK4D4/suwayomi.koplugin/issues/29) | Disclose bulk download limits before queue admission | [#4](https://github.com/LK4D4/suwayomi.koplugin/issues/4) | [#23](https://github.com/LK4D4/suwayomi.koplugin/issues/23): 1, 2, 3, 4, 5, 6, 7, 18 |
-| C2 / [#30](https://github.com/LK4D4/suwayomi.koplugin/issues/30) | Explain ahead buffers and completion retention consistently | [#28](https://github.com/LK4D4/suwayomi.koplugin/issues/28), [#19](https://github.com/LK4D4/suwayomi.koplugin/issues/19) | [#23](https://github.com/LK4D4/suwayomi.koplugin/issues/23): 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 |
-| C3 / [#31](https://github.com/LK4D4/suwayomi.koplugin/issues/31) | Verify remaining issue-2 workflows and record crash evidence limits | [#29](https://github.com/LK4D4/suwayomi.koplugin/issues/29), [#30](https://github.com/LK4D4/suwayomi.koplugin/issues/30), [#20](https://github.com/LK4D4/suwayomi.koplugin/issues/20) | [#23](https://github.com/LK4D4/suwayomi.koplugin/issues/23): 19, 20, 21, 22, 23, 24 |
+| C2 / [#30](https://github.com/LK4D4/suwayomi.koplugin/issues/30) | Explain ahead buffers and completion retention consistently | [#28](https://github.com/LK4D4/suwayomi.koplugin/issues/28), [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) | [#23](https://github.com/LK4D4/suwayomi.koplugin/issues/23): 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 |
+| C3 / [#31](https://github.com/LK4D4/suwayomi.koplugin/issues/31) | Verify remaining issue-2 workflows and record crash evidence limits | [#29](https://github.com/LK4D4/suwayomi.koplugin/issues/29), [#30](https://github.com/LK4D4/suwayomi.koplugin/issues/30), [#37: Verify reduced manual deletion on a device](https://github.com/LK4D4/suwayomi.koplugin/issues/37) | [#23](https://github.com/LK4D4/suwayomi.koplugin/issues/23): 19, 20, 21, 22, 23, 24 |
 
-P1 (#24) can start immediately. C1 (#29) can proceed independently of pagination once checked command admission (#4) is complete; it must reuse those results to report failed saves honestly. P2 completes the input required by R1; R1 also waits for safe manual-delete admission/worker fences (#16) and bounded shared shutdown (#10). R3 waits for bulk manual admission (#18). C2 waits for final refill behavior and retention generation safety (#19). C3 waits for both controls tickets and existing manual-delete/device acceptance (#20), which already includes ownership device acceptance (#11). These are genuine gates, not a requirement to close parent specs first.
-
+Original ticket routing is retained for unrelated work; consult live progress before starting. R1 (#26) keeps #25/#10 and waits for the replacement implementation's checked manual admission and automatic-work fences. R3 (#28) keeps #27 and waits for complete bulk coordination. C2 (#30) keeps #28 and waits for actual reduced outcomes plus necessary retention/identity coordination. C3 (#31) keeps #29/#30 and waits for replacement device acceptance, which also waits for #11. Busy manual deletion never cancels downloads; accepted archive-only deletion remains durable. These are genuine gates, not requirements to close parent specs.
 ## Specification coverage
 
 All 20 complete-retrieval stories, 34 refill stories, and 24 controls/acceptance stories map to at least one ticket above. Acceptance includes public action/lifecycle composition, targeted real filesystem/process checks, and device workflow evidence. No tests are claimed run in this planning task.
 
-## Publication verification
+## Original publication verification (2026-09-06)
 
 All three specification and eight ticket titles, bodies, open states, and ready-for-agent labels were read back. All 13 native blocked-by relationships match the table, including no blockers for #24 and checked command admission #4 for #29. Original report #2 and existing specifications #3/#12 retained identical titles, bodies, comments, states, and labels. No parent issue was modified or closed.
 
@@ -141,10 +140,12 @@ This ticket inherits its parent specification's complete behavior, safety, priva
 - [ ] Run full LuaJIT tests, lint, and localization checks. Keep startup requests preserved safely until recovery support is verified in the next slice; no unsafe fallback, extra quit wrapper, or new independent service.
 - [ ] Retain verified endpoint provenance for background enrollment; old/unknown-origin legacy associations cannot be stamped with current endpoint merely by closing a file. Require a fresh current-endpoint context plus explicit plugin Open/Download or ahead-setting association. Reject/refetch results when relevant read/pending-sync revision changes during fetch, including synchronization acknowledgment clearing pending state.
 
+Manual-deletion dependency supplies checked admission, command provenance, and automatic-work fences under reduced #12. Owning downloads produce busy/not-accepted deletion without cancellation; accepted archive-only requests still fence refill. This ticket owns new completion-triggered refill scheduling.
+
 #### Blocked by
 
 - [Preserve complete chapter selection across reopening and refresh (#25)](https://github.com/LK4D4/suwayomi.koplugin/issues/25)
-- [Coordinate manual deletion with existing and replacement downloads (#16)](https://github.com/LK4D4/suwayomi.koplugin/issues/16)
+- [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36)
 - [Stop download service within a bounded KOReader shutdown (#10)](https://github.com/LK4D4/suwayomi.koplugin/issues/10)
 
 
@@ -203,10 +204,12 @@ This ticket inherits its parent specification's complete behavior, safety, priva
 - [ ] Run full LuaJIT tests, lint, localization, and relevant real-process checks. Update the architecture map for implemented service/trigger ownership. The final audit acceptance ticket verifies combined device behavior.
 - [ ] Preserve verified origin through archive/policy association and reject unknown-origin completion after endpoint change. Exercise the close → fetch stale remote unread → read-sync acknowledgment → result sequence; revision invalidation must prevent re-downloading the completed chapter.
 
+Manual-deletion dependency supplies complete bulk checked read/intent coordination and unread revocation under reduced #12. Include busy/not-accepted members without canceling work or promising deletion; only accepted intents join the transaction. This ticket owns new refill enrollment across those existing actions.
+
 #### Blocked by
 
 - [Recover pending refills through offline operation and restart (#27)](https://github.com/LK4D4/suwayomi.koplugin/issues/27)
-- [Apply durable manual deletion to selected and previous chapters (#18)](https://github.com/LK4D4/suwayomi.koplugin/issues/18)
+- [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36)
 
 
 ### C1 / #29: Disclose bulk download limits before queue admission
@@ -256,15 +259,17 @@ This ticket inherits its parent specification's complete behavior, safety, priva
 - [ ] Explain Stop download ahead versus existing jobs, and download Cancel retiring current refill evaluation while permitting a later independent event. Cancel all retires all evaluations without disabling policies. Explain terminal chapter Retry separately from pending-refill Retry.
 - [ ] Keep retention persisted values 0–5 compatible: 0 disabled; 1–5 keep newest 0–4 recorded completions per manga. Use a shared label mapping in settings summary and picker, such as Keep 2 newest completions, replacing misleading ordinal list-position wording.
 - [ ] Explain completed status plus close, live-reader protection, manual completion enrollment, pathless positions, and no retroactive deletion authorization from historical/server read state.
-- [ ] Distinguish new manual-delete admission from retention, accepted requests surviving setting Off, and unread/explicit Cancel/later accepted deliberate-download revocation under specification #12.
+- [ ] Explain reduced #12: owning queued/running/stopping/finalizing work makes deletion busy/not accepted, preserves work, and requires another action after it finishes. Mark-read may succeed independently. Accepted archive-only requests survive setting Off and are revoked by unread or later accepted deliberate download; failed/uncertain/duplicate/automatic admission does not revoke them. Sidecars/backups/metadata remain, not unfinished deletion work. Use existing chapter status and immediate summaries, with no dedicated manual Downloads screen or new deletion Retry/Cancel controls.
 - [ ] Include ahead-five with two existing positions versus next-five additional downloads, and retention-three A/B/C with A eligible after C. Mention exact saved scanlator and no silent All fallback when missing.
 - [ ] Keep UI explanations short and user-facing; put fuller examples in help. Use existing localization/plural boundaries and accurate source catalogs/template, without fabricating translations.
 - [ ] Exercise public settings summary/picker/actions for all persisted values and repeated navigation, compare help to actual service/selection/retention behavior, and verify missing-filter/terminal-failure/pending-deletion wording. Run full suite, lint, and localization checks.
 
+The implementation dependency includes necessary publication/ordinary Delete/retention identity coordination and unchanged completion positions/pathless eligibility. Verify explanations against those implemented outcomes; this ticket does not redesign retention eligibility.
+
 #### Blocked by
 
 - [Unify refill triggers and honor current reading choices (#28)](https://github.com/LK4D4/suwayomi.koplugin/issues/28)
-- [Preserve retention semantics while enforcing archive identity (#19)](https://github.com/LK4D4/suwayomi.koplugin/issues/19)
+- [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36)
 
 
 ### C3 / #31: Verify remaining issue-2 workflows and record crash evidence limits
@@ -283,7 +288,7 @@ This ticket inherits its parent specification's complete behavior, safety, priva
 
 - [ ] Run the device long-series control with more than 200 stored chapters and unread chapters beyond page one. Compare complete identities/count/order and next/ahead candidates after ordinary reopening versus explicit Refresh, including saved filter and tied order.
 - [ ] From equivalent ahead-five state, compare plugin-list return against native Open next file/direct reader transitions without plugin screens. Both admit the sixth chapter after completed close; repeat offline/reconnect and pending-work quit/relaunch, with no duplicate workers or jobs.
-- [ ] Reuse and link ownership and manual-delete acceptance evidence: Downloads-only versus navigation, concurrency two then one, zero-view completion, bounded shutdown, manual deletion with retention off/three, live reader, restart, and later deliberate replacement. Record any gaps instead of assuming dependencies establish new combinations.
+- [ ] Reuse and link ownership and manual-delete acceptance evidence: Downloads-only versus navigation, concurrency two then one, zero-view completion, bounded shutdown, reduced archive-only manual deletion with retention off/three, live reader, navigation/restart, transient retry, busy downloads requiring another action, retained metadata, honest chapter summaries, and later deliberate replacement. Record any gaps instead of assuming dependencies establish new combinations.
 - [ ] Exercise independent retention-three A/B/C with restart between B/C, retention-one live then close, and final-page-without-completed-status negative control. Observe archives, retained/owned metadata, read state, and displayed status together.
 - [ ] Preserve automated controls for durable transient retries, quiet failures, full terminal-error inspection, and HTTP 400/404 archive-to-page fallback. Do not reopen already repaired regressions as new defects or attribute the later HTTP 400 bug to the original report.
 - [ ] On a device compare bulk confirmation versus actual admissions for more than 50 eligible chapters, a changing queue, compact layouts, and relevant localized strings. Use synthetic/controlled data; do not damage storage to force failures.
@@ -296,4 +301,4 @@ This ticket inherits its parent specification's complete behavior, safety, priva
 
 - [Disclose bulk download limits before queue admission (#29)](https://github.com/LK4D4/suwayomi.koplugin/issues/29)
 - [Explain ahead buffers and completion retention consistently (#30)](https://github.com/LK4D4/suwayomi.koplugin/issues/30)
-- [Verify durable manual deletion on a device (#20)](https://github.com/LK4D4/suwayomi.koplugin/issues/20)
+- [#37: Verify reduced manual deletion on a device](https://github.com/LK4D4/suwayomi.koplugin/issues/37)

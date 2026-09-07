@@ -5,7 +5,7 @@ This context describes reading and managing chapter downloads on a KOReader devi
 ## Language
 
 **Manual-delete intent**:
-An outstanding request created by a plugin manual mark-read action to remove the chapter's captured local archive and cancel download work already present at that action. Its eligibility is independent of while-reading retention; it never grants authority over a later deliberate download.
+An accepted request from a plugin manual mark-read action to remove only the chapter's captured local archive, preserving metadata; download work owning the chapter prevents acceptance. Its lifetime is independent of finish retention, and its authority never transfers to a replacement archive.
 _Avoid_: Finished-chapter record, retention candidate.
 
 **Archive generation**:

@@ -16,7 +16,7 @@ Single, selected, and previous-chapter mark-read actions will share private impl
 
 ## Follow-up ordering decision
 
-[Accepted ADR-0003](0003-durable-manual-delete-intent.md) revises the destructive-action ordering for deletion after manual mark-read. Capture archive/job targets and commit read-ledger changes plus manual-delete intent before cancellation or file removal. Retain this ADR's module boundary, visible completion order, pathless eligibility, selected-menu clearing, and durable reconciliation of non-target visible chapters. The original sequence below records the behavior this coordination refactor preserved; its immediate-delete phase must not be carried into the durable manual-delete implementation.
+[Accepted ADR-0003](0003-durable-manual-delete-intent.md) revises the destructive-action ordering for deletion after manual mark-read. Under its 2026-09-07 scope amendment, capture the exact archive target and commit read-ledger changes plus accepted manual-delete intent before file removal. Existing queued/running/stopping/finalizing work makes deletion busy/not accepted; manual mark-read does not cancel it. Retain this ADR's module boundary, visible completion order, pathless eligibility, selected-menu clearing, and durable reconciliation of non-target visible chapters. The original sequence below records the behavior this coordination refactor preserved; its immediate-delete phase must not be carried into the durable manual-delete implementation.
 
 ## Original ordering constraints
 
