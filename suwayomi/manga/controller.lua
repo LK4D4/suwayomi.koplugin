@@ -670,7 +670,11 @@ function Methods:performMangaAction(manga, action_id, options)
     if keep_unread_count then
         local limit = tonumber(keep_unread_count)
         if limit == 0 then
-            SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, 0)
+            local saved, err = SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, 0)
+            if not saved and err then
+                self:showMessage(err or I18n.t("Failed to save settings."))
+                return false
+            end
             return true
         end
         return self:keepNextUnreadChaptersForManga(manga, limit)
@@ -814,7 +818,11 @@ function Methods:confirmKeepNextUnreadChaptersDownloaded(limit)
 
     local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
     if #chapters == 0 then
-        SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
+        local saved, err = SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
+        if not saved and err then
+            self:showMessage(err or I18n.t("Failed to save settings."))
+            return 0
+        end
         self:showMessage(I18n.t("Download-ahead buffer is already downloaded or queued."))
         return 0
     end
@@ -829,7 +837,11 @@ function Methods:confirmKeepNextUnreadChaptersDownloaded(limit)
         ),
         I18n.t("Queue"),
         function()
-            SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
+            local saved, err = SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
+            if not saved and err then
+                self:showMessage(err or I18n.t("Failed to save settings."))
+                return
+            end
             self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
         end
     )
@@ -855,13 +867,21 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
                 ),
                 I18n.t("Queue"),
                 function()
-                    SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
+                    local saved, err = SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
+                    if not saved and err then
+                        self:showMessage(err or I18n.t("Failed to save settings."))
+                        return
+                    end
                     self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
                 end
             )
         end
 
-        SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
+        local saved, err = SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, requested_limit)
+        if not saved and err then
+            self:showMessage(err or I18n.t("Failed to save settings."))
+            return 0
+        end
         if #chapters == 0 then
             self:showMessage(I18n.t("Download-ahead buffer is already downloaded or queued."))
             return 0

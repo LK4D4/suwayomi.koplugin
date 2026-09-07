@@ -181,6 +181,21 @@ msgid "Canceled %1 queued download."
 msgid_plural "Canceled %1 queued downloads."
 msgstr[0] "已取消 %1 个排队下载。"
 
+msgid "Cannot cancel download: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot cancel downloads: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot delete chapter: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot enqueue download: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot enqueue downloads: storage is ambiguous"
+msgstr ""
+
 msgid "Categories"
 msgstr "分类"
 
@@ -251,6 +266,14 @@ msgstr "连接测试通过。"
 msgid "Continue"
 msgstr "继续"
 
+#, fuzzy
+msgid "Could not cancel download: %1"
+msgstr "无法开始章节下载：%1"
+
+#, fuzzy
+msgid "Could not clear failed downloads: %1"
+msgstr "无法开始章节下载：%1"
+
 msgid "Could not connect to Suwayomi."
 msgstr "无法连接到 Suwayomi。"
 
@@ -283,6 +306,14 @@ msgstr "无法加载已保存的筛选器。"
 
 msgid "Could not load source filters."
 msgstr "无法加载源筛选器。"
+
+#, fuzzy
+msgid "Could not queue download: %1"
+msgstr "无法开始章节下载：%1"
+
+#, fuzzy
+msgid "Could not queue downloads: %1"
+msgstr "无法开始章节下载：%1"
 
 msgid "Could not retry download."
 msgstr "无法重试下载。"
@@ -533,6 +564,10 @@ msgstr "失败"
 msgid "Failed to delete %1 download."
 msgid_plural "Failed to delete %1 downloads."
 msgstr[0] "删除 %1 个下载失败。"
+
+#, fuzzy
+msgid "Failed to save scanlator filter."
+msgstr "无法保存筛选器。"
 
 msgid "Failed to save settings."
 msgstr ""

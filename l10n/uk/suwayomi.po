@@ -201,6 +201,21 @@ msgstr[0] "Скасовано %1 завантаження в черзі."
 msgstr[1] "Скасовано %1 завантаження в черзі."
 msgstr[2] "Скасовано %1 завантажень у черзі."
 
+msgid "Cannot cancel download: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot cancel downloads: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot delete chapter: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot enqueue download: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot enqueue downloads: storage is ambiguous"
+msgstr ""
+
 msgid "Categories"
 msgstr "Категорії"
 
@@ -271,6 +286,14 @@ msgstr "Перевірку з'єднання пройдено."
 msgid "Continue"
 msgstr "Продовжити"
 
+#, fuzzy
+msgid "Could not cancel download: %1"
+msgstr "Не вдалося почати завантаження розділу: %1"
+
+#, fuzzy
+msgid "Could not clear failed downloads: %1"
+msgstr "Не вдалося почати завантаження розділу: %1"
+
 msgid "Could not connect to Suwayomi."
 msgstr "Не вдалося під'єднатися до Suwayomi."
 
@@ -303,6 +326,14 @@ msgstr "Не вдалося завантажити збережені фільт
 
 msgid "Could not load source filters."
 msgstr "Не вдалося завантажити фільтри джерела."
+
+#, fuzzy
+msgid "Could not queue download: %1"
+msgstr "Не вдалося почати завантаження розділу: %1"
+
+#, fuzzy
+msgid "Could not queue downloads: %1"
+msgstr "Не вдалося почати завантаження розділу: %1"
 
 msgid "Could not retry download."
 msgstr "Не вдалося повторити завантаження."
@@ -565,6 +596,10 @@ msgid_plural "Failed to delete %1 downloads."
 msgstr[0] "Не вдалося видалити %1 завантаження."
 msgstr[1] "Не вдалося видалити %1 завантаження."
 msgstr[2] "Не вдалося видалити %1 завантажень."
+
+#, fuzzy
+msgid "Failed to save scanlator filter."
+msgstr "Не вдалося зберегти фільтр."
 
 msgid "Failed to save settings."
 msgstr ""

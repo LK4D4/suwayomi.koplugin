@@ -80,8 +80,7 @@ function Methods:performChapterAction(manga, chapter, action_id)
         return self:openChapter(manga, chapter)
     end
     if action_id == "download" then
-        self:enqueueChapterDownload(manga, chapter)
-        return true
+        return self:enqueueChapterDownload(manga, chapter)
     end
     if action_id == "retry_download" then
         return self:retryDownloadJob({ key = self:getDownloadQueue():getKey(manga, chapter) })
@@ -114,7 +113,12 @@ function Methods:cancelChapterDownload(manga, chapter)
         self:refreshChapterMenu({ quick = true })
         return true
     end
-    if state == "downloading" then
+    if state == "store_blocked" or (type(state) == "string" and state:match("^ambiguous_post_replacement")) then
+        self:showMessage(I18n.t("Cannot cancel download: storage is ambiguous"))
+    elseif state and state ~= "missing" and state ~= "queued" and state ~= "downloading"
+        and state ~= "downloaded" and state ~= "skipped" and state ~= "failed" then
+        self:showMessage(I18n.f("Could not cancel download: %1", state))
+    elseif state == "downloading" then
         self:showMessage(I18n.t("Download is no longer active."))
     else
         self:showMessage(I18n.t("Download is no longer queued."))
@@ -141,6 +145,7 @@ end
 function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
     local started_at = SuwayomiDebug.now()
     local queued = 0
+    local enqueue_err
     local skipped = 0
     local capped = 0
     local queueable = {}
@@ -157,8 +162,12 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
     end
 
     self:withChapterMenuRefreshSuppressed(function()
-        queued = self:getDownloadQueue():enqueueBatch(manga, queueable, download_directory, { quiet_duplicate = true })
+        queued, enqueue_err = self:getDownloadQueue():enqueueBatch(manga, queueable, download_directory, { quiet_duplicate = true })
     end)
+    if enqueue_err then
+        self:showMessage(I18n.f("Could not queue downloads: %1", enqueue_err))
+        return queued, enqueue_err
+    end
     skipped = skipped + (#queueable - queued)
 
     self:clearChapterSelection(true)
@@ -591,10 +600,16 @@ function Methods:enqueueChapterDownload(manga, chapter)
         return
     end
 
+    local queued, state
     self:withChapterMenuRefreshSuppressed(function()
-        self:getDownloadQueue():enqueue(manga, chapter, download_directory)
+        queued, state = self:getDownloadQueue():enqueue(manga, chapter, download_directory)
     end)
+    if not queued and state and state ~= "queued" and state ~= "downloading" then
+        self:showMessage(I18n.f("Could not queue download: %1", state))
+        return false, state
+    end
     self:refreshChapterMenu({ quick = true })
+    return queued, state
 end
 
 

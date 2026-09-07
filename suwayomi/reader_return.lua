@@ -194,7 +194,11 @@ local function normalizeContextStore(contexts)
     if type(contexts) ~= "table" then
         return {}
     end
-    return contexts
+    local cloned = {}
+    for k, v in pairs(contexts) do
+        cloned[k] = v
+    end
+    return cloned
 end
 
 function Methods:saveReaderReturnContext(manga, chapter, chapter_path)
@@ -205,7 +209,10 @@ function Methods:saveReaderReturnContext(manga, chapter, chapter_path)
 
     local contexts = normalizeContextStore(SuwayomiSettings:loadReaderReturnContexts())
     contexts[chapter_path] = context
-    SuwayomiSettings:saveReaderReturnContexts(contexts)
+    local ok, err = SuwayomiSettings:saveReaderReturnContexts(contexts)
+    if not ok then
+        return nil, err
+    end
     return context
 end
 
@@ -229,7 +236,10 @@ function Methods:saveReaderReturnContextsForChapters(manga, entries)
     end
 
     if changed then
-        SuwayomiSettings:saveReaderReturnContexts(contexts)
+        local ok, err = SuwayomiSettings:saveReaderReturnContexts(contexts)
+        if not ok then
+            return {}, err
+        end
     end
     return saved
 end

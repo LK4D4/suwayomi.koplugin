@@ -349,7 +349,7 @@ describe("suwayomi/chapters/finished_cleanup", function()
             end
             subject.getDownloadQueue = function() return {
                 getStatus = function() end, cancelPending = function() return false end,
-                clearStatus = function() end,
+                clearStatus = function() return true end,
             } end
         end
         os.remove = function(candidate)

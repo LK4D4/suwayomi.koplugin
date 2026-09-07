@@ -48,6 +48,35 @@ local function isFiniteNumber(value)
         and value ~= -math.huge
 end
 
+local ok_ffi, ffi = pcall(require, "ffi")
+local is_windows = package.config:sub(1, 1) == "\\"
+
+if ok_ffi and ffi then
+    if is_windows then
+        pcall(function()
+            ffi.cdef[[
+                typedef void* HANDLE;
+                typedef unsigned long DWORD;
+                typedef int BOOL;
+                typedef const char* LPCSTR;
+                HANDLE CreateFileA(LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, void* lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
+                BOOL FlushFileBuffers(HANDLE hFile);
+                BOOL CloseHandle(HANDLE hObject);
+                DWORD GetLastError(void);
+                BOOL MoveFileExA(LPCSTR lpExistingFileName, LPCSTR lpNewFileName, DWORD dwFlags);
+            ]]
+        end)
+    else
+        pcall(function()
+            ffi.cdef[[
+                int open(const char *pathname, int flags, ...);
+                int fsync(int fd);
+                int close(int fd);
+            ]]
+        end)
+    end
+end
+
 local function defaultParentDir(path)
     return tostring(path):match("^(.*)[/\\][^/\\]+$") or "."
 end
@@ -63,23 +92,95 @@ local function defaultIoAdapter()
         flush = function(handle)
             return handle:flush()
         end,
-        sync_file = function(handle)
-            handle:flush()
+        sync_file = function(handle, path)
+            if handle then
+                local ok, err = handle:flush()
+                if ok == false or (ok == nil and err ~= nil) then
+                    return nil, err or "flush_failed"
+                end
+            end
+            path = path or (type(handle) == "table" and handle.path)
+            if not ok_ffi or not ffi then
+                return nil, "storage_sync_unsupported"
+            end
+            if is_windows and path then
+                local INVALID_HANDLE_VALUE = ffi.cast("HANDLE", -1)
+                local h = ffi.C.CreateFileA(path, 0x40000000, 7, nil, 3, 0x80, nil)
+                if h == INVALID_HANDLE_VALUE then
+                    h = ffi.C.CreateFileA(path, 0x80000000, 7, nil, 3, 0x80, nil)
+                end
+                if h ~= INVALID_HANDLE_VALUE then
+                    local res = ffi.C.FlushFileBuffers(h)
+                    ffi.C.CloseHandle(h)
+                    if res == 0 then
+                        return nil, "os_sync_file_failed: " .. tostring(ffi.C.GetLastError())
+                    end
+                else
+                    return nil, "os_sync_file_open_failed: " .. tostring(ffi.C.GetLastError())
+                end
+            elseif not is_windows and path then
+                local fd = ffi.C.open(path, 0)
+                if fd >= 0 then
+                    local res = ffi.C.fsync(fd)
+                    ffi.C.close(fd)
+                    if res ~= 0 then
+                        return nil, "os_fsync_failed"
+                    end
+                else
+                    return nil, "os_open_failed"
+                end
+            end
             return true
         end,
         close = function(handle)
             return handle:close()
         end,
         rename = function(old_path, new_path)
-            local ok, err = os.rename(old_path, new_path)
-            if not ok and package.config:sub(1, 1) == "\\" then
-                os.remove(new_path)
+            if is_windows then
+                if ok_ffi and ffi and ffi.C.MoveFileExA then
+                    -- MOVEFILE_REPLACE_EXISTING (1) | MOVEFILE_WRITE_THROUGH (8)
+                    local ok = ffi.C.MoveFileExA(old_path, new_path, 9)
+                    if ok ~= 0 then
+                        return true
+                    end
+                    return nil, "MoveFileExA_failed: " .. tostring(ffi.C.GetLastError())
+                end
                 return os.rename(old_path, new_path)
             end
-            return ok, err
+            return os.rename(old_path, new_path)
         end,
-        sync_dir = function(_dir_path)
-            return true
+        sync_dir = function(dir_path)
+            local ok_lfs, lfs = pcall(require, "lfs")
+            if ok_lfs and lfs and lfs.attributes then
+                local attr = lfs.attributes(dir_path)
+                if not attr or attr.mode ~= "directory" then
+                    return nil, "directory_does_not_exist"
+                end
+            end
+            if not ok_ffi or not ffi then
+                return nil, "storage_sync_unsupported"
+            end
+            if is_windows then
+                local INVALID_HANDLE_VALUE = ffi.cast("HANDLE", -1)
+                -- Check directory exists and open handle to it
+                local h = ffi.C.CreateFileA(dir_path, 0, 7, nil, 3, 0x02000000, nil)
+                if h == INVALID_HANDLE_VALUE then
+                    return nil, "sync_dir_open_failed: " .. tostring(ffi.C.GetLastError())
+                end
+                ffi.C.CloseHandle(h)
+                return true
+            else
+                local fd = ffi.C.open(dir_path, 0)
+                if fd < 0 then
+                    return nil, "sync_dir_open_failed"
+                end
+                local res = ffi.C.fsync(fd)
+                ffi.C.close(fd)
+                if res ~= 0 then
+                    return nil, "sync_dir_failed"
+                end
+                return true
+            end
         end,
         remove = function(path)
             return os.remove(path)
@@ -228,7 +329,10 @@ function SettingsStore:load(initial_data)
         return self.committed_data
     end
 
-    local raw_content, _read_err = self.io.read(self.path)
+    local raw_content
+    if self.io.read then
+        raw_content = self.io.read(self.path)
+    end
     if raw_content and raw_content ~= "" then
         local loader, _load_err = loadstring(raw_content)
         if loader then
@@ -292,21 +396,8 @@ function SettingsStore:saveDocument(mutator)
     end
 
     local parent_dir = defaultParentDir(self.path)
-    local parent_exists = self.io.dir_exists and self.io.dir_exists(parent_dir)
-
-    -- If in mock environment with luasettings and non-existent parent directory,
-    -- sync with luasettings and update committed cache.
-    if self.luasettings and not parent_exists then
-        self.committed_data = staged
-        self.last_tx_id = tx_id
-        self.last_tx_version = version
-        for k, v in pairs(staged) do
-            self.luasettings.data[k] = v
-        end
-        if self.luasettings.flush then
-            self.luasettings:flush()
-        end
-        return true, staged
+    if self.io.dir_exists and not self.io.dir_exists(parent_dir) then
+        return nil, "destination_directory_unavailable"
     end
 
     local tmp_path = string.format("%s.tmp.%d.%04x", self.path, os.time(), math.random(0, 0xffff))
@@ -329,7 +420,7 @@ function SettingsStore:saveDocument(mutator)
         return nil, "flush_failed: " .. tostring(flush_err or ok_flush)
     end
 
-    local call_sync_ok, ok_sync, sync_err = pcall(self.io.sync_file, handle)
+    local call_sync_ok, ok_sync, sync_err = pcall(self.io.sync_file, handle, tmp_path)
     if not call_sync_ok or ok_sync == false or (ok_sync == nil and sync_err ~= nil) then
         pcall(self.io.close, handle)
         pcall(self.io.remove, tmp_path)
@@ -364,9 +455,6 @@ function SettingsStore:saveDocument(mutator)
     if self.luasettings and type(self.luasettings.data) == "table" then
         for k, v in pairs(staged) do
             self.luasettings.data[k] = v
-        end
-        if self.luasettings.flush then
-            self.luasettings:flush()
         end
     end
 

@@ -10,8 +10,10 @@ describe("download failure user actions", function()
         "suwayomi/downloads/active_jobs", "suwayomi/downloads/job_store",
         "suwayomi/downloads/status_formatter", "ui/uimanager", "ui/widget/textviewer",
         "suwayomi/plugin/home", "ui/widget/infomessage",
+        "suwayomi/chapters/delete_actions",
     }
     local saved, stack, scheduled, messages, plugin, queue, now, ui, downloads
+    local save_error, blocked, terminated
     local manga = { id = "m1", title = "Example manga" }
     local chapter = { id = "c1", name = "Chapter 1" }
     local full_error = "HTTP 503\n" .. string.rep("診断 details with 100% certainty\n", 200) .. "last detail"
@@ -37,7 +39,15 @@ describe("download failure user actions", function()
         return require("suwayomi/downloads/queue"):new{
             settings = {
                 loadDownloadQueue = function() return json.decode(saved) end,
-                saveDownloadQueue = function(_, jobs) saved = json.encode(jobs) end,
+                saveDownloadQueue = function(_, jobs)
+                    if save_error and save_error:match("^ambiguous_post_replacement") then
+                        saved = json.encode(jobs)
+                        blocked = true
+                    end
+                    if save_error then return false, save_error end
+                    saved = json.encode(jobs)
+                end,
+                isBlocked = function() return blocked end,
             },
             downloader = {
                 chapterExists = function() return false end,
@@ -46,7 +56,7 @@ describe("download failure user actions", function()
             ffi_util = {
                 runInSubProcess = function() return 123 end,
                 isSubProcessDone = function() return true end,
-                terminateSubProcess = function() end,
+                terminateSubProcess = function() terminated = terminated + 1 end,
             },
             ui_manager = ui,
             now = function() return now end,
@@ -79,6 +89,7 @@ describe("download failure user actions", function()
     before_each(function()
         clearModules()
         saved, stack, scheduled, messages, now = "[]", {}, {}, {}, 100
+        save_error, blocked, terminated = nil, false, 0
         package.preload.gettext = function() return function(text) return text end end
         ui = {
             show = function(_, widget) table.insert(stack, widget) end,
@@ -151,6 +162,70 @@ describe("download failure user actions", function()
     end)
 
     after_each(clearModules)
+
+    for _, title_action in ipairs({ false, true }) do
+        it("reports rejected Clear failed from " .. (title_action and "title" or "menu") .. " action", function()
+            recover({ job("failed", "network failure") })
+            local committed = saved
+            local menu = plugin:showDownloads()
+            save_error = "write_failed: injected clear failure"
+            if title_action then
+                plugin:performDownloadsTitleAction({ id = "clear_failed" }, menu)
+            else
+                plugin:getDownloadsMenuCallbacks().onClearFailed(menu)
+            end
+            assert.are.equal("Could not clear failed downloads: " .. save_error, messages[#messages])
+            assert.are.equal(committed, saved)
+            assert.are.equal(1, queue:getFailedCount())
+            assert.are.equal("Failed", plugin.current_downloads_menu.item_table[1].mandatory)
+        end)
+    end
+
+    for _, failure in ipairs({ "write_failed: injected cancellation failure",
+        "ambiguous_post_replacement: injected directory sync failure" }) do
+        it("preserves archives and ledger when deletion cancellation returns " .. failure, function()
+            recover({ job("queued") })
+            for name, method in pairs(require("suwayomi/chapters/delete_actions").methods) do
+                plugin[name] = method
+            end
+            local archive_exists = true
+            local ledger = { ["m1:c1"] = { path = "/books/chapter.cbz", read = true } }
+            function plugin:isChapterDownloaded() return archive_exists, "/books/chapter.cbz" end
+            function plugin:getKoreaderMetadataPathForDocument() return "/books/chapter.sdr/metadata.lua" end
+            function plugin:removeChapterArchiveAndSidecars() archive_exists = false; return true end
+            function plugin:loadChapterLedger() return ledger end
+            function plugin:getChapterLedgerKey() return "m1:c1" end
+            function plugin:saveChapterLedger(value) ledger = value end
+            function plugin:refreshChapterMenu() end
+            save_error = failure
+            local ok, state = plugin:deleteChapterFromDevice(manga, chapter)
+            assert.is_false(ok)
+            assert.are.equal(blocked and "store_blocked" or "delete_failed", state)
+            assert.is_true(archive_exists)
+            assert.are.equal("/books/chapter.cbz", ledger["m1:c1"].path)
+            assert.are.equal("queued", queue:getSnapshot().queued[1].state)
+            assert.are.equal(blocked and "Cannot delete chapter: storage is ambiguous"
+                or "Could not delete this chapter from device.", messages[#messages])
+        end)
+    end
+
+    for _, active in ipairs({ false, true }) do
+        it("reports rejected " .. (active and "active" or "queued") .. " cancellation without losing its row", function()
+            recover({ job("queued") })
+            if active then queue:process() end
+            local committed = saved
+            local menu = plugin:showDownloads()
+            save_error = "write_failed: injected cancellation failure"
+            menu.item_table[1].callback()
+            stack[2].select(active and "cancel_download" or "cancel_queued")
+            assert.are.equal("Could not cancel download: " .. save_error, messages[#messages])
+            assert.are.equal(committed, saved)
+            assert.are.equal(active and 1 or 0, queue:getActiveCount())
+            assert.are.equal(0, terminated)
+            assert.are.equal(active and "Downloading" or "Queued",
+                plugin.current_downloads_menu.item_table[1].mandatory)
+        end)
+    end
 
     it("opens full multiline details directly and closes back to the same Downloads menu", function()
         recover({ job("failed", full_error) })

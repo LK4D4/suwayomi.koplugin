@@ -22,6 +22,16 @@ end
 
 local Methods = {}
 
+local function cancellationFailureMessage(state)
+    if state == "store_blocked" or (type(state) == "string" and state:match("^ambiguous_post_replacement")) then
+        return I18n.t("Cannot cancel download: storage is ambiguous")
+    end
+    if state and state ~= "missing" and state ~= "queued" and state ~= "downloading" and state ~= "downloaded"
+        and state ~= "skipped" and state ~= "failed" then
+        return I18n.f("Could not cancel download: %1", state)
+    end
+end
+
 function Methods:getDownloadJobTitle(job)
     local manga_title = job and job.manga and job.manga.title or nil
     local chapter_name = job and job.chapter and job.chapter.name or nil
@@ -38,6 +48,8 @@ end
 
 
 function Methods:formatCancelQueuedDownloadMessage(state)
+    local failure = cancellationFailureMessage(state)
+    if failure then return failure end
     if state == "downloading" then
         return I18n.t("Download is already downloading.")
     end
@@ -67,7 +79,11 @@ function Methods:performDownloadsTitleAction(action, menu)
     local queue = self:getDownloadQueue()
     if action.id == "cancel_all" then
         local callback = function()
-            queue:cancelAll()
+            local _count, err = queue:cancelAll()
+            if err and self.showMessage then
+                local message = err == "store_blocked" and I18n.t("Cannot cancel downloads: storage is ambiguous") or err
+                self:showMessage(message)
+            end
             self:closeMenu(menu)
             self:showDownloads()
         end
@@ -83,12 +99,19 @@ function Methods:performDownloadsTitleAction(action, menu)
         end
         return true
     elseif action.id == "cancel_queued" then
-        queue:cancelQueued()
+        local _count, err = queue:cancelQueued()
+        if err and self.showMessage then
+            local message = err == "store_blocked" and I18n.t("Cannot cancel downloads: storage is ambiguous") or err
+            self:showMessage(message)
+        end
         self:closeMenu(menu)
         self:showDownloads()
         return true
     elseif action.id == "clear_failed" then
-        queue:clearFailed()
+        local _count, err = queue:clearFailed()
+        if err then
+            self:showMessage(I18n.f("Could not clear failed downloads: %1", err))
+        end
         self:closeMenu(menu)
         self:showDownloads()
         return true
@@ -181,9 +204,7 @@ function Methods:getDownloadsMenuCallbacks()
             self:showFailedDownloadActions(job, menu)
         end,
         onClearFailed = function(menu)
-            self:getDownloadQueue():clearFailed()
-            self:closeMenu(menu)
-            self:showDownloads()
+            self:performDownloadsTitleAction({ id = "clear_failed" }, menu)
         end,
     }
 end
@@ -276,10 +297,11 @@ function Methods:showActiveDownloadActions(job, menu)
         if action and action.id == "open_chapter_list" then
             self:showChaptersForManga(job.manga)
         elseif action and action.id == "cancel_download" then
-            local cancelled = self:getDownloadQueue():cancelPending(job.manga, job.chapter)
+            local cancelled, state = self:getDownloadQueue():cancelPending(job.manga, job.chapter)
             self:closeMenu(menu)
             if not cancelled then
-                self:showMessage(I18n.t("Download is no longer active."), { timeout = 2 })
+                self:showMessage(cancellationFailureMessage(state)
+                    or I18n.t("Download is no longer active."), { timeout = 2 })
             end
             self:showDownloads()
         end
@@ -495,7 +517,11 @@ function Methods:keepNextUnreadChaptersDownloaded(limit)
         return 0
     end
 
-    self:saveMangaKeepNextUnreadDownloadsLimit(manga, requested_limit)
+    local saved, err = self:saveMangaKeepNextUnreadDownloadsLimit(manga, requested_limit)
+    if not saved and err then
+        self:showMessage(err or I18n.t("Failed to save settings."))
+        return 0
+    end
     local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
     if #chapters == 0 then
         self:showMessage(I18n.t("Download-ahead buffer is already downloaded or queued."))

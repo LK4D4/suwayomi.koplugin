@@ -105,7 +105,7 @@ Chapters and read state:
 Shared support:
 
 - `suwayomi/settings.lua`: KOReader settings persistence facade.
-- `suwayomi/settings/store.lua`: Atomic settings storage engine with transactional replacement, write-fence protection against torn files, and staging rollback.
+- `suwayomi/settings/store.lua`: Checked atomic replacement of the complete shared settings document. Failed writes before replacement preserve committed values; uncertain replacement outcomes fence writes until the stored transaction is reconciled. The queue schedules reconciliation and reconstructs committed work before resuming launches and polling.
 - `suwayomi/paths.lua`: source-scoped download path layout and path segment sanitization.
 - `suwayomi/debug.lua`: opt-in redacted debug logging.
 - `suwayomi/i18n.lua`: plugin-owned wrapper around KOReader gettext and template formatting for runtime UI strings. It loads compiled plugin catalogs from `l10n/<locale>/suwayomi.mo` when KOReader has a matching language, restores KOReader's native gettext state after loading, and intentionally does not persist plugin language settings or translate server-provided manga/source/chapter data.
@@ -176,6 +176,7 @@ Coverage is organized around runtime boundaries:
 - Library, manga, chapter, and downloads i18n specs use marker `suwayomi/i18n` stubs to prove plugin-authored menu chrome, confirmations, status summaries, and fallback errors route through the facade. Library category names, manga titles, chapter names, scanlator names, source names, category/genre metadata, filesystem paths, raw API errors, and raw worker errors remain external data and are asserted without translation markers.
 - `spec/suwayomi_download_failure_ux_spec.lua` composes real queue persistence, controller actions, and download UI builders with KOReader widget/worker substitutes to verify error access, restart recovery, stale actions, quiet failures, and displayed queue transitions together.
 - Queue/download specs cover persisted jobs, active worker scheduling, progress files, status text, and one-chapter CBZ behavior without real network or real subprocess timing.
+- `spec/suwayomi_settings_atomic_failure_spec.lua` composes the real settings store, queue, and active lifecycle with injected storage failures and controlled timers. It checks committed jobs, snapshots, worker effects, and reconciliation together. `spec/suwayomi_settings_store_spec.lua` also replaces an existing file and reopens the store using actual filesystem operations.
 - Controller specs exercise plugin-bound methods with KOReader/runtime stubs rather than requiring real KOReader.
 - Read-sync specs isolate ledger, metadata/history handling, worker behavior, and controller polling/retry flows.
 - `spec/manual_read_completion_spec.lua` exercises the public manual mark-read interface with real ledger, menu, queue, and cleanup modules. Storage and filesystem simulations verify archive outcomes, persisted ledger/journal state, and displayed status together, including cleared selection and durable refresh reconciliation of visible non-target chapters. These are not physical filesystem tests. `spec/suwayomi_finished_cleanup_spec.lua` retains coverage of the real sidecar-removal implementation.

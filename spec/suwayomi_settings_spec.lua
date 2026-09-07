@@ -44,6 +44,45 @@ describe("suwayomi/settings", function()
                 end,
             }
         end
+
+        local mock_io = {
+            open = function(path, _mode)
+                return { path = path, buffer = {} }
+            end,
+            write = function(handle, content)
+                table.insert(handle.buffer, content)
+                return true
+            end,
+            flush = function()
+                flushed = true
+                return true
+            end,
+            sync_file = function()
+                flushed = true
+                return true
+            end,
+            close = function()
+                return true
+            end,
+            rename = function(_old_path, _new_path)
+                return true
+            end,
+            sync_dir = function()
+                return true
+            end,
+            remove = function()
+                return true
+            end,
+            read = function()
+                return nil, "not_found"
+            end,
+            dir_exists = function()
+                return true
+            end,
+        }
+
+        local settings = require("suwayomi/settings")
+        settings:setIoAdapter(mock_io)
     end)
 
     after_each(function()

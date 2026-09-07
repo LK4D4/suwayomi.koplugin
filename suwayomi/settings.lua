@@ -334,6 +334,7 @@ function SuwayomiSettings:getStore()
         self.store = SettingsStore:new({
             path = self.settings_file,
             luasettings = self:open(),
+            io = self.io_adapter,
         })
     end
     return self.store
@@ -341,6 +342,21 @@ end
 
 function SuwayomiSettings:setStore(store)
     self.store = store
+end
+
+function SuwayomiSettings:setIoAdapter(io_adapter)
+    self.io_adapter = io_adapter
+    if self.store then
+        self.store:setIoAdapter(io_adapter)
+    end
+end
+
+function SuwayomiSettings:isBlocked()
+    return self:getStore():isBlocked()
+end
+
+function SuwayomiSettings:reconcile()
+    return self:getStore():reconcile()
 end
 
 function SuwayomiSettings:getSettingsDir()
@@ -504,6 +520,16 @@ local function loadDraftStore(settings, credentials_or_url)
             server_url = server_url,
             auth_identity = auth_identity,
             sources = {},
+        }
+    else
+        local cloned_sources = {}
+        for k, v in pairs(drafts.sources) do
+            cloned_sources[k] = v
+        end
+        drafts = {
+            server_url = drafts.server_url,
+            auth_identity = drafts.auth_identity,
+            sources = cloned_sources,
         }
     end
     return drafts
@@ -749,7 +775,11 @@ function SuwayomiSettings:loadReaderReturnContexts()
     if type(contexts) ~= "table" then
         return {}
     end
-    return contexts
+    local cloned = {}
+    for k, v in pairs(contexts) do
+        cloned[k] = v
+    end
+    return cloned
 end
 
 function SuwayomiSettings:saveReaderReturnContexts(contexts)

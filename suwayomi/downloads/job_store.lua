@@ -57,6 +57,20 @@ function JobStore:new(options)
     }, self)
 end
 
+function JobStore:isBlocked()
+    if self.settings and self.settings.isBlocked then
+        return self.settings:isBlocked()
+    end
+    return false
+end
+
+function JobStore:reconcile()
+    if self.settings and self.settings.reconcile then
+        return self.settings:reconcile()
+    end
+    return true
+end
+
 function JobStore:load()
     if not self.settings or not self.settings.loadDownloadQueue then
         return {}

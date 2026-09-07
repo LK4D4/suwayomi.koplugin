@@ -330,6 +330,14 @@ describe("suwayomi/settings/store real filesystem", function()
         assert.are.equal("works", data.real_test)
         assert.is_table(data.store_transaction)
 
+        local first_transaction = data.store_transaction.id
+        local replaced, replacement = store:saveKey("real_test", "replaced")
+        assert.is_true(replaced)
+        assert.are_not.equal(first_transaction, replacement.store_transaction.id)
+        local reopened = SettingsStore:new({ path = test_file })
+        assert.are.equal("replaced", reopened:readKey("real_test"))
+        assert.are.equal(replacement.store_transaction.id, reopened:getTransactionId())
+
         local ok_lfs, lfs = pcall(require, "lfs")
         if ok_lfs and lfs then
             for file in lfs.dir(test_dir) do

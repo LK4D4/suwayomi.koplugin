@@ -529,10 +529,15 @@ end
 
 
 function Methods:setScanlatorFilter(scanlator)
-    self.current_scanlator_filter = self:saveMangaScanlatorFilter(
+    local saved_filter, err = self:saveMangaScanlatorFilter(
         self.current_chapter_context and self.current_chapter_context.manga,
         scanlator
     )
+    if saved_filter == nil and err ~= nil then
+        self:showMessage(err or I18n.t("Failed to save scanlator filter."))
+        return false, err
+    end
+    self.current_scanlator_filter = saved_filter
     self:clearChapterSelection(true)
     self:refreshChapterMenu()
     return true

@@ -41,7 +41,6 @@ describe("suwayomi/chapters/actions", function()
 
         removed_paths = {}
         debug_events = {}
-        original_os_remove = os.remove
         os.remove = function(path)
             table.insert(removed_paths, path)
             local result = options.remove_results and options.remove_results[path]
@@ -143,6 +142,7 @@ describe("suwayomi/chapters/actions", function()
         end
         queue.clearStatus = queue.clearStatus or function(_, target_manga, target_chapter, clear_options)
             table.insert(queue.cleared, { manga = target_manga, chapter = target_chapter, options = clear_options })
+            return true
         end
 
         local ledger = options.ledger or {}
@@ -169,6 +169,7 @@ describe("suwayomi/chapters/actions", function()
             saveChapterLedger = function(self, saved)
                 table.insert(self.saved_ledgers, saved)
                 self.ledger = saved
+                return saved
             end,
             getChapterLedgerKey = function(_, target_manga, target_chapter)
                 return tostring(target_manga.id or "") .. ":" .. tostring(target_chapter.id or "")
@@ -255,6 +256,10 @@ describe("suwayomi/chapters/actions", function()
         end
         return plugin, queue
     end
+
+    before_each(function()
+        original_os_remove = os.remove
+    end)
 
     after_each(function()
         if original_os_remove then
@@ -641,6 +646,15 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(chapter, shown.chapter)
         assert.are.same({}, plugin.refreshes)
         assert.are.same({}, removed_paths)
+    end)
+
+    it("reports chapter cancellation storage failures without refreshing away the current state", function()
+        local plugin = build_plugin({ queue = {
+            cancelPending = function() return false, "write_failed: injected" end,
+        } })
+        assert.is_false(plugin:performChapterAction(manga, chapter, "cancel_download"))
+        assert.are.same({ "Could not cancel download: write_failed: injected" }, plugin.messages)
+        assert.are.same({}, plugin.refreshes)
     end)
 
     it("cancels chapter downloads from the chapter action menu", function()

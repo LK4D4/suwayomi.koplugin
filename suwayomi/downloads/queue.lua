@@ -107,7 +107,9 @@ function DownloadQueue:loadPersistentJobs()
 end
 
 function DownloadQueue:savePersistentJobs(jobs)
-    return self.job_store:save(jobs)
+    local ok, err = self.job_store:save(jobs)
+    if not ok and self:isBlocked() then self:scheduleReconciliation() end
+    return ok, err
 end
 
 function DownloadQueue:normalizeProgress(progress)
@@ -135,15 +137,158 @@ function DownloadQueue:buildPersistentJob(manga, chapter, download_directory, st
 end
 
 function DownloadQueue:upsertPersistentJob(job)
-    return self.job_store:upsert(job)
+    local ok, err = self.job_store:upsert(job)
+    if not ok and self:isBlocked() then self:scheduleReconciliation() end
+    return ok, err
 end
 
 function DownloadQueue:upsertPersistentJobs(new_jobs)
-    return self.job_store:upsertMany(new_jobs)
+    local ok, err = self.job_store:upsertMany(new_jobs)
+    if not ok and self:isBlocked() then self:scheduleReconciliation() end
+    return ok, err
 end
 
 function DownloadQueue:removePersistentJob(key)
-    return self.job_store:remove(key)
+    local ok, err = self.job_store:remove(key)
+    if not ok and self:isBlocked() then self:scheduleReconciliation() end
+    return ok, err
+end
+
+function DownloadQueue:scheduleReconciliation()
+    if self.reconciliation_scheduled then return end
+    self.reconciliation_scheduled = true
+    self.ui_manager:scheduleIn(1, function()
+        self.reconciliation_scheduled = false
+        local ok = self:reconcile()
+        if ok then
+            self:process()
+        else
+            self:scheduleReconciliation()
+        end
+    end)
+end
+
+function DownloadQueue:isBlocked()
+    if self.job_store and self.job_store.isBlocked then
+        return self.job_store:isBlocked()
+    end
+    if self.settings and self.settings.isBlocked then
+        return self.settings:isBlocked()
+    end
+    return false
+end
+
+function DownloadQueue:reconcile()
+    local ok, res
+    if self.job_store and self.job_store.reconcile then
+        ok, res = self.job_store:reconcile()
+    elseif self.settings and self.settings.reconcile then
+        ok, res = self.settings:reconcile()
+    else
+        ok, res = true, "reconciled"
+    end
+    if not ok then
+        return false, res
+    end
+
+    local persistent_jobs = self:loadPersistentJobs() or {}
+    local persistent_map = {}
+    local normalized = false
+    for index, job in ipairs(persistent_jobs) do
+        local key = job.key or (job.manga and job.chapter and self:getKey(job.manga, job.chapter))
+        if key and key ~= "" then
+            -- A launch intent can commit before the parent creates its worker.
+            if job.state == "downloading" and not self:getActiveJob(key) then
+                local staged_job = {}
+                for field, value in pairs(job) do staged_job[field] = value end
+                staged_job.state = "queued"
+                job = staged_job
+                persistent_jobs[index] = staged_job
+                normalized = true
+            end
+            persistent_map[key] = job
+        end
+    end
+    if normalized then
+        local saved, save_err = self:savePersistentJobs(persistent_jobs)
+        if not saved then
+            return false, save_err
+        end
+    end
+
+    local previous_pids = {}
+    if self.active_job_lifecycle and self.active_job_lifecycle.jobs then
+        for key, active in pairs(self.active_job_lifecycle.jobs) do
+            local pjob = persistent_map[key]
+            if not pjob or pjob.state ~= "downloading" then
+                previous_pids[key] = active.pid
+                self.active_job_lifecycle:terminateJob(active)
+                self.active_job_lifecycle:removeJob(active)
+                if self.cleanupInterruptedDownload then
+                    self:cleanupInterruptedDownload(active)
+                end
+                os.remove(active.progress_path)
+            end
+        end
+    end
+
+    local existing_items = {}
+    for _, item in ipairs(self.items or {}) do
+        local key = item.key or (item.manga and item.chapter and self:getKey(item.manga, item.chapter))
+        if key then existing_items[key] = item end
+    end
+    local remaining_items = {}
+    local seen = {}
+    for _, job in ipairs(persistent_jobs) do
+        local key = job.key or (job.manga and job.chapter and self:getKey(job.manga, job.chapter))
+        if key and job.state == "queued" and not seen[key] then
+            local item = existing_items[key] or {}
+            item.key = key
+            item.download_directory = job.download_directory
+            item.manga = job.manga
+            item.chapter = job.chapter
+            item.downloader = self.downloader
+            item.retry_count = job.retry_count
+            item.retry_at = job.retry_at
+            item.progress = job.progress
+            item.previous_pid = previous_pids[key] or item.previous_pid
+            table.insert(remaining_items, item)
+            seen[key] = true
+        end
+    end
+    self.items = remaining_items
+
+    local new_statuses = {}
+    for key, pjob in pairs(persistent_map) do
+        new_statuses[key] = {
+            state = pjob.state,
+            retry_count = pjob.retry_count,
+            retry_at = pjob.retry_at,
+            current = pjob.progress and pjob.progress.current or 0,
+            total = pjob.progress and pjob.progress.total or 0,
+        }
+    end
+    if self.active_job_lifecycle and self.active_job_lifecycle.jobs then
+        for key, active in pairs(self.active_job_lifecycle.jobs) do
+            new_statuses[key] = {
+                state = "downloading",
+                current = active.last_progress_current or 0,
+                total = active.last_progress_total or 0,
+            }
+        end
+    end
+    self.statuses = new_statuses
+    self.onStatusChanged()
+    self:schedulePoll()
+    return ok, res
+end
+
+function DownloadQueue:checkStoreFence()
+    if self:isBlocked() then
+        self:scheduleReconciliation()
+        return false, "store_blocked_ambiguous_transaction"
+    end
+    return true
 end
 
 function DownloadQueue:copySnapshotJob(job, state)
@@ -307,13 +452,20 @@ function DownloadQueue:notifyChapterArchiveReady(manga, chapter, path)
 end
 
 function DownloadQueue:clearStatus(manga, chapter, options)
+    if not self:checkStoreFence() then
+        return false, "store_blocked"
+    end
     options = options or {}
     local key = self:getKey(manga, chapter)
+    local ok, err = self:removePersistentJob(key)
+    if not ok then
+        return false, err
+    end
     self.statuses[key] = nil
-    self:removePersistentJob(key)
     if not options.quiet then
         self.onStatusChanged()
     end
+    return true
 end
 
 function DownloadQueue:jobArchiveExists(job, progress)
@@ -321,10 +473,18 @@ function DownloadQueue:jobArchiveExists(job, progress)
 end
 
 function DownloadQueue:cancelPending(manga, chapter)
+    if not self:checkStoreFence() then
+        self:notifyDownloadFailure(I18n.t("Cannot cancel download: storage is ambiguous"))
+        return false, "store_blocked"
+    end
     local key = self:getKey(manga, chapter)
     local active = self:getActiveJob(key)
     if active then
-        self.active_job_lifecycle:finishWithCancel(active)
+        local ok, err = self.active_job_lifecycle:finishWithCancel(active)
+        if not ok then
+            self:notifyDownloadFailure(err or "Failed to cancel active download")
+            return false, err or "save_failed"
+        end
         return true, "downloading"
     end
     local status = self.statuses[key]
@@ -359,6 +519,10 @@ function DownloadQueue:cancelPending(manga, chapter)
 end
 
 function DownloadQueue:cancelQueued()
+    if not self:checkStoreFence() then
+        self:notifyDownloadFailure(I18n.t("Cannot cancel downloads: storage is ambiguous"))
+        return 0, "store_blocked"
+    end
     local canceled_keys = {}
     local remaining_items = {}
 
@@ -404,12 +568,19 @@ function DownloadQueue:cancelQueued()
 end
 
 function DownloadQueue:cancelAll()
-    local queued = self:cancelQueued()
-    local active = 0
-    if self.active_job_lifecycle.cancelAll then
-        active = self.active_job_lifecycle:cancelAll()
+    if not self:checkStoreFence() then
+        self:notifyDownloadFailure(I18n.t("Cannot cancel downloads: storage is ambiguous"))
+        return 0, "store_blocked"
     end
-    return queued + active
+    local queued, queued_err = self:cancelQueued()
+    local active = 0
+    local active_err = nil
+    if self.active_job_lifecycle.cancelAll then
+        active, active_err = self.active_job_lifecycle:cancelAll()
+    end
+    local total = (queued or 0) + (active or 0)
+    local err = active_err or queued_err
+    return total, err
 end
 
 function DownloadQueue:splitUtf8Chars(text)
@@ -449,7 +620,7 @@ function DownloadQueue:formatFailureMessage(manga, chapter, detail)
 end
 
 function DownloadQueue:cleanupInterruptedDownload(job)
-    if not job or not job.download_directory or not job.manga or not job.chapter then
+    if not job or not job.download_directory or not job.manga or not job.chapter or not self.downloader then
         return false
     end
     local chapter_path = select(2, self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter))
@@ -485,9 +656,7 @@ end
 
 function DownloadQueue:recoverInterruptedJob(job)
     local progress = self:normalizeProgress(job.progress)
-    local partial_cleanup_attempted = self:cleanupInterruptedDownload(job)
-    local progress_cleanup_attempted = self:cleanupInterruptedProgress(job)
-    local recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued", {
+    return self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued", {
         started_at = job.started_at,
         last_progress_at = job.last_progress_at,
         retry_count = job.retry_count,
@@ -499,27 +668,38 @@ function DownloadQueue:recoverInterruptedJob(job)
             progress = progress,
         },
     })
+end
+
+function DownloadQueue:cleanupRecoveredJob(job)
+    local progress = self:normalizeProgress(job.progress)
+    local partial_cleanup_attempted = self:cleanupInterruptedDownload(job)
+    local progress_cleanup_attempted = self:cleanupInterruptedProgress(job)
     self:logDebug({
         operation = "downloadQueue.recover",
         event = "interrupted",
-        key = recovered.key,
-        chapter_id = recovered.chapter and recovered.chapter.id,
+        key = job.key or self:getKey(job.manga, job.chapter),
+        chapter_id = job.chapter and job.chapter.id,
         previous_state = "downloading",
         progress_state = progress and progress.state or nil,
         progress_current = progress and progress.current or nil,
         progress_total = progress and progress.total or nil,
         cleanup_attempted = partial_cleanup_attempted or progress_cleanup_attempted,
     })
-    return recovered
 end
 
 function DownloadQueue:recover()
+    if not self:checkStoreFence() then
+        return false, "store_blocked"
+    end
     local jobs = self:loadPersistentJobs()
     if #jobs == 0 then
         return
     end
 
     local recovered_jobs = {}
+    local recovered_items = {}
+    local recovered_statuses = {}
+    local cleanup_jobs = {}
     local should_process = false
     local seen_recovered_keys = {}
     local recoverable_active_keys = {}
@@ -533,6 +713,7 @@ function DownloadQueue:recover()
             local recovered
             if job.state == "downloading" then
                 recovered = self:recoverInterruptedJob(job)
+                table.insert(cleanup_jobs, job)
             else
                 recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued", {
                     retry_count = job.retry_count,
@@ -552,7 +733,7 @@ function DownloadQueue:recover()
                 seen_recovered_keys[key] = true
                 recovered.key = key
                 table.insert(recovered_jobs, recovered)
-                table.insert(self.items, {
+                table.insert(recovered_items, {
                     key = recovered.key,
                     download_directory = recovered.download_directory,
                     manga = recovered.manga,
@@ -562,7 +743,7 @@ function DownloadQueue:recover()
                     retry_at = recovered.retry_at,
                     progress = recovered.progress,
                 })
-                self.statuses[key] = {
+                recovered_statuses[key] = {
                     state = "queued",
                     retry_count = recovered.retry_count,
                     retry_at = recovered.retry_at,
@@ -579,24 +760,36 @@ function DownloadQueue:recover()
                     chapter_id = job.chapter and job.chapter.id,
                 })
             elseif self:jobArchiveExists(job, job.progress) then
-                self.statuses[job.key or self:getKey(job.manga, job.chapter)] = nil
+                recovered_statuses[job.key or self:getKey(job.manga, job.chapter)] = nil
             else
                 table.insert(recovered_jobs, job)
-                self.statuses[job.key or self:getKey(job.manga, job.chapter)] = { state = "failed" }
+                recovered_statuses[job.key or self:getKey(job.manga, job.chapter)] = { state = "failed" }
             end
         end
     end
 
-    self:savePersistentJobs(recovered_jobs)
+    local saved, save_err = self:savePersistentJobs(recovered_jobs)
+    if not saved then
+        self:scheduleReconciliation()
+        return false, save_err
+    end
+    for _, job in ipairs(cleanup_jobs) do self:cleanupRecoveredJob(job) end
+    self.items = recovered_items
+    self.statuses = recovered_statuses
     self.onStatusChanged()
     if should_process then
         self.ui_manager:scheduleIn(0, function()
             self:process()
         end)
     end
+    return true
 end
 
 function DownloadQueue:enqueue(manga, chapter, download_directory, options)
+    if not self:checkStoreFence() then
+        self:notifyDownloadFailure(I18n.t("Cannot enqueue download: storage is ambiguous"))
+        return false, "store_blocked"
+    end
     options = options or {}
     local status = self:getStatus(manga, chapter)
     if status and (status.state == "queued" or status.state == "downloading") then
@@ -638,6 +831,10 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
 end
 
 function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options)
+    if not self:checkStoreFence() then
+        self:notifyDownloadFailure(I18n.t("Cannot enqueue downloads: storage is ambiguous"))
+        return 0, "store_blocked"
+    end
     local started_at = os.time()
     local ok_socket, socket = pcall(require, "socket")
     if ok_socket and socket and socket.gettime then
@@ -721,6 +918,9 @@ function DownloadQueue:getCredentialsForJob()
 end
 
 function DownloadQueue:process()
+    if not self:checkStoreFence() then
+        return
+    end
     return self.active_job_lifecycle:process()
 end
 

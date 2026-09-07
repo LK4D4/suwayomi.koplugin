@@ -191,6 +191,21 @@ msgid_plural "Canceled %1 queued downloads."
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Cannot cancel download: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot cancel downloads: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot delete chapter: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot enqueue download: storage is ambiguous"
+msgstr ""
+
+msgid "Cannot enqueue downloads: storage is ambiguous"
+msgstr ""
+
 msgid "Categories"
 msgstr ""
 
@@ -261,6 +276,12 @@ msgstr ""
 msgid "Continue"
 msgstr ""
 
+msgid "Could not cancel download: %1"
+msgstr ""
+
+msgid "Could not clear failed downloads: %1"
+msgstr ""
+
 msgid "Could not connect to Suwayomi."
 msgstr ""
 
@@ -292,6 +313,12 @@ msgid "Could not load saved filters."
 msgstr ""
 
 msgid "Could not load source filters."
+msgstr ""
+
+msgid "Could not queue download: %1"
+msgstr ""
+
+msgid "Could not queue downloads: %1"
 msgstr ""
 
 msgid "Could not retry download."
@@ -548,6 +575,9 @@ msgid "Failed to delete %1 download."
 msgid_plural "Failed to delete %1 downloads."
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Failed to save scanlator filter."
+msgstr ""
 
 msgid "Failed to save settings."
 msgstr ""
