@@ -292,6 +292,117 @@ describe("complete stored chapter loading", function()
         end)
     end
 
+    for _, origin in ipairs({ "chapter title", "chapter bulk" }) do
+        for _, dataset in ipairs({ "unlabeled chapters", "empty result", "labeled chapters", "unrestricted unlabeled chapters" }) do
+            it("offers explicit saved-filter recovery from " .. origin .. " with " .. dataset, function()
+                for name, method in pairs(require("suwayomi/plugin/title_menu").methods) do plugin[name] = method end
+                local restricted = dataset ~= "unrestricted unlabeled chapters"
+                saved_filter = restricted and "Saved group" or nil
+                local filter_writes = 0
+                settings.saveMangaScanlatorFilter = function(_, target, filter)
+                    assert.are.equal("17", target.id)
+                    saved_filter, filter_writes = filter, filter_writes + 1
+                    return filter
+                end
+                respond = function(request)
+                    if not request.query:find("GET_CHAPTERS_MANGA", 1, true) then
+                        return { data = { fetchChapters = { chapters = {} } } }
+                    end
+                    if dataset == "empty result" then return page({}, 0, false) end
+                    local chapters = nodes(201, 202)
+                    chapters[1].scanlator, chapters[2].scanlator = json.null, ""
+                    if dataset == "labeled chapters" then
+                        chapters[1].scanlator, chapters[2].scanlator = "Saved group", "Other group"
+                    end
+                    return page(chapters, 2, false)
+                end
+                local facade = require("suwayomi/ui")
+                require("spec/support/controller_module_spec_helper").stubControllerDependencies()
+                package.loaded["suwayomi/ui"], package.preload["suwayomi/ui"] = nil, nil
+                local real_ui = require("suwayomi/ui")
+                facade.showActionMenu, facade.showChapterActionsMenu = real_ui.showActionMenu, real_ui.showChapterActionsMenu
+                facade.updateChapterMenu = function(menu, options)
+                    menu.title, menu.chapters = options.title, options.chapters
+                end
+                plugin:showChaptersForManga(manga)
+                finishRequest()
+                local initial_ids = not restricted and { "201", "202" }
+                    or (dataset == "labeled chapters" and { "201" } or {})
+                assert.are.same(initial_ids, chapterIds(plugin.current_chapter_menu.chapters))
+                assert.are.same(initial_ids, chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
+                assert.are.equal(restricted and "Saved group" or nil, saved_filter)
+                assert.are.equal(saved_filter, plugin.current_scanlator_filter)
+                assert.are.equal(0, filter_writes)
+                assert.are.same({}, admittedIds())
+                assert.are.same({}, queue:getSnapshot().queued)
+                assert.are.equal("{}", saved_ledger)
+                if dataset ~= "labeled chapters" then
+                    assert.are.same({}, plugin:getChapterScanlatorChoices(plugin.current_chapter_context.chapters))
+                    if restricted then assert.matches("No chapters match the saved scanlator filter", messages[1])
+                    else assert.are.same({}, messages) end
+                end
+                local menu = plugin.current_chapter_menu
+                local function open_action_menu()
+                    if origin == "chapter title" then plugin.current_chapter_options.on_title_bar_left_tap(menu)
+                    else plugin:showBulkChapterActions() end
+                end
+                local function find_action(id)
+                    for _, row in ipairs(loading.buttons) do
+                        for _, button in ipairs(row) do
+                            if button.id == id then return button end
+                        end
+                    end
+                end
+                local function select_action(id)
+                    local selected = find_action(id)
+                    assert.is_table(selected, "Missing public action: " .. id)
+                    selected.callback()
+                    local dispatch = table.remove(scheduled)
+                    assert.is_function(dispatch)
+                    dispatch()
+                end
+                open_action_menu()
+                if not restricted then
+                    assert.is_nil(find_action("scanlator_filter"))
+                    assert.are.equal(0, filter_writes)
+                    return
+                end
+                if dataset ~= "labeled chapters" then
+                    select_action("bulk_downloads")
+                    select_action("download_next_5_unread")
+                    assert.are.same({}, admittedIds())
+                    assert.are.same({}, queue:getSnapshot().queued)
+                    assert.are.equal("Saved group", saved_filter)
+                    assert.are.same({}, chapterIds(menu.chapters))
+                    assert.are.equal(0, #workers)
+                    open_action_menu()
+                end
+                select_action("scanlator_filter")
+                assert.are.equal("Scanlator filter", loading.title)
+                assert.are.equal("Saved group", saved_filter)
+                assert.are.same(initial_ids, chapterIds(menu.chapters))
+                select_action("scanlator_filter_all")
+                local expected_ids = dataset == "empty result" and {} or { "201", "202" }
+                assert.is_nil(saved_filter)
+                assert.is_nil(plugin.current_scanlator_filter)
+                assert.are.equal(1, filter_writes)
+                assert.are.equal(menu, plugin.current_chapter_menu)
+                assert.are.same(expected_ids, chapterIds(menu.chapters))
+                assert.are.same(expected_ids, chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
+                assert.are.same({}, admittedIds())
+                assert.are.equal("{}", saved_ledger)
+                open_action_menu()
+                if dataset ~= "labeled chapters" then assert.is_nil(find_action("scanlator_filter"))
+                else assert.is_table(find_action("scanlator_filter")) end
+                select_action("bulk_downloads")
+                select_action("download_next_5_unread")
+                assert.are.same(expected_ids, admittedIds())
+                assert.are.equal("{}", saved_ledger)
+                assert.are.equal(0, #workers)
+            end)
+        end
+    end
+
     it("preserves pending choices and unrelated ledger fields through persisted reopen and refresh", function()
         ledger_path = os.tmpname()
         os.remove(ledger_path)

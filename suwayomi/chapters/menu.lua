@@ -319,6 +319,8 @@ end
 
 function Methods:getBulkChapterActions()
     local actions = {}
+    local show_scanlator_filter = self.current_scanlator_filter ~= nil
+        or #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0
 
     if self:getSelectedChapterCount() > 0 then
         table.insert(actions, { id = "download_selected", text = self:getSelectedChapterCount() > (self.max_batch_queue_chapters or 50)
@@ -326,7 +328,7 @@ function Methods:getBulkChapterActions()
         table.insert(actions, { id = "mark_read_selected", text = I18n.t("Mark read") })
         table.insert(actions, { id = "mark_unread_selected", text = I18n.t("Mark unread") })
         table.insert(actions, { id = "clear_selection", text = I18n.t("Clear selection") })
-        if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
+        if show_scanlator_filter then
             table.insert(actions, { id = "scanlator_filter", text = I18n.t("Scanlator filter"), submenu = true })
         end
         if hasCancelableDownloads(self) then
@@ -344,7 +346,7 @@ function Methods:getBulkChapterActions()
     for _index, action in ipairs(manga_actions) do
         table.insert(actions, action)
     end
-    if #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0 then
+    if show_scanlator_filter then
         table.insert(actions, { id = "scanlator_filter", text = I18n.t("Scanlator filter"), submenu = true })
     end
     if hasCancelableDownloads(self) then
