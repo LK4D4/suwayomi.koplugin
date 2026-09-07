@@ -4,7 +4,7 @@ This document describes the current runtime boundaries after the module refactor
 
 ## Runtime Shape
 
-KOReader loads `_meta.lua` and `main.lua` from the plugin root. `main.lua` is the plugin shell: it registers the dispatcher action, wires the main menu entry, constructs shared dependencies, restores the download queue, and installs controller methods onto the KOReader plugin object. Feature behavior belongs under `suwayomi/`.
+KOReader loads `_meta.lua` and `main.lua` from the plugin root. `main.lua` is the plugin shell: it registers the dispatcher action, wires the main menu entry, constructs dependencies, creates and recovers a download queue per plugin instance, and installs controller methods onto the KOReader plugin object. Feature behavior belongs under `suwayomi/`.
 
 Runtime files shipped in releases are:
 
@@ -15,6 +15,12 @@ Runtime files shipped in releases are:
 - `l10n/<locale>/suwayomi.mo` when compiled catalogs exist
 
 Tests, docs, CI files, worktrees, `AGENTS.md`, source `.po` files, and template `.pot` files are development-only and must not be included in manual Android plugin pushes or release payloads.
+
+## Download ownership: implemented versus proposed
+
+On master at `01ed3e3`, `main.lua:getDownloadQueue()` caches the queue on the plugin instance and `init()` calls `recover()`. `onChapterArchiveReady` captures that host for reader-return context and ledger updates; queue status callbacks also schedule host-bound cleanup and refreshes. Recovery requeues persisted `downloading` jobs and preserves queued delayed retries. This is the implemented behavior behind the navigation defect, not a process-wide service.
+
+[Revised ADR-0002](adr/0002-navigation-safe-download-ownership.md) and [spec #3](superpowers/specs/2026-09-06-navigation-safe-download-ownership.md) propose one shared process queue with disposable views, completion independent of screens, restart-to-failed unfinished work, narrow known-worker file handling, and bounded best-effort quit. Implementation belongs to #5; device acceptance belongs to #11. No service, process lock, attempt protocol, or reboot gate from the rejected reference branch is implemented on master. #4's checked atomic settings store below is already implemented and remains required. The module map below continues to describe current source.
 
 ## Public Facades
 

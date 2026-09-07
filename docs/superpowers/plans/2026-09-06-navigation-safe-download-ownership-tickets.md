@@ -1,252 +1,107 @@
-# Navigation-safe download ownership: implementation tickets
+# Navigation-safe downloads: one implementation and device acceptance
 
-Status: published and verified. Parent: [spec #3](https://github.com/LK4D4/suwayomi.koplugin/issues/3). All eight implementation issues use the ready-for-agent label and native blocked-by relationships.
+Revised 2026-09-07. [Spec #3](https://github.com/LK4D4/suwayomi.koplugin/issues/3) mirrors the [authoritative local specification](../specs/2026-09-06-navigation-safe-download-ownership.md) verbatim. [ADR-0002](../../adr/0002-navigation-safe-download-ownership.md) supersedes the earlier reboot/ownership-recovery protocol. Runtime implementation and device acceptance remain pending.
 
-## Execution contract
+## Current routing
 
-These are behavior slices of one unreleased feature, not independently shippable claims that all of spec #3 is complete. T1 is the prerequisite persistence refactor. Each later slice includes its own composed or physical acceptance checks; T8 verifies the assembled feature. Keep the evolving implementation out of a release until T8 passes. This planning task does not authorize branch changes, runtime edits, deployment, merging, or pushing.
-
-Every ticket inherits spec #3 and accepted ADR-0002, preserves out-of-scope behavior, uses the existing redaction boundary, and keeps its relevant checks passing. Do not use an unsafe fallback to make an intermediate implementation appear complete. Adopt the new persisted protocol only when legacy proof and the new attempt pipeline are both available.
-
-The approved dependency graph is intentionally mostly sequential. T6 and T7 may proceed independently after T5. The edges below omit redundant transitive blockers.
-
-| Ticket | Delivers | Blocked by |
+| Issue | Disposition | Native blocked by |
 | --- | --- | --- |
-| T1: Make plugin state writes atomic and report failed commands | A preference change or download command either commits complete state or reports failure without damaging saved jobs or later flushing rejected changes. | None |
-| T2: Keep downloads and views stable across reader navigation | Downloads keep the same workers and progress through FileManager and ReaderUI transitions; newly opened views show current state and completion works without a screen. | T1 |
-| T3: Exclude competing processes and guard legacy adoption | Only one KOReader process can use writable Suwayomi state, and an upgrade waits for proof that old workers cannot interfere. | T2 |
-| T4: Stage and publish a chapter with explicit attempt ownership | One chapter downloads into private attempt files and becomes available only after the parent safely publishes its archive and commits completion metadata. | T3 |
-| T5: Recover interrupted attempts and publication without duplicate transfers | After parent death, a new owner waits for surviving writers and resumes incomplete transfers or finishes validated archives without duplicate publication. | T4 |
-| T6: Make cancellation, retries, and cleanup preserve attempt ownership | Cancel and retry actions survive restart, old output cannot affect replacement work, and temporary cleanup failures eventually converge. | T5 |
-| T7: Stop download service within a bounded KOReader shutdown | All actual quit routes attempt to stop downloads within one two-second service budget while retaining safe restart recovery. | T5 |
-| T8: Verify complete ownership behavior on a device | The assembled implementation satisfies the whole specification in composed tests, real OS/file checks, and the reported device navigation workflow. | T6, T7 |
+| #4: Make plugin state writes atomic and report failed commands | Completed; unchanged. Existing master protections remain required. | None |
+| #5: Keep downloads and views stable across reader navigation | The single implementation, ready-for-agent | #4 (already completed) |
+| #6–#10 | Closed as superseded/not planned, with wontfix; not implemented completion | None |
+| #11: Verify navigation-safe downloads on a device | Focused device acceptance, ready-for-human | #5 |
 
-## Publication record
+No new replacement issue or infrastructure sequence is needed. #3 stays open. Original report #2 remains open and unchanged. Current #5 and #11 bodies are reproduced below; update the issue and its local body together.
 
-Published one approved issue per ticket in dependency order, with real issue links and eight native blocked-by relationships. GitHub documents these relationships in its [issue-dependency API](https://docs.github.com/en/rest/issues/issue-dependencies).
+## Dependency repair
 
-The Parent section in each child references spec #3. The requested privacy correction replaces identifying device references in its current body and the local planning documents with generic wording. Parent status, labels, comments, and hierarchy remain unchanged. Current published bodies and labels were checked against the approved text; native blocking relationships were read back from GitHub.
+Before editing, read current bodies, comments, canonical labels, native blocking edges, and parent relationships. #6–#10 were open with no comments or completed acceptance evidence; the rejected reference branch does not establish acceptance of this revision.
 
-Historical issue revisions and local Git commits have not been redacted. Removing the earlier issue-body revision requires an authenticated browser session; the available browser is signed out. The branch remains unpushed.
-
-| Draft | Published issue | Native blockers |
+| Consumer | Former blockers | Revised blockers |
 | --- | --- | --- |
-| T1 | [#4: Make plugin state writes atomic and report failed commands](https://github.com/LK4D4/suwayomi.koplugin/issues/4) | None |
-| T2 | [#5: Keep downloads and views stable across reader navigation](https://github.com/LK4D4/suwayomi.koplugin/issues/5) | [#4](https://github.com/LK4D4/suwayomi.koplugin/issues/4) |
-| T3 | [#6: Exclude competing processes and guard legacy adoption](https://github.com/LK4D4/suwayomi.koplugin/issues/6) | [#5](https://github.com/LK4D4/suwayomi.koplugin/issues/5) |
-| T4 | [#7: Stage and publish a chapter with explicit attempt ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/7) | [#6](https://github.com/LK4D4/suwayomi.koplugin/issues/6) |
-| T5 | [#8: Recover interrupted attempts and publication without duplicate transfers](https://github.com/LK4D4/suwayomi.koplugin/issues/8) | [#7](https://github.com/LK4D4/suwayomi.koplugin/issues/7) |
-| T6 | [#9: Make cancellation, retries, and cleanup preserve attempt ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/9) | [#8](https://github.com/LK4D4/suwayomi.koplugin/issues/8) |
-| T7 | [#10: Stop download service within a bounded KOReader shutdown](https://github.com/LK4D4/suwayomi.koplugin/issues/10) | [#8](https://github.com/LK4D4/suwayomi.koplugin/issues/8) |
-| T8 | [#11: Verify complete ownership behavior on a device](https://github.com/LK4D4/suwayomi.koplugin/issues/11) | [#9](https://github.com/LK4D4/suwayomi.koplugin/issues/9), [#10](https://github.com/LK4D4/suwayomi.koplugin/issues/10) |
+| #11 | #9, #10 | #5 |
+| #36 (manual deletion) | #9, #10 | #5 |
+| #26 (refill) | #25, #36, #10 | #25, #36, #5 |
+| #37 (manual-deletion device acceptance) | #36, #11 | Unchanged |
 
-## Published tickets
+Remove the obsolete chain #6 blocked by #5, #7 by #6, #8 by #7, and #9/#10 by #8. Remove every incoming/outgoing native blocker on #6–#10 after adding replacements. None of #3–#11 had native parent/sub-issue relationships; preserve that hierarchy. Preserve unrelated blockers, parents, labels, and completion records, including completed #4 and the #12/#36/#37 hierarchy.
 
-### T1 / #4: Make plugin state writes atomic and report failed commands
+Direct dependency corrections in #12/#36 and their local documents now refer to #5's process service and known-worker behavior, not nonexistent archive-generation or OS-lock guarantees. Archive identity and conditional manual-removal coordination remain owned by #36; uncertain targets remain blocked by that feature's existing contract. They cannot expand #5 or require the rejected global legacy gate.
 
-#### Parent
+Likewise, #22/#26/#27 and ADR-0004 retain refill semantics and durable refill requests, but stop inheriting the removed lock/launch/publication machinery. Their context helper reuses existing subprocess facilities and #5's bounded quit integration. Chapter transfers interrupted by a restart remain terminal failures until explicit Retry under revised #3.
 
-[Spec #3: navigation-safe local download ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/3)
+## History and review
 
-#### What to build
+The historical investigation evidence is unchanged; only its planning routing reflects the revised tickets. Prior ADR/spec/ticket versions remain in git and issue edit history. Superseded #6–#10 retain their original requirements below an explicit historical banner, with obsolete active Blocked by sections removed and a closure explanation linking #3/#5. Do not mark their checkboxes complete. The rejected codex/ownership-5-10 branch/worktree remains unchanged.
 
-A preference change or download command either commits complete state or reports failure without damaging saved jobs or later flushing rejected changes.
+Use 0c86149 and follow-ups d3029d9, 5f87f3d, and 94498ab only as implementation references against current master. No cherry-pick, runtime edit, device operation, merge, push, or branch/worktree deletion is part of this cleanup.
 
-This is one unreleased slice of spec #3. Preserve its accepted architecture and out-of-scope behavior. The complete feature is accepted only after final integration and device validation. Relevant user stories: 25, 26, 29.
+Consistency review must compare #3's exact local/public text, #5/#11 bodies, native dependencies, closure reasons, canonical labels, and preserved #2/#4 fields/comments. No feature or device pass is established here. The reduced implementation has no remaining crash-recovery or cross-process prerequisite; focused tests and device evidence remain necessary.
 
-#### Acceptance criteria
+Readback verified all 14 edited issue bodies, including the exact local/public #3 text, and all five NOT_PLANNED closures with wontfix. The complete dependency graph changed only by the three replacement edges and ten removals listed above. Native parents/sub-issues, #2/#4, and unrelated issues remained unchanged. #11 is open with ready-for-human; #3/#5 remain open with ready-for-agent. Local review checked documentation scope, relative links, whitespace, and preserved investigation evidence. No runtime tests or device checks were run for this documentation-only revision.
 
-- [ ] Introduce one checked atomic write boundary for the complete shared plugin settings value, preserving unrelated settings. Route every plugin settings writer through it; hardening only download saves is insufficient.
-- [ ] Stage changes separately from the committed cache. Check serialization, write, flush, close, replacement, and required synchronization results.
-- [ ] Give transactions unique identities. A known pre-replacement failure leaves the committed state unchanged; post-replacement ambiguity blocks further writes and destructive transitions until stored transaction identity is reconciled.
-- [ ] Exercise public preference changes and enqueue/cancel entry points with injected failures. No command reports durable success for a failed or uncertain save, and an unrelated later save cannot accidentally commit a rejected mutation.
-- [ ] Preserve unfamiliar persisted versions and existing queue/ledger/context data. Add real temporary-file checks for atomic replacement and run the full existing suite, lint, and localization checks.
+## #5: Keep downloads and views stable across reader navigation
 
-#### Blocked by
+## Parent
 
-None (can start immediately).
+[Spec #3: navigation-safe local downloads](https://github.com/LK4D4/suwayomi.koplugin/issues/3), revised 2026-09-07 under ADR-0002.
 
-### T2 / #5: Keep downloads and views stable across reader navigation
+## What to build
 
-#### Parent
+Keep one download queue through FileManager–ReaderUI and reader-to-reader navigation. This issue owns the complete reduced implementation: the service/view seam, completion without screens, simple restart failure handling, ordinary cancellation/retry file handling, and bounded quit. Reuse the existing modules and KOReader subprocess helper. Scope is one focused coding session plus separate device acceptance in #11, with necessary tests included.
 
-[Spec #3: navigation-safe local download ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/3)
+This replaces the narrowly necessary completion, cancellation, and shutdown work previously split across #6–#10. Their reboot/legacy gate, process/attempt locks, publication journal, and automatic crash salvage are not planned. Those closures do not mean the feature is implemented. #4's atomic settings protections already on master remain unchanged.
 
-#### What to build
+## Acceptance criteria
 
-Downloads keep the same workers and progress through FileManager and ReaderUI transitions; newly opened views show current state and completion works without a screen.
+- [ ] Every production plugin instance gets the same process-owned queue. Initialize once on a fresh main process; navigation, screen/document closure, and sleep/wake do not recover, requeue, replace workers, or remove active files. Keep main.lua as composition glue.
+- [ ] Use disposable host subscriptions and current snapshots. Detach on CloseWidget without consuming it; queued deliveries after detach do nothing and release retired callback references. Reopened chapter, Downloads, and home views show current state. Subscriber exceptions cannot interrupt service work or other views.
+- [ ] Move archive completion and existing finished-cleanup wakeups out of UI callbacks. Through the existing checked store, commit queue completion, ledger path, and reader-return context while preserving current read/pending-sync state. Retain in-session completion-save retries through navigation, zero screens, and store reconciliation without another transfer or a watchdog failure.
+- [ ] Preserve process-wide chapter concurrency and ordinary in-session transient retry behavior, full diagnostics, quiet failures, captured directory, current credentials per attempt, archive layout, and existing settings semantics. A lower limit lets current workers finish; navigation/wake alone does not spend retries.
+- [ ] Reuse active_jobs and ffi/util launch/termination/completion helpers. Extend existing terminating-worker tracking only enough to retain chapter/file associations and defer cleanup/replacement while a known child is stopping. Failed/cleared rows and sent signals do not terminate children. Apply this to public Cancel/Cancel all, timeout, automatic retry, and explicit Retry; keep known stopping and completion-pending chapters busy. Preserve final CBZs. Use existing narrow temporary cleanup after known completion; deferred cleanup or a clearly failed/repeated transfer is acceptable.
+- [ ] On real startup, change unfinished persisted queued and downloading jobs, including queued delayed retries, to terminal failed with “Interrupted; retry download” and no automatic scheduling. Preserve existing permanent-failure diagnostics. If existing lookup finds a usable final archive, preserve it and reconcile completion bookkeeping instead. Leave already completed downloads and unsupported records unchanged. Do not sweep legacy temporary files or invent a migration to the rejected branch's protocol.
+- [ ] First launch/upgrade admits ordinary use without device reboot, storage relocation, or global legacy-worker proof. Explicit chapter/Downloads Retry succeeds after interruption using existing file handling. State honestly that an untracked surviving old child can still write shared paths and retry can conflict; do not add cross-process recovery guarantees.
+- [ ] Add one idempotent UIManager.quit integration that chains the previous method and preserves arguments/returns. Stop admission and invalidate service callbacks; attempt to stop/check known workers through existing helpers within at most two seconds total of added work. Always invoke original quit, even on failure. No per-worker wait budget, custom fork/waitpid wrappers, required final save, future UI tick, or network work. Leave unconfirmed worker files untouched.
+- [ ] Reuse existing composed fixtures. Drive real public menu/plugin actions through shell/service/queue/scheduler, checked persistence, filesystem effects, and rendered state. Cover both navigation routes at concurrency two and one, zero-screen completion, detached/throwing subscribers, completion-save failure/reconciliation, cancellation/retry while a child stops, fresh-process startup states, and quit/relaunch. Verify helper stop behavior and relevant real temporary-file effects; no exhaustive crash-boundary or lock/publication matrix.
+- [ ] Run full LuaJIT tests, Luacheck, and localization checks. Before a separately authorized merge, run required branch GitHub Actions. Update architecture and user guidance only for implemented behavior; leave device evidence to #11.
 
-This is one unreleased slice of spec #3. Preserve its accepted architecture and out-of-scope behavior. The complete feature is accepted only after final integration and device validation. Relevant user stories: 1, 2, 3, 4, 5, 6, 7, 8, 9, 30, 32.
+## Boundaries and references
 
-#### Acceptance criteria
+Do not broaden chapter retrieval, Download ahead, read-sync, manual deletion, retention, or settings policy. Future archive-generation or refill requirements belong to their own tickets; they do not make #5 an infrastructure prerequisite for removed guarantees. No mandatory reboot, directory change, inherited attempt locks, boot identities, receipt/content-hash protocol, multi-phase publication journal, automatic crash salvage, or coordination between simultaneously writable KOReader processes.
 
-- [ ] Introduce one process-owned service and return its queue from every production plugin instance. Construct dependencies without capturing the first UI. Reject parent-service access from an inherited child process object.
-- [ ] Move durable download completion into the service, committing queue completion, ledger path, and archive lookup context through the checked store. Preserve existing finished-cleanup wakeups through a process-owned adapter with a live reader lookup.
-- [ ] Give each live host an independent subscription and immediate snapshot. Detach idempotently on host CloseWidget without consuming it; reject queued callbacks after detach, release retired host references, and isolate subscriber exceptions.
-- [ ] Refresh only live views, obtain fresh snapshots when views reopen, and enforce one scheduler and one process-wide concurrency limit. Screen/document closure and sleep/wake are not queue recovery or shutdown.
-- [ ] Build the composed fixture using real shell/service/queue/scheduler/persistence/controller/row behavior with distinct host objects and a controlled non-inline clock/worker registry. Close FileManager before constructing ReaderUI, preserve modules through navigation, and model restart separately.
-- [ ] Assert stable worker identity, progress, files, committed state, and displayed rows through FileManager–Reader A–FileManager–Reader B and reader-to-reader navigation. Prove zero-view completion, stale-callback rejection, and that one broken subscriber cannot interrupt another.
+Read early navigation commit 0c86149 and follow-ups d3029d9, 5f87f3d, and 94498ab on the preserved rejected branch codex/ownership-5-10 as implementation references only. They predate current master changes; do not cherry-pick unchanged or import the later rejected machinery.
 
-#### Blocked by
+## Blocked by
 
-- [#4: Make plugin state writes atomic and report failed commands](https://github.com/LK4D4/suwayomi.koplugin/issues/4)
+- [#4: Make plugin state writes atomic and report failed commands](https://github.com/LK4D4/suwayomi.koplugin/issues/4) — completed and integrated; preserve its protections.
 
-### T3 / #6: Exclude competing processes and guard legacy adoption
+Implementation remains open. Planning and reference-branch work are not acceptance of this revision.
 
-#### Parent
+## #11: Verify navigation-safe downloads on a device
 
-[Spec #3: navigation-safe local download ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/3)
+## Parent
 
-#### What to build
+[Spec #3: navigation-safe local downloads](https://github.com/LK4D4/suwayomi.koplugin/issues/3), revised 2026-09-07 under ADR-0002.
 
-Only one KOReader process can use writable Suwayomi state, and an upgrade waits for proof that old workers cannot interfere.
+## What to verify
 
-This is one unreleased slice of spec #3. Preserve its accepted architecture and out-of-scope behavior. The complete feature is accepted only after final integration and device validation. Relevant user stories: 17, 27, 28, 29, 33.
+Verify the single implementation in #5 on a device using controlled test data. The target is navigation continuity and usable restart/retry behavior. The former lock, reboot-proof, publication, and crash-salvage matrix is removed. Keep this issue open until actual device evidence exists.
 
-#### Acceptance criteria
+## Acceptance criteria
 
-- [ ] Acquire a process-associated lfs.lock on a stable dedicated lock file before mutable plugin initialization. Retain its handle, never replace/unlink that lock file, and avoid other descriptors whose close could release the owner's record lock.
-- [ ] Disable the entire second writable Suwayomi instance, including all settings flushes, while leaving KOReader usable. Distinguish another owner from an unsupported or failed lock.
-- [ ] A previously blocked process reloads shared settings after obtaining ownership. Startup is idempotent and reentrant-safe; UI attachment cannot repeat successful recovery.
-- [ ] Persist protocol-adoption and legacy-proof state using the checked store. Uncertain old-worker history blocks scheduling/destructive recovery even when the old queue is empty, queued, or failed.
-- [ ] Accept verified old-worker-tree termination or a verified boot change after recording the uncertain boot. A confirmation button, missing progress, or KOReader relaunch alone cannot bypass the gate. Keep proof separate from activation of the new attempt protocol.
-- [ ] Preserve unknown versions and old state if migration fails. Never advertise full protocol adoption while the active worker path can still publish legacy shared files.
-- [ ] Use actual OS processes to verify exclusion, stale-cache protection, and process-lock release. Check the actual Android settings mount; unsupported semantics must fail safely rather than use PID or timestamp guesses.
+- [ ] Review #5's focused composed tests, helper/file checks, LuaJIT suite, lint, localization, and required CI evidence for the tested implementation. Record missing evidence; planning or CI alone does not prove device acceptance.
+- [ ] On first launch/upgrade, use the existing settings and download directory without reboot, relocation, or a global old-worker gate. Include empty and unfinished persisted queue cases using controlled fixtures. Do not damage storage or alter real library data to provoke failures.
+- [ ] Queue 8–10 missing test chapters at concurrency two and establish a Downloads-only control. Repeat while opening an already downloaded chapter, returning to FileManager, opening another, and switching reader-to-reader. Repeat at concurrency one.
+- [ ] Record chapter-worker counts and progress around navigation. Require the same queue and known workers, no navigation-triggered reset/requeue/replacement or active-file removal, and bounded concurrency. Distinguish chapter workers from thumbnail, search, and read-sync workers.
+- [ ] Close all Suwayomi screens while downloads complete. Verify the final archives, persisted ledger/reader-return context and queue completion, existing cleanup behavior, and current chapter/Downloads/home state on return. Retired screens receive no callbacks.
+- [ ] Exercise sleep/wake and a lower concurrency setting without queue reconstruction. Separate a real network failure and ordinary retry from navigation-triggered loss; retain quiet errors and on-demand full details.
+- [ ] Exercise ordinary cancellation and explicit Retry, including known workers still stopping. Verify deferred temporary cleanup/replacement and final-archive preservation using the implementation's controlled helper evidence where unsafe timing cannot be induced on-device.
+- [ ] Quit normally with unfinished work and relaunch. Confirm bounded best-effort shutdown, no transfer auto-resumption, interrupted queued/downloading jobs (including delayed retries) shown failed with “Interrupted; retry download”, existing permanent errors retained, and completed archives/metadata preserved. Explicit chapter/Downloads Retry must then complete successfully.
+- [ ] Record plugin revision, KOReader version, runtime-payload verification extent, generic environment, batch/concurrency, navigation and sleep/network controls, actual results, and gaps. Mark each case demonstrated, failed, or unverified. Redact credentials, URLs, private paths, library/source/chapter titles, identifying device details, and raw logs.
+- [ ] Document accepted limits: abrupt death may leave an untracked child writing shared paths; retry can fail or repeat a transfer and temporary cleanup can be deferred. No orphan-isolation, crash-salvage, simultaneous-writer, or mandatory reboot acceptance is required. Keep original report #2 open and unchanged; do not claim its unexplained crash is resolved.
 
-#### Blocked by
+## Blocked by
 
-- [#5: Keep downloads and views stable across reader navigation](https://github.com/LK4D4/suwayomi.koplugin/issues/5)
+- [#5: Keep downloads and views stable across reader navigation](https://github.com/LK4D4/suwayomi.koplugin/issues/5) — the complete reduced implementation must be available for testing.
 
-### T4 / #7: Stage and publish a chapter with explicit attempt ownership
-
-#### Parent
-
-[Spec #3: navigation-safe local download ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/3)
-
-#### What to build
-
-One chapter downloads into private attempt files and becomes available only after the parent safely publishes its archive and commits completion metadata.
-
-This is one unreleased slice of spec #3. Preserve its accepted architecture and out-of-scope behavior. The complete feature is accepted only after final integration and device validation. Relevant user stories: 16, 19, 23, 28, 33, 35.
-
-#### Acceptance criteria
-
-- [ ] Implement the specification's versioned attempt allocation, launch authorization, completion receipt, publication intent, and writer-retired records. Persist exact paths before creating attempt files and commit launch authorization while holding the attempt lock before fork.
-- [ ] Use a unique attempt identity for every launch, including retries. Keep the child’s inherited flock descriptor until process exit; the parent immediately closes its copy without unlocking it. Later forks must not inherit any other attempt or recovery lock.
-- [ ] Make workers write only private staging/progress/temporary files and a validated, identity-bound completion receipt. Remove child authority to publish canonical archives or write shared settings.
-- [ ] Retain the worker slot and file authority through confirmed exit/reaping, including terminal-receipt, timeout, and stop races. A subprocess-helper error or a sent signal never proves exit.
-- [ ] Validate the receipt and artifact, persist publication intent, and publish with an actual atomic no-replace operation on the destination filesystem. Preserve unrelated destination files and report conflicts; no existence-check/overwriting-rename fallback.
-- [ ] Atomically commit queue completion, ledger path, and archive lookup context before displaying completion. Retain failed finalization work and keep deletion guards aware of terminating/finalizing ownership.
-- [ ] Record writer-retired cleanup authorization before unlinking private artifacts or attempt locks. Never include the final archive in attempt cleanup.
-- [ ] Demonstrate enqueue through displayed completion with real composition. Add actual-child/filesystem checks for attempt-lock inheritance, sibling non-inheritance, terminal-progress races, content validation, and no-replace publication; verify Android destination support.
-
-#### Blocked by
-
-- [#6: Exclude competing processes and guard legacy adoption](https://github.com/LK4D4/suwayomi.koplugin/issues/6)
-
-### T5 / #8: Recover interrupted attempts and publication without duplicate transfers
-
-#### Parent
-
-[Spec #3: navigation-safe local download ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/3)
-
-#### What to build
-
-After parent death, a new owner waits for surviving writers and resumes incomplete transfers or finishes validated archives without duplicate publication.
-
-This is one unreleased slice of spec #3. Preserve its accepted architecture and out-of-scope behavior. The complete feature is accepted only after final integration and device validation. Relevant user stories: 12, 15, 16, 18, 19, 24, 29, 35.
-
-#### Acceptance criteria
-
-- [ ] Reconcile persisted attempt phases once on fresh owning-service startup, then retry blocked recovery as service work. Never re-fork a prior session's attempt; allocate a new attempt when an incomplete chapter must be transferred again.
-- [ ] Require independent acquisition of each old attempt lock before touching files. Pause new chapter launches while an old writer is unresolved; reject PID reuse, timestamps, missing progress, terminal receipts, and ECHILD as ownership proof.
-- [ ] Recognize allocation-only records as never launch-authorized. Preserve unexpectedly missing authorized locks or unreadable/unknown records and explain the blocker.
-- [ ] Recover validated staging after writer exit; recognize a matching published archive by content identity and retry only metadata. Preserve an unrelated target as a conflict.
-- [ ] Preserve retry order, count, deadline, errors, and unfinished intent. Restart alone does not consume a network-failure retry.
-- [ ] Recover durable canceled dispositions without requeuing, and honor writer-retired cleanup records after intentional lock removal. Seed each durable phase at the storage boundary, then exercise startup through the real service and UI snapshot.
-- [ ] Interrupt after allocation, lock creation, launch authorization, fork, receipt, publication-intent commit, publication, metadata commit, and authorized lock unlink. Assert convergence, files, committed state, and displayed state together.
-- [ ] Include a real surviving child across parent death to verify lock-based waiting and eventual progress. Recovered lock descriptors must close before any later child launch.
-
-#### Blocked by
-
-- [#7: Stage and publish a chapter with explicit attempt ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/7)
-
-### T6 / #9: Make cancellation, retries, and cleanup preserve attempt ownership
-
-#### Parent
-
-[Spec #3: navigation-safe local download ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/3)
-
-#### What to build
-
-Cancel and retry actions survive restart, old output cannot affect replacement work, and temporary cleanup failures eventually converge.
-
-This is one unreleased slice of spec #3. Preserve its accepted architecture and out-of-scope behavior. The complete feature is accepted only after final integration and device validation. Relevant user stories: 10, 11, 12, 13, 20, 21, 22, 24, 30, 31.
-
-#### Acceptance criteria
-
-- [ ] Persist cancellation before acknowledging it. Before publication, stop/reap and clean only the canceled attempt; after publication, preserve the archive and finish bookkeeping. Explicit Delete remains responsible for later archive removal.
-- [ ] Clearing a visible failed/canceled row must not discard pending worker or cleanup ownership. Public Delete and existing finished-cleanup guards must treat terminating/finalizing paths as owned.
-- [ ] Exercise cancellation before publication, after publication but before metadata commit, during uncertain persistence, and across restart through public actions. No falsely acknowledged cancellation or revived canceled transfer.
-- [ ] Give retries fresh namespaces and reject late receipts/progress from retired attempts. Preserve existing transient retry classification, deadlines/counts, outage pausing, quiet failures, and retry inspection.
-- [ ] Keep destination fixed at enqueue and read connection settings per attempt. Lowered concurrency lets current workers finish; navigation and wake retain the same queue and do not spend retries.
-- [ ] Persist remaining cleanup targets and retry intent before retiring records. Removal failures retry during the session and after restart, eventually removing only authorized private artifacts.
-- [ ] Verify public actions, real queue/cleanup behavior, committed state, files, and displayed rows together. Preserve existing cleanup wakeups without subscribers and keep diagnostic data redacted.
-
-#### Blocked by
-
-- [#8: Recover interrupted attempts and publication without duplicate transfers](https://github.com/LK4D4/suwayomi.koplugin/issues/8)
-
-### T7 / #10: Stop download service within a bounded KOReader shutdown
-
-#### Parent
-
-[Spec #3: navigation-safe local download ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/3)
-
-#### What to build
-
-All actual quit routes attempt to stop downloads within one two-second service budget while retaining safe restart recovery.
-
-This is one unreleased slice of spec #3. Preserve its accepted architecture and out-of-scope behavior. The complete feature is accepted only after final integration and device validation. Relevant user stories: 14, 15, 16.
-
-#### Acceptance criteria
-
-- [ ] Install one isolated, idempotent UIManager.quit wrapper that chains the prior method and preserves arguments/returns. Do not treat CloseWidget, CloseDocument, or plugin-screen closure as shutdown.
-- [ ] Stop admission/publication and invalidate ordinary timers/subscribers immediately. Signal known children and use nonblocking reaping against one monotonic two-second total deadline, not a deadline per child.
-- [ ] Require no final settings save, network request, future UI tick, or completed chapter on the shutdown path; pre-launch durable intent is the recovery record.
-- [ ] Retain locked artifacts for unconfirmed children. Expiring the deadline does not grant cleanup or publication authority, and shutdown errors cannot prevent the original quit method from running.
-- [ ] Fence plugin writers and hold process ownership through the original quit method's synchronous work. Release afterward or at process exit; a stopped service cannot restart in the exiting process.
-- [ ] Drive Exit, Restart, direct quit, Back-to-exit, repeated shutdown, and navigation negative controls through host composition. Then start a fresh service and prove jobs recover under the attempt-lock rules.
-- [ ] Measure the service-added budget with actual child processes, including a child whose exit is not confirmed before the deadline. Distinguish this budget from the original host's shutdown duration.
-
-#### Blocked by
-
-- [#8: Recover interrupted attempts and publication without duplicate transfers](https://github.com/LK4D4/suwayomi.koplugin/issues/8)
-
-### T8 / #11: Verify complete ownership behavior on a device
-
-#### Parent
-
-[Spec #3: navigation-safe local download ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/3)
-
-#### What to build
-
-The assembled implementation satisfies the whole specification in composed tests, real OS/file checks, and the reported device navigation workflow.
-
-This is one unreleased slice of spec #3. Preserve its accepted architecture and out-of-scope behavior. The complete feature is accepted only after final integration and device validation. Relevant user stories: 1, 2, 3, 4, 5, 8, 14, 15, 16, 32, 33, 34, 35, 36.
-
-#### Acceptance criteria
-
-- [ ] Audit every acceptance case and user story in spec #3 against the completed implementation. Fill composed coverage gaps without substituting refresh counts or per-UI queue mocks.
-- [ ] Run the full LuaJIT suite, lint, localization checks, and complete real filesystem/process checks for exclusion, fork inheritance, orphan waiting, reaping, publication, atomic settings, and cleanup. Record unsupported platform behavior explicitly.
-- [ ] On a device, establish a Downloads-only control with 8–10 missing chapters at concurrency two. Repeat while opening an existing chapter, returning, opening another, and switching readers directly; repeat at concurrency one.
-- [ ] Record chapter-worker counts, attempt/progress continuity, and returned UI state. Require no navigation-triggered reset, requeue, replacement, or active-file removal. Distinguish other plugin workers from chapter workers.
-- [ ] Verify zero-view completion, explicit quit/relaunch, and required platform primitives on actual settings and download mounts. Redact user data and never damage device storage to provoke failures.
-- [ ] Update the architecture reference and user-facing upgrade/blocker guidance for implemented behavior. Preserve runtime packaging boundaries and all out-of-scope policies.
-- [ ] Run required GitHub Actions before any separately authorized implementation merge. Record final evidence and unresolved blockers; do not claim acceptance if any required layer is missing.
-- [ ] Keep parent spec #3 and original report #2 unchanged. This ticket verifies the scoped feature; closing or editing those parent reports remains separate work.
-
-#### Blocked by
-
-- [#9: Make cancellation, retries, and cleanup preserve attempt ownership](https://github.com/LK4D4/suwayomi.koplugin/issues/9)
-- [#10: Stop download service within a bounded KOReader shutdown](https://github.com/LK4D4/suwayomi.koplugin/issues/10)
+Device acceptance remains pending. This issue is ready-for-human.

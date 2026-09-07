@@ -94,17 +94,17 @@ For an actual crash, record its timestamp and whether KOReader vanished/restarte
 
 Repair order: **shared download ownership first**, then **independent manual-delete retries**, **complete chapter retrieval**, and **durable completion-triggered refills**. Clarify the buffer trigger, retention meaning, and 50-download cap alongside those changes. Keep device validation focused on the contrasting workflows above.
 
-## Planning disposition, September 6 (manual scope amended September 7)
+## Planning disposition, September 6 (manual and ownership scope amended September 7)
 
 Every finding, preserved behavior, and remaining evidence obligation above now has a specification and implementation/acceptance ticket. These are planning outcomes, not runtime fixes or new device results; the investigation evidence and unresolved crash conclusion remain unchanged.
 
 | Audit scope | Specification | Tickets |
 | --- | --- | --- |
-| §1: navigation-safe ownership | [#3](https://github.com/LK4D4/suwayomi.koplugin/issues/3), ADR-0002 | #4–#11 |
+| §1: navigation-safe ownership | Revised [#3](https://github.com/LK4D4/suwayomi.koplugin/issues/3), ADR-0002 | #4 complete; #5 is the single implementation and #11 device acceptance. #6–#10 superseded/not planned. |
 | §2: complete stored chapters | [#21](https://github.com/LK4D4/suwayomi.koplugin/issues/21) | #24–#25; device comparison in #31 |
 | §3: completion-triggered refill | [#22](https://github.com/LK4D4/suwayomi.koplugin/issues/22), ADR-0004 | #26–#28; device comparison in #31 |
 | §4: durable manual deletion | [#12](https://github.com/LK4D4/suwayomi.koplugin/issues/12), ADR-0003 and ADR-0001 amendment | [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) and [#37: Verify reduced manual deletion on a device](https://github.com/LK4D4/suwayomi.koplugin/issues/37) supersede #13–#20 |
 | §5: batch cap, selection, and retention explanations | [#23](https://github.com/LK4D4/suwayomi.koplugin/issues/23) | #29–#30, preserving retention policy with required coordination owned by [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) |
 | Previous repairs, remaining device controls, provenance, and unproved crash | [#23](https://github.com/LK4D4/suwayomi.koplugin/issues/23) | #31, composing prior acceptance and retaining explicit unresolved/unverified outcomes |
 
-The [complete publication map](../plans/2026-09-06-remaining-issue-2-tickets.md) records all eight new implementation tickets, 13 verified native blocking links, and every new specification story. Pagination can begin immediately; cap disclosure is independent of pagination but waits for checked admission (#4); refill waits for existing ownership/manual-delete foundations. Already repaired failures receive regression obligations rather than duplicate repair tickets. The original GitHub report remains open. The September 7 revision updates #12/#22/#23 and manual-deletion routing; original investigation evidence remains historical. See the [manual-deletion replacement map](../plans/2026-09-06-durable-manual-delete-tickets.md) for current scope and dependencies.
+The [complete publication map](../plans/2026-09-06-remaining-issue-2-tickets.md) records the original eight new implementation tickets, 13 verified native blocking links, and every new specification story, with subsequent dependency corrections. Pagination can begin immediately; cap disclosure is independent of pagination but waits for checked admission (#4); refill waits for existing ownership/manual-delete foundations. Already repaired failures receive regression obligations rather than duplicate repair tickets. The original GitHub report remains open. The September 7 revisions update manual-deletion and navigation routing; original investigation evidence remains historical and unchanged. See the [manual-deletion replacement map](../plans/2026-09-06-durable-manual-delete-tickets.md) and [revised ownership map](../plans/2026-09-06-navigation-safe-download-ownership-tickets.md) for current scope and dependencies.

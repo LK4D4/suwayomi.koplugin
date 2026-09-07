@@ -8,7 +8,7 @@ Exactly two current native sub-issues belong to #12:
 
 | Issue | Delivers | Blocked by |
 | --- | --- | --- |
-| [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) | Complete reduced behavior with composed public-action and real-filesystem acceptance | #9 and #10, integrated before implementation starts |
+| [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) | Complete reduced behavior with composed public-action and real-filesystem acceptance | #5, integrated before implementation starts |
 | [#37: Verify reduced manual deletion on a device](https://github.com/LK4D4/suwayomi.koplugin/issues/37) | Separate device evidence for the integrated reduced feature | [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) and #11 |
 
 The implementation is fully specified (`ready-for-agent`) but blocked until prerequisites integrate. Device acceptance is `ready-for-human` and remains open. No feature result is established by publishing this map.
@@ -26,15 +26,15 @@ The implementation is fully specified (`ready-for-agent`) but blocked until prer
 | #19 | Necessary ordinary Delete/publication/retention coordination, unchanged positions and pathless eligibility, blocking unproved originals | Retention eligibility redesign and historical migration |
 | #20 | Replacement device acceptance verifies retained feature and prerequisite ownership evidence | Device evidence for removed guarantees |
 
-All retained safety obligations have an owner. In particular, #9/#10 supply process/attempt ownership, not the whole lasting archive/removal contract: the replacement implementation owns any minimal extension and conditional coordination needed for safe coexistence. Unproved old targets remain blocked; no requirement is silently made ready by removing its old owner.
+Revised #5 supplies only the process service, current-session known-worker tracking, and bounded quit, using #4's existing checked store. It does not supply archive-generation, publication, inherited-lock, or global legacy-proof infrastructure. #36 owns the minimal identity and conditional removal coordination its contract needs; unproved targets remain blocked. Superseded #9/#10 are not implemented prerequisites and must not expand #5.
 
-## Dependency migration
+## Dependency migration (manual-deletion history, updated ownership dependency)
 
 Add replacement blockers before removing old blockers; preserve all unrelated edges.
 
 | Consumer | Before | After | Required behavior supplied |
 | --- | --- | --- | --- |
-| #26 | #25, #16, #10 | #25, [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36), #10 | Checked manual admission, deliberate/automatic provenance, deletion fences; busy work is preserved, never canceled by mark-read |
+| #26 | #25, #16, #10 | #25, [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36), #5 | Checked manual admission, deliberate/automatic provenance, deletion fences; busy work is preserved, never canceled by mark-read |
 | #28 | #27, #18 | #27, [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) | Bulk checked read/intent coordination and unread revocation for refill enrollment |
 | #30 | #28, #19 | #28, [#36: Implement durable archive-only deletion after manual mark-read](https://github.com/LK4D4/suwayomi.koplugin/issues/36) | Actual busy/archive-only outcomes, metadata retention, and required retention/identity coexistence; no eligibility redesign |
 | #31 | #29, #30, #20 | #29, #30, [#37: Verify reduced manual deletion on a device](https://github.com/LK4D4/suwayomi.koplugin/issues/37) | Actual reduced-feature device evidence, including prerequisite #11 |

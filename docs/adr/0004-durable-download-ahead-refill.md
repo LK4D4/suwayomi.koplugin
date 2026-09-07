@@ -19,7 +19,7 @@ A changed endpoint cannot silently retarget outstanding work to reused manga IDs
 
 ## Lifecycle and policy
 
-Keep one read-only context helper across the service, with bounded fair work between manga. Reuse existing API/subprocess boundaries under the service's ownership protocol: unique private results, durable launch authorization, writer-exit proof before cleanup, and no child-side shared writes. Surviving helpers cannot overwrite replacement results. Share the existing total two-second shutdown deadline and quit wrapper.
+Keep one read-only context helper across the service, with bounded fair work between manga. Reuse existing API/subprocess result allocation, request tokens, and known-child completion checks; defer cleanup while the known helper runs and reject stale results. Helpers do not write shared settings. Revised #5 supplies the service and one total two-second best-effort quit integration, not a durable launch, inherited-lock, or orphan-isolation protocol. Recover durable refill requests with a fresh fetch after restart without sweeping untracked helper files. This does not retry chapter jobs that revised #3 marks interrupted/failed; refill semantics otherwise remain unchanged.
 
 Use complete ordinary chapter retrieval, current ledger read precedence, source-order/ID ordering, and exact saved scanlator restriction. Missing scanlator matches never broaden to All. Keep existing 5/10/50 earliest-unread-position semantics. Existing owned downloads and terminal failures occupy positions; automatic evaluation cannot reset terminal failures, extend beyond N to compensate, or revoke manual-delete intent. Explicit chapter Download/Retry retains the authority already specified by ADR-0003.
 

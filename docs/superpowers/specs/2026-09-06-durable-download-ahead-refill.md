@@ -75,9 +75,9 @@ At most one context-fetch helper runs across the service, distinct from the conf
 
 Fetch a complete ordinary chapter result under the complete-retrieval specification. Ordinary nonempty stored reads do not trigger a source refresh; its existing verified-empty fallback remains available. Load required manga/source metadata when durable context cannot provide it. No fetched result mutates chapter state or schedules jobs in the helper.
 
-Use unique helper/attempt identity and private result artifacts. Reuse the established service-owned attempt/file lifetime protocol: persist allocation/launch authorization before starting a child, never reuse paths, hold inherited writer ownership through final writes, and require proven exit before cleanup/replacement. A result file is not evidence of worker exit. Helpers write only private results; they never flush shared settings or publish archives. Close every unrelated attempt descriptor before fork.
+Reuse the existing one-shot subprocess helper's result allocation, request tokens, and known-child termination/completion checks. Helpers write only their result files, never shared settings or archives. Reject obsolete results through the current request revision and defer known active helper-file cleanup until the existing helper reports completion. Revised #5 supplies no inherited locks or durable launch/publication protocol; do not add those as navigation prerequisites.
 
-A fresh service may retain/discard and refetch an obsolete read-only result after ownership release; it does not need a resumable context transfer. Surviving old helpers cannot mutate current state, reuse replacement paths, or keep an inherited process lock. Unknown ownership preserves artifacts and blocks the affected recovery. Include helper workers in the existing single two-second shutdown budget; no extra quit wrapper, required final save, or second deadline.
+After a genuine restart, recover the durable refill request and fetch a fresh context through existing helper facilities; do not salvage an old helper result. Do not sweep untracked old helper files or claim isolation from surviving legacy workers. Include known helper workers in #5's single total two-second best-effort shutdown budget; no extra quit wrapper, required final save, or second deadline. Refill-request recovery does not automatically retry chapter jobs marked interrupted/failed by revised #3.
 
 ### Current policy and atomic queue admission
 
@@ -105,7 +105,7 @@ Snapshots in Downloads and relevant chapter views show pending/waiting/blocked r
 
 Canceling a chapter download does not turn off ahead. Its checked cancellation retires the affected manga's already outstanding evaluation, including a delayed retry or running helper, so that existing work cannot immediately undo cancellation. A later independent completion/manual/context/policy event may select it again if eligible. Explain this behavior rather than adding a suppression journal or another cancellation setting.
 
-Startup recovers outstanding requests once after exclusive ownership is available. Navigation does not reset retry history or initiate another recovery. Do not infer lost historical requests by scanning existing read state; enroll new qualifying events and retain known versioned records only.
+Startup recovers outstanding refill requests once after the process service is initialized under revised #5. Navigation does not reset retry history or initiate another recovery. Do not infer lost historical requests by scanning existing read state; enroll new qualifying events and retain known versioned records only.
 
 ## Testing Decisions
 
@@ -115,7 +115,7 @@ Prior art includes public manual-completion integration, read-sync controller/le
 
 Required cases cover all stories, including: ahead five queues the sixth after completed close; already-read completed close; final-page/unfinished/unlinked negatives; zero views; duplicate events; two manga fairness; more than 200 chapters; local read/unread versus stale server; filter/limit/directory/endpoint changes mid-fetch; absent filter; terminal failure and manual-delete fence; mixed single/selected/previous actions; reconciliation outside visible manga; Off during a fetch; explicit download Cancel/Cancel all during an in-flight, delayed, or blocked evaluation without immediate reenrollment; read-sync acknowledgment between stale server fetch and result application; unknown-origin completion after endpoint change; offline/reconnect/restart with persisted deadlines; stale results; and failures/uncertainty at enrollment and queue-consumption commits.
 
-Use real temporary files and actual processes to verify helper artifact isolation, inherited lock release, surviving children, same-path replacement resistance, checked persistence, and the shared shutdown deadline. Reuse ownership test adapters rather than claiming simulated workers prove these guarantees.
+Use focused real temporary-file and existing-helper checks for result lifetime, stale-result rejection, known-child cancellation, checked persistence, and the shared shutdown budget. Revised #5 does not establish inherited-lock or orphan-isolation guarantees; do not require its removed lock/publication matrix as refill evidence.
 
 The shared device acceptance ticket contrasts plugin-list return and native Open next file from equivalent state, including offline recovery and quit/relaunch. Use generic device wording and synthetic test data. Run the full LuaJIT suite, lint, localization, and required GitHub Actions before a separately authorized implementation merge. No runtime acceptance is established by writing this specification.
 
