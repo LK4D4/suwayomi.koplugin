@@ -421,6 +421,7 @@ describe("suwayomi settings atomic failure handling", function()
         local messages, cleared = {}, false
         local plugin = {
             max_batch_queue_chapters = 1,
+            loadMangaScanlatorFilter = function() return nil end,
             getDownloadQueue = function() return queue end,
             getDownloadDirectoryOrChoose = function() return "." end,
             isChapterDownloaded = function() return false end,
@@ -428,6 +429,7 @@ describe("suwayomi settings atomic failure handling", function()
             refreshChapterMenu = function() end,
             clearChapterSelection = function() cleared = true end,
             showMessage = function(_, message) table.insert(messages, message) end,
+            showBulkActionConfirmation = function(_, _, _, callback) return callback() end,
         }
         for name, method in pairs(require("suwayomi/chapters/actions").methods) do
             if plugin[name] == nil then plugin[name] = method end

@@ -15,7 +15,7 @@ describe("suwayomi/chapters/context", function()
     end
 
     before_each(function()
-        fake_settings = {}
+        fake_settings = { loadDownloadDirectory = function() return "/books" end }
         package.loaded["suwayomi/chapters/context"] = nil
         package.loaded.gettext = nil
         package.loaded["ffi/util"] = nil
@@ -225,11 +225,7 @@ describe("suwayomi/chapters/context", function()
                 },
             },
             getDownloadQueue = function()
-                return {
-                    getStatus = function()
-                        return nil
-                    end,
-                }
+                return require("suwayomi/downloads/queue"):new{}
             end,
             isChapterDownloaded = function()
                 return false

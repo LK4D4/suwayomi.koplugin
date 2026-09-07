@@ -301,7 +301,8 @@ function Methods:getBulkChapterActions()
     local actions = {}
 
     if self:getSelectedChapterCount() > 0 then
-        table.insert(actions, { id = "download_selected", text = I18n.t("Download selected") })
+        table.insert(actions, { id = "download_selected", text = self:getSelectedChapterCount() > (self.max_batch_queue_chapters or 50)
+            and I18n.t("Download selected (up to 50 new)") or I18n.t("Download selected") })
         table.insert(actions, { id = "mark_read_selected", text = I18n.t("Mark read") })
         table.insert(actions, { id = "mark_unread_selected", text = I18n.t("Mark unread") })
         table.insert(actions, { id = "clear_selection", text = I18n.t("Clear selection") })

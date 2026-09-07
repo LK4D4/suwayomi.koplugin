@@ -691,27 +691,19 @@ end
 
 function Methods:downloadNextUnreadChaptersForManga(manga, limit, confirm)
     local function queue(download_directory)
-        local chapters = self:getNextUnreadChaptersForDownload(manga, limit)
+        local chapters, skipped = self:getNextUnreadChaptersForDownload(manga, limit, download_directory)
         if #chapters == 0 then
-            self:showMessage(I18n.t("No unread chapters available to download."))
-            return 0
+            return self:confirmChapterDownloadBatch(manga, chapters, download_directory, { unread = true, skipped = skipped })
         end
 
-        if confirm then
-            return self:showBulkActionConfirmation(
-                I18n.count(
-                    #chapters,
-                    "Queue %1 unread chapter download?",
-                    "Queue %1 unread chapter downloads?"
-                ),
-                I18n.t("Queue"),
-                function()
-                    self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
-                end
-            )
+        if confirm or limit >= self.max_batch_queue_chapters then
+            return self:confirmChapterDownloadBatch(manga, chapters, download_directory, {
+                scope = I18n.f("Download next %1 (up to 50 new)", limit), unread = true, skipped = skipped,
+            })
         end
 
-        return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+        return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory,
+            self:captureChapterDownloadBatch(manga, chapters, download_directory, { unread = true, skipped = skipped }))
     end
 
     local function queueAfterContext(download_directory)
@@ -736,17 +728,9 @@ function Methods:confirmDownloadAllUnreadChaptersForManga(manga)
             return 0
         end
 
-        return self:showBulkActionConfirmation(
-            I18n.count(
-                #chapters,
-                "Queue downloads for all %1 unread chapter?",
-                "Queue downloads for all %1 unread chapters?"
-            ),
-            I18n.t("Queue"),
-            function()
-                self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
-            end
-        )
+        return self:confirmChapterDownloadBatch(manga, chapters, download_directory, {
+            scope = I18n.t("Download all unread (up to 50 new)"), unread = true,
+        })
     end
 
     local function queueAfterContext(download_directory)
@@ -771,17 +755,9 @@ function Methods:confirmDownloadAllChaptersForManga(manga)
             return 0
         end
 
-        return self:showBulkActionConfirmation(
-            I18n.count(
-                #chapters,
-                "Queue downloads for all %1 chapter?",
-                "Queue downloads for all %1 chapters?"
-            ),
-            I18n.t("Queue"),
-            function()
-                self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
-            end
-        )
+        return self:confirmChapterDownloadBatch(manga, chapters, download_directory, {
+            scope = I18n.t("Download all chapters (up to 50 new)"),
+        })
     end
 
     local function queueAfterContext(download_directory)

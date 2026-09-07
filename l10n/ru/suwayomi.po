@@ -45,11 +45,24 @@ msgstr[2] "%1 активных загрузок."
 msgid "%1 active, %2 queued, %3 failed"
 msgstr "Активных: %1, в очереди: %2, с ошибкой: %3"
 
+#, fuzzy
+msgid "%1 already downloaded or in the download queue."
+msgid_plural "%1 already downloaded or in the download queue."
+msgstr[0] "Пропущена %1 глава: уже скачана или в очереди."
+msgstr[1] "Пропущены %1 главы: уже скачаны или в очереди."
+msgstr[2] "Пропущено %1 глав: уже скачаны или в очереди."
+
 msgid "%1 chapter"
 msgid_plural "%1 chapters"
 msgstr[0] "%1 глава"
 msgstr[1] "%1 главы"
 msgstr[2] "%1 глав"
+
+msgid "%1 eligible chapter left outside this batch."
+msgid_plural "%1 eligible chapters left outside this batch."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "%1 failed for %2"
 msgstr "%1: ошибка для %2"
@@ -241,6 +254,9 @@ msgstr "Истекло время ожидания загрузки главы."
 msgid "Chapter downloads"
 msgstr "Загрузки глав"
 
+msgid "Chapter view changed. Run this download action again."
+msgstr ""
+
 msgid "Chapters"
 msgstr "Главы"
 
@@ -294,6 +310,13 @@ msgstr "Не удалось начать загрузку главы: %1"
 #, fuzzy
 msgid "Could not clear failed downloads: %1"
 msgstr "Не удалось начать загрузку главы: %1"
+
+#, fuzzy
+msgid "Could not confirm %1 chapter download."
+msgid_plural "Could not confirm %1 chapter downloads."
+msgstr[0] "Не удалось начать загрузку главы: %1"
+msgstr[1] "Не удалось начать загрузку главы: %1"
+msgstr[2] "Не удалось начать загрузку главы: %1"
 
 msgid "Could not connect to Suwayomi."
 msgstr "Не удалось подключиться к Suwayomi."
@@ -455,10 +478,12 @@ msgstr "Скачать"
 msgid "Download ahead"
 msgstr "Скачать заранее"
 
-msgid "Download all chapters"
+#, fuzzy
+msgid "Download all chapters (up to 50 new)"
 msgstr "Скачать все главы"
 
-msgid "Download all unread"
+#, fuzzy
+msgid "Download all unread (up to 50 new)"
 msgstr "Скачать все непрочитанные"
 
 msgid "Download directory: %1"
@@ -488,6 +513,10 @@ msgstr "Загрузка больше не находится в состоян�
 msgid "Download is no longer queued."
 msgstr "Загрузка больше не в очереди."
 
+#, fuzzy
+msgid "Download next %1 (up to 50 new)"
+msgstr "Скачать следующие 10"
+
 msgid "Download next 10"
 msgstr "Скачать следующие 10"
 
@@ -498,6 +527,10 @@ msgid "Download next 50"
 msgstr "Скачать следующие 50"
 
 msgid "Download selected"
+msgstr "Скачать выбранное"
+
+#, fuzzy
+msgid "Download selected (up to 50 new)"
 msgstr "Скачать выбранное"
 
 msgid "Download the chapter first."
@@ -594,6 +627,13 @@ msgstr "Ошибка"
 
 msgid "Failed to delete %1 download."
 msgid_plural "Failed to delete %1 downloads."
+msgstr[0] "Не удалось удалить %1 загрузку."
+msgstr[1] "Не удалось удалить %1 загрузки."
+msgstr[2] "Не удалось удалить %1 загрузок."
+
+#, fuzzy
+msgid "Failed to queue %1 chapter download."
+msgid_plural "Failed to queue %1 chapter downloads."
 msgstr[0] "Не удалось удалить %1 загрузку."
 msgstr[1] "Не удалось удалить %1 загрузки."
 msgstr[2] "Не удалось удалить %1 загрузок."
@@ -722,6 +762,10 @@ msgstr "Загрузка..."
 msgid "Login information"
 msgstr "Данные входа"
 
+#, fuzzy
+msgid "Manga"
+msgstr "%1 манга"
+
 msgid "Manga actions"
 msgstr "Действия с мангой"
 
@@ -758,6 +802,10 @@ msgstr "Следующая попытка: %1"
 msgid "No actions available"
 msgstr "Нет доступных действий"
 
+#, fuzzy
+msgid "No chapters available to download."
+msgstr "Нет непрочитанных глав для скачивания."
+
 msgid "No chapters selected."
 msgstr "Главы не выбраны."
 
@@ -766,6 +814,10 @@ msgstr "Описание недоступно."
 
 msgid "No downloads queued."
 msgstr "Нет загрузок в очереди."
+
+#, fuzzy
+msgid "No eligible chapters match the saved scanlator filter."
+msgstr "Не удалось сохранить фильтр."
 
 msgid "No error details were recorded."
 msgstr "Подробности ошибки не сохранены."
@@ -781,6 +833,12 @@ msgstr "Нет манги, соответствующей этому поиск�
 
 msgid "No matching extensions"
 msgstr "Нет подходящих расширений"
+
+#, fuzzy
+msgid ""
+"No new downloads available: chapters are already downloaded or in the "
+"download queue."
+msgstr "Буфер предварительной загрузки уже скачан или стоит в очереди."
 
 msgid "No new downloads queued."
 msgstr "Новые загрузки не добавлены в очередь."
@@ -822,6 +880,11 @@ msgstr "Приостановлено"
 
 msgid "Ongoing"
 msgstr "Выходит"
+
+msgid ""
+"Only this batch will be queued. If availability changes, fewer downloads may "
+"be added. Run another action for more."
+msgstr ""
 
 msgctxt "chapter action"
 msgid "Open"
@@ -878,37 +941,28 @@ msgstr[2] ""
 "Добавить %1 отсутствующих загрузок в очередь, чтобы держать доступными "
 "следующие непрочитанные главы (%2)?"
 
-msgid "Queue %1 unread chapter download?"
-msgid_plural "Queue %1 unread chapter downloads?"
+#, fuzzy
+msgid "Queue up to %1 new chapter download?"
+msgid_plural "Queue up to %1 new chapter downloads?"
 msgstr[0] "Добавить в очередь %1 непрочитанную главу?"
 msgstr[1] "Добавить в очередь %1 непрочитанные главы?"
 msgstr[2] "Добавить в очередь %1 непрочитанных глав?"
 
-msgid "Queue downloads for all %1 chapter?"
-msgid_plural "Queue downloads for all %1 chapters?"
-msgstr[0] "Добавить в очередь загрузки для всех глав (%1)?"
-msgstr[1] "Добавить в очередь загрузки для всех глав (%1)?"
-msgstr[2] "Добавить в очередь загрузки для всех глав (%1)?"
-
-msgid "Queue downloads for all %1 unread chapter?"
-msgid_plural "Queue downloads for all %1 unread chapters?"
-msgstr[0] "Добавить в очередь загрузки для всех непрочитанных глав (%1)?"
-msgstr[1] "Добавить в очередь загрузки для всех непрочитанных глав (%1)?"
-msgstr[2] "Добавить в очередь загрузки для всех непрочитанных глав (%1)?"
-
 msgid "Queued"
 msgstr "В очереди"
+
+#, fuzzy
+msgid "Queued %1 chapter download."
+msgid_plural "Queued %1 chapter downloads."
+msgstr[0] "В очередь добавлена %1 выбранная глава."
+msgstr[1] "В очередь добавлены %1 выбранные главы."
+msgstr[2] "В очередь добавлено %1 выбранных глав."
 
 msgid "Queued %1 selected chapter download."
 msgid_plural "Queued %1 selected chapter downloads."
 msgstr[0] "В очередь добавлена %1 выбранная глава."
 msgstr[1] "В очередь добавлены %1 выбранные главы."
 msgstr[2] "В очередь добавлено %1 выбранных глав."
-
-msgid "Queued first %1 downloads. Refine the chapter selection to queue more."
-msgstr ""
-"Первые %1 загрузок добавлены в очередь. Уточните выбор глав, чтобы добавить "
-"больше."
 
 msgid "Read"
 msgstr "Прочитано"
@@ -989,6 +1043,10 @@ msgstr "Метаданные сохранённых фильтров не явл
 msgid "Scanlator filter"
 msgstr "Фильтр сканлейторов"
 
+#, fuzzy
+msgid "Scanlator: %1"
+msgstr "Фильтр сканлейторов"
+
 msgctxt "extension action"
 msgid "Search"
 msgstr "Поиск"
@@ -1060,6 +1118,13 @@ msgstr[2] "Пропущено %1 глав: уже скачаны или в оч�
 
 msgid "Skipped %1 chapter not downloaded."
 msgid_plural "Skipped %1 chapters not downloaded."
+msgstr[0] "Пропущена %1 нескачанная глава."
+msgstr[1] "Пропущены %1 нескачанные главы."
+msgstr[2] "Пропущено %1 нескачанных глав."
+
+#, fuzzy
+msgid "Skipped %1 chapter."
+msgid_plural "Skipped %1 chapters."
 msgstr[0] "Пропущена %1 нескачанная глава."
 msgstr[1] "Пропущены %1 нескачанные главы."
 msgstr[2] "Пропущено %1 нескачанных глав."

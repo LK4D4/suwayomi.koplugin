@@ -42,9 +42,18 @@ msgstr[0] "%1 个下载正在进行。"
 msgid "%1 active, %2 queued, %3 failed"
 msgstr "%1 个进行中，%2 个排队中，%3 个失败"
 
+#, fuzzy
+msgid "%1 already downloaded or in the download queue."
+msgid_plural "%1 already downloaded or in the download queue."
+msgstr[0] "已跳过 %1 个已下载或已排队的项目。"
+
 msgid "%1 chapter"
 msgid_plural "%1 chapters"
 msgstr[0] "%1 章"
+
+msgid "%1 eligible chapter left outside this batch."
+msgid_plural "%1 eligible chapters left outside this batch."
+msgstr[0] ""
 
 msgid "%1 failed for %2"
 msgstr "%2 的%1失败了"
@@ -220,6 +229,9 @@ msgstr "章节下载超时。"
 msgid "Chapter downloads"
 msgstr "章节下载"
 
+msgid "Chapter view changed. Run this download action again."
+msgstr ""
+
 msgid "Chapters"
 msgstr "章节"
 
@@ -273,6 +285,11 @@ msgstr "无法开始章节下载：%1"
 #, fuzzy
 msgid "Could not clear failed downloads: %1"
 msgstr "无法开始章节下载：%1"
+
+#, fuzzy
+msgid "Could not confirm %1 chapter download."
+msgid_plural "Could not confirm %1 chapter downloads."
+msgstr[0] "无法开始章节下载：%1"
 
 msgid "Could not connect to Suwayomi."
 msgstr "无法连接到 Suwayomi。"
@@ -426,10 +443,12 @@ msgstr "下载"
 msgid "Download ahead"
 msgstr "提前下载"
 
-msgid "Download all chapters"
+#, fuzzy
+msgid "Download all chapters (up to 50 new)"
 msgstr "下载全部章节"
 
-msgid "Download all unread"
+#, fuzzy
+msgid "Download all unread (up to 50 new)"
 msgstr "下载全部未读"
 
 msgid "Download directory: %1"
@@ -459,6 +478,10 @@ msgstr "下载已不再处于失败状态。"
 msgid "Download is no longer queued."
 msgstr "下载不再排队中。"
 
+#, fuzzy
+msgid "Download next %1 (up to 50 new)"
+msgstr "下载接下来 10 章"
+
 msgid "Download next 10"
 msgstr "下载接下来 10 章"
 
@@ -469,6 +492,10 @@ msgid "Download next 50"
 msgstr "下载接下来 50 章"
 
 msgid "Download selected"
+msgstr "下载选中的"
+
+#, fuzzy
+msgid "Download selected (up to 50 new)"
 msgstr "下载选中的"
 
 msgid "Download the chapter first."
@@ -563,6 +590,11 @@ msgstr "失败"
 
 msgid "Failed to delete %1 download."
 msgid_plural "Failed to delete %1 downloads."
+msgstr[0] "删除 %1 个下载失败。"
+
+#, fuzzy
+msgid "Failed to queue %1 chapter download."
+msgid_plural "Failed to queue %1 chapter downloads."
 msgstr[0] "删除 %1 个下载失败。"
 
 #, fuzzy
@@ -687,6 +719,10 @@ msgstr "正在加载..."
 msgid "Login information"
 msgstr "登录信息"
 
+#, fuzzy
+msgid "Manga"
+msgstr "%1 部漫画"
+
 msgid "Manga actions"
 msgstr "漫画操作"
 
@@ -723,6 +759,10 @@ msgstr "下次重试：%1"
 msgid "No actions available"
 msgstr "没有可用操作"
 
+#, fuzzy
+msgid "No chapters available to download."
+msgstr "没有可下载的未读章节。"
+
 msgid "No chapters selected."
 msgstr "未选择章节。"
 
@@ -731,6 +771,10 @@ msgstr "无可用描述。"
 
 msgid "No downloads queued."
 msgstr "没有排队中的下载。"
+
+#, fuzzy
+msgid "No eligible chapters match the saved scanlator filter."
+msgstr "无法保存筛选器。"
 
 msgid "No error details were recorded."
 msgstr "未记录错误详情。"
@@ -746,6 +790,12 @@ msgstr "没有漫画匹配此搜索。"
 
 msgid "No matching extensions"
 msgstr "没有匹配的扩展"
+
+#, fuzzy
+msgid ""
+"No new downloads available: chapters are already downloaded or in the "
+"download queue."
+msgstr "提前下载缓冲中的章节已下载或已加入队列。"
 
 msgid "No new downloads queued."
 msgstr "没有新的下载排队。"
@@ -787,6 +837,11 @@ msgstr "暂停更新"
 
 msgid "Ongoing"
 msgstr "连载中"
+
+msgid ""
+"Only this batch will be queued. If availability changes, fewer downloads may "
+"be added. Run another action for more."
+msgstr ""
 
 msgctxt "chapter action"
 msgid "Open"
@@ -835,27 +890,22 @@ msgid_plural ""
 "Queue %1 missing downloads to keep the next %2 unread chapters available?"
 msgstr[0] "要将缺少的 %1 个下载加入队列，以保留接下来 %2 个未读章节可用吗？"
 
-msgid "Queue %1 unread chapter download?"
-msgid_plural "Queue %1 unread chapter downloads?"
+#, fuzzy
+msgid "Queue up to %1 new chapter download?"
+msgid_plural "Queue up to %1 new chapter downloads?"
 msgstr[0] "将 %1 个未读章节下载加入队列？"
-
-msgid "Queue downloads for all %1 chapter?"
-msgid_plural "Queue downloads for all %1 chapters?"
-msgstr[0] "将全部 %1 章下载加入队列？"
-
-msgid "Queue downloads for all %1 unread chapter?"
-msgid_plural "Queue downloads for all %1 unread chapters?"
-msgstr[0] "将全部 %1 个未读章节下载加入队列？"
 
 msgid "Queued"
 msgstr "排队中"
 
+#, fuzzy
+msgid "Queued %1 chapter download."
+msgid_plural "Queued %1 chapter downloads."
+msgstr[0] "已将 %1 个选中章节下载加入队列。"
+
 msgid "Queued %1 selected chapter download."
 msgid_plural "Queued %1 selected chapter downloads."
 msgstr[0] "已将 %1 个选中章节下载加入队列。"
-
-msgid "Queued first %1 downloads. Refine the chapter selection to queue more."
-msgstr "已将前 %1 个下载加入队列。请细化章节选择以加入更多。"
 
 msgid "Read"
 msgstr "已读"
@@ -935,6 +985,10 @@ msgstr "已保存筛选器的元数据不是有效的 JSON。"
 msgid "Scanlator filter"
 msgstr "汉化组筛选器"
 
+#, fuzzy
+msgid "Scanlator: %1"
+msgstr "汉化组筛选器"
+
 msgctxt "extension action"
 msgid "Search"
 msgstr "搜索"
@@ -1004,6 +1058,11 @@ msgstr[0] "已跳过 %1 个已下载或已排队的项目。"
 
 msgid "Skipped %1 chapter not downloaded."
 msgid_plural "Skipped %1 chapters not downloaded."
+msgstr[0] "已跳过 %1 个未下载章节。"
+
+#, fuzzy
+msgid "Skipped %1 chapter."
+msgid_plural "Skipped %1 chapters."
 msgstr[0] "已跳过 %1 个未下载章节。"
 
 msgid "Skipped %1 download."
