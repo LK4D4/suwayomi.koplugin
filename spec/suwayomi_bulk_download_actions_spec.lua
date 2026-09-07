@@ -95,8 +95,8 @@ describe("bounded bulk download actions", function()
         queue = require("suwayomi/downloads/queue"):new{
             settings = settings, ui_manager = ui,
             downloader = {
-                getTargetPath = function(_, _, target_manga, chapter)
-                    return "/books", "/books/" .. target_manga.id .. "-" .. chapter.id .. ".cbz"
+                getTargetPath = function(_, directory, target_manga, chapter)
+                    return directory, directory .. "/" .. target_manga.id .. "-" .. chapter.id .. ".cbz"
                 end,
                 chapterExists = function(_, path) return archives[path] == true end,
             },
@@ -109,7 +109,7 @@ describe("bounded bulk download actions", function()
             for name, method in pairs(require(module).methods) do plugin[name] = method end
         end
         function plugin:getDownloadQueue() return queue end
-        function plugin:getDownloadDirectoryOrChoose() return "/books" end
+        function plugin:getDownloadDirectoryOrChoose() return settings:loadDownloadDirectory() end
         function plugin:showMessage(text) messages[#messages + 1] = text end
         function plugin:refreshChapterMenu() end
         function plugin:withChapterMenuRefreshSuppressed(callback) return callback() end
@@ -308,6 +308,7 @@ describe("bounded bulk download actions", function()
             for index, state in ipairs({ "stopping", "finalizing", "running", "downloaded", "skipped" }) do
                 queue:setStatus(manga, items[index + 4], { state = state })
             end
+            archives["/books/m1-c8.cbz"], archives["/books/m1-c9.cbz"] = true, true
             assert.is_truthy(queue:upsertPersistentJob(queue:buildPersistentJob(manga, items[10], "/books", "failed")))
             queue:setStatus(manga, items[10], { state = "failed" })
             local owner_progress = queue:buildProgressPath(manga, items[4], "/books")
@@ -386,6 +387,65 @@ describe("bounded bulk download actions", function()
         assert.are.equal(3, #storedJobs())
         assert.are.equal(owner, queue:getActiveJob("m1:c2"))
     end)
+
+    for _, terminal_state in ipairs({ "downloaded", "skipped" }) do
+        it("keeps active ownership authoritative over stale " .. terminal_state .. " status without an archive", function()
+            local items = openChapters(chapters(1))
+            assert.is_true(queue:enqueue(manga, items[1], "/books"))
+            queue:process()
+            local owner = queue:getActiveJob("m1:c1")
+            assert.is_not_nil(owner)
+            queue:setStatus(manga, items[1], { state = terminal_state })
+            assert.is_false(queue:enqueue(manga, items[1], "/books"))
+            local queued, err, outcome = queue:enqueueBatch(manga, items, "/books")
+            assert.are.equal(0, queued)
+            assert.is_nil(err)
+            assert.are.same({ skipped = 1, failed = 0, unconfirmed = 0 }, outcome)
+            assert.are.equal(1, #storedJobs())
+            assert.are.equal(owner, queue:getActiveJob("m1:c1"))
+            assert.are.equal(0, #queue:getSnapshot().queued)
+        end)
+
+        for _, change in ipairs({ "archive removal", "directory change" }) do
+            for _, entrypoint in ipairs({ "chapter", "bulk" }) do
+                it("re-admits " .. terminal_state .. " through " .. entrypoint .. " after " .. change, function()
+                    local items = openChapters(chapters(1))
+                    local old_path = "/books/m1-c1.cbz"
+                    archives[old_path] = true
+                    queue:setStatus(manga, items[1], { state = terminal_state, path = old_path })
+                    assert.are.equal("open", plugin:getChapterActions(manga, items[1])[1].id)
+                    assert.is_false(queue:enqueue(manga, items[1], "/books"))
+                    local directory = "/books"
+                    if change == "archive removal" then
+                        archives[old_path] = nil
+                    else
+                        directory = "/new-books"
+                        settings:saveDownloadDirectory(directory)
+                    end
+                    local action = plugin:getChapterActions(manga, items[1])[1]
+                    assert.are.equal("download", action.id)
+                    assert.are.equal("Download", action.text)
+                    if entrypoint == "chapter" then
+                        plugin:performChapterAction(manga, items[1], action.id)
+                    else
+                        plugin:performMangaAction(manga, "download_all_chapters")
+                        local dialog = stack[#stack]
+                        assert.is_not_nil(dialog)
+                        assert.is_truthy(dialog.text:find("Queue up to 1 new chapter download?", 1, true))
+                        dialog.ok_callback()
+                        assert.is_truthy(messages[#messages]:find("Queued 1 chapter download.", 1, true))
+                    end
+                    local jobs = storedJobs()
+                    assert.are.equal(1, #jobs)
+                    assert.are.equal("m1:c1", jobs[1].key)
+                    assert.are.equal("queued", jobs[1].state)
+                    assert.are.equal(directory, jobs[1].download_directory)
+                    assert.are.equal(1, #queue:getSnapshot().queued)
+                    assert.are.equal(change == "directory change", archives[old_path] == true)
+                end)
+            end
+        end
+    end
 
     for _, action in ipairs({ "download_selected", "download_next_5_unread" }) do
         it("keeps " .. action .. " immediate when a small batch fits", function()

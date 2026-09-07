@@ -792,10 +792,10 @@ function DownloadQueue:canEnqueue(manga, chapter, download_directory)
         return false, "downloading"
     end
     if status and (status.state == "queued" or status.state == "downloading"
-        or status.state == "running" or status.state == "stopping" or status.state == "finalizing"
-        or status.state == "downloaded" or status.state == "skipped") then
+        or status.state == "running" or status.state == "stopping" or status.state == "finalizing") then
         return false, status.state
     end
+    -- Terminal status can outlive its archive or configured download directory.
     if self:getExistingArchivePath({ manga = manga, chapter = chapter, download_directory = download_directory }) then
         return false, "downloaded"
     end
