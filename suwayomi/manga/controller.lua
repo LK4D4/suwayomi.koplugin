@@ -78,14 +78,20 @@ local function copyOptions(options)
     return copied
 end
 
-local function mangaActionCallback(owner, manga, options)
+local function guardMangaCallback(owner, manga, callback)
     local is_current = owner.captureChapterActionGuard and owner:captureChapterActionGuard()
     local manga_id = manga and tostring(manga.id or manga.title)
-    return function(action)
+    return function(...)
         if owner.suwayomi_host_retired or (is_current and not is_current())
             or (manga and tostring(manga.id or manga.title) ~= manga_id) then return false end
-        if action and action.id then return owner:performMangaAction(manga, action.id, options) end
+        return callback(...)
     end
+end
+
+local function mangaActionCallback(owner, manga, options)
+    return guardMangaCallback(owner, manga, function(action)
+        if action and action.id then return owner:performMangaAction(manga, action.id, options) end
+    end)
 end
 
 function Methods:attachSourceToManga(manga, source)
@@ -593,9 +599,9 @@ function Methods:showBulkDownloadMangaActions(manga, options)
     local menu = SuwayomiUI.showMangaActionsMenu({
         title = I18n.t("Bulk downloads"),
         actions = MangaActionMenu.buildBulkDownloadActions(),
-        on_back = function()
+        on_back = guardMangaCallback(self, manga, function()
             self:showMangaActions(manga, options)
-        end,
+        end),
     }, mangaActionCallback(self, manga, options))
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("manga-actions", menu)
@@ -612,9 +618,9 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
     local menu = SuwayomiUI.showMangaActionsMenu({
         title = I18n.t("Download ahead"),
         actions = MangaActionMenu.buildKeepDownloadedActions(),
-        on_back = function()
+        on_back = guardMangaCallback(self, manga, function()
             self:showMangaActions(manga, options)
-        end,
+        end),
     }, mangaActionCallback(self, manga, options))
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("manga-actions", menu)
