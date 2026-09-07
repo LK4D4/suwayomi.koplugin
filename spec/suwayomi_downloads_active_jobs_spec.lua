@@ -595,13 +595,12 @@ describe("suwayomi/downloads/active_jobs", function()
 
     it("backfills a completed active slot while another chapter keeps downloading", function()
         local first_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
+        local existing_archive_paths = {}
         local context = build_queue({
             max_active_chapters = 2,
             subprocess_done = {},
             skip_subprocess_callback = true,
-            existing_archive_paths = {
-                [first_path] = true,
-            },
+            existing_archive_paths = existing_archive_paths,
         })
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapters = {
@@ -614,6 +613,7 @@ describe("suwayomi/downloads/active_jobs", function()
         table.remove(context.scheduled, 1).callback()
         local first = context.active_job(manga, chapters[1])
         local second = context.active_job(manga, chapters[2])
+        existing_archive_paths[first_path] = true
         context.write_progress(manga, chapters[1], "downloaded", 1, 1, first_path)
         context.write_progress(manga, chapters[2], "downloading", 1, 2, "/books/Sousou no Frieren/Official_Vol. 1 Ch. 2.cbz")
         context.set_subprocess_done(first.pid, true)
@@ -632,15 +632,15 @@ describe("suwayomi/downloads/active_jobs", function()
 
     it("records reader return context when a download finishes with a CBZ path", function()
         local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
+        local existing_archive_paths = {}
         local context = build_queue({
-            existing_archive_paths = {
-                [target_path] = true,
-            },
+            existing_archive_paths = existing_archive_paths,
         })
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
+        existing_archive_paths[target_path] = true
         context.run_scheduled()
 
         assert.are.equal(1, #context.archive_ready_calls)
@@ -654,6 +654,7 @@ describe("suwayomi/downloads/active_jobs", function()
 
     it("records reader return context when the downloader skips an existing CBZ", function()
         local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
+        local archive_exists = false
         local context = build_queue({
             downloader = {
                 getTargetPath = function(_, download_directory, manga)
@@ -668,13 +669,14 @@ describe("suwayomi/downloads/active_jobs", function()
                         path = target_path,
                     }
                 end,
-                chapterExists = function() return true end,
+                chapterExists = function() return archive_exists end,
             },
         })
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
+        archive_exists = true
         context.run_scheduled()
 
         assert.are.equal(1, #context.archive_ready_calls)
@@ -956,6 +958,7 @@ describe("suwayomi/downloads/active_jobs", function()
 
     it("treats failed progress as downloaded when the archive exists locally", function()
         local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
+        local archive_exists = false
         local context = build_queue({
             subprocess_done = true,
             skip_subprocess_callback = true,
@@ -966,7 +969,7 @@ describe("suwayomi/downloads/active_jobs", function()
                 end,
                 getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
                 chapterExists = function(_, chapter_path)
-                    return chapter_path == target_path
+                    return archive_exists and chapter_path == target_path
                 end,
             },
         })
@@ -975,6 +978,7 @@ describe("suwayomi/downloads/active_jobs", function()
 
         context.queue:enqueue(manga, chapter, "/books")
         table.remove(context.scheduled, 1).callback()
+        archive_exists = true
         context.write_progress(manga, chapter, "failed", 2, 2, target_path, "Could not finalize chapter archive.")
         table.remove(context.scheduled, 1).callback()
 
@@ -985,6 +989,7 @@ describe("suwayomi/downloads/active_jobs", function()
 
     it("treats a finished subprocess as downloaded when progress is missing but the archive exists locally", function()
         local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
+        local archive_exists = false
         local context = build_queue({
             subprocess_done = true,
             skip_subprocess_callback = true,
@@ -995,7 +1000,7 @@ describe("suwayomi/downloads/active_jobs", function()
                 end,
                 getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
                 chapterExists = function(_, chapter_path)
-                    return chapter_path == target_path
+                    return archive_exists and chapter_path == target_path
                 end,
             },
         })
@@ -1004,6 +1009,7 @@ describe("suwayomi/downloads/active_jobs", function()
 
         context.queue:enqueue(manga, chapter, "/books")
         table.remove(context.scheduled, 1).callback()
+        archive_exists = true
         table.remove(context.scheduled, 1).callback()
 
         assert.are.same({}, context.saved_queue())

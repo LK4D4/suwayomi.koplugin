@@ -480,23 +480,13 @@ function Methods:formatBulkDownloadMessage(queued, skipped)
 end
 
 
-function Methods:canQueueChapterDownload(manga, chapter)
+function Methods:canQueueChapterDownload(manga, chapter, download_directory)
     if chapter.is_read == true then
         return false
     end
 
-    local status = self:getDownloadQueue():getStatus(manga, chapter)
-    if status and (
-        status.state == "queued"
-            or status.state == "downloading"
-            or status.state == "downloaded"
-            or status.state == "skipped"
-    ) then
-        return false
-    end
-
-    local downloaded = self:isChapterDownloaded(manga, chapter)
-    return downloaded ~= true
+    return self:getDownloadQueue():canEnqueue(manga, chapter,
+        download_directory or SuwayomiSettings:loadDownloadDirectory())
 end
 
 
@@ -516,17 +506,27 @@ function Methods:isChapterDownloadAvailable(manga, chapter)
 end
 
 
-function Methods:getNextUnreadChaptersForDownload(manga, limit)
+function Methods:getNextUnreadChaptersForDownload(manga, limit, download_directory)
     local chapters = {}
+    local skipped = 0
+    local seen = {}
+    local queue = self:getDownloadQueue()
+    local saved_filter = self:loadMangaScanlatorFilter(manga)
     for _index, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
-        if self:canQueueChapterDownload(manga, chapter) then
-            table.insert(chapters, chapter)
-            if #chapters >= limit then
-                break
+        local key = queue:getKey(manga, chapter)
+        if not seen[key] and (not saved_filter or self:getChapterScanlator(chapter) == saved_filter) then
+            seen[key] = true
+            if self:canQueueChapterDownload(manga, chapter, download_directory) then
+                table.insert(chapters, chapter)
+                if #chapters >= limit then
+                    break
+                end
+            elseif chapter.is_read ~= true then
+                skipped = skipped + 1
             end
         end
     end
-    return chapters
+    return chapters, skipped
 end
 
 

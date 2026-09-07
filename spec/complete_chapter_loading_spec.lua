@@ -62,6 +62,11 @@ describe("complete stored chapter loading", function()
         return ids
     end
 
+    local function assertQueuedMessage(count)
+        assert.are.same({ "Queued " .. count .. (count == 1 and " chapter download." or " chapter downloads.")
+            .. "\nSkipped 0 chapters.\n0 eligible chapters left outside this batch." }, messages)
+    end
+
     local function finishRequest(index, token)
         index = index or 1
         local run = table.remove(workers, index)
@@ -105,6 +110,10 @@ describe("complete stored chapter loading", function()
         package.preload.gettext = function() return function(value) return value end end
         package.preload["ffi/archiver"] = function() return {} end
         local host = {
+            template = function(text, ...)
+                local values = { ... }
+                return (text:gsub("%%(%d+)", function(index) return tostring(values[tonumber(index)]) end))
+            end,
             joinPath = function(...) return table.concat({ ... }, "/") end,
             runInSubProcess = function(run) workers[#workers + 1] = run; return #workers end,
             isSubProcessDone = function() return subprocess_done end,
@@ -181,7 +190,7 @@ describe("complete stored chapter loading", function()
         assert.is_nil(json.decode(saved_ledger)["17:201"])
         plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
         assert.are.same({ "201", "202", "203", "204", "205" }, admittedIds())
-        assert.are.same({}, messages)
+        assertQueuedMessage(5)
     end)
 
     it("preserves the complete view and read ledger without admitting a failed reload action", function()
@@ -243,7 +252,7 @@ describe("complete stored chapter loading", function()
             plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
             assert.are.same({ "999", "1000", "203", "204", "205" }, admittedIds())
             assert.is_true(json.decode(saved_ledger)["17:200"].read)
-            assert.are.same({}, messages)
+            assertQueuedMessage(5)
         end)
     end
 
@@ -331,7 +340,7 @@ describe("complete stored chapter loading", function()
         assert.are.same({ revision = 202 }, real_settings:loadChapterLedger()["17:202"].manual_intent)
         plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
         assert.are.same({ "199", "200", "202", "203", "204" }, admittedIds())
-        assert.are.same({}, messages)
+        assertQueuedMessage(5)
     end)
 
     for _, route in ipairs({ "reopen", "refresh", "action" }) do
@@ -596,7 +605,7 @@ describe("complete stored chapter loading", function()
         plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
         assert.are.same({ "201" }, admittedIds())
         assert.are.equal("{}", saved_ledger)
-        assert.are.same({}, messages)
+        assertQueuedMessage(1)
     end)
 
     for _, route in ipairs({ "fallback", "refresh" }) do
@@ -749,7 +758,7 @@ describe("complete stored chapter loading", function()
         assert.are.equal(201, #plugin.current_chapter_context.chapters)
         assert.is_true(json.decode(saved_ledger)["17:199"].read)
         assert.are.same({ 0, 100, 200 }, { requests[1].variables.offset, requests[2].variables.offset, requests[3].variables.offset })
-        assert.are.same({}, messages)
+        assertQueuedMessage(2)
     end)
 
     it("reports aggregate result size before handoff without discarding a complete view", function()
@@ -792,7 +801,7 @@ describe("complete stored chapter loading", function()
         plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
         assert.are.same({ "201" }, admittedIds())
         assert.are.equal("{}", saved_ledger)
-        assert.are.same({}, messages)
+        assertQueuedMessage(1)
     end)
 
     it("preserves transport failure details through worker handoff and prevents a failed ahead action", function()
@@ -830,7 +839,7 @@ describe("complete stored chapter loading", function()
         assert.are.same({ "201", "202", "203", "204", "205" }, admittedIds())
         assert.are.equal("{}", saved_ledger)
         assert.are.equal(2, #requests)
-        assert.are.same({}, messages)
+        assertQueuedMessage(5)
     end)
 
     it("loads all stored pages before admitting a fresh Download ahead action", function()
@@ -846,7 +855,7 @@ describe("complete stored chapter loading", function()
         assert.are.equal(205, #plugin.current_chapter_context.chapters)
         assert.are.same({ "201", "202", "203", "204", "205" }, admittedIds())
         assert.is_true(json.decode(saved_ledger)["17:200"].read)
-        assert.are.same({}, messages)
+        assertQueuedMessage(5)
     end)
 
     for _, action in ipairs({ "fetch_chapters_for_manga", "refresh_manga", "fetch_reader_return_chapters_for_manga" }) do

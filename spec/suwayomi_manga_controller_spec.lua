@@ -199,10 +199,18 @@ local function installController(options)
         messages = state.messages,
         opened_chapters = {},
         enqueued = {},
+        max_batch_queue_chapters = 50,
     }
     for name, method in pairs(controller.methods) do
         plugin[name] = method
     end
+    package.loaded["suwayomi/chapters/actions"] = nil
+    local actions = require("suwayomi/chapters/actions").methods
+    plugin.captureChapterDownloadBatch = actions.captureChapterDownloadBatch
+    plugin.confirmChapterDownloadBatch = actions.confirmChapterDownloadBatch
+    local queue = require("suwayomi/downloads/queue"):new{}
+    function plugin:getDownloadQueue() return queue end
+    function plugin:loadMangaScanlatorFilter() return nil end
     function plugin:showMessage(message)
         table.insert(self.messages, message)
     end
@@ -363,7 +371,7 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("Bulk downloads", state.manga_actions_options.title)
         assert.are.equal("Download first unread", state.manga_actions_options.actions[1].text)
         assert.are.equal("Download next 5", state.manga_actions_options.actions[2].text)
-        assert.are.equal("Download all chapters", state.manga_actions_options.actions[6].text)
+        assert.are.equal("Download all chapters (up to 50 new)", state.manga_actions_options.actions[6].text)
         assert.is_function(state.manga_actions_options.on_back)
 
         plugin:showKeepDownloadedMangaActions(manga)
@@ -1086,7 +1094,8 @@ describe("suwayomi/manga/controller", function()
 
         assert.is_true(plugin:confirmDownloadAllUnreadChaptersForManga(manga))
 
-        assert.are.equal("tx:Queue downloads for all 2 unread chapters?", state.bulk_confirmation.text)
+        assert.is_truthy(state.bulk_confirmation.text:find("tx:Queue up to 2 new chapter downloads?", 1, true))
+        assert.is_truthy(state.bulk_confirmation.text:find("tx:Download all unread (up to 50 new)", 1, true))
         assert.are.equal("tx:Queue", state.bulk_confirmation.ok_text)
     end)
 

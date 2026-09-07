@@ -1,6 +1,6 @@
 -- Boundary: public device-local download queue facade.
 --
--- Responsibility: enqueue, retry, cancel, recover, snapshot, and format status
+-- Responsibility: shared eligibility, checked enqueue results, retry, cancel, recovery, snapshots, and status
 -- while delegating persistence and active worker lifecycle to focused modules.
 -- Owned state: pending queue items, chapter status map, active lifecycle
 -- controller, and settings-backed job store.
@@ -643,6 +643,7 @@ function DownloadQueue:cleanupInterruptedProgress(job)
 end
 
 function DownloadQueue:prepareFailedRetry(job)
+    if self:getActiveJob(self:getKey(job.manga, job.chapter)) then return false end
     local partial_cleanup_attempted = self:cleanupInterruptedDownload(job)
     local progress_cleanup_attempted = self:cleanupInterruptedProgress(job)
     self:logDebug({
@@ -785,26 +786,38 @@ function DownloadQueue:recover()
     return true
 end
 
+function DownloadQueue:canEnqueue(manga, chapter, download_directory)
+    local status = self:getStatus(manga, chapter)
+    if self:getActiveJob(self:getKey(manga, chapter)) then
+        return false, "downloading"
+    end
+    if status and (status.state == "queued" or status.state == "downloading"
+        or status.state == "running" or status.state == "stopping" or status.state == "finalizing") then
+        return false, status.state
+    end
+    -- Terminal status can outlive its archive or configured download directory.
+    if self:getExistingArchivePath({ manga = manga, chapter = chapter, download_directory = download_directory }) then
+        return false, "downloaded"
+    end
+    return true
+end
+
 function DownloadQueue:enqueue(manga, chapter, download_directory, options)
     if not self:checkStoreFence() then
         self:notifyDownloadFailure(I18n.t("Cannot enqueue download: storage is ambiguous"))
         return false, "store_blocked"
     end
     options = options or {}
-    local status = self:getStatus(manga, chapter)
-    if status and (status.state == "queued" or status.state == "downloading") then
+    local eligible, state = self:canEnqueue(manga, chapter, download_directory)
+    if not eligible then
         if not options.quiet_duplicate then
             self.onMessage(I18n.t("Chapter download is already in progress."))
         end
-        return false, status.state
+        return false, state
     end
+    local status = self:getStatus(manga, chapter)
     local enqueue_state = "queued"
     if status and status.state == "failed" then
-        self:prepareFailedRetry({
-            download_directory = download_directory,
-            manga = manga,
-            chapter = chapter,
-        })
         enqueue_state = "retry"
     end
 
@@ -814,6 +827,7 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
         self:notifyDownloadFailure(err or "Failed to persist queued download")
         return false, err or "save_failed"
     end
+    if enqueue_state == "retry" then self:prepareFailedRetry(persistent_job) end
 
     table.insert(self.items, {
         key = persistent_job.key,
@@ -830,10 +844,19 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
     return true, enqueue_state
 end
 
+local function batchOutcome(attempted, skipped, err)
+    local uncertain = type(err) == "string" and err:match("^ambiguous_post_replacement")
+    return {
+        skipped = skipped,
+        failed = err and not uncertain and attempted or 0,
+        unconfirmed = uncertain and attempted or 0,
+    }
+end
+
 function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options)
     if not self:checkStoreFence() then
         self:notifyDownloadFailure(I18n.t("Cannot enqueue downloads: storage is ambiguous"))
-        return 0, "store_blocked"
+        return 0, "store_blocked", batchOutcome(#(chapters or {}), 0, "store_blocked")
     end
     local started_at = os.time()
     local ok_socket, socket = pcall(require, "socket")
@@ -844,26 +867,22 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
     local persistent_jobs = {}
     local candidates = {}
     local queued_count = 0
+    local seen = {}
 
     for _index, chapter in ipairs(chapters or {}) do
+        local key = self:getKey(manga, chapter)
         local status = self:getStatus(manga, chapter)
-        if status and (status.state == "queued" or status.state == "downloading") then
+        if seen[key] or not self:canEnqueue(manga, chapter, download_directory) then
             if not options.quiet_duplicate then
                 self.onMessage(I18n.t("Chapter download is already in progress."))
             end
         else
-            if status and status.state == "failed" then
-                self:prepareFailedRetry({
-                    download_directory = download_directory,
-                    manga = manga,
-                    chapter = chapter,
-                })
-            end
-
+            seen[key] = true
             local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued")
             table.insert(persistent_jobs, persistent_job)
             table.insert(candidates, {
                 persistent_job = persistent_job,
+                retry = status and status.state == "failed",
                 item = {
                     key = persistent_job.key,
                     download_directory = download_directory,
@@ -877,16 +896,18 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
     end
 
     if queued_count == 0 then
-        return 0
+        return 0, nil, batchOutcome(0, #(chapters or {}))
     end
 
     local ok, err = self:upsertPersistentJobs(persistent_jobs)
     if not ok then
         self:notifyDownloadFailure(err or "Failed to persist queued batch")
-        return 0, err or "save_failed"
+        err = err or "save_failed"
+        return 0, err, batchOutcome(queued_count, #(chapters or {}) - queued_count, err)
     end
 
     for _, candidate in ipairs(candidates) do
+        if candidate.retry then self:prepareFailedRetry(candidate.persistent_job) end
         self.statuses[candidate.persistent_job.key] = { state = "queued" }
         table.insert(self.items, candidate.item)
     end
@@ -907,7 +928,7 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
         queued_count = queued_count,
         elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
     })
-    return queued_count
+    return queued_count, nil, batchOutcome(queued_count, #(chapters or {}) - queued_count)
 end
 
 function DownloadQueue:getCredentialsForJob()

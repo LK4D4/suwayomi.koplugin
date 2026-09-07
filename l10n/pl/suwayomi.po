@@ -45,8 +45,20 @@ msgstr[2] ""
 msgid "%1 active, %2 queued, %3 failed"
 msgstr ""
 
+msgid "%1 already downloaded or in the download queue."
+msgid_plural "%1 already downloaded or in the download queue."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
 msgid "%1 chapter"
 msgid_plural "%1 chapters"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "%1 eligible chapter left outside this batch."
+msgid_plural "%1 eligible chapters left outside this batch."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
@@ -241,6 +253,9 @@ msgstr ""
 msgid "Chapter downloads"
 msgstr ""
 
+msgid "Chapter view changed. Run this download action again."
+msgstr ""
+
 msgid "Chapters"
 msgstr ""
 
@@ -292,6 +307,12 @@ msgstr ""
 
 msgid "Could not clear failed downloads: %1"
 msgstr ""
+
+msgid "Could not confirm %1 chapter download."
+msgid_plural "Could not confirm %1 chapter downloads."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Could not connect to Suwayomi."
 msgstr ""
@@ -451,10 +472,10 @@ msgstr ""
 msgid "Download ahead"
 msgstr ""
 
-msgid "Download all chapters"
+msgid "Download all chapters (up to 50 new)"
 msgstr ""
 
-msgid "Download all unread"
+msgid "Download all unread (up to 50 new)"
 msgstr ""
 
 msgid "Download directory: %1"
@@ -484,6 +505,9 @@ msgstr ""
 msgid "Download is no longer queued."
 msgstr ""
 
+msgid "Download next %1 (up to 50 new)"
+msgstr ""
+
 msgid "Download next 10"
 msgstr ""
 
@@ -494,6 +518,9 @@ msgid "Download next 50"
 msgstr ""
 
 msgid "Download selected"
+msgstr ""
+
+msgid "Download selected (up to 50 new)"
 msgstr ""
 
 msgid "Download the chapter first."
@@ -590,6 +617,12 @@ msgstr ""
 
 msgid "Failed to delete %1 download."
 msgid_plural "Failed to delete %1 downloads."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Failed to queue %1 chapter download."
+msgid_plural "Failed to queue %1 chapter downloads."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
@@ -715,6 +748,9 @@ msgstr ""
 msgid "Login information"
 msgstr ""
 
+msgid "Manga"
+msgstr ""
+
 msgid "Manga actions"
 msgstr ""
 
@@ -751,6 +787,9 @@ msgstr ""
 msgid "No actions available"
 msgstr ""
 
+msgid "No chapters available to download."
+msgstr ""
+
 msgid ""
 "No chapters match the saved scanlator filter. Choose another scanlator or "
 "All scanlators."
@@ -763,6 +802,9 @@ msgid "No description available."
 msgstr ""
 
 msgid "No downloads queued."
+msgstr ""
+
+msgid "No eligible chapters match the saved scanlator filter."
 msgstr ""
 
 msgid "No error details were recorded."
@@ -778,6 +820,11 @@ msgid "No manga match this search."
 msgstr ""
 
 msgid "No matching extensions"
+msgstr ""
+
+msgid ""
+"No new downloads available: chapters are already downloaded or in the "
+"download queue."
 msgstr ""
 
 msgid "No new downloads queued."
@@ -819,6 +866,11 @@ msgid "On hiatus"
 msgstr ""
 
 msgid "Ongoing"
+msgstr ""
+
+msgid ""
+"Only this batch will be queued. If availability changes, fewer downloads may "
+"be added. Run another action for more."
 msgstr ""
 
 msgctxt "chapter action"
@@ -870,20 +922,8 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
-msgid "Queue %1 unread chapter download?"
-msgid_plural "Queue %1 unread chapter downloads?"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
-msgid "Queue downloads for all %1 chapter?"
-msgid_plural "Queue downloads for all %1 chapters?"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
-msgid "Queue downloads for all %1 unread chapter?"
-msgid_plural "Queue downloads for all %1 unread chapters?"
+msgid "Queue up to %1 new chapter download?"
+msgid_plural "Queue up to %1 new chapter downloads?"
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
@@ -891,14 +931,17 @@ msgstr[2] ""
 msgid "Queued"
 msgstr ""
 
+msgid "Queued %1 chapter download."
+msgid_plural "Queued %1 chapter downloads."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
 msgid "Queued %1 selected chapter download."
 msgid_plural "Queued %1 selected chapter downloads."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
-
-msgid "Queued first %1 downloads. Refine the chapter selection to queue more."
-msgstr ""
 
 msgid "Read"
 msgstr ""
@@ -978,6 +1021,9 @@ msgstr ""
 msgid "Scanlator filter"
 msgstr ""
 
+msgid "Scanlator: %1"
+msgstr ""
+
 msgctxt "extension action"
 msgid "Search"
 msgstr ""
@@ -1049,6 +1095,12 @@ msgstr[2] ""
 
 msgid "Skipped %1 chapter not downloaded."
 msgid_plural "Skipped %1 chapters not downloaded."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Skipped %1 chapter."
+msgid_plural "Skipped %1 chapters."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""

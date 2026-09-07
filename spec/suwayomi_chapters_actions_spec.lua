@@ -257,6 +257,15 @@ describe("suwayomi/chapters/actions", function()
         return plugin, queue
     end
 
+    local function install_bulk_admission(plugin)
+        plugin.max_batch_queue_chapters = 50
+        plugin.queue = require("suwayomi/downloads/queue"):new{ downloader = downloader }
+        local context = require("suwayomi/chapters/context").methods
+        for _, name in ipairs({ "loadMangaScanlatorFilter", "getChapterScanlator" }) do
+            plugin[name] = context[name]
+        end
+    end
+
     before_each(function()
         original_os_remove = os.remove
     end)
@@ -1116,6 +1125,7 @@ describe("suwayomi/chapters/actions", function()
             },
         })
         plugin.current_scanlator_filter = "Team A"
+        install_bulk_admission(plugin)
         function plugin:getDownloadDirectoryOrChoose()
             return "/downloads"
         end
@@ -1140,7 +1150,8 @@ describe("suwayomi/chapters/actions", function()
         assert.is_true(plugin:confirmNextUnreadChapterDownloads(2))
         plugin.confirmation.callback()
 
-        assert.are.same({ team_a }, plugin.enqueued.chapters)
+        assert.are.equal(1, #plugin.enqueued.chapters)
+        assert.are.equal(team_a.id, plugin.enqueued.chapters[1].id)
     end)
 
     it("translates next unread chapter bulk confirmations", function()
@@ -1172,9 +1183,11 @@ describe("suwayomi/chapters/actions", function()
             return true
         end
 
+        install_bulk_admission(plugin)
         plugin:confirmNextUnreadChapterDownloads(2)
 
-        assert.are.equal("tx:Queue 2 unread chapter downloads?", plugin.confirmation.text)
+        assert.is_truthy(plugin.confirmation.text:find("tx:Queue up to 2 new chapter downloads?", 1, true))
+        assert.is_truthy(plugin.confirmation.text:find("tx:Download next 2 (up to 50 new)", 1, true))
         assert.are.equal("tx:Queue", plugin.confirmation.ok_text)
     end)
 
