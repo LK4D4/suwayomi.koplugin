@@ -18,6 +18,16 @@ describe("suwayomi plugin", function()
         return plugin_class(instance or {})
     end
 
+    it("retires chapter requests on host CloseWidget without consuming the host event", function()
+        local plugin = build_plugin()
+        local canceled = false
+        plugin.cancelReaderReturnRequest = function() canceled = true end
+        assert.is_nil(plugin:onCloseWidget())
+        assert.is_true(plugin.suwayomi_host_retired)
+        assert.is_true(canceled)
+        assert.is_false(plugin:showChaptersForManga({ id = "17" }))
+    end)
+
     it("registers a file-manager dispatcher action and main-menu entry on init", function()
         local plugin = build_plugin({
             ui = {

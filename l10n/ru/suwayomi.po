@@ -758,6 +758,11 @@ msgstr "Следующая попытка: %1"
 msgid "No actions available"
 msgstr "Нет доступных действий"
 
+msgid ""
+"No chapters match the saved scanlator filter. Choose another scanlator or "
+"All scanlators."
+msgstr ""
+
 msgid "No chapters selected."
 msgstr "Главы не выбраны."
 

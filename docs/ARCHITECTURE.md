@@ -35,7 +35,7 @@ Core plugin shell:
 
 - `main.lua`: KOReader lifecycle, dependency construction, action/menu registration, queue recovery, and controller method installation.
 - `suwayomi/navigation.lua`: route-aware stack for Suwayomi-owned KOReader widgets.
-- `suwayomi/reader_return.lua`: reader-menu shortcut state and async chapter reload for returning from an opened CBZ to the originating Suwayomi chapter list.
+- `suwayomi/reader_return.lua`: reader-menu shortcut state and async chapter reload for returning from an opened CBZ to the originating Suwayomi chapter list. It validates the reader request/context immediately before intentional teardown, consumes the accepted result, and publishes through the live `FileManager.instance.suwayomi` plugin after FileManager initialization. It never publishes through the retired reader plugin.
 - `suwayomi/plugin/home.lua`: Suwayomi hub and main-menu entry behavior.
 - `suwayomi/plugin/title_menu.lua`: shared title-bar burger menus for full-screen plugin screens, including the universal Suwayomi home action.
 - `suwayomi/plugin/settings_controller.lua`: grouped Settings menus, setup wizard orchestration, connection-test state, and settings action routing.
@@ -44,7 +44,7 @@ Core plugin shell:
 API:
 
 - `suwayomi/api/queries.lua`: GraphQL query and mutation payload builders.
-- `suwayomi/api/parsers.lua`: defensive parsing and normalization of Suwayomi responses. The stored chapter page parser retains validated `chapters`, `total_count`, and `has_next_page` for complete-load validation in the API facade.
+- `suwayomi/api/parsers.lua`: defensive parsing and normalization of Suwayomi responses. Shared chapter validation rejects malformed identities/order and duplicate IDs. Source-fetch/refresh lists are sorted by source order then numeric ID; stored pages retain server order so API validation can detect backward pages. The stored chapter page parser retains validated `chapters`, `total_count`, and `has_next_page` for complete-load validation in the API facade.
 - `suwayomi/api/transport.lua`: basic auth, endpoint construction, GraphQL requests, archive downloads, binary page fetches, and bounded response sinks for bad-network protection.
 - `suwayomi/api.lua`: facade that composes the submodules and owns API debug logging. `queryChaptersForManga` retrieves sequential stored pages of 200 using actual received offsets and ascending source-order/numeric-ID order. It rejects changing totals, duplicates, backward order, and contradictory continuation before returning one complete result. `fetchChaptersForManga` uses source fallback only after verified stored-empty success. Both accept an optional `max_result_bytes` budget; stored accumulation defaults to 4 MiB and counts encoded chapter bytes incrementally. Completeness assumes a stable server dataset: detected count/order/identity changes fail, while offset pagination cannot detect every same-count concurrent edit or establish an atomic snapshot.
 
@@ -88,6 +88,10 @@ Downloads:
 - `suwayomi/downloads/downloader.lua`: one-chapter download, page validation, ordered CBZ writing, `.part` cleanup, and final rename. The optional archive export falls back to device-local page downloading on HTTP 400 (no server download) or HTTP 404; transient failures retry, while authentication and filesystem failures remain failures.
 
 Chapters and read state:
+
+Chapter menu loads and action preloads supersede each other on a plugin instance. Manga identity, prior context, request tokens, cancellation, and timeout guard publication; `main.lua:onCloseWidget` permanently retires that host's chapter requests without consuming KOReader's close event. Loading-message dismissal cancels its network request, while programmatic completion disarms the dismissal callback. Complete empty results replace old context/menu/selection; failed reloads retain the previous complete view without executing the failed action. Context guards also invalidate captured confirmations and directory continuations. Admission rejects chapter IDs absent from the current filtered context.
+
+The saved scanlator restriction remains exact even when absent from the complete list, with an explanation and no matching candidates. Read-ledger merging retains pending local read/unread precedence; merge, upsert, and settings normalization preserve unrelated entry fields, including on pathless entries whose pending unread choice is acknowledged.
 
 - `suwayomi/chapters/context.lua`: current manga/chapter context and visible chapter filtering state; remote chapter loading is owned by async manga request helpers. Plugin-authored title fallbacks, selected-count titles, scanlator menu chrome, and queue summaries route through `suwayomi/i18n.lua`; manga titles and scanlator values remain external data.
 - `suwayomi/chapters/menu.lua`: chapter menu construction, updates, selection mode, and menu refresh behavior. Plugin-authored action labels, bulk-menu titles, and scanlator menu chrome route through `suwayomi/i18n.lua`; chapter names remain external data.
@@ -169,7 +173,7 @@ Coverage is organized around runtime boundaries:
 
 - `spec/main_spec.lua` focuses on KOReader lifecycle: dispatcher/menu registration, lazy dependency construction, queue recovery, debug logger setup, and controller method installation.
 - API specs cover the facade plus query/parser/transport submodules without live Suwayomi calls.
-- `spec/complete_chapter_loading_spec.lua` composes real query/parser/API, asynchronous worker result files, manga/chapter controllers, chapter menu data, read-ledger reconciliation, and queue persistence. External HTTP and host scheduling are controlled; assertions couple visible count/order, committed read state, candidate/admitted IDs, and failure preservation across long-series pagination and byte limits.
+- `spec/complete_chapter_loading_spec.lua` composes real query/parser/API, asynchronous worker result files, manga/chapter controllers, chapter menu data, read-ledger reconciliation, and queue persistence. External HTTP and host scheduling are controlled; assertions couple visible count/order, committed read state, candidate/admitted IDs, and failure preservation across long-series pagination and byte limits. Reopen/source/refresh parity, exact filters, empty replacement, stale callbacks, and reader-to-FileManager handoff use the same composed seam. The ledger preservation case writes and reopens a real temporary settings file. Device long-series comparison remains pending under #31.
 - Client specs are split by flow: `spec/suwayomi_client_source_manga_spec.lua`, `spec/suwayomi_client_global_search_spec.lua`, `spec/suwayomi_client_library_spec.lua`, and the small facade-focused `spec/suwayomi_client_spec.lua`.
 - UI specs cover menu table construction and KOReader dialog/menu helper behavior with stubbed widgets.
 - I18n specs stub KOReader `gettext` and `ffi/util.template` directly. Module specs that assert visible built-in labels should clear `suwayomi/i18n` from `package.loaded` before requiring the module under test so each spec controls the active gettext stub. Worker specs should prefer structured message/error IDs for plugin-authored text and reserve raw strings for server/API data.

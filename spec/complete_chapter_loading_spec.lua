@@ -5,7 +5,9 @@ package.path = "?.lua;" .. package.path
 describe("complete stored chapter loading", function()
     local json = require("dkjson")
     local plugin, manga, queue, messages, scheduled, workers, requests
-    local saved_ledger, saved_jobs, respond, settings
+    local saved_ledger, saved_jobs, respond, settings, saved_filter, ledger_path, confirmation
+    local subprocess_done, loading, fake_time, original_time
+    local directory_callback, download_directory
     local modules = {
         "gettext", "ffi/util", "ffi/archiver", "ui/uimanager", "ssl.https",
         "socket.http", "suwayomi/api", "suwayomi/api/queries", "suwayomi/api/parsers",
@@ -19,6 +21,10 @@ describe("complete stored chapter loading", function()
         "suwayomi/downloads/job_store", "suwayomi/downloads/status_formatter",
         "suwayomi/downloads/downloader", "suwayomi/downloads/progress_file",
         "suwayomi/paths", "suwayomi/downloads/controller",
+        "datastorage", "luasettings", "suwayomi/settings/store", "suwayomi/source_filters",
+        "suwayomi/downloads/directory", "suwayomi/reader_return",
+        "apps/reader/readerui", "apps/filemanager/filemanager",
+        "suwayomi/plugin/home", "ui/widget/infomessage",
     }
 
     local function clearModules()
@@ -56,14 +62,15 @@ describe("complete stored chapter loading", function()
         return ids
     end
 
-    local function finishRequest()
-        local run = table.remove(workers, 1)
+    local function finishRequest(index, token)
+        index = index or 1
+        local run = table.remove(workers, index)
         assert.is_function(run)
         run()
-        local active = plugin.active_manga_network_requests.chapter_context
+        local active = token or plugin.active_manga_network_requests.chapter_context
             or plugin.active_manga_network_requests.chapter_menu
         local result = require("suwayomi/network/request_worker"):readResult(active.active.result_path)
-        local poll = table.remove(scheduled, 1)
+        local poll = table.remove(scheduled, index)
         assert.is_function(poll)
         poll()
         return result
@@ -73,6 +80,12 @@ describe("complete stored chapter loading", function()
         clearModules()
         messages, scheduled, workers, requests = {}, {}, {}, {}
         saved_ledger, saved_jobs = "{}", "[]"
+        saved_filter = nil
+        confirmation = nil
+        directory_callback, download_directory = nil, "./nonexistent-test-library"
+        subprocess_done, fake_time = true, 100
+        original_time = os.time
+        os.time = function() return fake_time end
         manga = { id = "17", title = "Example manga", initialized = true }
         settings = {
             load = function() return { server_url = "https://suwayomi.example" } end,
@@ -81,9 +94,11 @@ describe("complete stored chapter loading", function()
             saveChapterLedger = function(_, value) saved_ledger = json.encode(value); return value end,
             loadDownloadQueue = function() return json.decode(saved_jobs) end,
             saveDownloadQueue = function(_, value) saved_jobs = json.encode(value); return true end,
-            loadDownloadDirectory = function() return "./nonexistent-test-library" end,
+            loadDownloadDirectory = function() return download_directory end,
+            saveDownloadDirectory = function(_, path) download_directory = path; return path end,
             normalizeMangaKeepNextUnreadDownloads = function(_, limit) return limit end,
             saveMangaKeepNextUnreadDownloads = function(_, _, limit) return limit end,
+            loadMangaScanlatorFilter = function() return saved_filter end,
         }
         package.preload["suwayomi/settings"] = function() return settings end
         package.preload.gettext = function() return function(value) return value end end
@@ -91,14 +106,20 @@ describe("complete stored chapter loading", function()
         local host = {
             joinPath = function(...) return table.concat({ ... }, "/") end,
             runInSubProcess = function(run) workers[#workers + 1] = run; return #workers end,
-            isSubProcessDone = function() return true end,
+            isSubProcessDone = function() return subprocess_done end,
             terminateSubProcess = function() end,
         }
-        local ui = { scheduleIn = function(_, _, callback) scheduled[#scheduled + 1] = callback end }
+        local ui = { scheduleIn = function(_, _, callback) scheduled[#scheduled + 1] = callback end,
+            nextTick = function(_, callback) scheduled[#scheduled + 1] = callback end,
+            show = function(_, widget) loading = widget end,
+            close = function(_, widget) if widget.dismiss_callback then widget.dismiss_callback() end end }
         package.preload["ffi/util"] = function() return host end
         package.preload["ui/uimanager"] = function() return ui end
+        package.preload["ui/widget/infomessage"] = function() return { new = function(_, options) return options end } end
         package.preload["suwayomi/ui"] = function()
-            return { showChapterMenu = function(options) return options end }
+            return { showChapterMenu = function(options) return options end,
+                showConfirm = function(options) confirmation = options.ok_callback; return true end,
+                showDirectoryChooser = function(callback) directory_callback = callback end }
         end
         package.preload["ssl.https"] = function()
             return { request = function(options)
@@ -119,20 +140,21 @@ describe("complete stored chapter loading", function()
         plugin = { max_batch_queue_chapters = 50 }
         for _, module in ipairs({ "suwayomi/manga/controller", "suwayomi/chapters/context",
             "suwayomi/chapters/menu", "suwayomi/chapters/actions", "suwayomi/readsync/ledger",
-            "suwayomi/downloads/controller" }) do
+            "suwayomi/downloads/controller", "suwayomi/downloads/directory" }) do
             for name, method in pairs(require(module).methods) do plugin[name] = method end
         end
         function plugin:getDownloadQueue() return queue end
         function plugin:showMessage(message) messages[#messages + 1] = message end
-        function plugin:showLoadingMessage(message) return { text = message } end
-        function plugin:closeLoadingMessage() end
+        plugin.showLoadingMessage = require("suwayomi/plugin/home").methods.showLoadingMessage
+        plugin.closeLoadingMessage = require("suwayomi/plugin/home").methods.closeLoadingMessage
         function plugin:loadKoreaderHistoryPaths() return {} end
-        function plugin:getDownloadDirectoryOrChoose() return settings:loadDownloadDirectory() end
         function plugin:withChapterMenuRefreshSuppressed(callback) return callback() end
     end)
 
     after_each(function()
         if plugin then plugin:cancelMangaNetworkRequests() end
+        os.time = original_time
+        if ledger_path then os.remove(ledger_path); ledger_path = nil end
         os.remove("./suwayomi_manga_request_1.json")
         os.remove("./suwayomi_manga_request_1.json.tmp")
         clearModules()
@@ -183,6 +205,366 @@ describe("complete stored chapter loading", function()
         assert.matches("Later page failed", messages[#messages])
         assert.are.equal(3, #requests)
     end)
+
+    for _, route in ipairs({ "reopen", "fallback", "initial", "refresh" }) do
+        it("shares complete numeric tie order and selection through " .. route, function()
+            local chapters = nodes(1, 205)
+            chapters[201].sourceOrder = 200
+            chapters[201].id = 999
+            chapters[202].sourceOrder = 200
+            chapters[202].id = 1000
+            respond = function(request)
+                if request.query:find("GET_CHAPTERS_MANGA", 1, true) then
+                    if route == "fallback" then return page({}, 0, false) end
+                    local offset, selected = request.variables.offset, {}
+                    for index = offset + 1, math.min(offset + 200, #chapters) do
+                        selected[#selected + 1] = chapters[index]
+                    end
+                    return page(selected, #chapters, offset + #selected < #chapters)
+                end
+                local reversed = {}
+                for index = #chapters, 1, -1 do reversed[#reversed + 1] = chapters[index] end
+                return { data = { fetchManga = { manga = { id = 17, title = "Example manga" } },
+                    fetchChapters = { chapters = reversed } } }
+            end
+            if route == "initial" then manga.initialized = false end
+            if route == "refresh" then plugin:refreshMangaChapters(manga)
+            else plugin:showChaptersForManga(manga) end
+            finishRequest()
+            assert.are.equal(205, #plugin.current_chapter_menu.chapters)
+            assert.are.equal("1", plugin.current_chapter_menu.chapters[1].id)
+            assert.are.equal("999", plugin:getFirstUnreadChapterForManga(manga).id)
+            assert.are.equal(200, #plugin:getChaptersBefore(plugin.current_chapter_context.chapters[201]))
+            assert.are.same({ "999", "1000", "203", "204", "205" },
+                chapterIds(plugin:getUnreadDownloadBufferCandidates(manga, 5)))
+            plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
+            assert.are.same({ "999", "1000", "203", "204", "205" }, admittedIds())
+            assert.is_true(json.decode(saved_ledger)["17:200"].read)
+            assert.are.same({}, messages)
+        end)
+    end
+
+    for _, filter in ipairs({ "Late group", "Absent group" }) do
+        it("keeps exact saved " .. filter .. " across complete reopen and refresh", function()
+            saved_filter = filter
+            respond = function(request)
+                local chapters = nodes(1, 205)
+                for index, chapter in ipairs(chapters) do
+                    chapter.scanlator = index >= 201 and "Late group" or "Other group"
+                end
+                if request.query:find("GET_CHAPTERS_MANGA", 1, true) then
+                    local offset, selected = request.variables.offset, {}
+                    for index = offset + 1, math.min(offset + 200, 205) do selected[#selected + 1] = chapters[index] end
+                    return page(selected, 205, offset + #selected < 205)
+                end
+                return { data = { fetchManga = { manga = { id = 17 } }, fetchChapters = { chapters = chapters } } }
+            end
+            local expected = filter == "Late group" and { "201", "202", "203", "204", "205" } or {}
+            for _, refresh in ipairs({ false, true }) do
+                if refresh then plugin:refreshMangaChapters(manga) else plugin:showChaptersForManga(manga) end
+                finishRequest()
+                assert.are.equal(filter, plugin.current_scanlator_filter)
+                assert.are.same(expected, chapterIds(plugin.current_chapter_menu.chapters))
+                assert.are.same(expected, chapterIds(plugin:getUnreadDownloadBufferCandidates(manga, 5)))
+                assert.are.same(expected, chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
+                assert.is_true(json.decode(saved_ledger)["17:200"].read)
+            end
+            if filter == "Absent group" then
+                assert.matches("No chapters match the saved scanlator filter", messages[#messages])
+            end
+            plugin:keepNextUnreadChaptersForManga(manga, 5)
+            assert.are.same(expected, admittedIds())
+        end)
+    end
+
+    it("preserves pending choices and unrelated ledger fields through persisted reopen and refresh", function()
+        ledger_path = os.tmpname()
+        os.remove(ledger_path)
+        package.preload.datastorage = function() return { getSettingsDir = function() return "." end } end
+        package.preload.luasettings = function() return {} end
+        local real_settings = dofile("suwayomi/settings.lua")
+        real_settings:setStore(require("suwayomi/settings/store"):new({ path = ledger_path }))
+        local entries = {}
+        for _, id in ipairs({ 199, 200, 201, 202 }) do
+            entries["17:" .. id] = { manga_id = "17", chapter_id = tostring(id),
+                read = id == 201 or id == 202, pending_read_sync = id ~= 202,
+                pending_read_state = id == 201 and true or false,
+                archive_generation = { id = "generation-" .. id }, manual_intent = { revision = id } }
+        end
+        assert.is_table(real_settings:saveChapterLedger(entries))
+        settings.loadChapterLedger = function() return real_settings:loadChapterLedger() end
+        settings.saveChapterLedger = function(_, value) return real_settings:saveChapterLedger(value) end
+        respond = function(request)
+            local chapters = nodes(1, 205)
+            chapters[200].isRead = false -- Acknowledges pending local unread without dropping pathless extras.
+            if request.query:find("GET_CHAPTERS_MANGA", 1, true) then
+                local offset, selected = request.variables.offset, {}
+                for index = offset + 1, math.min(offset + 200, 205) do selected[#selected + 1] = chapters[index] end
+                return page(selected, 205, offset + #selected < 205)
+            end
+            return { data = { fetchManga = { manga = { id = 17 } }, fetchChapters = { chapters = chapters } } }
+        end
+        for _, refresh in ipairs({ false, true }) do
+            if refresh then plugin:refreshMangaChapters(manga) else plugin:showChaptersForManga(manga) end
+            finishRequest()
+            assert.are.equal(205, #plugin.current_chapter_menu.chapters)
+            assert.are.same({ "199", "200", "202", "203", "204" },
+                chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
+            -- Reopen the serialized store to verify normalization and actual persistence together.
+            real_settings:setStore(require("suwayomi/settings/store"):new({ path = ledger_path }))
+            local persisted = real_settings:loadChapterLedger()
+            for _, id in ipairs({ 199, 200, 201, 202 }) do
+                assert.are.same({ id = "generation-" .. id }, persisted["17:" .. id].archive_generation)
+                assert.are.same({ revision = id }, persisted["17:" .. id].manual_intent)
+            end
+            assert.is_false(persisted["17:199"].read)
+            assert.is_true(persisted["17:199"].pending_read_sync)
+            assert.is_nil(persisted["17:200"].pending_read_sync)
+            assert.is_true(persisted["17:201"].read)
+            assert.is_true(persisted["17:201"].pending_read_sync)
+            assert.is_false(persisted["17:202"].read)
+        end
+        plugin:upsertChapterLedgerEntry(manga, { id = "202", name = "Chapter 202" }, { path = "example.cbz" })
+        assert.are.same({ revision = 202 }, real_settings:loadChapterLedger()["17:202"].manual_intent)
+        plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
+        assert.are.same({ "199", "200", "202", "203", "204" }, admittedIds())
+        assert.are.same({}, messages)
+    end)
+
+    for _, route in ipairs({ "reopen", "refresh", "action" }) do
+        it("replaces a prior nonempty view with verified empty through " .. route, function()
+            respond = function() return page(nodes(201, 205), 5, false) end
+            plugin:showChaptersForManga(manga)
+            finishRequest()
+            plugin:selectAllChapters()
+            plugin:downloadNextUnreadChaptersForManga(manga, 5, true)
+            assert.is_function(confirmation)
+            local old_chapter = plugin.current_chapter_context.chapters[1]
+            respond = function(request)
+                if request.query:find("GET_CHAPTERS_MANGA", 1, true) then return page({}, 0, false) end
+                return { data = { fetchManga = { manga = { id = 17 } }, fetchChapters = { chapters = {} } } }
+            end
+            if route == "refresh" then plugin:refreshMangaChapters(manga)
+            elseif route == "action" then
+                plugin:startLoadMangaChapterContext(manga, function()
+                    plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
+                end)
+            else plugin:showChaptersForManga(manga) end
+            finishRequest()
+            assert.are.same({}, plugin.current_chapter_context.chapters)
+            assert.are.same({}, plugin.current_chapter_menu.chapters)
+            assert.are.equal(0, plugin:getSelectedChapterCount())
+            assert.are.equal("This manga has no chapters.", messages[#messages])
+            confirmation()
+            plugin:enqueueChapterDownload(manga, old_chapter)
+            plugin:toggleChapterSelection(manga, old_chapter)
+            assert.are.equal(0, plugin:getSelectedChapterCount())
+            plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
+            assert.are.same({}, admittedIds())
+            assert.are.equal("{}", saved_ledger)
+            assert.are.equal(0, #workers)
+        end)
+    end
+
+    for _, different_manga in ipairs({ false, true }) do
+        it("ignores old action completion after newer menu success, different manga " .. tostring(different_manga), function()
+            respond = function() return page(nodes(1, 1), 1, false) end
+            plugin:showChaptersForManga(manga)
+            finishRequest()
+            plugin:startLoadMangaChapterContext(manga, function()
+                plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
+            end)
+            local older = plugin.active_manga_network_requests.chapter_context
+            local target = different_manga and { id = "18", title = "Other manga" } or manga
+            plugin:showChaptersForManga(target)
+            respond = function() return page(nodes(301, 301), 1, false) end
+            finishRequest(2)
+            local context, menu, ledger = plugin.current_chapter_context, plugin.current_chapter_menu, saved_ledger
+            respond = function() return page(nodes(201, 205), 5, false) end
+            finishRequest(1, older)
+            assert.are.equal(context, plugin.current_chapter_context)
+            assert.are.equal(menu, plugin.current_chapter_menu)
+            assert.are.same({ "301" }, chapterIds(plugin.current_chapter_menu.chapters))
+            assert.are.equal(ledger, saved_ledger)
+            assert.are.same({}, admittedIds())
+            assert.are.same({}, messages)
+        end)
+    end
+
+    for _, invalidation in ipairs({ "cancel", "timeout", "manga identity", "retired host" }) do
+        it("preserves prior view without action after " .. invalidation, function()
+            respond = function() return page(nodes(1, 1), 1, false) end
+            plugin:showChaptersForManga(manga)
+            finishRequest()
+            local context, menu, ledger = plugin.current_chapter_context, plugin.current_chapter_menu, saved_ledger
+            plugin:startLoadMangaChapterContext(manga, function()
+                plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
+            end)
+            local token = plugin.active_manga_network_requests.chapter_context
+            if invalidation == "cancel" then
+                assert.is_function(loading.dismiss_callback)
+                loading.dismiss_callback()
+            elseif invalidation == "timeout" then
+                subprocess_done, fake_time = false, 200
+                table.remove(scheduled, 1)()
+                subprocess_done = true
+            elseif invalidation == "manga identity" then manga.id = "18"
+            else plugin:retireChapterHost() end
+            respond = function() return page(nodes(201, 205), 5, false) end
+            finishRequest(1, token)
+            assert.are.equal(context, plugin.current_chapter_context)
+            assert.are.equal(menu, plugin.current_chapter_menu)
+            assert.are.equal(ledger, saved_ledger)
+            assert.are.same({ "1" }, chapterIds(plugin.current_chapter_menu.chapters))
+            assert.are.same({}, admittedIds())
+            if invalidation == "timeout" then assert.are.same({ "Could not load chapters." }, messages)
+            else assert.are.same({}, messages) end
+        end)
+    end
+
+    it("does not revive a captured directory action after complete empty replacement", function()
+        respond = function() return page(nodes(201, 205), 5, false) end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        download_directory = nil
+        plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
+        assert.is_function(directory_callback)
+        respond = function(request)
+            if request.query:find("GET_CHAPTERS_MANGA", 1, true) then return page({}, 0, false) end
+            return { data = { fetchChapters = { chapters = {} } } }
+        end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        messages = {}
+        directory_callback("./nonexistent-test-library")
+        assert.are.same({ "Suwayomi download directory saved." }, messages)
+        assert.are.same({}, plugin.current_chapter_menu.chapters)
+        assert.are.same({}, admittedIds())
+        assert.are.equal("{}", saved_ledger)
+        assert.are.equal(0, #workers)
+    end)
+
+    it("does not cancel a newer load from an already dismissed loading message", function()
+        respond = function() return page(nodes(201, 201), 1, false) end
+        plugin:showChaptersForManga(manga)
+        local old_loading, dismiss = loading, loading.dismiss_callback
+        finishRequest()
+        assert.is_nil(old_loading.dismiss_callback)
+        plugin:showChaptersForManga(manga)
+        dismiss()
+        respond = function() return page(nodes(301, 301), 1, false) end
+        finishRequest()
+        assert.are.same({ "301" }, chapterIds(plugin.current_chapter_menu.chapters))
+        assert.are.same({}, admittedIds())
+        assert.are.equal("{}", saved_ledger)
+        assert.are.same({}, messages)
+    end)
+
+    it("explains an absent filter after a fresh Download ahead load without running its action", function()
+        saved_filter = "Absent group"
+        respond = function() return page(nodes(201, 205), 5, false) end
+        plugin:keepNextUnreadChaptersForManga(manga, 5)
+        finishRequest()
+        assert.are.same({}, plugin:getVisibleChapters(plugin.current_chapter_context.chapters))
+        assert.matches("No chapters match the saved scanlator filter", messages[#messages])
+        assert.are.equal(1, #messages)
+        assert.are.same({}, admittedIds())
+        assert.are.equal("{}", saved_ledger)
+    end)
+
+    for _, total in ipairs({ 0, 205 }) do
+        it("hands complete reader return of " .. total .. " chapters to the live FileManager host", function()
+            local reader_context = { path = "example.cbz", manga_id = "17", chapter_id = "201" }
+            settings.loadReaderReturnContexts = function() return { ["example.cbz"] = reader_context } end
+            for name, method in pairs(require("suwayomi/reader_return").methods) do plugin[name] = method end
+            local destination = { max_batch_queue_chapters = 50 }
+            for name, method in pairs(plugin) do if type(method) == "function" then destination[name] = method end end
+            local filemanager = { suwayomi = destination, reinit = function() end }
+            destination.ui = filemanager
+            destination:setCurrentMangaChapterContext(manga, { { id = "999", name = "Old", is_read = false } })
+            destination.current_chapter_menu = { chapters = destination.current_chapter_context.chapters }
+            local reader = { document = { file = "example.cbz" }, onClose = function() plugin:retireChapterHost() end }
+            plugin.ui = reader
+            package.preload["apps/reader/readerui"] = function() return { instance = reader } end
+            package.preload["apps/filemanager/filemanager"] = function() return { instance = filemanager } end
+            respond = function(request)
+                if request.query:find("GET_CHAPTERS_MANGA", 1, true) then
+                    local offset = request.variables.offset
+                    return page(nodes(offset + 1, math.min(offset + 200, total)), total, offset + 200 < total)
+                end
+                if request.query:find("GET_MANGA_CHAPTERS_FETCH", 1, true) then
+                    return { data = { fetchChapters = { chapters = {} } } }
+                end
+                return { data = { mangas = { totalCount = 1, nodes = { { id = 17 } } } } }
+            end
+            plugin:returnToSuwayomiChapters(reader_context)
+            local token = plugin.active_reader_return_request
+            finishRequest(1, token)
+            assert.is_nil(plugin.current_chapter_context)
+            assert.is_function(scheduled[1])
+            table.remove(scheduled, 1)()
+            assert.is_true(plugin.suwayomi_host_retired)
+            assert.is_nil(plugin.current_chapter_context)
+            assert.are.equal(total, #destination.current_chapter_menu.chapters)
+            destination:downloadNextUnreadChaptersForManga(manga, 5, false)
+            assert.are.same(total == 0 and {} or { "201", "202", "203", "204", "205" }, admittedIds())
+            assert.are.equal(total > 0, json.decode(saved_ledger)["17:200"] ~= nil)
+        end)
+    end
+
+    it("accepts nullable metadata while normalizing explicit source refresh", function()
+        respond = function()
+            return { data = { fetchManga = { manga = { id = 17, title = "Example manga", firstUnreadChapter = json.null,
+                author = json.null, source = json.null } }, fetchChapters = { chapters = {
+                    { id = 201, sourceOrder = 1, name = json.null, scanlator = json.null, isRead = false },
+                } } } }
+        end
+        plugin:refreshMangaChapters(manga)
+        finishRequest()
+        assert.are.same({ "201" }, chapterIds(plugin.current_chapter_menu.chapters))
+        assert.is_nil(manga.author)
+        plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
+        assert.are.same({ "201" }, admittedIds())
+        assert.are.equal("{}", saved_ledger)
+        assert.are.same({}, messages)
+    end)
+
+    for _, route in ipairs({ "fallback", "refresh" }) do
+        for _, malformed in ipairs({
+            { "duplicate ID", function(value) value.data.fetchChapters.chapters[2].id = 201 end },
+            { "missing ID", function(value) value.data.fetchChapters.chapters[1].id = nil end },
+            { "string ID", function(value) value.data.fetchChapters.chapters[1].id = "201" end },
+            { "missing source order", function(value) value.data.fetchChapters.chapters[1].sourceOrder = nil end },
+            { "fractional source order", function(value) value.data.fetchChapters.chapters[1].sourceOrder = 1.5 end },
+            { "null chapter", function(value) value.data.fetchChapters.chapters[1] = json.null end },
+            { "object list", function(value) value.data.fetchChapters.chapters = { chapter = nodes(201, 201)[1] } end },
+            { "GraphQL partial failure", function(value) value.errors = { { message = "Source refresh failed." } } end },
+        }) do
+            it("rejects " .. route .. " " .. malformed[1] .. " without replacing the valid view", function()
+                respond = function() return page(nodes(1, 1), 1, false) end
+                plugin:showChaptersForManga(manga)
+                finishRequest()
+                local context, menu, ledger = plugin.current_chapter_context, plugin.current_chapter_menu, saved_ledger
+                respond = function(request)
+                    if request.query:find("GET_CHAPTERS_MANGA", 1, true) then return page({}, 0, false) end
+                    local result = { data = { fetchManga = { manga = { id = 17 } }, fetchChapters = { chapters = nodes(201, 205) } } }
+                    malformed[2](result)
+                    return result
+                end
+                if route == "refresh" then plugin:refreshMangaChapters(manga)
+                else plugin:startLoadMangaChapterContext(manga, function()
+                    plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
+                end) end
+                finishRequest()
+                assert.are.equal(context, plugin.current_chapter_context)
+                assert.are.equal(menu, plugin.current_chapter_menu)
+                assert.are.equal(ledger, saved_ledger)
+                assert.are.same({}, admittedIds())
+                assert.are.equal(1, #messages)
+                assert.is_string(messages[1])
+            end)
+        end
+    end
 
     for _, malformed in ipairs({
         { "missing total", function(value) value.data.chapters.totalCount = nil end },
@@ -266,7 +648,7 @@ describe("complete stored chapter loading", function()
             finishRequest()
             if total == 0 then
                 assert.are.equal("This manga has no chapters.", messages[#messages])
-                assert.is_nil(plugin.current_chapter_context)
+                assert.are.same({}, plugin.current_chapter_context.chapters)
                 assert.are.equal(2, #requests)
             else
                 assert.are.equal(total, #plugin.current_chapter_menu.chapters)

@@ -723,6 +723,11 @@ msgstr "下次重试：%1"
 msgid "No actions available"
 msgstr "没有可用操作"
 
+msgid ""
+"No chapters match the saved scanlator filter. Choose another scanlator or "
+"All scanlators."
+msgstr ""
+
 msgid "No chapters selected."
 msgstr "未选择章节。"
 

@@ -233,7 +233,7 @@ describe("suwayomi/api facade", function()
                 body = [[{"errors":[{"message":"Cannot query field \"genre\" on type \"Manga\""}]}]],
             },
             {
-                body = [[{"data":{"fetchManga":{"manga":{"id":17,"title":"Harbor Notes","initialized":true}},"fetchChapters":{"chapters":[{"id":398,"name":"Ch. 1","isRead":false}]}}}]],
+                body = [[{"data":{"fetchManga":{"manga":{"id":17,"title":"Harbor Notes","initialized":true}},"fetchChapters":{"chapters":[{"id":398,"sourceOrder":1,"name":"Ch. 1","isRead":false}]}}}]],
             },
         })
 
@@ -416,7 +416,7 @@ describe("suwayomi/api facade", function()
         assert.are.equal(true, updated.ok)
         assert.are.equal(true, updated.manga.in_library)
 
-        install_graphql_stub([[{"data":{"fetchManga":{"manga":{"id":17,"title":"Frieren","initialized":true}},"fetchChapters":{"chapters":[{"id":398,"name":"Ch. 1","isRead":false}]}}}]])
+        install_graphql_stub([[{"data":{"fetchManga":{"manga":{"id":17,"title":"Frieren","initialized":true}},"fetchChapters":{"chapters":[{"id":398,"sourceOrder":1,"name":"Ch. 1","isRead":false}]}}}]])
         local refreshed = api.refreshManga(valid_credentials(), "17")
         assert.are.equal(true, refreshed.ok)
         assert.are.equal("Frieren", refreshed.manga.title)
@@ -460,7 +460,7 @@ describe("suwayomi/api facade", function()
 
         local fetch_request = install_graphql_sequence_stub({
             { body = [[{"data":{"chapters":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}]] },
-            { body = [[{"data":{"fetchChapters":{"chapters":[{"id":1,"name":"Fetched Chapter"}]}}}]] },
+            { body = [[{"data":{"fetchChapters":{"chapters":[{"id":1,"sourceOrder":1,"name":"Fetched Chapter"}]}}}]] },
         })
         local fetched = api.fetchChaptersForManga(valid_credentials(), "17")
         assert.are.equal(true, fetched.ok)

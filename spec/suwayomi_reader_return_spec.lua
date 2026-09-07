@@ -181,6 +181,11 @@ describe("suwayomi/reader_return", function()
         for name, method in pairs(ReaderReturn.methods) do
             plugin[name] = method
         end
+        local filemanager = require("apps/filemanager/filemanager").instance
+        filemanager.suwayomi = {
+            ui = filemanager,
+            showChapterResultForManga = plugin.showChapterResultForManga,
+        }
         return plugin
     end
 

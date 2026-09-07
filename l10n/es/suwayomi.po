@@ -734,6 +734,11 @@ msgstr ""
 msgid "No actions available"
 msgstr ""
 
+msgid ""
+"No chapters match the saved scanlator filter. Choose another scanlator or "
+"All scanlators."
+msgstr ""
+
 msgid "No chapters selected."
 msgstr ""
 

@@ -20,6 +20,18 @@ end
 
 local Methods = {}
 
+local read_fields = {
+    manga_id = true, manga_title = true, chapter_id = true, chapter_name = true,
+    read = true, path = true, pending_read_sync = true, pending_read_state = true,
+}
+
+local function hasUnrelatedFields(entry)
+    for key in pairs(entry or {}) do
+        if not read_fields[key] then return true end
+    end
+    return false
+end
+
 function Methods:loadChapterLedger()
     if not SuwayomiSettings.loadChapterLedger then
         return {}
@@ -41,16 +53,14 @@ function Methods:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, update
     local key = self:getChapterLedgerKey(manga, chapter)
     local existing = ledger[key] or {}
 
-    local entry = {
-        manga_id = tostring(manga.id or existing.manga_id or ""),
-        manga_title = manga.title or existing.manga_title,
-        chapter_id = tostring(chapter.id or existing.chapter_id or ""),
-        chapter_name = chapter.name or existing.chapter_name,
-        read = existing.read == true,
-        path = existing.path,
-        pending_read_sync = existing.pending_read_sync == true or nil,
-        pending_read_state = existing.pending_read_state,
-    }
+    local entry = {}
+    for key_name, value in pairs(existing) do entry[key_name] = value end
+    entry.manga_id = tostring(manga.id or existing.manga_id or "")
+    entry.manga_title = manga.title or existing.manga_title
+    entry.chapter_id = tostring(chapter.id or existing.chapter_id or "")
+    entry.chapter_name = chapter.name or existing.chapter_name
+    entry.read = existing.read == true
+    entry.pending_read_sync = existing.pending_read_sync == true or nil
 
     for update_key, value in pairs(updates or {}) do
         entry[update_key] = value
@@ -109,33 +119,21 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters)
         item.is_read = is_read
 
         if remote_matches_pending then
-            if is_read or (entry and entry.path) then
-                ledger[key] = {
-                    manga_id = tostring(manga.id or ""),
-                    manga_title = manga.title,
-                    chapter_id = tostring(item.id or ""),
-                    chapter_name = item.name,
-                    read = is_read == true,
-                    path = entry and entry.path or nil,
-                }
+            if is_read or (entry and entry.path) or hasUnrelatedFields(entry) then
+                entry = self:upsertChapterLedgerEntryInLedger(ledger, manga, item, { read = is_read == true })
+                entry.pending_read_sync = nil
+                entry.pending_read_state = nil
             else
                 ledger[key] = nil
             end
             changed = true
         elseif is_read or pending_read_state ~= nil then
-            ledger[key] = {
-                manga_id = tostring(manga.id or ""),
-                manga_title = manga.title,
-                chapter_id = tostring(item.id or ""),
-                chapter_name = item.name,
-                read = is_read == true,
-                path = entry and entry.path or nil,
-                pending_read_sync = pending_read_state ~= nil and true or nil,
-                pending_read_state = pending_read_state,
-            }
+            entry = self:upsertChapterLedgerEntryInLedger(ledger, manga, item, { read = is_read == true })
+            entry.pending_read_sync = pending_read_state ~= nil and true or nil
+            entry.pending_read_state = pending_read_state
             changed = true
         elseif entry and entry.read == true then
-            if entry.path then
+            if entry.path or hasUnrelatedFields(entry) then
                 entry.read = nil
                 entry.pending_read_sync = nil
                 ledger[key] = entry

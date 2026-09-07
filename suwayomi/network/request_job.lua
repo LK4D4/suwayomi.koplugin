@@ -14,6 +14,7 @@ local RequestWorker = require("suwayomi/network/request_worker")
 local RequestJob = {}
 
 local function closeLoading(owner, loading_message)
+    if loading_message then loading_message.dismiss_callback = nil end
     if owner and owner.closeLoadingMessage then
         owner:closeLoadingMessage(loading_message)
     elseif loading_message and UIManager.close then
@@ -21,9 +22,9 @@ local function closeLoading(owner, loading_message)
     end
 end
 
-local function showLoading(owner, message)
+local function showLoading(owner, message, cancel)
     if owner and owner.showLoadingMessage then
-        return owner:showLoadingMessage(message)
+        return owner:showLoadingMessage(message, cancel)
     end
     return nil
 end
@@ -31,8 +32,18 @@ end
 function RequestJob.start(options)
     options = options or {}
     local owner = options.owner
-    local loading_message = showLoading(owner, options.loading_message)
-    local active
+    local active, loading_message, dismissed
+    loading_message = showLoading(owner, options.loading_message, function()
+        if dismissed then return end
+        dismissed = true
+        if loading_message then loading_message.dismiss_callback = nil end
+        if active then RequestJob.cancel(active) end
+    end)
+    local function close()
+        if dismissed then return end
+        dismissed = true
+        closeLoading(owner, loading_message)
+    end
     active = SubprocessJob.start({
         active = {
             request = options.request,
@@ -49,13 +60,13 @@ function RequestJob.start(options)
             return RequestWorker:readResult(path)
         end,
         on_finish = function(_, result)
-            closeLoading(owner, loading_message)
+            close()
             if options.on_finish then
                 options.on_finish(result)
             end
         end,
         on_timeout = function()
-            closeLoading(owner, loading_message)
+            close()
             if options.on_finish then
                 options.on_finish({
                     ok = false,
@@ -64,7 +75,7 @@ function RequestJob.start(options)
             end
         end,
         on_error = function(err)
-            closeLoading(owner, loading_message)
+            close()
             if options.on_finish then
                 options.on_finish({
                     ok = false,
@@ -73,7 +84,7 @@ function RequestJob.start(options)
             end
         end,
         on_cancel = function()
-            closeLoading(owner, loading_message)
+            close()
             if options.on_cancel then
                 options.on_cancel()
             end

@@ -340,14 +340,19 @@ end
 
 
 function Methods:showBulkActionConfirmation(text, ok_text, callback)
+    local is_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
+    local function accept()
+        if is_current and not is_current() then return false end
+        return callback()
+    end
     if SuwayomiUI.showConfirm then
         SuwayomiUI.showConfirm({
             text = text,
             ok_text = ok_text,
-            ok_callback = callback,
+            ok_callback = accept,
         })
     else
-        callback()
+        accept()
     end
     return true
 end

@@ -281,7 +281,7 @@ describe("suwayomi/api/parsers", function()
                     "author": "Rina Vale", "artist": "Mako Reed",
                     "description": "Archive notes cross the harbor.", "genre": ["Quest", "Ink"], "status": "ONGOING",
                     "thumbnailUrl": "/api/v1/manga/17/thumbnail" } },
-                "fetchChapters": { "chapters": [ { "id": 398, "name": "Ch. 1", "scanlator": "Crew One", "isRead": false } ] }
+                "fetchChapters": { "chapters": [ { "id": 398, "sourceOrder": 1, "name": "Ch. 1", "scanlator": "Crew One", "isRead": false } ] }
             } }
         ]]))
         assert.are.equal("17", refreshed.manga.id)
@@ -384,7 +384,7 @@ describe("suwayomi/api/parsers", function()
         local refreshed, refresh_error = parsers.parseRefreshMangaResponse([[
             { "data": {
                 "fetchManga": { "manga": { "title": "Missing id" } },
-                "fetchChapters": { "chapters": [ { "id": 398, "name": "Ch. 1" } ] }
+                "fetchChapters": { "chapters": [ { "id": 398, "sourceOrder": 1, "name": "Ch. 1" } ] }
             } }
         ]])
         assert.is_nil(refreshed)

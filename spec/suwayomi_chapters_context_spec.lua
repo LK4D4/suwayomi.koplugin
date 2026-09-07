@@ -339,10 +339,11 @@ describe("suwayomi/chapters/context", function()
         }, plugin:getVisibleChapters(plugin.current_chapter_context.chapters))
     end)
 
-    it("drops a saved scanlator filter when refreshed chapters no longer contain it", function()
+    it("keeps an absent saved scanlator filter and explains the empty selection", function()
         local controller = require("suwayomi/chapters/context")
         local manga = { id = "m1", title = "Manga" }
         local plugin = {
+            showMessage = function(self, message) self.message = message end,
             loadMangaScanlatorFilter = function()
                 return "Missing Team"
             end,
@@ -359,7 +360,9 @@ describe("suwayomi/chapters/context", function()
             { id = "2", name = "Two", scanlator = "Team B" },
         })
 
-        assert.is_nil(plugin.current_scanlator_filter)
+        assert.are.equal("Missing Team", plugin.current_scanlator_filter)
+        assert.are.same({}, plugin:getVisibleChapters(plugin.current_chapter_context.chapters))
+        assert.matches("No chapters match the saved scanlator filter", plugin.message)
     end)
 
     it("saves scanlator filter changes for the current manga", function()

@@ -152,7 +152,9 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
     for _index, chapter in ipairs(chapters or {}) do
         local status = self:getDownloadQueue():getStatus(manga, chapter)
         local downloaded = self:isChapterDownloaded(manga, chapter)
-        if downloaded or (status and (status.state == "queued" or status.state == "downloading" or status.state == "downloaded" or status.state == "skipped")) then
+        if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then
+            skipped = skipped + 1
+        elseif downloaded or (status and (status.state == "queued" or status.state == "downloading" or status.state == "downloaded" or status.state == "skipped")) then
             skipped = skipped + 1
         elseif #queueable >= self.max_batch_queue_chapters then
             capped = capped + 1
@@ -593,6 +595,7 @@ end
 
 
 function Methods:enqueueChapterDownload(manga, chapter)
+    if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
     local download_directory = self:getDownloadDirectoryOrChoose(function()
         self:enqueueChapterDownload(manga, chapter)
     end, { next_tick = true })

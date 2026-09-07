@@ -186,6 +186,10 @@ function SuwayomiPlugin:closeSuwayomiPlugin()
     end
 end
 
+function SuwayomiPlugin:onCloseWidget()
+    self:retireChapterHost()
+end
+
 function SuwayomiPlugin:withChapterMenuRefreshSuppressed(callback)
     self.chapter_menu_refresh_suppressed = (self.chapter_menu_refresh_suppressed or 0) + 1
     local ok, result = pcall(callback)

@@ -35,9 +35,6 @@ local function getLoadedMangaChapterContext(owner, manga)
     if not owner.isCurrentChapterContextForManga and owner.current_chapter_context.manga ~= manga then
         return nil
     end
-    if #(owner.current_chapter_context.chapters or {}) == 0 then
-        return nil
-    end
     return owner.current_chapter_context
 end
 
@@ -107,6 +104,7 @@ function Methods:refreshUninitializedMangaForChapters(manga)
 end
 
 function Methods:startMangaNetworkRequest(manga, request, loading_message, on_finish, timeout_message, slot_key)
+    if self.suwayomi_host_retired then return false end
     if not manga or not manga.id then
         self:showMessage(I18n.t("This manga cannot be loaded right now."))
         return false
@@ -117,6 +115,16 @@ function Methods:startMangaNetworkRequest(manga, request, loading_message, on_fi
     self.active_manga_network_requests = active_requests
     slot_key = slot_key or tostring(request and request.action or "manga_request")
 
+    local chapter_request = slot_key == "chapter_menu" or slot_key == "chapter_context"
+    if chapter_request then
+        self.chapter_request_revision = (self.chapter_request_revision or 0) + 1
+        local other_slot = slot_key == "chapter_menu" and "chapter_context" or "chapter_menu"
+        local other = active_requests[other_slot]
+        active_requests[other_slot] = nil
+        if other and other.active then NetworkRequestJob.cancel(other.active) end
+        if self.cancelReaderReturnRequest then self:cancelReaderReturnRequest() end
+    end
+
     local previous = active_requests[slot_key]
     if previous and previous.active then
         NetworkRequestJob.cancel(previous.active)
@@ -124,6 +132,7 @@ function Methods:startMangaNetworkRequest(manga, request, loading_message, on_fi
 
     local request_token = {
         manga_id = tostring(manga.id),
+        context = self.current_chapter_context,
     }
     active_requests[slot_key] = request_token
 
@@ -145,6 +154,9 @@ function Methods:startMangaNetworkRequest(manga, request, loading_message, on_fi
                 return
             end
             active_requests[slot_key] = nil
+            if self.suwayomi_host_retired or tostring(manga.id) ~= request_token.manga_id
+                or (chapter_request and self.current_chapter_context ~= request_token.context)
+            then return end
             if on_finish then
                 on_finish(result)
             end
@@ -163,6 +175,7 @@ function Methods:startMangaNetworkRequest(manga, request, loading_message, on_fi
 end
 
 function Methods:cancelMangaNetworkRequests()
+    self.chapter_request_revision = (self.chapter_request_revision or 0) + 1
     local active_requests = self.active_manga_network_requests
     if type(active_requests) ~= "table" then
         return false
@@ -179,7 +192,14 @@ function Methods:cancelMangaNetworkRequests()
     return canceled
 end
 
+function Methods:retireChapterHost()
+    self.suwayomi_host_retired = true
+    self:cancelMangaNetworkRequests()
+    if self.cancelReaderReturnRequest then self:cancelReaderReturnRequest() end
+end
+
 function Methods:handleRefreshMangaResult(manga, result, options)
+    if self.suwayomi_host_retired then return false end
     options = options or {}
     if not result then
         return false
@@ -205,6 +225,7 @@ function Methods:handleRefreshMangaResult(manga, result, options)
 end
 
 function Methods:handleChapterContextResult(manga, result, on_ready)
+    if self.suwayomi_host_retired then return false end
     if not result then
         return false
     end
@@ -212,16 +233,18 @@ function Methods:handleChapterContextResult(manga, result, on_ready)
         self:showMessage(result.error)
         return false
     end
-    if type(result.chapters) ~= "table" or #result.chapters == 0 then
-        self:showMessage(I18n.t("This manga has no chapters."))
+    if type(result.chapters) ~= "table" then
+        self:showMessage(I18n.t("Could not load chapters."))
         return false
     end
+    if #result.chapters == 0 then return self:showChapterResultForManga(manga, result) end
 
     if result.manga then
         self:applyMangaRefreshResult(manga, result.manga)
     end
     local chapters = self:mergeChaptersWithReadLedger(manga, result.chapters)
     local context = self:setCurrentMangaChapterContext(manga, chapters)
+    if self.current_scanlator_filter and #self:getVisibleChapters(chapters) == 0 then return true end
     if on_ready then
         on_ready(context)
     end
@@ -242,6 +265,7 @@ function Methods:startLoadMangaChapterContext(manga, on_ready)
 end
 
 function Methods:withMangaChapterContext(manga, on_ready, options)
+    if self.suwayomi_host_retired then return false end
     options = options or {}
     local context
     if options.defer_empty_context_warning then
@@ -250,6 +274,14 @@ function Methods:withMangaChapterContext(manga, on_ready, options)
         context = self:ensureMangaChapterContext(manga)
     end
     if context then
+        if #(context.chapters or {}) == 0 then
+            self:showMessage(I18n.t("This manga has no chapters."))
+            return false
+        end
+        if self.current_scanlator_filter and #self:getVisibleChapters(context.chapters) == 0 then
+            self:showMessage(I18n.t("No chapters match the saved scanlator filter. Choose another scanlator or All scanlators."))
+            return false
+        end
         if on_ready then
             on_ready(context)
         end
@@ -311,6 +343,7 @@ end
 
 
 function Methods:showChapterResultForManga(manga, result, options)
+    if self.suwayomi_host_retired then return false end
     options = options or {}
     if not result then
         return
@@ -326,8 +359,8 @@ function Methods:showChapterResultForManga(manga, result, options)
         manga_id = manga and manga.id,
         chapter_count = #(result.chapters or {}),
     })
-    if not result.chapters or #result.chapters == 0 then
-        self:showMessage(I18n.t("This manga has no chapters."))
+    if type(result.chapters) ~= "table" then
+        self:showMessage(I18n.t("Could not load chapters."))
         return
     end
 
@@ -366,7 +399,9 @@ function Methods:showChapterResultForManga(manga, result, options)
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("chapters", chapter_menu)
     end
-    if self.applyMangaKeepNextUnreadDownloadsPolicy then
+    if #chapters == 0 then
+        self:showMessage(I18n.t("This manga has no chapters."))
+    elseif self.applyMangaKeepNextUnreadDownloadsPolicy then
         self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
     end
     return true
@@ -374,6 +409,7 @@ end
 
 
 function Methods:showChaptersForManga(manga)
+    if self.suwayomi_host_retired then return false end
     return SuwayomiDebug.time("showChaptersForManga", {
         manga_id = manga and manga.id,
     }, function()

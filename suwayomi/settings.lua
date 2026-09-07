@@ -228,15 +228,15 @@ function SuwayomiSettings:normalizeChapterLedgerEntry(entry)
     if type(entry) ~= "table" then
         return nil
     end
-    local normalized = {
-        manga_id = entry.manga_id ~= nil and tostring(entry.manga_id) or nil,
-        manga_title = entry.manga_title ~= nil and tostring(entry.manga_title) or nil,
-        chapter_id = entry.chapter_id ~= nil and tostring(entry.chapter_id) or nil,
-        chapter_name = entry.chapter_name ~= nil and tostring(entry.chapter_name) or nil,
-        path = entry.path ~= nil and tostring(entry.path) or nil,
-        read = entry.read == true,
-        pending_read_sync = entry.pending_read_sync == true or nil,
-    }
+    -- Read synchronization owns only these fields; retain data owned elsewhere.
+    local normalized = copyTable(entry)
+    normalized.manga_id = entry.manga_id ~= nil and tostring(entry.manga_id) or nil
+    normalized.manga_title = entry.manga_title ~= nil and tostring(entry.manga_title) or nil
+    normalized.chapter_id = entry.chapter_id ~= nil and tostring(entry.chapter_id) or nil
+    normalized.chapter_name = entry.chapter_name ~= nil and tostring(entry.chapter_name) or nil
+    normalized.path = entry.path ~= nil and tostring(entry.path) or nil
+    normalized.read = entry.read == true
+    normalized.pending_read_sync = entry.pending_read_sync == true or nil
     if entry.pending_read_state ~= nil then
         normalized.pending_read_state = entry.pending_read_state == true or entry.pending_read_state == 1
     end

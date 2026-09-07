@@ -226,10 +226,11 @@ function Methods:withLoadingMessage(key, message, callback)
 end
 
 
-function Methods:showLoadingMessage(message)
+function Methods:showLoadingMessage(message, cancel)
     local loading_message = InfoMessage:new{
         text = message,
         suwayomi_loading = true,
+        dismiss_callback = cancel,
     }
     UIManager:show(loading_message)
     if UIManager.forceRePaint then

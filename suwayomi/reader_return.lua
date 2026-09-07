@@ -294,11 +294,13 @@ function Methods:fetchReaderReturnChapters(context)
 end
 
 function Methods:startReaderReturnChapterRequest(context)
+    if self.suwayomi_host_retired then return false end
     if not context or not context.manga_id then
         self:showMessage(I18n.t("This book is not linked to Suwayomi chapters."))
         return false
     end
 
+    if self.cancelMangaNetworkRequests then self:cancelMangaNetworkRequests() end
     local previous = self.active_reader_return_request
     if previous and previous.active and NetworkRequestJob.cancel then
         NetworkRequestJob.cancel(previous.active)
@@ -327,7 +329,7 @@ function Methods:startReaderReturnChapterRequest(context)
             end
         end,
         on_finish = function(result)
-            if self.active_reader_return_request ~= request_token then
+            if self.suwayomi_host_retired or self.active_reader_return_request ~= request_token then
                 return
             end
             if not contextMatches(self:getCurrentReaderReturnContext(), context) then
@@ -343,31 +345,32 @@ function Methods:startReaderReturnChapterRequest(context)
                 self:showMessage(result.error)
                 return
             end
-            if not result.chapters or #result.chapters == 0 then
+            if type(result.chapters) ~= "table" then
                 self.active_reader_return_request = nil
-                self:showMessage(I18n.t("This manga has no chapters."))
+                self:showMessage(I18n.t("Could not load chapters."))
                 return
             end
 
             local manga = buildReturnedManga(context, result.manga)
-            self:closeReaderToFileManager(function()
-                if self.active_reader_return_request == request_token then
-                    self.active_reader_return_request = nil
-                end
-                self:showChapterResultForManga(manga, result, {
+            self:closeReaderToFileManager(function(destination)
+                if not destination or destination.suwayomi_host_retired then return end
+                if destination.cancelMangaNetworkRequests then destination:cancelMangaNetworkRequests() end
+                destination:showChapterResultForManga(manga, result, {
                     return_context = context,
                     reader_return_close_target = self.buildReaderReturnCloseTarget
                         and self:buildReaderReturnCloseTarget(context, manga)
                         or nil,
                 })
             end, function()
-                if self.active_reader_return_request ~= request_token then
+                if self.suwayomi_host_retired or self.active_reader_return_request ~= request_token then
                     return false
                 end
                 if not contextMatches(self:getCurrentReaderReturnContext(), context) then
                     self.active_reader_return_request = nil
                     return false
                 end
+                -- Consume the result before intentional teardown retires this host.
+                self.active_reader_return_request = nil
                 return true
             end)
         end,
@@ -417,8 +420,11 @@ function Methods:closeReaderToFileManager(callback, should_continue)
             end
         end
 
-        if callback then
-            callback()
+        local destination = ok_filemanager and FileManager.instance and FileManager.instance.suwayomi
+        if callback and destination and destination.ui == FileManager.instance
+            and not destination.suwayomi_host_retired and destination.showChapterResultForManga
+        then
+            callback(destination)
         end
     end)
 end

@@ -637,11 +637,65 @@ function Parsers.parseUpdateMangaLibraryResponse(response_body)
     }
 end
 
+local function chapterResponseError(payload)
+    if payload.errors ~= nil and payload.errors ~= json.null then
+        if type(payload.errors) ~= "table" or next(payload.errors) ~= nil then
+            local first = type(payload.errors) == "table" and payload.errors[1]
+            return type(first) == "table" and type(first.message) == "string" and first.message
+                or "Suwayomi server returned GraphQL errors."
+        end
+    end
+end
+
+local function parseCompleteChapterNodes(chapter_nodes, sort)
+    if type(chapter_nodes) ~= "table" or chapter_nodes == json.null
+        or (getmetatable(chapter_nodes) or {}).__jsontype ~= "array"
+    then
+        return nil, "Suwayomi server returned invalid chapter data."
+    end
+    local chapters, seen = {}, {}
+    for _, entry in ipairs(chapter_nodes) do
+        if type(entry) ~= "table" or type(entry.id) ~= "number"
+            or entry.id <= 0 or entry.id > 9007199254740991 or entry.id ~= math.floor(entry.id)
+            or type(entry.sourceOrder) ~= "number" or math.abs(entry.sourceOrder) > 9007199254740991
+            or entry.sourceOrder ~= math.floor(entry.sourceOrder)
+        then
+            return nil, "Suwayomi server returned invalid chapter data."
+        end
+        local id = string.format("%.0f", entry.id)
+        if seen[id] then return nil, "The server returned duplicate chapter IDs." end
+        seen[id] = true
+        for key, value in pairs(entry) do
+            if value == json.null then entry[key] = nil end
+        end
+        local chapter = parseChapterNode(entry)
+        chapter.id = id
+        chapters[#chapters + 1] = chapter
+    end
+    -- Stored pages retain server order so the API can detect backward pages.
+    if sort then
+        table.sort(chapters, function(left, right)
+            if left.source_order == right.source_order then return tonumber(left.id) < tonumber(right.id) end
+            return left.source_order < right.source_order
+        end)
+    end
+    return chapters
+end
+
+local function removeJSONNulls(value)
+    for key, child in pairs(value) do
+        if child == json.null then value[key] = nil
+        elseif type(child) == "table" then removeJSONNulls(child) end
+    end
+end
+
 function Parsers.parseRefreshMangaResponse(response_body)
-    local payload, _, err = json.decode(response_body, 1, nil)
-    if err then
+    local payload, _, err = json.decode(response_body, 1, json.null)
+    if err or type(payload) ~= "table" then
         return nil, "Invalid response from Suwayomi server."
     end
+    local graph_error = chapterResponseError(payload)
+    if graph_error then return nil, graph_error end
 
     local manga = payload
         and payload.data
@@ -652,25 +706,12 @@ function Parsers.parseRefreshMangaResponse(response_body)
         and payload.data.fetchChapters
         and payload.data.fetchChapters.chapters
     if type(manga) ~= "table" or type(chapter_nodes) ~= "table" then
-        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
-        return nil, graph_error or "Suwayomi server did not refresh manga."
+        return nil, "Suwayomi server did not refresh manga."
     end
 
-    local chapters = {}
-    for _, chapter in ipairs(chapter_nodes) do
-        local parsed_chapter = parseChapterNode(chapter)
-        if not parsed_chapter then
-            return nil, "Suwayomi server returned invalid chapter data."
-        end
-        table.insert(chapters, {
-            id = parsed_chapter.id,
-            name = parsed_chapter.name,
-            chapter_number = parsed_chapter.chapter_number,
-            source_order = parsed_chapter.source_order,
-            scanlator = parsed_chapter.scanlator,
-            is_read = parsed_chapter.is_read,
-        })
-    end
+    local chapters, chapter_error = parseCompleteChapterNodes(chapter_nodes, true)
+    if not chapters then return nil, chapter_error end
+    removeJSONNulls(manga)
     local parsed_manga = parseMangaNode(manga)
     if not parsed_manga then
         return nil, "Suwayomi server returned invalid manga data."
@@ -683,10 +724,12 @@ function Parsers.parseRefreshMangaResponse(response_body)
 end
 
 function Parsers.parseChapterResponse(response_body)
-    local payload, _, err = json.decode(response_body, 1, nil)
-    if err then
+    local payload, _, err = json.decode(response_body, 1, json.null)
+    if err or type(payload) ~= "table" then
         return nil, "Invalid response from Suwayomi server."
     end
+    local graph_error = chapterResponseError(payload)
+    if graph_error then return nil, graph_error end
 
     local chapter_nodes = payload
         and payload.data
@@ -694,20 +737,10 @@ function Parsers.parseChapterResponse(response_body)
         and payload.data.fetchChapters.chapters
 
     if type(chapter_nodes) ~= "table" then
-        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
-        return nil, graph_error or "Suwayomi server did not return a chapter list."
+        return nil, "Suwayomi server did not return a chapter list."
     end
 
-    local chapters = {}
-    for _, entry in ipairs(chapter_nodes) do
-        local chapter = parseChapterNode(entry)
-        if not chapter then
-            return nil, "Suwayomi server returned invalid chapter data."
-        end
-        table.insert(chapters, chapter)
-    end
-
-    return chapters
+    return parseCompleteChapterNodes(chapter_nodes, true)
 end
 
 function Parsers.parseChapterPagesResponse(response_body)
@@ -756,13 +789,8 @@ function Parsers.parseStoredChapterResponse(response_body)
         return nil, "Invalid response from Suwayomi server."
     end
 
-    if payload.errors ~= nil and payload.errors ~= json.null then
-        if type(payload.errors) ~= "table" or next(payload.errors) ~= nil then
-            local first = type(payload.errors) == "table" and payload.errors[1]
-            return nil, type(first) == "table" and type(first.message) == "string" and first.message
-                or "Suwayomi server returned GraphQL errors."
-        end
-    end
+    local graph_error = chapterResponseError(payload)
+    if graph_error then return nil, graph_error end
     local connection = type(payload.data) == "table" and payload.data.chapters
     local chapter_nodes = type(connection) == "table" and connection.nodes
     local page_info = type(connection) == "table" and connection.pageInfo
@@ -775,22 +803,8 @@ function Parsers.parseStoredChapterResponse(response_body)
         return nil, "Suwayomi server returned invalid chapter completion metadata."
     end
 
-    local chapters = {}
-    for _, entry in ipairs(chapter_nodes) do
-        if type(entry) ~= "table" or type(entry.id) ~= "number"
-            or entry.id <= 0 or entry.id > 9007199254740991 or entry.id ~= math.floor(entry.id)
-            or type(entry.sourceOrder) ~= "number" or math.abs(entry.sourceOrder) > 9007199254740991
-            or entry.sourceOrder ~= math.floor(entry.sourceOrder)
-        then
-            return nil, "Suwayomi server returned invalid chapter data."
-        end
-        for key, value in pairs(entry) do
-            if value == json.null then entry[key] = nil end
-        end
-        local chapter = parseChapterNode(entry)
-        chapter.id = string.format("%.0f", entry.id)
-        table.insert(chapters, chapter)
-    end
+    local chapters, chapter_error = parseCompleteChapterNodes(chapter_nodes, false)
+    if not chapters then return nil, chapter_error end
 
     return {
         chapters = chapters,

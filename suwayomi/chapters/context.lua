@@ -106,13 +106,17 @@ function Methods:setCurrentMangaChapterContext(manga, chapters)
     if self.current_chapter_context and not self:isCurrentChapterContextForManga(manga) then
         self:clearChapterSelection(true)
     end
-    self.current_scanlator_filter = self:getValidMangaScanlatorFilter(manga, chapters)
+    local filter, present = self:getValidMangaScanlatorFilter(manga, chapters)
+    self.current_scanlator_filter = filter
     self.current_chapter_context = {
         manga = manga,
         chapters = chapters or {},
     }
     if same_manga then
         self:pruneChapterSelectionForCurrentContext()
+    end
+    if filter and not present then
+        self:showMessage(I18n.t("No chapters match the saved scanlator filter. Choose another scanlator or All scanlators."))
     end
     return self.current_chapter_context
 end
@@ -121,7 +125,6 @@ end
 function Methods:ensureMangaChapterContext(manga)
     if self:isCurrentChapterContextForManga(manga)
         and self.current_chapter_context
-        and #(self.current_chapter_context.chapters or {}) > 0
     then
         return self.current_chapter_context
     end
@@ -132,6 +135,26 @@ function Methods:ensureMangaChapterContext(manga)
     end
 
     return nil
+end
+
+function Methods:isChapterInCurrentContext(manga, chapter)
+    if self.suwayomi_host_retired then return false end
+    if not self.current_chapter_context then return true end
+    if not self:isCurrentChapterContextForManga(manga) then return false end
+    for _, current in ipairs(self:getVisibleChapters(self.current_chapter_context.chapters)) do
+        if tostring(current.id) == tostring(chapter and chapter.id) then return true end
+    end
+    return false
+end
+
+function Methods:captureChapterActionGuard()
+    local context = self.current_chapter_context
+    local revision = self.chapter_request_revision
+    return function()
+        return not self.suwayomi_host_retired
+            and self.current_chapter_context == context
+            and self.chapter_request_revision == revision
+    end
 end
 
 
@@ -308,10 +331,10 @@ function Methods:getValidMangaScanlatorFilter(manga, chapters)
     end
     for _index, scanlator in ipairs(self:getChapterScanlatorChoices(chapters)) do
         if scanlator == filter then
-            return filter
+            return filter, true
         end
     end
-    return nil
+    return filter, false
 end
 
 
@@ -382,6 +405,7 @@ end
 
 
 function Methods:toggleChapterSelection(manga, chapter)
+    if not self:isChapterInCurrentContext(manga, chapter) then return false end
     self.selected_chapters = self.selected_chapters or {}
     local key = self:getChapterSelectionKey(manga, chapter)
     if self.selected_chapters[key] then
@@ -395,6 +419,7 @@ end
 
 
 function Methods:handleChapterTap(manga, chapter)
+    if not self:isChapterInCurrentContext(manga, chapter) then return false end
     if self.selection_mode then
         self:toggleChapterSelection(manga, chapter)
         return

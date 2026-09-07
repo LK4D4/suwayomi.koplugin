@@ -148,7 +148,11 @@ function Methods:getDownloadDirectoryOrChoose(callback, options)
         return download_directory
     end
 
-    self:chooseDownloadDirectory(callback, options)
+    local is_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
+    self:chooseDownloadDirectory(function(path)
+        if is_current and not is_current() then return end
+        if callback then callback(path) end
+    end, options)
     return nil
 end
 
