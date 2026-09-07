@@ -432,7 +432,14 @@ end
 function ActiveJobs:finishWithCancel(active, options)
     options = options or {}
     local queue = self.queue
-    if active.pending_completion or queue:getExistingArchivePath(active) then
+    local path = active.pending_completion or queue:getExistingArchivePath(active)
+    if path then
+        if not self:isWorkerDone(active) then
+            active.pending_completion = path
+            self:terminateJob(active)
+            self:schedulePoll()
+            return true
+        end
         return self:finishFromProgress(active)
     end
     local key = active.key or queue:getKey(active.manga, active.chapter)
