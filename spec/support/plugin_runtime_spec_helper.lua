@@ -23,7 +23,9 @@ local MODULES_TO_CLEAR = {
     "ffi/util",
     "gettext",
     "ui/uimanager",
+    "ui/font",
     "ui/widget/infomessage",
+    "ui/widget/textboxwidget",
     "ui/widget/container/widgetcontainer",
     "ui/elements/reader_menu_order",
     "apps/reader/readerui",
@@ -185,6 +187,20 @@ function Helper.install(options)
                 return widget_options or {}
             end,
         }
+    end
+
+    package.preload["ui/font"] = function()
+        return { getFace = function() return {} end }
+    end
+
+    package.preload["ui/widget/textboxwidget"] = function()
+        return { new = function()
+            return {
+                getAllLineCount = function() return 1 end,
+                getVisLineCount = function() return 15 end,
+                free = function() end,
+            }
+        end }
     end
 
     package.preload["ui/widget/container/widgetcontainer"] = function()
@@ -401,6 +417,10 @@ function Helper.install(options)
 
     package.preload.device = function()
         return {
+            screen = {
+                getWidth = function() return 600 end,
+                getHeight = function() return 800 end,
+            },
             home_dir = "/device-home",
         }
     end

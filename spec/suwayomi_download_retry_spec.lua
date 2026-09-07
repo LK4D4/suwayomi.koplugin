@@ -131,6 +131,15 @@ describe("download retry across live menus", function()
             end
         end
         package.preload["ui/font"] = function() return { getFace = function() return {} end } end
+        package.preload["ui/widget/textboxwidget"] = function()
+            return { new = function()
+                return {
+                    getAllLineCount = function() return 1 end,
+                    getVisLineCount = function() return 15 end,
+                    free = function() end,
+                }
+            end }
+        end
         package.preload["ui/widget/menu"] = function()
             return { new = function(_, options)
                 function options:onMenuChoice(item) if item.callback then item.callback() end end

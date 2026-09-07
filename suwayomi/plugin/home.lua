@@ -1,8 +1,8 @@
 -- Boundary: HomeController.
 --
--- Responsibility: Owns the plugin home dialog, main-menu entry, and generic KOReader message/loading helpers.
+-- Responsibility: Owns the plugin home dialog, main-menu entry, screen-bounded messages, and loading helpers.
 -- Owned state: Plugin UI state only; it does not own persisted settings or network state.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
+-- Dependencies: KOReader UI helpers and plugin modules; text measurement and viewer widgets load when messages are shown.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
 local UIManager = require("ui/uimanager")
@@ -188,6 +188,29 @@ end
 
 function Methods:showMessage(message, options)
     options = options or {}
+    local Screen = require("device").screen
+    local Font = require("ui/font")
+    local TextBoxWidget = require("ui/widget/textboxwidget")
+    local measurement = TextBoxWidget:new{
+        text = message,
+        face = Font:getFace("infofont"),
+        width = math.floor(Screen:getWidth() * 2/3),
+        -- TextBoxWidget renders during construction; bound its temporary pixel buffer too.
+        height = math.floor(Screen:getHeight() * 0.6),
+        for_measurement_only = true,
+    }
+    local needs_scrolling = measurement:getAllLineCount() > measurement:getVisLineCount()
+    measurement:free()
+
+    if needs_scrolling then
+        local TextViewer = require("ui/widget/textviewer")
+        -- Leave long messages open until dismissed so every diagnostic line can be read.
+        UIManager:show(TextViewer:new{
+            title = I18n.t("Suwayomi"),
+            text = message,
+        })
+        return
+    end
     UIManager:show(InfoMessage:new{
         text = message,
         timeout = options.timeout,

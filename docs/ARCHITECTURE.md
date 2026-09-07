@@ -36,7 +36,7 @@ Core plugin shell:
 - `main.lua`: KOReader lifecycle, dependency construction, action/menu registration, queue recovery, and controller method installation.
 - `suwayomi/navigation.lua`: route-aware stack for Suwayomi-owned KOReader widgets.
 - `suwayomi/reader_return.lua`: reader-menu shortcut state and async chapter reload for returning from an opened CBZ to the originating Suwayomi chapter list.
-- `suwayomi/plugin/home.lua`: Suwayomi hub and main-menu entry behavior.
+- `suwayomi/plugin/home.lua`: Suwayomi hub, main-menu entry, and shared message helpers. Messages are measured with the current screen width and normal InfoMessage font in a bounded temporary viewport. Text exceeding 60% of screen height opens in KOReader's screen-sized, scrollable TextViewer until dismissed; short messages retain compact InfoMessage behavior and optional timeouts.
 - `suwayomi/plugin/title_menu.lua`: shared title-bar burger menus for full-screen plugin screens, including the universal Suwayomi home action.
 - `suwayomi/plugin/settings_controller.lua`: grouped Settings menus, setup wizard orchestration, connection-test state, and settings action routing.
 - `suwayomi/plugin/onboarding_connection_worker.lua`: subprocess-safe Suwayomi connection probe used by the setup wizard. It returns structured result IDs for plugin-authored success/failure text and raw `error` strings only for external API/network failures; `settings_controller` owns user-facing translation.
