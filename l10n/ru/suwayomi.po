@@ -692,6 +692,10 @@ msgstr "Установлено"
 msgid "Installing extension..."
 msgstr "Установка расширения..."
 
+#, fuzzy
+msgid "Interrupted; retry download"
+msgstr "Не удалось повторить загрузку."
+
 msgid "KOReader could not open this chapter right now."
 msgstr "KOReader не смог открыть эту главу сейчас."
 

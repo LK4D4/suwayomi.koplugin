@@ -651,6 +651,10 @@ msgstr "已安装"
 msgid "Installing extension..."
 msgstr "正在安装扩展..."
 
+#, fuzzy
+msgid "Interrupted; retry download"
+msgstr "无法重试下载。"
+
 msgid "KOReader could not open this chapter right now."
 msgstr "KOReader 现在无法打开此章节。"
 

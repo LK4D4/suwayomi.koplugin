@@ -1,7 +1,7 @@
 -- Boundary: KOReader plugin lifecycle and composition shell.
 --
 -- Responsibility: register KOReader actions, compose controller method tables,
--- and lazily construct shared runtime services.
+-- and attach disposable hosts to the process-owned download service.
 -- Owned state: plugin instance fields only.
 -- Dependencies: KOReader runtime modules and plugin-local suwayomi/* modules.
 -- External data: delegated to focused controllers and services.
@@ -11,7 +11,7 @@ local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local SuwayomiAPI = require("suwayomi/api")
 local SuwayomiClient = require("suwayomi/client")
-local SuwayomiDownloadQueue = require("suwayomi/downloads/queue")
+local DownloadService = require("suwayomi/downloads/service")
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
 local SuwayomiNavigation = require("suwayomi/navigation")
@@ -58,53 +58,33 @@ local SuwayomiPlugin = WidgetContainer:extend{
 }
 
 function SuwayomiPlugin:createDownloadQueue()
-    return SuwayomiDownloadQueue:new{
-        settings = SuwayomiSettings,
-        downloader = require("suwayomi/downloads/downloader"),
-        ui_manager = UIManager,
-        ffi_util = require("ffi/util"),
-        max_active_chapters = SuwayomiSettings.loadMaxParallelChapterDownloads
-            and SuwayomiSettings:loadMaxParallelChapterDownloads()
-            or nil,
-        debug_logger = SuwayomiDebug.log,
-        getCredentials = function()
-            return SuwayomiSettings:load()
-        end,
-        onStatusChanged = function()
-            self:scheduleFinishedChapterCleanup(0)
-            if self.chapter_menu_refresh_suppressed and self.chapter_menu_refresh_suppressed > 0 then
-                self.pending_chapter_menu_refresh = true
-                return
-            end
-            self:refreshChapterMenu({ quick = true })
-            if self.refreshDownloadsMenu then
-                self:refreshDownloadsMenu()
-            end
-            if self.refreshHomeDownloads then
-                self:refreshHomeDownloads()
-            end
-        end,
-        onMessage = function(message)
-            self:showMessage(message)
-        end,
-        onChapterArchiveReady = function(manga, chapter, chapter_path)
-            if self.saveReaderReturnContext then
-                self:saveReaderReturnContext(manga, chapter, chapter_path)
-            end
-            if self.upsertChapterLedgerEntry then
-                self:upsertChapterLedgerEntry(manga, chapter, {
-                    path = chapter_path,
-                })
-            end
-        end,
-    }
+    return DownloadService.get():getQueue()
 end
 
 function SuwayomiPlugin:getDownloadQueue()
-    if not self.download_queue then
-        self.download_queue = self:createDownloadQueue()
+    return self:createDownloadQueue()
+end
+
+function SuwayomiPlugin:onDownloadSnapshot(snapshot, message, full_refresh, changed_mangas)
+    if self.download_host_closed then return end
+    self.download_snapshot = snapshot
+    if message then self:showMessage(message) end
+    if self.chapter_menu_refresh_suppressed and self.chapter_menu_refresh_suppressed > 0 then
+        self.pending_chapter_menu_refresh = true
+        return
     end
-    return self.download_queue
+    local navigation = self.suwayomi_navigation
+    if not navigation then return end
+    for _, field in ipairs({ "current_chapter_menu", "current_downloads_menu", "current_home_dialog" }) do
+        if self[field] and not navigation:contains(self[field]) then self[field] = nil end
+    end
+    if navigation:isCurrent(self.current_chapter_menu) then
+        local context = self.current_chapter_context
+        local affected = changed_mangas and context and context.manga and changed_mangas[tostring(context.manga.id)]
+        self:refreshChapterMenu((full_refresh or affected) and {} or { quick = true })
+    end
+    if navigation:isCurrent(self.current_downloads_menu) then self:refreshDownloadsMenu() end
+    if navigation:isCurrent(self.current_home_dialog) then self:refreshHomeDownloads() end
 end
 
 function SuwayomiPlugin:createClient()
@@ -127,7 +107,9 @@ end
 
 function SuwayomiPlugin:getNavigation()
     if not self.suwayomi_navigation then
-        self.suwayomi_navigation = SuwayomiNavigation.new(UIManager)
+        self.suwayomi_navigation = SuwayomiNavigation.new(UIManager, function()
+            DownloadService.get():notify(nil, true)
+        end)
     end
     return self.suwayomi_navigation
 end
@@ -188,6 +170,10 @@ end
 
 function SuwayomiPlugin:onCloseWidget()
     self:retireChapterHost()
+    self.download_host_closed = true
+    if self.detach_download_subscription then self.detach_download_subscription() end
+    self.detach_download_subscription = nil
+    self.download_snapshot = nil
 end
 
 function SuwayomiPlugin:withChapterMenuRefreshSuppressed(callback)
@@ -238,8 +224,12 @@ function SuwayomiPlugin:init()
     self:onDispatcherRegisterActions()
     self.selected_chapters = self.selected_chapters or {}
     self.selection_mode = self.selection_mode == true
-    self:getDownloadQueue():recover()
-    self:processFinishedChapterCleanup()
+    local service = DownloadService.get()
+    if not self.detach_download_subscription and not self.download_host_closed then
+        self.detach_download_subscription = service:subscribe(function(snapshot, message, full_refresh, changed_mangas)
+            self:onDownloadSnapshot(snapshot, message, full_refresh, changed_mangas)
+        end)
+    end
     if self.ui and self.ui.menu then
         self.ui.menu:registerToMainMenu(self)
     end
@@ -274,6 +264,15 @@ end
 
 for _, controller_module in ipairs(CONTROLLER_MODULES) do
     installControllerMethods(SuwayomiPlugin, controller_module)
+end
+
+-- The policy remains shared with focused controller tests; production calls use
+-- one adapter so its timers never retain a retired FileManager or ReaderUI.
+for name in pairs(FinishedChapterCleanup.methods) do
+    SuwayomiPlugin[name] = function(_, ...)
+        local service = DownloadService.get()
+        return service.cleanup[name](service.cleanup, ...)
+    end
 end
 
 return SuwayomiPlugin

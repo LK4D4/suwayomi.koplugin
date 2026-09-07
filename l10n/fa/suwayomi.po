@@ -654,6 +654,9 @@ msgstr ""
 msgid "Installing extension..."
 msgstr ""
 
+msgid "Interrupted; retry download"
+msgstr ""
+
 msgid "KOReader could not open this chapter right now."
 msgstr ""
 

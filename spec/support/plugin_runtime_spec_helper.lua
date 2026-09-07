@@ -34,6 +34,8 @@ local MODULES_TO_CLEAR = {
     "suwayomi/client",
     "suwayomi/fs",
     "suwayomi/downloads/queue",
+    "suwayomi/downloads/service",
+    "suwayomi/downloads/cleanup_adapter",
     "suwayomi/downloads/downloader",
     "suwayomi/downloads/active_jobs",
     "suwayomi/downloads/job_store",
@@ -257,6 +259,12 @@ function Helper.install(options)
                 self.recovered = true
                 table.insert(state.lifecycle_events, "queue-recover")
             end
+
+            function instance:getSnapshot()
+                return { active = {}, queued = {}, failed = {} }
+            end
+
+            function instance:checkStoreFence() return true end
 
             table.insert(state.queue_instances, instance)
             table.insert(state.queue_status_callbacks, queue_options.onStatusChanged)

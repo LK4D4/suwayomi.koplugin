@@ -109,9 +109,7 @@ describe("Downloads chapter navigation", function()
 
     local function openFrom(state, manga)
         local chapter = { id = "chapter", name = "Chapter from network" }
-        queue:upsertPersistentJob(queue:buildPersistentJob(manga, chapter,
-            os.getenv("TEMP") or "/tmp", "queued"))
-        queue:recover()
+        assert(queue:enqueue(manga, chapter, os.getenv("TEMP") or "/tmp"))
         if state == "active" then queue:process() end
         local menu = plugin:showDownloads()
         assert.are.equal(state == "active" and "Downloading" or "Queued", menu.item_table[1].mandatory)

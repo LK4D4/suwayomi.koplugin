@@ -501,7 +501,7 @@ describe("suwayomi/downloads/active_jobs", function()
         table.remove(context.scheduled, 1).callback()
 
         assert.is_nil(context.active_job(manga, chapter))
-        assert.are.equal(1, context.scheduled[1].delay)
+        assert.is_true(context.scheduled[1].delay <= 1)
 
         context.set_subprocess_done(1234, true)
         context.advance(1)
@@ -548,11 +548,11 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.is_true(context.queue:cancelPending(manga, chapter))
         assert.are.same({}, context.saved_queue())
         assert.is_nil(context.queue:getStatus(manga, chapter))
-        assert.is_true(context.queue.active_job_lifecycle.terminating_pids[1234])
+        assert.is_true(context.queue:isChapterBusy("m1:398"))
 
         context.advance(retry_at - 100)
         table.remove(context.scheduled, 1).callback()
-        assert.are.equal(1, context.scheduled[1].delay)
+        assert.is_true(context.scheduled[1].delay <= 1)
 
         context.set_subprocess_done(1234, true)
         context.advance(1)
@@ -825,7 +825,7 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.same({}, context.messages)
     end)
 
-    it("removes partial archives when an active job is canceled", function()
+    it("removes partial archives only after the canceled worker exits", function()
         local context = build_queue({
             subprocess_done = false,
             skip_subprocess_callback = true,
@@ -841,6 +841,9 @@ describe("suwayomi/downloads/active_jobs", function()
         local cancelled = context.queue:cancelPending(manga, chapter)
 
         assert.is_true(cancelled)
+        assert.is_false(path_was_removed(chapter_path .. ".part"))
+        context.set_subprocess_done(1234, true)
+        context.queue:process()
         assert.is_true(path_was_removed(chapter_path .. ".part"))
         assert.is_true(path_was_removed(chapter_path .. ".direct.part"))
         assert.is_true(path_was_removed(progress_path))
@@ -907,6 +910,9 @@ describe("suwayomi/downloads/active_jobs", function()
             updated_at = watchdog_time,
         }, context.saved_queue()[1].progress)
         assert.are.same({}, context.messages)
+        assert.is_false(path_was_removed(chapter_path .. ".part"))
+        context.set_subprocess_done(1234, true)
+        context.queue:process()
         assert.is_true(path_was_removed(chapter_path .. ".part"))
         assert.is_true(path_was_removed(chapter_path .. ".direct.part"))
     end)

@@ -223,21 +223,6 @@ describe("suwayomi plugin", function()
         assert.are.equal(1, #runtime.queue_instances)
     end)
 
-    it("processes finished cleanup after download queue recovery on init", function()
-        local plugin = build_plugin()
-        local process = plugin.processFinishedChapterCleanup
-        plugin.processFinishedChapterCleanup = function(self)
-            self.finished_cleanup_process_count = (self.finished_cleanup_process_count or 0) + 1
-            table.insert(runtime.lifecycle_events, "cleanup-process")
-            return process(self)
-        end
-
-        plugin:init()
-
-        assert.are.equal(1, plugin.finished_cleanup_process_count)
-        assert.are.same({ "queue-recover", "cleanup-process" }, runtime.lifecycle_events)
-    end)
-
     it("records the freshly persisted read entry when a finished document closes", function()
         local path = "/downloads/source/manga/c1.cbz"
         runtime_helper.teardown()
@@ -275,147 +260,6 @@ describe("suwayomi plugin", function()
         assert.are.equal("c1", runtime.finished_cleanup_journal.mangas.m1.records[1].chapter_id)
     end)
 
-    it("schedules finished cleanup from queue status changes without processor reentry", function()
-        local plugin = build_plugin()
-        plugin.finished_cleanup_processing = true
-        plugin.refreshChapterMenu = function() end
-        plugin.refreshDownloadsMenu = function() end
-        local schedule = plugin.scheduleFinishedChapterCleanup
-        plugin.scheduleFinishedChapterCleanup = function(self, delay_seconds)
-            self.finished_cleanup_schedule_count = (self.finished_cleanup_schedule_count or 0) + 1
-            self.finished_cleanup_scheduled_delay = delay_seconds
-            return schedule(self, delay_seconds)
-        end
-        plugin.processFinishedChapterCleanup = function(self)
-            self.unexpected_cleanup_reentry_count = (self.unexpected_cleanup_reentry_count or 0) + 1
-        end
-
-        local queue = plugin:getDownloadQueue()
-        queue.options.onStatusChanged()
-
-        assert.are.equal(1, plugin.finished_cleanup_schedule_count)
-        assert.are.equal(0, plugin.finished_cleanup_scheduled_delay)
-        assert.is_nil(plugin.unexpected_cleanup_reentry_count)
-    end)
-
-    it("defers a FileManager cleanup timer after ReaderUI opens the candidate", function()
-        local path = "/downloads/source/manga/c1.cbz"
-        runtime_helper.teardown()
-        runtime = runtime_helper.install({
-            chapter_ledger = {
-                ["m1:c1"] = {
-                    manga_id = "m1",
-                    chapter_id = "c1",
-                    path = path,
-                    read = true,
-                },
-            },
-            finished_cleanup_journal = {
-                version = 1,
-                next_sequence = 2,
-                mangas = {
-                    m1 = {
-                        records = {
-                            { chapter_id = "c1", path = path, sequence = 1, retry_count = 0, retry_after = 0 },
-                        },
-                    },
-                },
-            },
-            delete_chapters_settings = {
-                delete_after_mark_read = false,
-                delete_finished_while_reading = 1,
-            },
-            download_directory = "/downloads",
-        })
-        local plugin = build_plugin()
-        local delete_calls = {}
-        plugin.chapterArchiveExists = function(_, candidate)
-            return candidate == path
-        end
-        plugin.getDownloadQueue = function()
-            return { getStatus = function() end }
-        end
-        plugin.deleteChapterFromDeviceWithOptions = function(_, manga, chapter)
-            table.insert(delete_calls, { manga = manga, chapter = chapter })
-            return true, "deleted"
-        end
-
-        plugin:scheduleFinishedChapterCleanup(0)
-        runtime.reader_ui.instance = { document = { file = path } }
-        runtime.scheduled[1].callback()
-
-        local record = runtime.finished_cleanup_journal.mangas.m1.records[1]
-        assert.are.equal(0, #delete_calls)
-        assert.are.equal(1, record.retry_count)
-        assert.are.equal(105, record.retry_after)
-    end)
-
-    it("ignores a closed reader's retained document when later cleanup timers run", function()
-        local path = "/downloads/source/manga/c1.cbz"
-        local reader_ui = { document = { file = path } }
-        runtime_helper.teardown()
-        runtime = runtime_helper.install({
-            reader_ui_instance = reader_ui,
-            chapter_ledger = {
-                ["m1:c1"] = {
-                    manga_id = "m1",
-                    chapter_id = "c1",
-                    path = path,
-                    read = true,
-                },
-            },
-            finished_cleanup_journal = {
-                version = 1,
-                next_sequence = 2,
-                mangas = {
-                    m1 = {
-                        records = {
-                            { chapter_id = "c1", path = path, sequence = 1, retry_count = 0, retry_after = 0 },
-                        },
-                    },
-                },
-            },
-            delete_chapters_settings = {
-                delete_after_mark_read = false,
-                delete_finished_while_reading = 1,
-            },
-            download_directory = "/downloads",
-        })
-        local retained_document = reader_ui.document
-        local retained_reader = build_plugin({ ui = reader_ui, document = retained_document })
-        local filemanager = build_plugin()
-        local delete_calls = {}
-        local queue = { getStatus = function() end }
-        local function installCleanupBoundary(plugin, owner)
-            plugin.chapterArchiveExists = function(_, candidate)
-                return candidate == path
-            end
-            plugin.getDownloadQueue = function()
-                return queue
-            end
-            plugin.deleteChapterFromDeviceWithOptions = function(_, manga, chapter)
-                table.insert(delete_calls, { owner = owner, manga = manga, chapter = chapter })
-                return true, "deleted"
-            end
-        end
-        installCleanupBoundary(retained_reader, "reader")
-        installCleanupBoundary(filemanager, "filemanager")
-
-        retained_reader:scheduleFinishedChapterCleanup(0)
-        local reader_timer = runtime.scheduled[1].callback
-        reader_ui.document = nil
-        runtime.reader_ui.instance = nil
-        filemanager:scheduleFinishedChapterCleanup(0)
-        local filemanager_timer = runtime.scheduled[2].callback
-
-        reader_timer()
-        filemanager_timer()
-
-        assert.are.equal(1, #delete_calls)
-        assert.is_nil(runtime.finished_cleanup_journal.mangas.m1)
-        assert.are.equal(2, #runtime.scheduled)
-    end)
-
     it("reevaluates blocked cleanup before download-directory callbacks", function()
         local plugin = build_plugin()
         local events = {}
@@ -433,41 +277,6 @@ describe("suwayomi plugin", function()
         assert.are.same({ "cleanup-directory-changed", "caller" }, events)
     end)
 
-    it("wires completed download archives into reader return context", function()
-        local plugin = build_plugin()
-        local saved_context
-        local ledger_context
-        plugin.saveReaderReturnContext = function(_, manga, chapter, path)
-            saved_context = {
-                manga = manga,
-                chapter = chapter,
-                path = path,
-            }
-        end
-        plugin.upsertChapterLedgerEntry = function(_, manga, chapter, updates)
-            ledger_context = {
-                manga = manga,
-                chapter = chapter,
-                updates = updates,
-            }
-        end
-
-        local queue = plugin:getDownloadQueue()
-        local manga = { id = "m1", title = "Manga" }
-        local chapter = { id = "c1", name = "Chapter 1" }
-
-        queue.options.onChapterArchiveReady(manga, chapter, "/downloads/Manga/Chapter 1.cbz")
-
-        assert.are.equal(manga, saved_context.manga)
-        assert.are.equal(chapter, saved_context.chapter)
-        assert.are.equal("/downloads/Manga/Chapter 1.cbz", saved_context.path)
-        assert.are.equal(manga, ledger_context.manga)
-        assert.are.equal(chapter, ledger_context.chapter)
-        assert.are.same({
-            path = "/downloads/Manga/Chapter 1.cbz",
-        }, ledger_context.updates)
-    end)
-
     it("drains suppressed download status refreshes after the outer callback finishes", function()
         local plugin = build_plugin()
         local refreshes = {}
@@ -477,7 +286,7 @@ describe("suwayomi plugin", function()
 
         local queue = plugin:getDownloadQueue()
         plugin:withChapterMenuRefreshSuppressed(function()
-            queue.options.onStatusChanged()
+            plugin:onDownloadSnapshot(queue:getSnapshot())
             assert.are.equal(0, #refreshes)
             assert.is_true(plugin.pending_chapter_menu_refresh)
         end)
@@ -517,21 +326,21 @@ describe("suwayomi plugin", function()
         assert.are.equal("Downloads", dialog.actions[3].text)
 
         failed_count = 2
-        queue.options.onStatusChanged()
+        plugin:onDownloadSnapshot(queue:getSnapshot())
         assert.are.equal("Downloads · 2 failed", dialog.actions[3].text)
         assert.are.equal(dialog, runtime.shown_home_dialog)
-        queue.options.onStatusChanged()
+        plugin:onDownloadSnapshot(queue:getSnapshot())
         assert.are.equal(1, #runtime.home_downloads_labels)
 
         failed_count = 1
         plugin:withChapterMenuRefreshSuppressed(function()
-            queue.options.onStatusChanged()
+            plugin:onDownloadSnapshot(queue:getSnapshot())
             assert.are.equal("Downloads · 2 failed", dialog.actions[3].text)
         end)
         assert.are.equal("Downloads · 1 failed", dialog.actions[3].text)
 
         failed_count = 0
-        queue.options.onStatusChanged()
+        plugin:onDownloadSnapshot(queue:getSnapshot())
         assert.are.equal("Downloads", dialog.actions[3].text)
         assert.are.same({ "Downloads · 2 failed", "Downloads · 1 failed", "Downloads" }, runtime.home_downloads_labels)
         assert.is_true(plugin:isSuwayomiScreenActive(dialog))
@@ -550,7 +359,7 @@ describe("suwayomi plugin", function()
 
         dialog.onClose()
         failed_count = 2
-        queue.options.onStatusChanged()
+        plugin:onDownloadSnapshot(queue:getSnapshot())
 
         assert.are.same({}, runtime.home_downloads_labels)
         assert.is_nil(plugin.current_home_dialog)
@@ -560,7 +369,7 @@ describe("suwayomi plugin", function()
         assert.are.equal("Downloads · 2 failed", reopened.actions[3].text)
         plugin:getNavigation():pop(reopened)
         failed_count = 0
-        queue.options.onStatusChanged()
+        plugin:onDownloadSnapshot(queue:getSnapshot())
         assert.are.same({}, runtime.home_downloads_labels)
         assert.is_nil(plugin.current_home_dialog)
     end)
@@ -685,7 +494,7 @@ describe("suwayomi plugin", function()
             require("suwayomi/chapters/context"),
             require("suwayomi/chapters/menu"),
             require("suwayomi/chapters/actions"),
-            require("suwayomi/chapters/finished_cleanup"),
+
             require("suwayomi/downloads/controller"),
             require("suwayomi/readsync/ledger"),
             require("suwayomi/readsync/koreader_metadata"),

@@ -405,10 +405,11 @@ function Methods:showParallelDownloadsDialog(touchmenu_instance)
             self:showMessage(err or I18n.t("Failed to save settings."))
             return
         end
-        if self.download_queue then
-            self.download_queue.max_active_chapters = saved_value
-            if self.download_queue.process then
-                self.download_queue:process()
+        local queue = self.getDownloadQueue and self:getDownloadQueue() or self.download_queue
+        if queue then
+            queue.max_active_chapters = saved_value
+            if queue.process then
+                queue:process()
             end
         end
         self:refreshSettingsMenu(touchmenu_instance)

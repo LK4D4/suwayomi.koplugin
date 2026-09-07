@@ -3,7 +3,7 @@
 -- Responsibility: track route widgets, coordinate branch replacement, and keep
 -- navigator state in sync when current widgets close themselves.
 -- Owned state: ordered route entries for one navigator instance.
--- Dependencies: injected UIManager close method.
+-- Dependencies: injected UIManager close method and optional route-change callback.
 -- External data: route ids, widgets, and route options are stored opaquely.
 
 local Navigation = {}
@@ -122,6 +122,7 @@ function Navigator:pop(widget)
     end
 
     restoreCallback(entry)
+    if self.on_changed then self.on_changed() end
     return entry.widget
 end
 
@@ -164,9 +165,10 @@ function Navigator:contains(widget)
     return findEntryIndex(self.entries, widget) ~= nil
 end
 
-function Navigation.new(ui_manager)
+function Navigation.new(ui_manager, on_changed)
     return setmetatable({
         ui_manager = ui_manager,
+        on_changed = type(on_changed) == "function" and on_changed or nil,
         entries = {},
         closing_widgets = {},
     }, Navigator)

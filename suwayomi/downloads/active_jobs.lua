@@ -2,7 +2,7 @@
 --
 -- Responsibility: own in-memory active jobs, launch downloader workers, poll
 -- progress files, handle terminal states, and schedule follow-up polls.
--- Owned state: active job table plus poll-scheduled flag; persisted state still
+-- Owned state: active and stopping jobs, completion retries and timers; persisted state still
 -- flows through the queue facade and JobStore.
 -- Dependencies: queue facade callbacks, KOReader subprocess utilities, progress
 -- files, and the plugin i18n facade.
@@ -42,7 +42,43 @@ function ActiveJobs:getCount()
     for _ in pairs(self.jobs or {}) do
         count = count + 1
     end
+    for _, job in pairs(self.terminating_pids) do
+        if not self.jobs[job.key] then count = count + 1 end
+    end
     return count
+end
+
+function ActiveJobs:getStoppingJob(key)
+    for _, job in pairs(self.terminating_pids) do
+        if job.key == key then return job end
+    end
+end
+
+function ActiveJobs:isWorkerDone(job)
+    if job.worker_done or not job.pid then return true end
+    local ok, done = pcall(self.queue.ffi_util.isSubProcessDone, job.pid)
+    if ok and done then job.worker_done = true end
+    return job.worker_done == true
+end
+
+function ActiveJobs:cleanupStoppedJob(job)
+    self.queue:cleanupInterruptedDownload(job)
+    if job.progress_path then os.remove(job.progress_path) end
+end
+
+function ActiveJobs:reapStoppingJobs()
+    for pid, job in pairs(self.terminating_pids) do
+        if self:isWorkerDone(job) then
+            local path = self.queue:getExistingArchivePath(job)
+            if path then
+                self:completeArchive(job, path)
+            else
+                self:cleanupStoppedJob(job)
+                self.terminating_pids[pid] = nil
+                self.queue.onStatusChanged()
+            end
+        end
+    end
 end
 
 function ActiveJobs:getJob(key)
@@ -146,7 +182,7 @@ function ActiveJobs:startQueuedJob(queued)
     queued.last_progress_state = nil
     queued.progress = nil
     queued.progress_path = queue:buildProgressPath(queued.manga, queued.chapter, queued.download_directory)
-    queued.credentials = queued.credentials or queue:getCredentialsForJob()
+    queued.credentials = queue:getCredentialsForJob()
     local ok, err = queue:upsertPersistentJob(queue:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading", {
         started_at = queued.started_at,
         last_progress_at = queued.last_progress_at,
@@ -197,13 +233,10 @@ function ActiveJobs:process()
     local started_count = 0
     local earliest_retry_at
     local terminating_pending = false
-    for pid in pairs(self.terminating_pids) do
-        if queue.ffi_util.isSubProcessDone(pid) then
-            self.terminating_pids[pid] = nil
-        else
-            earliest_retry_at = queue.now() + 1
-            terminating_pending = true
-        end
+    self:reapStoppingJobs()
+    if next(self.terminating_pids) then
+        earliest_retry_at = queue.now() + 1
+        terminating_pending = true
     end
     while self:getCount() < queue.max_active_chapters do
         if terminating_pending then
@@ -329,10 +362,6 @@ function ActiveJobs:scheduleTransientRetry(active, progress)
 
     self:terminateJob(active)
     self:removeJob(active)
-    if queue.cleanupInterruptedDownload then
-        queue:cleanupInterruptedDownload(active)
-    end
-    os.remove(active.progress_path)
 
     local queued = {
         key = active.key,
@@ -366,10 +395,10 @@ function ActiveJobs:terminateJob(active)
     if not active or not active.pid then
         return
     end
-    if queue and queue.ffi_util and queue.ffi_util.terminateSubProcess then
+    self.terminating_pids[active.pid] = active
+    if not self:isWorkerDone(active) and queue and queue.ffi_util and queue.ffi_util.terminateSubProcess then
         pcall(queue.ffi_util.terminateSubProcess, active.pid)
     end
-    self.terminating_pids[active.pid] = true
 end
 
 function ActiveJobs:finishWithFailure(active, message)
@@ -395,10 +424,6 @@ function ActiveJobs:finishWithFailure(active, message)
     end
     self:terminateJob(active)
     self:removeJob(active)
-    if queue.cleanupInterruptedDownload then
-        queue:cleanupInterruptedDownload(active)
-    end
-    os.remove(active.progress_path)
     queue:setStatus(active.manga, active.chapter, { state = "failed" })
     queue:notifyDownloadFailure(failure_message)
     return true
@@ -407,6 +432,9 @@ end
 function ActiveJobs:finishWithCancel(active, options)
     options = options or {}
     local queue = self.queue
+    if active.pending_completion or queue:getExistingArchivePath(active) then
+        return self:finishFromProgress(active)
+    end
     local key = active.key or queue:getKey(active.manga, active.chapter)
     local ok, err = queue:removePersistentJob(key)
     if not ok then
@@ -414,10 +442,6 @@ function ActiveJobs:finishWithCancel(active, options)
     end
     self:terminateJob(active)
     self:removeJob(active)
-    if queue.cleanupInterruptedDownload then
-        queue:cleanupInterruptedDownload(active)
-    end
-    os.remove(active.progress_path)
     queue.statuses[key] = nil
     if not options.quiet then
         queue.onStatusChanged()
@@ -496,165 +520,47 @@ function ActiveJobs:recordProgress(active, progress)
     end
 end
 
+function ActiveJobs:completeArchive(active, path, progress)
+    local queue = self.queue
+    active.pending_completion = path
+    if not self:isWorkerDone(active) then return false, "worker_stopping" end
+    local ok, err = queue:commitChapterCompletion(active, path)
+    if not ok then return false, err end
+    self:removeJob(active)
+    if active.pid then self.terminating_pids[active.pid] = nil end
+    local remaining = {}
+    for _, item in ipairs(queue.items) do
+        if item.key ~= active.key then remaining[#remaining + 1] = item end
+    end
+    queue.items = remaining
+    self:cleanupStoppedJob(active)
+    queue:setStatus(active.manga, active.chapter, {
+        state = progress and progress.state == "skipped" and "skipped" or "downloaded",
+        current = progress and progress.current or active.last_progress_current,
+        total = progress and progress.total or active.last_progress_total,
+    })
+    queue:notifyChapterArchiveReady(active.manga, active.chapter, path)
+    return true
+end
+
 function ActiveJobs:finishFromProgress(active, progress)
     local queue = self.queue
-    if queue and queue.checkStoreFence and not queue:checkStoreFence() then
-        return false, "store_blocked"
-    end
+    if not queue:checkStoreFence() then return false, "store_blocked" end
+    local path = queue:getExistingArchivePath(active, progress)
+    if path then return self:completeArchive(active, path, progress) end
     if progress and progress.state == "failed" and progress.retryable == true then
-        local retried, retry_err = self:scheduleTransientRetry(active, progress)
-        if retried or retry_err then
-            return retried, retry_err
-        end
+        local retried, err = self:scheduleTransientRetry(active, progress)
+        if retried or err then return retried, err end
     end
+    local message = progress and progress.error
     if progress and (progress.state == "downloaded" or progress.state == "skipped") then
-        local archive_path = queue:getExistingArchivePath(active, progress)
-        if not archive_path then
-            local message = queue:formatFailureMessage(
-                active.manga,
-                active.chapter,
-                I18n.t("Chapter download finished but the archive is missing.")
-            )
-            local ok, err = queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
-                started_at = active.started_at,
-                last_progress_at = active.last_progress_at or queue.now(),
-                progress = {
-                    state = "failed",
-                    current = progress.current,
-                    total = progress.total,
-                    path = progress.path,
-                    error = message,
-                    updated_at = active.last_progress_at or queue.now(),
-                },
-            }))
-            if not ok then
-                return false, err
-            end
-            if active.pid then
-                self.terminating_pids[active.pid] = true
-            end
-            self:removeJob(active)
-            os.remove(active.progress_path)
-            queue:setStatus(active.manga, active.chapter, { state = "failed" })
-            queue:notifyDownloadFailure(message)
-            return
-        end
-        local ok, err = queue:removePersistentJob(active.key or queue:getKey(active.manga, active.chapter))
-        if not ok then
-            return false, err
-        end
-        if active.pid then
-            self.terminating_pids[active.pid] = true
-        end
-        self:removeJob(active)
-        os.remove(active.progress_path)
-        queue:setStatus(active.manga, active.chapter, {
-            state = progress.state,
-            current = progress.current,
-            total = progress.total,
-        })
-        queue:notifyChapterArchiveReady(
-            active.manga,
-            active.chapter,
-            archive_path
-        )
-    elseif progress and progress.state == "failed" and queue:jobArchiveExists(active, progress) then
-        -- A downloader may report failure after writing a valid CBZ. Keep the
-        -- user-facing state aligned with the archive that now exists on disk.
-        local archive_path = queue:getExistingArchivePath(active, progress)
-        local ok, err = queue:removePersistentJob(active.key or queue:getKey(active.manga, active.chapter))
-        if not ok then
-            return false, err
-        end
-        if active.pid then
-            self.terminating_pids[active.pid] = true
-        end
-        self:removeJob(active)
-        os.remove(active.progress_path)
-        queue:setStatus(active.manga, active.chapter, {
-            state = "downloaded",
-            current = progress.current,
-            total = progress.total,
-        })
-        queue:notifyChapterArchiveReady(active.manga, active.chapter, archive_path)
-    elseif progress and progress.state == "failed" then
-        local message = queue:formatFailureMessage(
-            active.manga,
-            active.chapter,
-            progress.error or I18n.t("Chapter download failed.")
-        )
-        local ok, err = queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
-            started_at = active.started_at,
-            last_progress_at = active.last_progress_at or queue.now(),
-            progress = {
-                state = "failed",
-                current = progress.current,
-                total = progress.total,
-                path = progress.path,
-                error = message,
-                updated_at = active.last_progress_at or queue.now(),
-            },
-        }))
-        if not ok then
-            return false, err
-        end
-        if active.pid then
-            self.terminating_pids[active.pid] = true
-        end
-        self:removeJob(active)
-        os.remove(active.progress_path)
-        queue:setStatus(active.manga, active.chapter, {
-            state = "failed",
-            current = progress.current,
-            total = progress.total,
-        })
-        queue:notifyDownloadFailure(message)
+        message = I18n.t("Chapter download finished but the archive is missing.")
     end
+    return self:finishWithFailure(active, message)
 end
 
 function ActiveJobs:finishWithoutProgress(active)
-    local queue = self.queue
-    if queue and queue.checkStoreFence and not queue:checkStoreFence() then
-        return false, "store_blocked"
-    end
-    local archive_path = queue:getExistingArchivePath(active)
-    if archive_path then
-        local ok, err = queue:removePersistentJob(active.key or queue:getKey(active.manga, active.chapter))
-        if not ok then
-            return false, err
-        end
-        self:removeJob(active)
-        os.remove(active.progress_path)
-        queue:setStatus(active.manga, active.chapter, {
-            state = "downloaded",
-            current = active.last_progress_current,
-            total = active.last_progress_total,
-        })
-        queue:notifyChapterArchiveReady(active.manga, active.chapter, archive_path)
-        return true
-    end
-
-    local message = queue:formatFailureMessage(active.manga, active.chapter, I18n.t("Chapter download failed."))
-    local ok, err = queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
-        started_at = active.started_at,
-        last_progress_at = queue.now(),
-        progress = {
-            state = "failed",
-            current = active.last_progress_current or 0,
-            total = active.last_progress_total or 0,
-            path = active.last_progress_path,
-            error = message,
-            updated_at = queue.now(),
-        },
-    }))
-    if not ok then
-        return false, err
-    end
-    self:removeJob(active)
-    os.remove(active.progress_path)
-    queue:setStatus(active.manga, active.chapter, { state = "failed" })
-    queue:notifyDownloadFailure(message)
-    return true
+    return self:finishFromProgress(active)
 end
 
 function ActiveJobs:poll()
@@ -682,7 +588,12 @@ function ActiveJobs:poll()
             break
         end
         local active = active_jobs[index]
-        local progress = active.pending_retry and {
+        local progress = active.pending_completion and {
+            state = active.last_progress_state == "skipped" and "skipped" or "downloaded",
+            current = active.last_progress_current,
+            total = active.last_progress_total,
+            path = active.pending_completion,
+        } or active.pending_retry and {
             state = "failed",
             retryable = true,
         } or ProgressFile.read(active.progress_path)
@@ -691,7 +602,10 @@ function ActiveJobs:poll()
             break
         end
 
-        if queue.now() - (active.last_progress_at or active.started_at or queue.now()) > queue.WATCHDOG_TIMEOUT_SECONDS then
+        if active.pending_completion then
+            -- Storage retries cannot turn a completed transfer into a network timeout.
+            self:finishFromProgress(active, progress)
+        elseif queue.now() - (active.last_progress_at or active.started_at or queue.now()) > queue.WATCHDOG_TIMEOUT_SECONDS then
             -- The worker may have died without writing terminal progress. The
             -- watchdog converts that silent active state into a recoverable
             -- failed job instead of leaving a permanent "downloading" row.
@@ -732,6 +646,24 @@ function ActiveJobs:poll()
         queued_count = #(queue.items or {}),
         elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
     })
+end
+
+function ActiveJobs:shutdown()
+    self.retry_wakeup_at, self.poll_scheduled = nil, false
+    local now = require("socket").gettime
+    local deadline = now() + 2
+    local workers = {}
+    for _, job in pairs(self.jobs) do if job.pid then workers[job.pid] = job end end
+    for pid, job in pairs(self.terminating_pids) do workers[pid] = job end
+    -- Both helpers are nonblocking without isSubProcessDone's optional wait flag.
+    -- One pass shares the entire budget; no file IO or final save is required.
+    for pid, job in pairs(workers) do
+        if now() >= deadline then break end
+        if not self:isWorkerDone(job) then
+            pcall(self.queue.ffi_util.terminateSubProcess, pid)
+            if now() < deadline then self:isWorkerDone(job) end
+        end
+    end
 end
 
 return ActiveJobs

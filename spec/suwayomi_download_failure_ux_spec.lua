@@ -70,11 +70,11 @@ describe("download failure user actions", function()
         }
     end
 
-    local function recover(jobs)
+    local function restoreSession(jobs)
         saved = require("dkjson").encode(jobs)
         queue = newQueue()
         plugin.queue = queue
-        queue:recover()
+        assert(queue:reconcile())
     end
 
     local function button(viewer, id)
@@ -165,7 +165,7 @@ describe("download failure user actions", function()
 
     for _, title_action in ipairs({ false, true }) do
         it("reports rejected Clear failed from " .. (title_action and "title" or "menu") .. " action", function()
-            recover({ job("failed", "network failure") })
+            restoreSession({ job("failed", "network failure") })
             local committed = saved
             local menu = plugin:showDownloads()
             save_error = "write_failed: injected clear failure"
@@ -184,7 +184,7 @@ describe("download failure user actions", function()
     for _, failure in ipairs({ "write_failed: injected cancellation failure",
         "ambiguous_post_replacement: injected directory sync failure" }) do
         it("preserves archives and ledger when deletion cancellation returns " .. failure, function()
-            recover({ job("queued") })
+            restoreSession({ job("queued") })
             for name, method in pairs(require("suwayomi/chapters/delete_actions").methods) do
                 plugin[name] = method
             end
@@ -211,7 +211,7 @@ describe("download failure user actions", function()
 
     for _, active in ipairs({ false, true }) do
         it("reports rejected " .. (active and "active" or "queued") .. " cancellation without losing its row", function()
-            recover({ job("queued") })
+            restoreSession({ job("queued") })
             if active then queue:process() end
             local committed = saved
             local menu = plugin:showDownloads()
@@ -228,7 +228,7 @@ describe("download failure user actions", function()
     end
 
     it("opens full multiline details directly and closes back to the same Downloads menu", function()
-        recover({ job("failed", full_error) })
+        restoreSession({ job("failed", full_error) })
         local menu = plugin:showDownloads()
         assert.are.equal(1, #stack)
         assert.are.equal("Failed", menu.item_table[1].mandatory)
@@ -247,7 +247,7 @@ describe("download failure user actions", function()
     end)
 
     it("retries from chapter details and keeps the originating chapter screen", function()
-        recover({ job("failed", full_error) })
+        restoreSession({ job("failed", full_error) })
         local chapter_screen = { name = "chapters" }
         ui:show(chapter_screen)
         plugin:showChapterDownloadError(manga, chapter)
@@ -262,7 +262,7 @@ describe("download failure user actions", function()
     end)
 
     it("refreshes the existing Downloads row after Retry", function()
-        recover({ job("failed", "network failure") })
+        restoreSession({ job("failed", "network failure") })
         local menu = plugin:showDownloads()
         menu.item_table[1].callback()
         button(stack[2], "retry").callback()
@@ -274,7 +274,7 @@ describe("download failure user actions", function()
 
     it("provides a missing-error fallback from both entry points", function()
         for _, error_message in ipairs({ false, "", " \n\t" }) do
-            recover({ job("failed", error_message or nil) })
+            restoreSession({ job("failed", error_message or nil) })
             local menu = plugin:showDownloads()
             assert.are.equal("No error details were recorded.", menu.item_table[1].subtitle)
             menu.item_table[1].callback()
@@ -287,8 +287,8 @@ describe("download failure user actions", function()
         end
     end)
 
-    it("keeps scheduled retry errors after restart without adding countdown refreshes", function()
-        recover({ job("queued", full_error, 130) })
+    it("keeps scheduled retry errors during the session without adding countdown refreshes", function()
+        restoreSession({ job("queued", full_error, 130) })
         local menu = plugin:showDownloads()
         assert.are.equal("Retry scheduled", menu.item_table[1].mandatory)
         assert.is_truthy(menu.item_table[1].subtitle:find(os.date("%Y-%m-%d %H:%M:%S", 130), 1, true))
@@ -312,7 +312,7 @@ describe("download failure user actions", function()
         button(stack[1], "close").callback()
         queue = newQueue()
         plugin.queue = queue
-        queue:recover()
+        assert(queue:reconcile())
         assert.are.equal(full_error, queue:getSnapshot().queued[1].progress.error)
         queue:process()
         assert.are.equal(0, queue:getActiveCount())
@@ -323,7 +323,7 @@ describe("download failure user actions", function()
     end)
 
     it("keeps individual cancellation available while a retry is scheduled", function()
-        recover({ job("queued", full_error, 130) })
+        restoreSession({ job("queued", full_error, 130) })
         local menu = plugin:showDownloads()
         menu.item_table[1].callback()
         stack[2].select("cancel_queued")
@@ -335,7 +335,7 @@ describe("download failure user actions", function()
 
     it("revalidates Retry after jobs become queued, active, completed, cleared, or replaced", function()
         for _, state in ipairs({ "queued", "downloading", "downloaded", "cleared", "failed" }) do
-            recover({ job("failed", "old error") })
+            restoreSession({ job("failed", "old error") })
             local menu = plugin:showDownloads()
             menu.item_table[1].callback()
             local viewer = stack[#stack]
@@ -355,11 +355,11 @@ describe("download failure user actions", function()
     end)
 
     it("revalidates Retry against a replaced queue instance", function()
-        recover({ job("failed", "old error") })
+        restoreSession({ job("failed", "old error") })
         plugin:showChapterDownloadError(manga, chapter)
         local viewer = stack[1]
         local old_queue = queue
-        recover({ job("queued", "scheduled error", 130) })
+        restoreSession({ job("queued", "scheduled error", 130) })
         button(viewer, "retry").callback()
         assert.are.equal(0, #old_queue.items)
         assert.are.equal(1, #queue.items)

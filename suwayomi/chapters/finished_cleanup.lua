@@ -1,8 +1,8 @@
 -- Boundary: FinishedChapterCleanup.
 --
 -- Responsibility: Persist finished-chapter order, process retention-based local cleanup, and refresh changed download views per batch.
--- Owned state: Per-plugin processing, scheduling, retry, and notification state.
--- Dependencies: Plugin ledger/delete methods, settings, UIManager, filesystem path resolution, debug, and i18n.
+-- Owned state: Processing, scheduling, retry, and notification state on a process-owned receiver in production.
+-- Dependencies: Receiver ledger/delete methods, settings, UIManager, filesystem path resolution, debug, and i18n.
 -- External data: Journal, ledger, queue, and filesystem paths are revalidated before deletion.
 
 local UIManager = require("ui/uimanager")
@@ -130,7 +130,7 @@ local function refreshChangedDownloadViews(self, changed_mangas)
         -- rebuilding can reconcile metadata and write a newer ledger itself.
         self:refreshChapterMenu()
     end
-    if self.refreshDownloadsMenu then self:refreshDownloadsMenu() end
+    if self.refreshDownloadsMenu then self:refreshDownloadsMenu(changed_mangas) end
 end
 
 local function retryDelay(retry_count)
@@ -572,8 +572,10 @@ local function processFinishedChapterCleanup(self, summary)
                     transient_reason = "stat_failed"
                 elseif current_path == record.path then
                     transient_reason = "current_document"
-                elseif queue_status and (queue_status.state == "queued" or queue_status.state == "downloading") then
-                    transient_reason = queue_status.state
+                elseif (queue_status and (queue_status.state == "queued" or queue_status.state == "downloading"))
+                    or (self:getDownloadQueue().isChapterBusy
+                        and self:getDownloadQueue():isChapterBusy(manga_id .. ":" .. chapter_id)) then
+                    transient_reason = queue_status and queue_status.state or "downloading"
                 end
 
                 if transient_reason then

@@ -58,7 +58,8 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
         return false, "delete_failed", err
     end
     local status = queue and queue:getStatus(manga, chapter)
-    if status and status.state == "downloading" then
+    if (status and status.state == "downloading")
+        or (queue and queue.isChapterBusy and queue:isChapterBusy(queue:getKey(manga, chapter))) then
         if not options.quiet_active then
             self:showMessage(I18n.t("This chapter is downloading. Wait for it to finish before deleting it."))
         end

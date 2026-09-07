@@ -11,6 +11,13 @@
 local JobStore = {}
 JobStore.__index = JobStore
 
+local function copyMetadata(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for key, item in pairs(value) do result[key] = copyMetadata(item) end
+    return result
+end
+
 local function hasValidJobKey(job)
     return type(job) == "table" and type(job.key) == "string" and job.key ~= ""
 end
@@ -292,8 +299,8 @@ function JobStore:copySnapshotJob(job, state)
         key = job.key or self.getKey(job.manga or {}, job.chapter or {}),
         state = state or job.state,
         download_directory = job.download_directory,
-        manga = job.manga,
-        chapter = job.chapter,
+        manga = copyMetadata(job.manga),
+        chapter = copyMetadata(job.chapter),
         retry_count = job.retry_count,
         retry_at = job.retry_at,
     }

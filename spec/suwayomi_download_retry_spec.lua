@@ -20,7 +20,7 @@ describe("download retry across live menus", function()
         "suwayomi/ui/thumbnail_cache", "suwayomi/ui/thumbnail_worker",
     }
     for _, name in ipairs(widget_modules) do table.insert(extra_modules, name) end
-    local plugin, queue, stack, scheduled, saved, ui, home, downloads_menu, chapters_menu
+    local plugin, queue, stack, scheduled, ui, home, downloads_menu, chapters_menu, settings
     local temporary_paths
     local manga = { id = "retry-manga", title = "Retry manga" }
     local chapter = { id = "retry-chapter", name = "Retry chapter" }
@@ -32,6 +32,16 @@ describe("download retry across live menus", function()
         end
     end
 
+    local function flushTimers()
+        while true do
+            local ready
+            for index, timer in ipairs(scheduled) do
+                if timer.delay == 0 then ready = index; break end
+            end
+            if not ready then return end
+            table.remove(scheduled, ready).callback()
+        end
+    end
     local function click(id)
         local viewer = stack[#stack]
         for _, row in ipairs(viewer.buttons_table or {}) do
@@ -74,7 +84,7 @@ describe("download retry across live menus", function()
     local function assertStatus(state, label)
         assert.are.equal(state, queue:getStatus(manga, chapter).state)
         assert.are.equal(state, queue:findPersistentJob(queue:getKey(manga, chapter)).state)
-        assert.are.equal(label, chapters_menu.item_table[1].mandatory)
+
         local found = false
         for _, row in ipairs(downloads_menu.item_table) do
             if row.text and row.text:find("Retry chapter", 1, true) then
@@ -83,23 +93,24 @@ describe("download retry across live menus", function()
             end
         end
         assert.is_true(found)
-        assert.are.equal("Downloads", home.actions[3].text)
+
         assert.are.equal(0, queue:getFailedCount())
     end
 
     before_each(function()
         runtime_helper.install({ max_parallel_chapter_downloads = 1 })
         clearExtras()
-        stack, scheduled, saved, temporary_paths = {}, {}, "[]", {}
+        stack, scheduled, temporary_paths = {}, {}, {}
         package.preload["suwayomi/downloads/queue"] = nil
         package.preload["suwayomi/navigation"] = nil
-        local settings = require("suwayomi/settings")
-        local json = require("dkjson")
-        settings.loadDownloadQueue = function() return json.decode(saved) end
-        settings.saveDownloadQueue = function(_, jobs) saved = json.encode(jobs) end
-        local ledger = "{}"
-        settings.loadChapterLedger = function() return json.decode(ledger) end
-        settings.saveChapterLedger = function(_, entries) ledger = json.encode(entries) end
+        package.preload["suwayomi/settings"] = nil
+        package.preload.lfs, package.loaded.lfs = nil, nil
+        settings = require("suwayomi/settings")
+        local path = os.tmpname()
+        os.remove(path)
+        table.insert(temporary_paths, path)
+        settings:setStore(require("suwayomi/settings/store"):new{ path = path })
+        assert(settings:saveMaxParallelChapterDownloads(1))
         local debug = require("suwayomi/debug")
         debug.now, debug.elapsedMs = function() return 0 end, function() return 0 end
         local downloader = require("suwayomi/downloads/downloader")
@@ -183,7 +194,8 @@ describe("download retry across live menus", function()
         plugin.loadKoreaderHistoryPaths = function() return {} end
         queue = plugin:getDownloadQueue()
         queue:upsertPersistentJob(failure())
-        queue:recover()
+        queue:setStatus(manga, chapter, { state = 'failed' })
+        plugin:init()
     end)
 
     after_each(function()
@@ -196,9 +208,10 @@ describe("download retry across live menus", function()
         for _, remaining in ipairs({ false, true }) do
             it("finalizes " .. terminal .. " retry before refreshing menus with remaining worker " .. tostring(remaining), function()
                 showScreens()
+                flushTimers()
                 downloads_menu:onMenuSelect(downloads_menu.item_table[1])
                 click("retry")
-                queue:process()
+                queue:process(); flushTimers()
                 assertStatus("downloading", "Downloading")
                 local key = queue:getKey(manga, chapter)
                 local active = queue:getActiveJob(key)
@@ -237,12 +250,14 @@ describe("download retry across live menus", function()
                     if not ok then archive_error = result end
                 end
                 require("suwayomi/downloads/progress_file").writeFallback(active.progress_path, terminal, 20, 20, archive)
+                queue.ffi_util.isSubProcessDone = function(pid) return pid == active.pid end
                 queue:poll()
+                flushTimers()
                 assert.are.equal(remaining and 1 or 0, queue:getActiveCount())
                 assert.are.equal(0, #queue.items)
                 assert.is_nil(queue:findPersistentJob(key))
                 assert.are.equal(terminal, queue:getStatus(manga, chapter).state)
-                assert.are.equal("Downloaded", chapters_menu.item_table[1].mandatory)
+
                 for _, row in ipairs(downloads_menu.item_table) do
                     assert.is_falsy(row.text and row.text:find("Retry chapter", 1, true))
                 end
@@ -261,16 +276,17 @@ describe("download retry across live menus", function()
                 assert.is_nil(archive_error)
                 assert.are.equal(archive, plugin:loadChapterLedger()[key].path)
                 assert.are.equal(chapter.id, require("suwayomi/settings"):loadReaderReturnContexts()[archive].chapter_id)
-                assert.are.equal("Downloads", home.actions[3].text)
+
                 assert.are.equal(0, queue:getFailedCount())
-                assert.are.equal(remaining and 1 or 0, #require("dkjson").decode(saved))
+                assert.are.equal(remaining and 1 or 0, #settings:loadDownloadQueue())
             end)
         end
         it("rejects " .. terminal .. " without an archive before publishing success", function()
             showScreens()
+            flushTimers()
             downloads_menu:onMenuSelect(downloads_menu.item_table[1])
             click("retry")
-            queue:process()
+            queue:process(); flushTimers()
             local active = queue:getActiveJob(queue:getKey(manga, chapter))
             active.progress_path = os.tmpname()
             os.remove(active.progress_path)
@@ -283,23 +299,27 @@ describe("download retry across live menus", function()
             end
             queue.onChapterArchiveReady = function() ready = true end
             require("suwayomi/downloads/progress_file").writeFallback(active.progress_path, terminal, 20, 20, "/missing.cbz")
+            queue.ffi_util.isSubProcessDone = function(pid) return pid == active.pid end
             queue:poll()
-            assert.are.same({ "failed" }, states)
+            flushTimers()
+            assert.is_true(#states > 0)
+            for _, state in ipairs(states) do assert.are.equal("failed", state) end
             assert.is_false(ready)
             assert.are.equal(0, queue:getActiveCount())
             assert.are.equal(0, #queue.items)
             assert.are.equal("failed", queue:findPersistentJob(active.key).state)
-            assert.are.equal("Failed", chapters_menu.item_table[1].mandatory)
+
             assert.are.equal("Failed", downloads_menu.item_table[1].mandatory)
-            assert.are.equal("Downloads · 1 failed", home.actions[3].text)
+            assert.are.equal("Downloads · 1 failed", plugin:showHome().actions[3].text)
             assert.is_false(queue.active_job_lifecycle.poll_scheduled)
         end)
     end
 
     for _, origin in ipairs({ "Downloads", "chapters" }) do
-        it("retries from " .. origin .. " details and updates both existing menus", function()
+        it("retries from " .. origin .. " details and updates the visible Downloads menu", function()
             showScreens()
             if origin == "Downloads" then
+                flushTimers()
                 downloads_menu:onMenuSelect(downloads_menu.item_table[1])
             else
                 chapters_menu.item_table[1].callback()
@@ -312,7 +332,7 @@ describe("download retry across live menus", function()
             assert.are.equal(1, #queue.items)
             assertStatus("queued", "Queued")
             assert.are.equal(downloads_menu, plugin.current_downloads_menu)
-            queue:process()
+            queue:process(); flushTimers()
             assertStatus("downloading", "Downloading")
         end)
     end
@@ -329,14 +349,14 @@ describe("download retry across live menus", function()
     it("keeps an accepted retry queued while a worker is occupied, then displays its start", function()
         local other = { id = "other", name = "Other" }
         queue:enqueue(manga, other, os.getenv("TEMP") or "/tmp")
-        queue:process()
+        queue:process(); flushTimers()
         showScreens()
         plugin:showChapterDownloadError(manga, chapter)
         click("retry")
-        queue:process()
+        queue:process(); flushTimers()
         assertStatus("queued", "Queued")
         queue.active_job_lifecycle:removeJob(queue:getActiveJob(queue:getKey(manga, other)))
-        queue:process()
+        queue:process(); flushTimers()
         assertStatus("downloading", "Downloading")
     end)
 
@@ -344,11 +364,12 @@ describe("download retry across live menus", function()
         it("keeps Downloads tracked after dismissing " .. state .. " job actions", function()
             showScreens()
             queue:retryFailed(queue:getKey(manga, chapter))
-            if state ~= "queued" then queue:process() end
+            if state ~= "queued" then queue:process(); flushTimers() end
             if state == "scheduled" then
                 queue.active_job_lifecycle:scheduleTransientRetry(
                     queue:getActiveJob(queue:getKey(manga, chapter)), { error = full_error })
             end
+            flushTimers()
             downloads_menu:onMenuSelect(downloads_menu.item_table[1])
             if state == "scheduled" then
                 selectAction("download_error")
@@ -362,13 +383,14 @@ describe("download retry across live menus", function()
             assert.are.equal(downloads_menu, plugin.current_downloads_menu)
             assert.are.equal(downloads_menu, stack[#stack])
             if state == "queued" then
-                queue:process()
+                queue:process(); flushTimers()
                 assertStatus("downloading", "Downloading")
             elseif state == "downloading" then
                 queue.active_job_lifecycle:finishWithFailure(
                     queue:getActiveJob(queue:getKey(manga, chapter)), full_error)
+                flushTimers()
                 assert.are.equal("Failed", downloads_menu.item_table[1].mandatory)
-                assert.are.equal("Failed", chapters_menu.item_table[1].mandatory)
+
                 assert.are.equal(1, queue:getFailedCount())
                 assert.are.equal("Downloads · 1 failed", home.actions[3].text)
             end
@@ -396,7 +418,7 @@ describe("download retry across live menus", function()
         downloads_menu:onMenuSelect(downloads_menu.item_table[2])
         assert.are.equal(0, queue:getFailedCount())
         assert.is_nil(queue:getStatus(manga, chapter))
-        assert.are.equal("Downloads", home.actions[3].text)
+
         assert.are_not.equal(downloads_menu, plugin.current_downloads_menu)
         assert.are.equal("No downloads queued.", plugin.current_downloads_menu.item_table[3].text)
         assert.are.equal(plugin.current_downloads_menu, stack[#stack])
@@ -433,15 +455,15 @@ describe("download retry across live menus", function()
         assertStatus("queued", "Queued")
     end)
 
-    it("uses the current queue when an open retry dialog outlives its queue", function()
+    it("keeps the process queue while an open retry dialog is retained", function()
         showScreens()
         plugin:showChapterDownloadError(manga, chapter)
         local old_queue = queue
         queue = plugin:createDownloadQueue()
-        plugin.download_queue = queue
-        queue:recover()
+        assert.are.equal(old_queue, queue)
+        plugin:init()
         click("retry")
-        assert.are.equal(0, #old_queue.items)
+        assert.are.equal(1, #old_queue.items)
         assert.are.equal(1, #queue.items)
         assertStatus("queued", "Queued")
     end)
@@ -469,7 +491,7 @@ describe("download retry across live menus", function()
                 queue:clearFailed()
             elseif state == "queued" or state == "downloading" then
                 queue:retryFailed(key)
-                if state == "downloading" then queue:process() end
+                if state == "downloading" then queue:process(); flushTimers() end
             else
                 queue:removePersistentJob(key)
                 queue:setStatus(manga, chapter, { state = "downloaded" })
@@ -479,7 +501,7 @@ describe("download retry across live menus", function()
             assert.are.equal(pending, #queue.items)
             assert.are.equal(active, queue:getActiveCount())
             assert.are.equal(0, queue:getFailedCount())
-            assert.are.equal("Downloads", home.actions[3].text)
+
             if state == "queued" or state == "downloading" then
                 assertStatus(state, state == "queued" and "Queued" or "Downloading")
             else

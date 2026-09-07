@@ -357,7 +357,7 @@ describe("suwayomi settings atomic failure handling", function()
         assert.are.equal(0, #terminated)
         io_adapter.fail_sync_dir = false
         assert.is_true(queue:reconcile())
-        assert.are.same({ 1 }, terminated)
+        assert.are.same({}, terminated) -- The helper already confirmed this child exited.
         local retry = queue:getSnapshot().queued[1]
         assert.are.equal(1, retry.retry_count)
         queue:process()
@@ -412,8 +412,8 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_false(ok)
         assert.are.equal("downloading", progress and progress.state)
         assert.are.equal(0, #snapshot.queued)
-        assert.are.equal(1, #queue:getSnapshot().queued)
-        assert.are.equal("queued", SuwayomiSettings:loadDownloadQueue()[1].state)
+        assert.are.equal(1, #queue:getSnapshot().failed)
+        assert.are.equal("failed", SuwayomiSettings:loadDownloadQueue()[1].state)
     end)
 
     it("reports rejected single and capped batch download actions without claiming queued work", function()

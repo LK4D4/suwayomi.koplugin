@@ -49,6 +49,7 @@ function DownloadQueue:new(options)
         onStatusChanged = options.onStatusChanged or function() end,
         onMessage = options.onMessage or function() end,
         onChapterArchiveReady = options.onChapterArchiveReady or function() end,
+        commitChapterArchive = options.commitChapterArchive,
         debug_logger = options.debug_logger or function() end,
         getCredentials = options.getCredentials,
         items = {},
@@ -80,6 +81,10 @@ end
 
 function DownloadQueue:getActiveJob(key)
     return self.active_job_lifecycle:getJob(key)
+end
+
+function DownloadQueue:isChapterBusy(key)
+    return self:getActiveJob(key) ~= nil or self.active_job_lifecycle:getStoppingJob(key) ~= nil
 end
 
 function DownloadQueue:setActiveJob(job)
@@ -155,9 +160,10 @@ function DownloadQueue:removePersistentJob(key)
 end
 
 function DownloadQueue:scheduleReconciliation()
-    if self.reconciliation_scheduled then return end
+    if self.stopped or self.reconciliation_scheduled then return end
     self.reconciliation_scheduled = true
     self.ui_manager:scheduleIn(1, function()
+        if self.stopped then return end
         self.reconciliation_scheduled = false
         local ok = self:reconcile()
         if ok then
@@ -179,6 +185,7 @@ function DownloadQueue:isBlocked()
 end
 
 function DownloadQueue:reconcile()
+    if self.stopped then return false, "stopped" end
     local ok, res
     if self.job_store and self.job_store.reconcile then
         ok, res = self.job_store:reconcile()
@@ -190,6 +197,7 @@ function DownloadQueue:reconcile()
     if not ok then
         return false, res
     end
+    if self.recovery_pending then return self:recover() end
 
     local persistent_jobs = self:loadPersistentJobs() or {}
     local persistent_map = {}
@@ -220,14 +228,10 @@ function DownloadQueue:reconcile()
     if self.active_job_lifecycle and self.active_job_lifecycle.jobs then
         for key, active in pairs(self.active_job_lifecycle.jobs) do
             local pjob = persistent_map[key]
-            if not pjob or pjob.state ~= "downloading" then
+            if (not pjob or pjob.state ~= "downloading") and not active.pending_completion then
                 previous_pids[key] = active.pid
                 self.active_job_lifecycle:terminateJob(active)
                 self.active_job_lifecycle:removeJob(active)
-                if self.cleanupInterruptedDownload then
-                    self:cleanupInterruptedDownload(active)
-                end
-                os.remove(active.progress_path)
             end
         end
     end
@@ -284,6 +288,8 @@ function DownloadQueue:reconcile()
 end
 
 function DownloadQueue:checkStoreFence()
+    if self.stopped then return false, "stopped" end
+    if self.recovery_pending then return false, "startup_pending" end
     if self:isBlocked() then
         self:scheduleReconciliation()
         return false, "store_blocked_ambiguous_transaction"
@@ -337,13 +343,14 @@ function DownloadQueue:retryFailed(key)
         return false, "missing"
     end
     local status = self:getStatus(job.manga, job.chapter)
-    if self:getActiveJob(key) or (status and status.state ~= "failed") then
+    if self:isChapterBusy(key) or (status and status.state ~= "failed") then
         return false, "missing"
     end
     return self:enqueue(job.manga, job.chapter, job.download_directory)
 end
 
 function DownloadQueue:clearFailed()
+    if not self:checkStoreFence() then return 0, "store_blocked" end
     local remaining = {}
     local cleared = 0
     for _index, job in ipairs(self:loadPersistentJobs()) do
@@ -468,6 +475,18 @@ function DownloadQueue:clearStatus(manga, chapter, options)
     return true
 end
 
+function DownloadQueue:commitChapterCompletion(active, path)
+    active.pending_completion = path
+    local ok, err
+    if self.commitChapterArchive then
+        ok, err = self.commitChapterArchive(active, path)
+    else
+        ok, err = self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
+    end
+    if not ok and self:isBlocked() then self:scheduleReconciliation() end
+    return ok, err
+end
+
 function DownloadQueue:jobArchiveExists(job, progress)
     return self:getExistingArchivePath(job, progress) ~= nil
 end
@@ -511,6 +530,7 @@ function DownloadQueue:cancelPending(manga, chapter)
         return true, "queued"
     end
 
+    if self.active_job_lifecycle:getStoppingJob(key) then return false, "downloading" end
     if status then
         return false, status.state
     end
@@ -643,7 +663,7 @@ function DownloadQueue:cleanupInterruptedProgress(job)
 end
 
 function DownloadQueue:prepareFailedRetry(job)
-    if self:getActiveJob(self:getKey(job.manga, job.chapter)) then return false end
+    if self:isChapterBusy(self:getKey(job.manga, job.chapter)) then return false end
     local partial_cleanup_attempted = self:cleanupInterruptedDownload(job)
     local progress_cleanup_attempted = self:cleanupInterruptedProgress(job)
     self:logDebug({
@@ -655,140 +675,68 @@ function DownloadQueue:prepareFailedRetry(job)
     })
 end
 
-function DownloadQueue:recoverInterruptedJob(job)
-    local progress = self:normalizeProgress(job.progress)
-    return self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued", {
-        started_at = job.started_at,
-        last_progress_at = job.last_progress_at,
-        retry_count = job.retry_count,
-        retry_at = job.retry_at,
-        recovery = {
-            reason = "interrupted",
-            recovered_at = self.now(),
-            previous_state = "downloading",
-            progress = progress,
-        },
-    })
-end
-
-function DownloadQueue:cleanupRecoveredJob(job)
-    local progress = self:normalizeProgress(job.progress)
-    local partial_cleanup_attempted = self:cleanupInterruptedDownload(job)
-    local progress_cleanup_attempted = self:cleanupInterruptedProgress(job)
-    self:logDebug({
-        operation = "downloadQueue.recover",
-        event = "interrupted",
-        key = job.key or self:getKey(job.manga, job.chapter),
-        chapter_id = job.chapter and job.chapter.id,
-        previous_state = "downloading",
-        progress_state = progress and progress.state or nil,
-        progress_current = progress and progress.current or nil,
-        progress_total = progress and progress.total or nil,
-        cleanup_attempted = partial_cleanup_attempted or progress_cleanup_attempted,
-    })
-end
-
 function DownloadQueue:recover()
-    if not self:checkStoreFence() then
-        return false, "store_blocked"
-    end
-    local jobs = self:loadPersistentJobs()
-    if #jobs == 0 then
-        return
-    end
-
-    local recovered_jobs = {}
-    local recovered_items = {}
-    local recovered_statuses = {}
-    local cleanup_jobs = {}
-    local should_process = false
-    local seen_recovered_keys = {}
-    local recoverable_active_keys = {}
-    for _index, job in ipairs(jobs) do
-        if job.manga and job.chapter and job.download_directory and (job.state == "queued" or job.state == "downloading") then
-            recoverable_active_keys[self:getKey(job.manga, job.chapter)] = true
-        end
-    end
-    for _index, job in ipairs(jobs) do
-        if job.manga and job.chapter and job.download_directory and (job.state == "queued" or job.state == "downloading") then
-            local recovered
-            if job.state == "downloading" then
-                recovered = self:recoverInterruptedJob(job)
-                table.insert(cleanup_jobs, job)
-            else
-                recovered = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "queued", {
-                    retry_count = job.retry_count,
-                    retry_at = job.retry_at,
-                    progress = job.progress,
-                })
-            end
-            local key = recovered.key or self:getKey(recovered.manga, recovered.chapter)
-            if seen_recovered_keys[key] then
-                self:logDebug({
-                    operation = "downloadQueue.recover",
-                    event = "duplicate",
-                    key = key,
-                    chapter_id = recovered.chapter and recovered.chapter.id,
-                })
-            else
-                seen_recovered_keys[key] = true
-                recovered.key = key
-                table.insert(recovered_jobs, recovered)
-                table.insert(recovered_items, {
-                    key = recovered.key,
-                    download_directory = recovered.download_directory,
-                    manga = recovered.manga,
-                    chapter = recovered.chapter,
-                    downloader = self.downloader,
-                    retry_count = recovered.retry_count,
-                    retry_at = recovered.retry_at,
-                    progress = recovered.progress,
-                })
-                recovered_statuses[key] = {
-                    state = "queued",
-                    retry_count = recovered.retry_count,
-                    retry_at = recovered.retry_at,
-                }
-                should_process = true
-            end
-        elseif job.manga and job.chapter and job.state == "failed" then
-            local key = self:getKey(job.manga, job.chapter)
-            if recoverable_active_keys[key] then
-                self:logDebug({
-                    operation = "downloadQueue.recover",
-                    event = "duplicate",
-                    key = key,
-                    chapter_id = job.chapter and job.chapter.id,
-                })
-            elseif self:jobArchiveExists(job, job.progress) then
-                recovered_statuses[job.key or self:getKey(job.manga, job.chapter)] = nil
-            else
-                table.insert(recovered_jobs, job)
-                recovered_statuses[job.key or self:getKey(job.manga, job.chapter)] = { state = "failed" }
-            end
-        end
-    end
-
-    local saved, save_err = self:savePersistentJobs(recovered_jobs)
-    if not saved then
+    if self.recovered then return true end
+    self.recovery_pending = true
+    self.recovery_completions = self.recovery_completions or {}
+    local function retry(err)
         self:scheduleReconciliation()
-        return false, save_err
+        return false, err
     end
-    for _, job in ipairs(cleanup_jobs) do self:cleanupRecoveredJob(job) end
-    self.items = recovered_items
-    self.statuses = recovered_statuses
+    if self:isBlocked() then return retry("store_blocked") end
+    local jobs = self:loadPersistentJobs()
+    for _, job in ipairs(jobs) do
+        if job.manga and job.chapter and job.download_directory
+            and (job.state == "queued" or job.state == "downloading") then
+            local path = self:getExistingArchivePath(job)
+            if path then
+                local key = self:getKey(job.manga, job.chapter)
+                self.recovery_completions[key] = { job = job, path = path }
+            end
+        end
+    end
+    -- Retain these observations across an ambiguous save that removed the job.
+    for _, completion in pairs(self.recovery_completions) do
+        if not completion.saved then
+            local ok, err = self:commitChapterCompletion(completion.job, completion.path)
+            if not ok then return retry(err) end
+            completion.saved = true
+        end
+    end
+    jobs = self:loadPersistentJobs()
+    local statuses, normalized, changed = {}, {}, false
+    for _, job in ipairs(jobs) do
+        if job.manga and job.chapter and job.download_directory
+            and (job.state == "queued" or job.state == "downloading") then
+            local failed = {}
+            for key, value in pairs(job) do failed[key] = value end
+            failed.state, failed.retry_at = "failed", nil
+            failed.progress = self:normalizeProgress(job.progress) or {}
+            failed.progress.state = "failed"
+            failed.progress.retryable = nil
+            failed.progress.error = I18n.t("Interrupted; retry download")
+            job, changed = failed, true
+        end
+        normalized[#normalized + 1] = job
+        if job.manga and job.chapter and job.state == "failed" then
+            statuses[self:getKey(job.manga, job.chapter)] = { state = "failed" }
+        end
+    end
+    if changed then
+        local ok, err = self:savePersistentJobs(normalized)
+        if not ok then return retry(err) end
+    end
+    for key in pairs(self.recovery_completions) do statuses[key] = { state = "downloaded" } end
+    self.statuses = statuses
+    self.recovery_completions = nil
+    self.recovery_pending, self.recovered = nil, true
     self.onStatusChanged()
-    if should_process then
-        self.ui_manager:scheduleIn(0, function()
-            self:process()
-        end)
-    end
     return true
 end
 
 function DownloadQueue:canEnqueue(manga, chapter, download_directory)
     local status = self:getStatus(manga, chapter)
-    if self:getActiveJob(self:getKey(manga, chapter)) then
+    if self:isChapterBusy(self:getKey(manga, chapter)) then
         return false, "downloading"
     end
     if status and (status.state == "queued" or status.state == "downloading"
