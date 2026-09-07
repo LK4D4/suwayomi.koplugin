@@ -296,9 +296,9 @@ function Queries._buildChapterPagesQuery(chapter_id)
     })
 end
 
-function Queries._buildStoredChapterQuery(manga_id)
+function Queries._buildStoredChapterQuery(manga_id, offset)
     return json.encode({
-        query = "query GET_CHAPTERS_MANGA($filter: ChapterFilterInput, $first: Int, $order: [ChapterOrderInput!]) { chapters(filter: $filter, first: $first, order: $order) { totalCount nodes { id name chapterNumber sourceOrder scanlator isRead } } }",
+        query = "query GET_CHAPTERS_MANGA($filter: ChapterFilterInput, $first: Int, $offset: Int, $order: [ChapterOrderInput!]) { chapters(filter: $filter, first: $first, offset: $offset, order: $order) { totalCount pageInfo { hasNextPage } nodes { id name chapterNumber sourceOrder scanlator isRead } } }",
         variables = {
             filter = {
                 mangaId = {
@@ -306,10 +306,13 @@ function Queries._buildStoredChapterQuery(manga_id)
                 },
             },
             first = 200,
+            offset = offset or 0,
             order = {
                 {
                     by = "SOURCE_ORDER",
+                    byType = "ASC",
                 },
+                { by = "ID", byType = "ASC" },
             },
         },
     })

@@ -751,31 +751,52 @@ function Parsers.parseChapterPagesResponse(response_body)
 end
 
 function Parsers.parseStoredChapterResponse(response_body)
-    local payload, _, err = json.decode(response_body, 1, nil)
-    if err then
+    local payload, _, err = json.decode(response_body, 1, json.null)
+    if err or type(payload) ~= "table" then
         return nil, "Invalid response from Suwayomi server."
     end
 
-    local chapter_nodes = payload
-        and payload.data
-        and payload.data.chapters
-        and payload.data.chapters.nodes
-
-    if type(chapter_nodes) ~= "table" then
-        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
-        return nil, graph_error or "Suwayomi server did not return a chapter list."
+    if payload.errors ~= nil and payload.errors ~= json.null then
+        if type(payload.errors) ~= "table" or next(payload.errors) ~= nil then
+            local first = type(payload.errors) == "table" and payload.errors[1]
+            return nil, type(first) == "table" and type(first.message) == "string" and first.message
+                or "Suwayomi server returned GraphQL errors."
+        end
+    end
+    local connection = type(payload.data) == "table" and payload.data.chapters
+    local chapter_nodes = type(connection) == "table" and connection.nodes
+    local page_info = type(connection) == "table" and connection.pageInfo
+    local total = type(connection) == "table" and connection.totalCount
+    if type(total) ~= "number" or total < 0 or total > 9007199254740991 or total ~= math.floor(total)
+        or type(page_info) ~= "table" or type(page_info.hasNextPage) ~= "boolean"
+        or type(chapter_nodes) ~= "table" or chapter_nodes == json.null
+        or (getmetatable(chapter_nodes) or {}).__jsontype ~= "array"
+    then
+        return nil, "Suwayomi server returned invalid chapter completion metadata."
     end
 
     local chapters = {}
     for _, entry in ipairs(chapter_nodes) do
-        local chapter = parseChapterNode(entry)
-        if not chapter then
+        if type(entry) ~= "table" or type(entry.id) ~= "number"
+            or entry.id <= 0 or entry.id > 9007199254740991 or entry.id ~= math.floor(entry.id)
+            or type(entry.sourceOrder) ~= "number" or math.abs(entry.sourceOrder) > 9007199254740991
+            or entry.sourceOrder ~= math.floor(entry.sourceOrder)
+        then
             return nil, "Suwayomi server returned invalid chapter data."
         end
+        for key, value in pairs(entry) do
+            if value == json.null then entry[key] = nil end
+        end
+        local chapter = parseChapterNode(entry)
+        chapter.id = string.format("%.0f", entry.id)
         table.insert(chapters, chapter)
     end
 
-    return chapters
+    return {
+        chapters = chapters,
+        total_count = total,
+        has_next_page = page_info.hasNextPage,
+    }
 end
 
 function Parsers.parseMarkChapterReadResponse(response_body)

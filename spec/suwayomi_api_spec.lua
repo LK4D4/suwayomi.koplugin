@@ -430,7 +430,7 @@ describe("suwayomi/api facade", function()
         assert.are.equal("398", pages.chapter.id)
         assert.are.equal("/api/v1/page/0", pages.pages[1])
 
-        install_graphql_stub([[{"data":{"chapters":{"nodes":[{"id":398,"name":"Ch. 1","isRead":false}]}}}]])
+        install_graphql_stub([[{"data":{"chapters":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"id":398,"sourceOrder":1,"name":"Ch. 1","isRead":false}]}}}]])
         local stored = api.queryChaptersForManga(valid_credentials(), "17")
         assert.are.equal(true, stored.ok)
         assert.are.equal("398", stored.chapters[1].id)
@@ -452,14 +452,14 @@ describe("suwayomi/api facade", function()
     end)
 
     it("prefers stored chapters before falling back to fetched chapters", function()
-        local stored_request = install_graphql_stub([[{"data":{"chapters":{"nodes":[{"id":2,"name":"Stored Chapter"}]}}}]])
+        local stored_request = install_graphql_stub([[{"data":{"chapters":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"id":2,"sourceOrder":1,"name":"Stored Chapter"}]}}}]])
         local stored = api.fetchChaptersForManga(valid_credentials(), "17")
         assert.are.equal(true, stored.ok)
         assert.are.equal("Stored Chapter", stored.chapters[1].name)
         assert.are.equal(1, stored_request.count)
 
         local fetch_request = install_graphql_sequence_stub({
-            { body = [[{"data":{"chapters":{"nodes":[]}}}]] },
+            { body = [[{"data":{"chapters":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}]] },
             { body = [[{"data":{"fetchChapters":{"chapters":[{"id":1,"name":"Fetched Chapter"}]}}}]] },
         })
         local fetched = api.fetchChaptersForManga(valid_credentials(), "17")
@@ -481,7 +481,8 @@ describe("suwayomi/api facade", function()
         install_graphql_stub([[{"data":{"fetchChapters":null},"errors":[{"message":"No chapters found"}]}]])
         local graph_error = api.fetchChaptersForManga(valid_credentials(), "17")
         assert.are.equal(false, graph_error.ok)
-        assert.are.equal("No chapters found", graph_error.error)
+        assert.are.equal("Incomplete chapter load: No chapters found", graph_error.error)
+        assert.are.equal("incomplete", graph_error.error_kind)
     end)
 
     it("delegates binary and archive downloads through the transport layer", function()

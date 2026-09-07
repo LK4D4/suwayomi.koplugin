@@ -326,12 +326,14 @@ describe("suwayomi/api/parsers", function()
         assert.are.equal("Suwayomi server returned invalid chapter page URLs.", invalid_pages_error)
 
         local stored = assert(parsers.parseStoredChapterResponse([[
-            { "data": { "chapters": { "nodes": [
-                { "id": 399, "name": "Ch. 2", "isRead": true }
+            { "data": { "chapters": { "totalCount": 1, "pageInfo": { "hasNextPage": false }, "nodes": [
+                { "id": 399, "sourceOrder": 2, "name": "Ch. 2", "isRead": true }
             ] } } }
         ]]))
-        assert.are.equal("399", stored[1].id)
-        assert.are.equal(true, stored[1].is_read)
+        assert.are.equal("399", stored.chapters[1].id)
+        assert.are.equal(true, stored.chapters[1].is_read)
+        assert.are.equal(1, stored.total_count)
+        assert.is_false(stored.has_next_page)
 
         local read = assert(parsers.parseMarkChapterReadResponse([[
             { "data": { "updateChapter": { "chapter": { "id": 398, "isRead": true } } } }

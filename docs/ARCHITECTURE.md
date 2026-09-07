@@ -44,9 +44,9 @@ Core plugin shell:
 API:
 
 - `suwayomi/api/queries.lua`: GraphQL query and mutation payload builders.
-- `suwayomi/api/parsers.lua`: defensive parsing and normalization of Suwayomi responses.
+- `suwayomi/api/parsers.lua`: defensive parsing and normalization of Suwayomi responses. The stored chapter page parser retains validated `chapters`, `total_count`, and `has_next_page` for complete-load validation in the API facade.
 - `suwayomi/api/transport.lua`: basic auth, endpoint construction, GraphQL requests, archive downloads, binary page fetches, and bounded response sinks for bad-network protection.
-- `suwayomi/api.lua`: facade that composes the submodules and owns API debug logging.
+- `suwayomi/api.lua`: facade that composes the submodules and owns API debug logging. `queryChaptersForManga` retrieves sequential stored pages of 200 using actual received offsets and ascending source-order/numeric-ID order. It rejects changing totals, duplicates, backward order, and contradictory continuation before returning one complete result. `fetchChaptersForManga` uses source fallback only after verified stored-empty success. Both accept an optional `max_result_bytes` budget; stored accumulation defaults to 4 MiB and counts encoded chapter bytes incrementally. Completeness assumes a stable server dataset: detected count/order/identity changes fail, while offset pagination cannot detect every same-count concurrent edit or establish an atomic snapshot.
 
 Browse and Library:
 
@@ -100,7 +100,7 @@ Chapters and read state:
 - `suwayomi/readsync/koreader_metadata.lua`: KOReader sidecar/history inspection. `getKoreaderMetadataPathForDocument` uses `DocSettings` to return the current metadata path plus the candidate paths for cleanup across document, central, and hash storage. It checks metadata and backups without opening or mutating `DocSettings` and rejects failed path resolution or inspection.
 - `suwayomi/readsync/worker.lua`: background read-sync worker behavior.
 - `suwayomi/readsync/controller.lua`: pending read-sync scheduling, polling, retry, and reconciliation.
-- `suwayomi/network/request_worker.lua`, `suwayomi/network/request_job.lua`: generic one-shot network request worker/launcher for Library, reader-return, manga actions, and chapter-context flows that need remote data without blocking KOReader UI callbacks. Callers keep active job tokens so newer requests cancel or ignore stale older results.
+- `suwayomi/network/request_worker.lua`, `suwayomi/network/request_job.lua`: generic one-shot network request worker/launcher for Library, reader-return, manga actions, and chapter-context flows that need remote data without blocking KOReader UI callbacks. Callers keep active job tokens so newer requests cancel or ignore stale older results. The worker passes the shared result-byte budget into stored chapter retrieval and checks the complete serialized envelope, including source-refresh and reader-return metadata, before writing. Incomplete/too-large categories and available transport status/retry details survive result handoff; chapter controllers publish only successful results.
 
 Shared support:
 
@@ -169,6 +169,7 @@ Coverage is organized around runtime boundaries:
 
 - `spec/main_spec.lua` focuses on KOReader lifecycle: dispatcher/menu registration, lazy dependency construction, queue recovery, debug logger setup, and controller method installation.
 - API specs cover the facade plus query/parser/transport submodules without live Suwayomi calls.
+- `spec/complete_chapter_loading_spec.lua` composes real query/parser/API, asynchronous worker result files, manga/chapter controllers, chapter menu data, read-ledger reconciliation, and queue persistence. External HTTP and host scheduling are controlled; assertions couple visible count/order, committed read state, candidate/admitted IDs, and failure preservation across long-series pagination and byte limits.
 - Client specs are split by flow: `spec/suwayomi_client_source_manga_spec.lua`, `spec/suwayomi_client_global_search_spec.lua`, `spec/suwayomi_client_library_spec.lua`, and the small facade-focused `spec/suwayomi_client_spec.lua`.
 - UI specs cover menu table construction and KOReader dialog/menu helper behavior with stubbed widgets.
 - I18n specs stub KOReader `gettext` and `ffi/util.template` directly. Module specs that assert visible built-in labels should clear `suwayomi/i18n` from `package.loaded` before requiring the module under test so each spec controls the active gettext stub. Worker specs should prefer structured message/error IDs for plugin-authored text and reserve raw strings for server/API data.

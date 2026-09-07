@@ -2,7 +2,8 @@
 --
 -- Responsibility: preserve the historical require("suwayomi/api") surface while
 -- delegating query building, response parsing, and transport concerns to focused
--- internal modules.
+-- internal modules. Stored chapter loading validates complete sequential pages
+-- and bounds their aggregate result before publishing success.
 -- Owned state: optional debug logger only.
 -- Dependencies: suwayomi/api/* modules; callers should not need to require
 -- those internal modules directly.
@@ -14,6 +15,9 @@ local SuwayomiAPI = {}
 local queries = require("suwayomi/api/queries")
 local parsers = require("suwayomi/api/parsers")
 local transport = require("suwayomi/api/transport")
+local json = require("dkjson")
+
+local MAX_CHAPTER_RESULT_BYTES = 4 * 1024 * 1024
 
 local debug_logger
 
@@ -484,24 +488,70 @@ function SuwayomiAPI.downloadChapterArchive(credentials, chapter_id, target_path
     return transport.downloadChapterArchive(credentials, chapter_id, target_path, logDebugEvent, options)
 end
 
-function SuwayomiAPI.queryChaptersForManga(credentials, manga_id)
-    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildStoredChapterQuery(manga_id), "queryChaptersForManga")
-    if not result.ok then
-        return result
-    end
+local function incompleteChapterLoad(reason)
+    return { ok = false, error_kind = "incomplete", error = "Incomplete chapter load: " .. tostring(reason) }
+end
 
-    local chapters, parse_error = SuwayomiAPI.parseStoredChapterResponse(result.response_body)
-    if not chapters then
-        logDebugEvent({ operation = "queryChaptersForManga", event = "parse_error", error = parse_error })
-        return {
-            ok = false,
-            error = parse_error,
-        }
+function SuwayomiAPI.queryChaptersForManga(credentials, manga_id, options)
+    options = options or {}
+    local max_result_bytes = tonumber(options.max_result_bytes) or MAX_CHAPTER_RESULT_BYTES
+    local chapters = {}
+    local seen = {}
+    local total_count
+    local previous
+    local result_bytes
+    while true do
+        local result = performGraphQLRequest(credentials,
+            SuwayomiAPI._buildStoredChapterQuery(manga_id, #chapters), "queryChaptersForManga")
+        if not result.ok then
+            local failure = incompleteChapterLoad(result.error)
+            failure.retryable = result.retryable
+            failure.status_code = result.status_code
+            return failure
+        end
+        local page, parse_error = SuwayomiAPI.parseStoredChapterResponse(result.response_body)
+        if not page then
+            logDebugEvent({ operation = "queryChaptersForManga", event = "parse_error", error = parse_error })
+            return incompleteChapterLoad(parse_error)
+        end
+        if total_count ~= nil and page.total_count ~= total_count then
+            return incompleteChapterLoad("The chapter total changed during loading.")
+        end
+        total_count = page.total_count
+        if not result_bytes then
+            result_bytes = #json.encode({ ok = true, chapters = {}, total_count = total_count, has_next_page = false })
+        end
+        if #page.chapters > 200 or #chapters + #page.chapters > total_count then
+            return incompleteChapterLoad("The chapter count exceeds the reported page or total size.")
+        end
+        for _, chapter in ipairs(page.chapters) do
+            if seen[chapter.id] then
+                return incompleteChapterLoad("The server returned duplicate chapter IDs.")
+            end
+            if previous and (chapter.source_order < previous.source_order
+                or (chapter.source_order == previous.source_order and tonumber(chapter.id) <= tonumber(previous.id)))
+            then
+                return incompleteChapterLoad("The server returned chapters out of order.")
+            end
+            seen[chapter.id] = true
+            previous = chapter
+            result_bytes = result_bytes + #json.encode(chapter) + (#chapters > 0 and 1 or 0)
+            if result_bytes > max_result_bytes then
+                return { ok = false, error_kind = "too_large", error = "Chapter list is too large to load completely." }
+            end
+            chapters[#chapters + 1] = chapter
+        end
+        if #chapters == total_count and page.has_next_page == false then break end
+        if #page.chapters == 0 or #chapters == total_count or page.has_next_page == false then
+            return incompleteChapterLoad("The chapter count and continuation do not agree.")
+        end
     end
 
     return {
         ok = true,
         chapters = chapters,
+        total_count = total_count,
+        has_next_page = false,
     }
 end
 
@@ -576,9 +626,9 @@ function SuwayomiAPI.markChaptersReadState(credentials, chapter_ids, is_read)
     }
 end
 
-function SuwayomiAPI.fetchChaptersForManga(credentials, manga_id)
-    local stored_result = SuwayomiAPI.queryChaptersForManga(credentials, manga_id)
-    if stored_result.ok and stored_result.chapters and #stored_result.chapters > 0 then
+function SuwayomiAPI.fetchChaptersForManga(credentials, manga_id, options)
+    local stored_result = SuwayomiAPI.queryChaptersForManga(credentials, manga_id, options)
+    if not stored_result.ok or #stored_result.chapters > 0 then
         return stored_result
     end
 

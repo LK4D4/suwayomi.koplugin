@@ -4,7 +4,8 @@
 -- compact result file for the UI process.
 -- Owned state: none.
 -- Dependencies: dkjson, Suwayomi API facade, and shared subprocess result IO.
--- External data: request tables and API results are normalized before writing.
+-- External data: request tables and API results are normalized before writing;
+-- complete chapter results must fit the shared result-file byte budget.
 
 local json = require("dkjson")
 local SuwayomiAPI = require("suwayomi/api")
@@ -68,7 +69,9 @@ local function fetchLibraryMangaPages(credentials)
 end
 
 local function fetchReaderReturnChapters(credentials, manga_id)
-    local result = SuwayomiAPI.fetchChaptersForManga(credentials, manga_id)
+    local result = SuwayomiAPI.fetchChaptersForManga(credentials, manga_id, {
+        max_result_bytes = SubprocessJob.max_result_bytes,
+    })
     if not result.ok then
         return result
     end
@@ -108,7 +111,9 @@ function RequestWorker:run(credentials, request, result_path)
     request = request or {}
     local ok, result = pcall(function()
         if request.action == "fetch_chapters_for_manga" then
-            return SuwayomiAPI.fetchChaptersForManga(credentials, request.manga_id)
+            return SuwayomiAPI.fetchChaptersForManga(credentials, request.manga_id, {
+                max_result_bytes = SubprocessJob.max_result_bytes,
+            })
         end
         if request.action == "fetch_reader_return_chapters_for_manga" then
             return fetchReaderReturnChapters(credentials, request.manga_id)
@@ -136,6 +141,11 @@ function RequestWorker:run(credentials, request, result_path)
             ok = false,
             error = tostring(result),
         }
+    end
+    if type(result) == "table" and result.ok and type(result.chapters) == "table"
+        and #json.encode(result) > (tonumber(SubprocessJob.max_result_bytes) or 4 * 1024 * 1024)
+    then
+        result = { ok = false, error_kind = "too_large", error = "Chapter list is too large to load completely." }
     end
     self:writeResult(result_path, result)
     return result
