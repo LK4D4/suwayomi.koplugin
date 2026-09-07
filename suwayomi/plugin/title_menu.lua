@@ -2,7 +2,7 @@
 --
 -- Responsibility: Owns shared title-bar burger action menus and the universal
 -- Suwayomi home title action for full-screen plugin menus.
--- Owned state: none; callbacks and screen-specific actions are supplied by callers.
+-- Owned state: optional per-open guards; callbacks and screen-specific actions are supplied by callers.
 -- Dependencies: Suwayomi UI action menu renderer and the plugin i18n facade.
 -- External data: screen actions are controller-owned and treated as opaque action tables.
 
@@ -67,6 +67,7 @@ end
 function Methods:showTitleBarActionMenu(menu, screen_options)
     screen_options = screen_options or {}
     local anchor = titleBarAnchor(menu)
+    local is_current = screen_options.captureActionGuard and screen_options.captureActionGuard()
     return SuwayomiUI.showActionMenu({
         title = screen_options.title or I18n.t("Suwayomi"),
         actions = self:buildTitleBarActions(screen_options.actions),
@@ -75,6 +76,7 @@ function Methods:showTitleBarActionMenu(menu, screen_options)
         destructive_actions_at_bottom = screen_options.destructive_actions_at_bottom,
         anchor = anchor,
     }, function(action)
+        if action and action.id ~= "home" and is_current and not is_current() then return false end
         return self:performTitleBarAction(menu, action, screen_options, {
             anchor = anchor,
         })

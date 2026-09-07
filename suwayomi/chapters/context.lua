@@ -152,12 +152,14 @@ function Methods:captureChapterActionGuard()
     local manga = context and context.manga
     local manga_id = manga and tostring(manga.id or manga.title)
     local revision = self.chapter_request_revision
+    local scanlator_filter = self.current_scanlator_filter
     return function()
         return not self.suwayomi_host_retired
             and self.current_chapter_context == context
             and (not context or context.manga == manga)
             and (not manga or tostring(manga.id or manga.title) == manga_id)
             and self.chapter_request_revision == revision
+            and self.current_scanlator_filter == scanlator_filter
     end
 end
 

@@ -184,4 +184,22 @@ describe("suwayomi/plugin/title_menu", function()
 
         assert.are.same({ "home" }, events)
     end)
+
+    it("keeps Home and unguarded Downloads actions independent of a chapter guard", function()
+        local plugin = { homes = 0, downloads = 0 }
+        for name, method in pairs(require("suwayomi/plugin/title_menu").methods) do plugin[name] = method end
+        function plugin:showHome() self.homes = self.homes + 1 end
+        local function downloadAction() plugin.downloads = plugin.downloads + 1 end
+        plugin:showTitleBarActionMenu({}, {
+            captureActionGuard = function() return function() return false end end,
+            onSelect = downloadAction,
+        })
+        action_callback({ id = "home" })
+        assert.are.equal(1, plugin.homes)
+        assert.is_false(action_callback({ id = "download_next_5_unread" }))
+        assert.are.equal(0, plugin.downloads)
+        plugin:showTitleBarActionMenu({}, { onSelect = downloadAction })
+        action_callback({ id = "retry_failed_downloads" })
+        assert.are.equal(1, plugin.downloads)
+    end)
 end)

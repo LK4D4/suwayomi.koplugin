@@ -55,15 +55,35 @@ end
 
 local Methods = {}
 
+local function guardChapterCallback(owner, callback)
+    local is_current = owner.captureChapterActionGuard and owner:captureChapterActionGuard()
+    return function(...)
+        if owner.suwayomi_host_retired or (is_current and not is_current()) then return false end
+        return callback(...)
+    end
+end
+
 function Methods:getChapterTitleBarMenuOptions(manga)
     if not self.getTitleBarMenuOptions then
         return {}
     end
+    local context = self.current_chapter_context
+    local manga_id = manga and tostring(manga.id or manga.title)
     return self:getTitleBarMenuOptions({
         title = self:formatChapterListTitle(manga),
         actions = self:getBulkChapterActions(),
         vertical = true,
         destructive_actions_at_bottom = true,
+        -- Retained title options outlive failed reloads; capture request freshness on opening.
+        captureActionGuard = function()
+            local is_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
+            return function()
+                return not self.suwayomi_host_retired and self.current_chapter_context == context
+                    and (not context or context.manga == manga)
+                    and (not manga or tostring(manga.id or manga.title) == manga_id)
+                    and (not is_current or is_current())
+            end
+        end,
         onSelect = function(action, _, menu_context)
             return self:performBulkChapterAction(action.id, menu_context)
         end,
@@ -371,16 +391,16 @@ function Methods:showScanlatorFilterActions(menu_context)
         title = I18n.t("Scanlator filter"),
         actions = self:getScanlatorFilterActions(),
         anchor = menu_context and menu_context.anchor,
-        on_back = function()
+        on_back = guardChapterCallback(self, function()
             self:showBulkChapterActions(menu_context)
-        end,
-    }, function(action)
+        end),
+    }, guardChapterCallback(self, function(action)
         if action.id == "scanlator_filter_all" then
             self:setScanlatorFilter(nil)
         else
             self:setScanlatorFilter(action.scanlator)
         end
-    end)
+    end))
     return true
 end
 
@@ -394,12 +414,12 @@ function Methods:showBulkDownloadActions(menu_context)
         title = I18n.t("Bulk downloads"),
         actions = self:getBulkDownloadActions(),
         anchor = menu_context and menu_context.anchor,
-        on_back = function()
+        on_back = guardChapterCallback(self, function()
             self:showBulkChapterActions(menu_context)
-        end,
-    }, function(action)
+        end),
+    }, guardChapterCallback(self, function(action)
         self:performBulkChapterAction(action.id)
-    end)
+    end))
 end
 
 
@@ -412,12 +432,12 @@ function Methods:showKeepDownloadedActions(menu_context)
         title = I18n.t("Download ahead"),
         actions = MangaActionMenu.buildKeepDownloadedActions(),
         anchor = menu_context and menu_context.anchor,
-        on_back = function()
+        on_back = guardChapterCallback(self, function()
             self:showBulkChapterActions(menu_context)
-        end,
-    }, function(action)
+        end),
+    }, guardChapterCallback(self, function(action)
         self:performBulkChapterAction(action.id, menu_context)
-    end)
+    end))
 end
 
 
@@ -438,9 +458,9 @@ function Methods:showBulkChapterActions(menu_context)
         anchor = menu_context and menu_context.anchor,
     }
 
-    SuwayomiUI.showChapterActionsMenu(options, function(action)
+    SuwayomiUI.showChapterActionsMenu(options, guardChapterCallback(self, function(action)
         self:performBulkChapterAction(action.id, menu_context)
-    end)
+    end))
 end
 
 
