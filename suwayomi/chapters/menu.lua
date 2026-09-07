@@ -441,6 +441,7 @@ end
 
 
 function Methods:showChapterActions(manga, chapter)
+    local is_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
     if not SuwayomiUI.showChapterActionsMenu then
         self:enqueueChapterDownload(manga, chapter)
         return
@@ -452,7 +453,8 @@ function Methods:showChapterActions(manga, chapter)
     }
 
     SuwayomiUI.showChapterActionsMenu(options, function(action)
-        self:performChapterAction(manga, chapter, action.id)
+        if is_current and not is_current() then return false end
+        return self:performChapterAction(manga, chapter, action.id)
     end)
 end
 

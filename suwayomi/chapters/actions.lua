@@ -76,6 +76,7 @@ end
 
 
 function Methods:performChapterAction(manga, chapter, action_id)
+    if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
     if action_id == "open" then
         return self:openChapter(manga, chapter)
     end

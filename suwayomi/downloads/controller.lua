@@ -166,7 +166,7 @@ function Methods:retryDownloadJob(job)
 end
 
 
-function Methods:showDownloadJobError(job)
+function Methods:showDownloadJobError(job, is_current)
     local queue = self:getDownloadQueue()
     local current = job and queue:findPersistentJob(job.key)
     if not current or not (current.state == "failed" or (current.state == "queued" and current.retry_at)) then
@@ -179,6 +179,7 @@ function Methods:showDownloadJobError(job)
         -- Scheduled retries remain automatic. A stale Retry button must check
         -- the live queue again after the reader dismisses the details.
         onRetry = current.state == "failed" and function()
+            if is_current and not is_current() then return false end
             return self:retryDownloadJob(current)
         end or nil,
     })
@@ -189,7 +190,11 @@ function Methods:showFailedDownloadActions(job)
 end
 
 function Methods:showChapterDownloadError(manga, chapter)
-    return self:showDownloadJobError({ key = self:getDownloadQueue():getKey(manga, chapter) })
+    local is_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
+    return self:showDownloadJobError({ key = self:getDownloadQueue():getKey(manga, chapter) }, function()
+        return (not is_current or is_current())
+            and (not self.isChapterInCurrentContext or self:isChapterInCurrentContext(manga, chapter))
+    end)
 end
 
 function Methods:getDownloadsMenuCallbacks()

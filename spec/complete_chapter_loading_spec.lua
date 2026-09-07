@@ -7,7 +7,7 @@ describe("complete stored chapter loading", function()
     local plugin, manga, queue, messages, scheduled, workers, requests
     local saved_ledger, saved_jobs, respond, settings, saved_filter, ledger_path, confirmation
     local subprocess_done, loading, fake_time, original_time
-    local directory_callback, download_directory
+    local directory_callback, download_directory, chapter_action_callback, error_details
     local modules = {
         "gettext", "ffi/util", "ffi/archiver", "ui/uimanager", "ssl.https",
         "socket.http", "suwayomi/api", "suwayomi/api/queries", "suwayomi/api/parsers",
@@ -83,6 +83,7 @@ describe("complete stored chapter loading", function()
         saved_filter = nil
         confirmation = nil
         directory_callback, download_directory = nil, "./nonexistent-test-library"
+        chapter_action_callback, error_details = nil, nil
         subprocess_done, fake_time = true, 100
         original_time = os.time
         os.time = function() return fake_time end
@@ -119,6 +120,8 @@ describe("complete stored chapter loading", function()
         package.preload["suwayomi/ui"] = function()
             return { showChapterMenu = function(options) return options end,
                 showConfirm = function(options) confirmation = options.ok_callback; return true end,
+                showChapterActionsMenu = function(_, callback) chapter_action_callback = callback end,
+                showDownloadErrorDetails = function(_, options) error_details = options; return true end,
                 showDirectoryChooser = function(callback) directory_callback = callback end }
         end
         package.preload["ssl.https"] = function()
@@ -364,6 +367,73 @@ describe("complete stored chapter loading", function()
             assert.are.equal("{}", saved_ledger)
             assert.are.equal(0, #workers)
         end)
+    end
+
+    for _, origin in ipairs({ "chapter menu", "chapter error details" }) do
+        for _, invalidation in ipairs({ "empty replacement", "another manga", "newer request", "cancellation", "retired host", "manga identity" }) do
+            it("keeps failed jobs unchanged after " .. invalidation .. " invalidates " .. origin .. " Retry", function()
+                saved_ledger = json.encode({ ["17:200"] = { manga_id = "17", chapter_id = "200", read = true } })
+                respond = function() return page(nodes(201, 201), 1, false) end
+                plugin:showChaptersForManga(manga)
+                finishRequest()
+                local chapter = plugin.current_chapter_context.chapters[1]
+                local failed = queue:buildPersistentJob(manga, chapter, download_directory, "failed", {
+                    error = "Example transfer failure.", retry_count = 3,
+                })
+                assert.is_true(queue:savePersistentJobs({ failed }))
+                queue:setStatus(manga, chapter, { state = "failed" })
+                plugin:showChapterActions(manga, chapter)
+                local retry = function() return chapter_action_callback({ id = "retry_download" }) end
+                if origin == "chapter error details" then
+                    chapter_action_callback({ id = "download_error" })
+                    retry = error_details.onRetry
+                end
+                assert.is_function(retry)
+                local ledger, jobs = saved_ledger, saved_jobs
+                local visible_ids = { "201" }
+                if invalidation == "empty replacement" then
+                    respond = function(request)
+                        if request.query:find("GET_CHAPTERS_MANGA", 1, true) then return page({}, 0, false) end
+                        return { data = { fetchChapters = { chapters = {} } } }
+                    end
+                    plugin:showChaptersForManga(manga)
+                    finishRequest()
+                    visible_ids = {}
+                elseif invalidation == "another manga" then
+                    respond = function() return page(nodes(301, 301), 1, false) end
+                    plugin:showChaptersForManga({ id = "18", title = "Other manga" })
+                    finishRequest()
+                    visible_ids = { "301" }
+                elseif invalidation == "newer request" then
+                    plugin:showChaptersForManga(manga)
+                elseif invalidation == "cancellation" then
+                    plugin:cancelMangaNetworkRequests()
+                elseif invalidation == "retired host" then
+                    plugin:retireChapterHost()
+                else
+                    manga.id = "18"
+                end
+                retry()
+                if invalidation == "empty replacement" then
+                    assert.is_false(plugin:performChapterAction(manga, chapter, "retry_download"))
+                end
+                assert.are.same(visible_ids, chapterIds(plugin.current_chapter_menu.chapters))
+                assert.are.same(visible_ids, chapterIds(plugin.current_chapter_context.chapters))
+                assert.are.equal(ledger, saved_ledger)
+                assert.are.equal(jobs, saved_jobs)
+                assert.are.equal("failed", queue:findPersistentJob(failed.key).state)
+                assert.are.same({}, queue:getSnapshot().queued)
+
+                if invalidation == "empty replacement" then
+                    plugin:showFailedDownloadActions(failed)
+                    assert.is_true(error_details.onRetry())
+                    assert.are.equal("queued", queue:findPersistentJob(failed.key).state)
+                    assert.are.same({ "201" }, admittedIds())
+                    assert.are.equal(ledger, saved_ledger)
+                    assert.are.same({}, plugin.current_chapter_menu.chapters)
+                end
+            end)
+        end
     end
 
     for _, different_manga in ipairs({ false, true }) do
