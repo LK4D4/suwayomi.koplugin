@@ -71,9 +71,12 @@ describe("manual read completion integration", function()
     local function publish(chapter, content)
         assert(service.queue:enqueue(manga, chapter, directory, { provenance = "explicit" }))
         service.queue:process()
+        local active = assert(service.queue:getActiveJob("m:" .. chapter.id))
         write(path(chapter.id), content or "archive pages")
+        write(active.progress_path, "state=downloaded\ncurrent=1\ntotal=1\npath=" .. path(chapter.id) .. "\n")
         service.queue:poll()
         assert.is_nil(service.queue:getActiveJob("m:" .. chapter.id))
+        assert.equals(path(chapter.id), settings:loadChapterLedger()["m:" .. chapter.id].path)
     end
     local function row(id)
         for _, item in ipairs(plugin.current_chapter_menu.chapters or {}) do
