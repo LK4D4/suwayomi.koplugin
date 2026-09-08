@@ -19,6 +19,15 @@ These defaults govern unspecified choices. They do not weaken explicit task requ
 - Preserve user archives, saved read state, and credentials. Keep uncertain files and report failed writes; simplicity does not justify destructive guesses.
 - Make routine tradeoffs directly when requirements leave them open. If an explicit requirement demands disproportionate complexity, propose a smaller contract before building it.
 
+## Worktrees and concurrent agents
+
+- Every editing agent MUST use its own worktree and branch, including for documentation-only tasks. Read-only investigation may share a checkout. Reserve the primary checkout for inspection and authorized integration.
+- Before editing, inspect `git worktree list` and `git status --short --branch`. Reuse a worktree only when assigned to this task and not being edited by another agent; otherwise create one under the primary checkout's ignored `.worktrees/<task>/` directory with a unique branch. Use the assigned base, or local `master` when none is specified; report the chosen base.
+- Run edits and checks from the assigned worktree root. Preserve other agents' worktrees, branches, and uncommitted changes; never reset, stash, or clean a shared checkout to make room.
+- Split concurrent work by task and file ownership. Agree on shared interfaces before editing; assign overlapping changes to one owner. Worktrees isolate files, not integration conflicts.
+- Name one integration owner for related tasks. Workers hand off their branch, worktree path, commit IDs or uncommitted state, checks run, and remaining risks. The integration owner combines changes and verifies the combined candidate under the Verification rules below.
+- Keep worktrees until handoff is accepted. Remove only your own worktree after its changes are integrated or explicitly discarded; never force-remove a dirty worktree.
+
 ## Proportionate workflow
 
 - Routine fixes need a short explanation and focused tests, not a new spec, ADR, ticket tree, or multi-agent workflow.
@@ -40,9 +49,20 @@ These defaults govern unspecified choices. They do not weaken explicit task requ
 
 ## Verification
 
-- Before merging or pushing `master`, push the work branch and run GitHub Actions `Test` against that branch: `gh workflow run test.yml --ref <branch>`, then `gh run watch` or `gh run view --log-failed`.
+- Before merging or pushing `master`, push the work branch and run GitHub Actions `Test` against that branch: `gh workflow run test.yml --ref <branch>`. Identify the run for that branch and exact commit, then use `gh run watch <run-id> --exit-status`; inspect failures with `gh run view <run-id> --log-failed`. Require success, not merely a dispatched or completed run.
 - If GitHub Actions cannot run because of auth, network, or GitHub availability, report that blocker. Do not treat local lint/tests as a substitute for required pre-merge Actions.
 - For prose and guidance changes, review the diff, links, consistency, and scope. Run relevant executable checks when documentation changes executable examples, commands, packaging, or other behavior those checks can validate.
+
+## Finalizing work
+
+An explicit request to "finalize" authorizes the integration owner to commit, push the task branch, run CI, merge to `master`, push `master`, and clean up the task's worktree and branches. A request to implement or document something alone does not authorize this sequence. Respect explicit limits such as "do not push".
+
+1. Review the task diff and commit only in-scope changes. Run the applicable local checks above; for runtime changes, run full lint, specs, and l10n checks on the completed candidate. Report unavailable checks.
+2. Coordinate exclusive integration access to the primary checkout. Fetch `origin` and incorporate current `master` and `origin/master` into the work branch so the candidate includes the changes it will join. Resolve conflicts in the task worktree and repeat checks invalidated by integration.
+3. Push the candidate branch and satisfy the pre-merge CI gate under Verification, including for documentation-only changes. If the candidate changes, push and validate the new commit.
+4. Fast-forward the clean primary checkout's `master` to the tested commit, then push `master` without force. If `master` has advanced or the push is rejected because the remote advanced, incorporate the new base and repeat verification before retrying. Preserve unrelated local changes rather than stashing or resetting them.
+5. Wait for the `Test` push run on the exact published `master` commit to succeed. If CI fails or any step is blocked, report the published state and blocker; retain the task branch and worktree for repair.
+6. After successful publication and CI, remove the task's clean worktree from outside it, then delete its merged local branch and task-owned remote branch. Preserve worktrees or branches still used by another task. Report the final commit, CI results, and any retained resources; do not call partial integration finalized.
 
 ## Code Rules
 
