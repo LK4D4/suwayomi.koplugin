@@ -399,9 +399,20 @@ function Methods:showChapterResultForManga(manga, result, options)
         self:showMessage(err or I18n.t("Failed to save settings."))
         return false
     end
+    local previous_context, previous_filter = self.current_chapter_context, self.current_scanlator_filter
+    local previous_selection, previous_mode = self.selected_chapters, self.selection_mode
+    -- Context publication prunes selection; stage a copy until reconciliation commits.
+    if previous_selection then
+        self.selected_chapters = {}
+        for key, selected in pairs(previous_selection) do self.selected_chapters[key] = selected end
+    end
     self:setCurrentMangaChapterContext(manga, chapters)
     local chapter_options = self:buildChapterMenuOptions(manga, chapters)
-    if not chapter_options then return false end
+    if not chapter_options then
+        self.current_chapter_context, self.current_scanlator_filter = previous_context, previous_filter
+        self.selected_chapters, self.selection_mode = previous_selection, previous_mode
+        return false
+    end
 
     local previous_chapter_menu = self.current_chapter_menu
     if previous_chapter_menu and self.isSuwayomiScreenActive and self:isSuwayomiScreenActive(previous_chapter_menu) and self.closeMenu then

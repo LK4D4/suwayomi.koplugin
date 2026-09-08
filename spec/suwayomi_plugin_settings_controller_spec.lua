@@ -100,6 +100,7 @@ local function installController(options)
     end
     package.preload["ffi/util"] = function()
         return {
+            joinPath = function(...) return table.concat({ ... }, "/") end,
             template = function(template_string, ...)
                 local result = template_string
                 for index, value in ipairs({...}) do
@@ -111,6 +112,8 @@ local function installController(options)
     end
     package.preload["ui/uimanager"] = function()
         return {
+            scheduleIn = function() end,
+            unschedule = function() end,
             nextTick = function(_, callback)
                 callback()
             end,

@@ -83,7 +83,8 @@ function Refill:_save(mutator)
     local store = self.settings:getStore()
     if store:isBlocked() then self.queue:scheduleReconciliation(); return nil, "persistence_failed" end
     local called, ok, err = pcall(store.saveDocument, store, mutator)
-    if not called then return nil, ok end
+    -- Rejected mutations throw; checked storage failures return an error.
+    if not called then return nil, ok, true end
     if not ok then self.queue:scheduleReconciliation(); return nil, err end
     return true
 end
@@ -352,7 +353,7 @@ function Refill:_apply(active, result)
         return a.source_order < b.source_order
     end)
     local admitted, blocker = {}, nil
-    local ok, err = self:_save(function(doc)
+    local ok, err, rejected = self:_save(function(doc)
         local state = collection(doc)
         local current = state and state.requests[request.manga_id]
         if not valid(current, request.manga_id) or current.revision ~= request.revision then error("stale_request", 0) end
@@ -411,6 +412,8 @@ function Refill:_apply(active, result)
         self.queue:reconcile()
         self.queue:process()
         self.onChanged()
+    elseif rejected and err ~= "stale_request" then
+        self:_transition(request, "blocked", "unsupported_state")
     elseif err ~= "stale_request" then
         self:_transition(request, "waiting", "persistence_failed", true)
     end

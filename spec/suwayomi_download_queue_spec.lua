@@ -571,7 +571,7 @@ describe("suwayomi/downloads/queue", function()
         context.queue:recover()
         assert.are.equal("failed", context.queue:getStatus(manga, chapter).state)
 
-        local ok, state = context.queue:enqueue(manga, chapter, "/books")
+        local ok, state = context.queue:retryFailed("m1:398")
 
         assert.is_true(ok)
         assert.are.equal("retry", state)

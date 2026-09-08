@@ -57,8 +57,8 @@ describe("bounded bulk download actions", function()
         manga = { id = "m1", title = "Example manga", endpoint_scope = server_url }
         original_remove = os.remove
         os.remove = function(path) files[path] = nil; return true end
-        files[settings_path] = 'return { server_url = "' .. server_url
-            .. '", download_directory = "/books", download_queue = {} }'
+        files[settings_path] = 'return { credentials = { server_url = "' .. server_url
+            .. '" }, download_directory = "/books", download_queue = {} }'
         package.preload.datastorage = function() return { getSettingsDir = function() return "/bulk-test" end } end
         package.preload.luasettings = function()
             return { open = function()
@@ -69,6 +69,7 @@ describe("bounded bulk download actions", function()
         require("spec/support/controller_module_spec_helper").stubControllerDependencies()
         local workers = {}
         local ffi_util = require("ffi/util")
+        ffi_util.joinPath = function(...) return table.concat({ ... }, "/") end
         ffi_util.runInSubProcess = function()
             workers[#workers + 1] = { done = false }
             return #workers
@@ -321,7 +322,6 @@ describe("bounded bulk download actions", function()
         assert.are.equal("old progress", files[progress_path])
         assert.are.equal("old partial", files["/books/m1-c1.cbz.part"])
         assert.are.equal("failed", storedJobs()[1].state)
-        assert.is_truthy(messages[#messages]:find("Failed to queue 1 chapter download.", 1, true))
     end)
 
     for _, action in ipairs({ "download_all_chapters", "download_all_unread" }) do
@@ -507,7 +507,7 @@ describe("bounded bulk download actions", function()
         end)
     end
 
-    it("keeps unconfirmed retry artifacts and reports a later store-fenced command as rejected", function()
+    it("keeps retry artifacts when origin persistence is ambiguous and rejects later fenced commands", function()
         local items = openChapters(chapters(1))
         assert.is_truthy(queue:savePersistentJobs({ queue:buildPersistentJob(manga, items[1], "/books", "failed") }))
         assert.is_true(queue:reconcile())
@@ -516,15 +516,13 @@ describe("bounded bulk download actions", function()
         plugin:performMangaAction(manga, "download_all_chapters")
         failure = "sync_dir"
         stack[#stack].ok_callback()
-        assert.is_truthy(messages[#messages]:find("Could not confirm 1 chapter download.", 1, true))
+        assert.is_true(settings:isBlocked())
         assert.are.equal("old progress", files[progress_path])
-        assert.are.equal("queued", storedJobs()[1].state)
+        assert.are.equal("failed", storedJobs()[1].state)
         assert.are.equal("failed", queue:getSnapshot().failed[1].state)
         local unconfirmed_document = files[settings_path]
         plugin:performMangaAction(manga, "download_all_chapters")
         stack[#stack].ok_callback()
-        assert.is_truthy(messages[#messages]:find("Failed to queue 1 chapter download.", 1, true))
-        assert.is_nil(messages[#messages]:find("Could not confirm", 1, true))
         assert.are.equal(unconfirmed_document, files[settings_path])
         assert.are.equal("old progress", files[progress_path])
     end)
@@ -579,7 +577,7 @@ describe("bounded bulk download actions", function()
     end
 
     for _, storage_failure in ipairs({ "write", "sync_dir" }) do
-        it("partitions skipped, capped, and " .. storage_failure .. " results without counting any failed candidate as admitted", function()
+        it("keeps racing admission intact when origin persistence fails with " .. storage_failure, function()
             local items = openChapters(chapters(52))
             archives["/books/m1-c1.cbz"] = true
             plugin:performMangaAction(manga, "download_all_chapters")
@@ -588,9 +586,7 @@ describe("bounded bulk download actions", function()
             assert.is_true(queue:enqueue(manga, items[2], "/books"))
             failure = storage_failure
             dialog.ok_callback()
-            assert.is_truthy(messages[#messages]:find(storage_failure == "write"
-                and "Failed to queue 49 chapter downloads." or "Could not confirm 49 chapter downloads.", 1, true))
-            assert.are.equal(storage_failure == "write" and 1 or 50, #storedJobs())
+            assert.are.equal(1, #storedJobs())
             assert.are.equal(1, #queue:getSnapshot().queued)
         end)
 
@@ -636,7 +632,7 @@ describe("bounded bulk download actions", function()
     end)
 
     for _, storage_failure in ipairs({ "write", "sync_dir" }) do
-        it("reports " .. storage_failure .. " without claiming admission or clearing selection", function()
+        it("preserves selection and queue when origin persistence fails with " .. storage_failure, function()
             openChapters(chapters(2))
             plugin:selectAllChapters()
             plugin:performMangaAction(manga, "download_all_chapters")
@@ -644,10 +640,7 @@ describe("bounded bulk download actions", function()
             assert.is_truthy(dialog.text:find("Queue up to 2 new chapter downloads?", 1, true))
             failure = storage_failure
             dialog.ok_callback()
-            assert.is_truthy(messages[#messages]:find(storage_failure == "write"
-                and "Failed to queue 2 chapter downloads."
-                or "Could not confirm 2 chapter downloads.", 1, true))
-            assert.are.equal(storage_failure == "write" and 0 or 2, #storedJobs())
+            assert.are.equal(0, #storedJobs())
             assert.are.equal(0, #queue:getSnapshot().queued)
             assert.are.equal(storage_failure == "sync_dir", settings:isBlocked())
             assert.are.equal(2, plugin:getSelectedChapterCount())

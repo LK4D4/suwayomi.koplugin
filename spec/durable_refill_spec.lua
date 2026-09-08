@@ -156,6 +156,32 @@ describe("durable refill through the process service", function()
         assert.are.equal(99, persisted().manual_archive_state.requests["1:2"].version)
     end)
 
+    it("blocks unsupported archive admission until repair and explicit Retry", function()
+        local unknown = { version = 99, opaque = "preserve" }
+        assert(settings:getStore():saveDocument(function(doc)
+            doc.manual_archive_state = { version = 1, next_revision = 1,
+                archives = { ["1:1"] = unknown }, requests = {} }
+        end))
+        assert.are.equal(5, service.refill:setPolicy(manga(), 5))
+        advance(0)
+        finishContext()
+        local request = service:getSnapshot().refills[1]
+        assert.are.equal("blocked", request.state)
+        assert.are.equal("unsupported_state", request.reason)
+        assert.is_nil(request.next_retry_at)
+        assert.same({}, jobIds())
+        assert.same(unknown, persisted().manual_archive_state.archives["1:1"])
+        local count = #workers
+        advance(600)
+        assert.are.equal(count, #workers)
+        assert(settings:getStore():saveDocument(function(doc) doc.manual_archive_state.archives["1:1"] = nil end))
+        assert(service.refill:retry("1", request.revision))
+        advance(0)
+        finishContext()
+        assert.same({ "1", "2", "3", "4", "5" }, jobIds())
+        assert.same({}, service:getSnapshot().refills)
+    end)
+
     it("keeps offline deadlines through restart and lets another manga proceed", function()
         responses["1"] = { ok = false, error = "Offline" }
         assert.are.equal(5, service.refill:setPolicy(manga("1"), 5))

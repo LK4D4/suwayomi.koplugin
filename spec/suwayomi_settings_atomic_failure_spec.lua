@@ -6,6 +6,7 @@ describe("suwayomi settings atomic failure handling", function()
     local DownloadQueue
     local stored_data
     local io_adapter
+    local saved_join_path
     local mock_dir = "/atomic_fail_test"
     local settings_path = mock_dir .. "/suwayomi.lua"
 
@@ -34,6 +35,13 @@ describe("suwayomi settings atomic failure handling", function()
         package.loaded["suwayomi/downloads/job_store"] = nil
         package.loaded.datastorage = nil
         package.loaded.luasettings = nil
+        for _, name in ipairs({
+            "suwayomi/downloads/service", "suwayomi/downloads/refill",
+            "suwayomi/downloads/cleanup_adapter", "suwayomi/chapters/manual_deletion",
+            "suwayomi/downloads/controller", "suwayomi/chapters/actions", "suwayomi/chapters/context",
+        }) do
+            package.loaded[name], package.preload[name] = nil, nil
+        end
 
         package.preload.datastorage = function()
             return {
@@ -67,6 +75,9 @@ describe("suwayomi settings atomic failure handling", function()
 
         local helper = require("spec/support/controller_module_spec_helper")
         helper.stubControllerDependencies()
+        local host = require("ffi/util")
+        saved_join_path = host.joinPath
+        host.joinPath = function(...) return table.concat({ ... }, "/") end
 
         -- Mock IO adapter simulating real filesystem
         local files = {
@@ -162,6 +173,7 @@ describe("suwayomi settings atomic failure handling", function()
     after_each(function()
         package.preload.datastorage = nil
         package.preload.luasettings = nil
+        require("ffi/util").joinPath = saved_join_path
     end)
 
     it("restores failed chapter status alongside Downloads after a cold restart", function()
@@ -213,14 +225,14 @@ describe("suwayomi settings atomic failure handling", function()
     end)
 
     local function build_test_queue()
-        return DownloadQueue:new({
+        return require("suwayomi/downloads/service"):new({
             settings = SuwayomiSettings,
             ui_manager = {
                 scheduleIn = function(_, _delay, _callback)
                     -- in tests, do not immediately process
                 end,
             },
-        })
+        }).queue
     end
 
     it("keeps startup failure terminal in storage and every subscriber snapshot", function()
@@ -459,10 +471,11 @@ describe("suwayomi settings atomic failure handling", function()
             if plugin[name] == nil then plugin[name] = method end
         end
         io_adapter.fail_write = true
-        local ok, single_err = plugin:performChapterAction({ id = "m1" }, { id = "c1" }, "download")
+        local manga = { id = "m1", endpoint_scope = "http://suwayomi.test" }
+        local ok, single_err = plugin:performChapterAction(manga, { id = "c1" }, "download")
         assert.is_false(ok)
         assert.is_truthy(single_err:match("write_failed"))
-        local count, batch_err = plugin:enqueueSelectedChapterDownloads({ id = "m1" }, {
+        local count, batch_err = plugin:enqueueSelectedChapterDownloads(manga, {
             { id = "c1" }, { id = "c2" },
         }, ".")
         assert.are.equal(0, count)
@@ -751,6 +764,11 @@ describe("suwayomi settings atomic failure handling", function()
         for k, v in pairs(ChaptersContext.methods) do
             context_obj[k] = v
         end
+        local queue = build_test_queue()
+        for name, method in pairs(require("suwayomi/downloads/controller").methods) do
+            context_obj[name] = method
+        end
+        context_obj.getDownloadQueue = function() return queue end
         context_obj.clearChapterSelection = function(self) self.selection_cleared = true end
         context_obj.refreshChapterMenu = function(self) self.menu_refreshed = true end
         context_obj.showMessage = function(self, msg) table.insert(self.messages, msg) end
@@ -945,56 +963,36 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_nil(queue:getStatus(manga, chapter))
     end)
 
-    it("cancelAll returns partial count and error, and controller displays error message", function()
-        local DownloadsController = require("suwayomi/downloads/controller")
-        local SuwayomiUI = require("suwayomi/ui")
+    it("keeps cancellation and refill retirement atomic when storage rejects the command", function()
         local queue = build_test_queue()
-        local manga1 = { id = "m1", title = "Manga 1" }
+        local manga1 = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter1 = { id = "c1", name = "Chapter 1" }
         local manga2 = { id = "m2", title = "Manga 2" }
         local chapter2 = { id = "c2", name = "Chapter 2" }
-
-        queue:enqueue(manga1, chapter1, "/sdcard/manga")
-        queue:enqueue(manga2, chapter2, "/sdcard/manga")
-
+        assert(queue.refill:setPolicy(manga1, 5))
+        assert(queue:enqueue(manga1, chapter1, "/sdcard/manga"))
+        assert(queue:enqueue(manga2, chapter2, "/sdcard/manga"))
+        local terminated = 0
         queue.ffi_util = {
             runInSubProcess = function() return 301 end,
             isSubProcessDone = function() return false end,
-            terminateSubProcess = function() end,
+            terminateSubProcess = function() terminated = terminated + 1 end,
         }
-        local item1 = table.remove(queue.items, 1)
-        queue.active_job_lifecycle:startQueuedJob(item1)
-        assert.are.equal(1, queue:getActiveCount())
-        assert.are.equal(1, #queue.items)
-
-        queue.active_job_lifecycle.finishWithCancel = function()
-            return false, "active_cancel_failed"
-        end
-
+        queue:process()
+        local before = SuwayomiSettings:loadDownloadQueue()
+        local refills = queue.refill:snapshot()
+        assert.are.equal(2, queue:getActiveCount())
+        io_adapter.fail_write = true
         local total, err = queue:cancelAll()
-        assert.are.equal(1, total)
-        assert.are.equal("active_cancel_failed", err)
-
-        local messages = {}
-        local controller = {}
-        for k, v in pairs(DownloadsController.methods) do
-            controller[k] = v
-        end
-        controller.getDownloadQueue = function() return queue end
-        controller.showMessage = function(_, msg) table.insert(messages, msg) end
-        controller.closeMenu = function() end
-        controller.showDownloads = function() end
-
-        local orig_confirm = SuwayomiUI.showConfirm
-        SuwayomiUI.showConfirm = function(opts)
-            if opts and opts.ok_callback then
-                opts.ok_callback()
-            end
-        end
-
-        controller:performDownloadsTitleAction({ id = "cancel_all" })
-        SuwayomiUI.showConfirm = orig_confirm
-        assert.are.equal(1, #messages)
-        assert.are.equal("active_cancel_failed", messages[1])
+        assert.are.equal(0, total)
+        assert.is_truthy(err:match("write_failed"))
+        assert.are.same(before, SuwayomiSettings:loadDownloadQueue())
+        assert.are.same(refills, queue.refill:snapshot())
+        assert.are.equal(0, terminated)
+        io_adapter.fail_write = false
+        assert.are.equal(2, queue:cancelAll())
+        assert.are.same({}, SuwayomiSettings:loadDownloadQueue())
+        assert.are.same({}, queue.refill:snapshot())
+        assert.are.equal(2, terminated)
     end)
 end)

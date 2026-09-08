@@ -270,6 +270,36 @@ describe("complete stored chapter loading", function()
         assert.are.same({}, messages)
     end)
 
+    it("preserves the complete view and selection after rejected archive reconciliation", function()
+        saved_filter = "Group A"
+        respond = function()
+            local items = nodes(201, 201)
+            items[1].scanlator = "Group A"
+            return page(items, 1, false)
+        end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        local context, menu = plugin.current_chapter_context, plugin.current_chapter_menu
+        local chapter = context.chapters[1]
+        plugin:toggleChapterSelection(manga, chapter)
+        saved_filter = "Group B"
+        respond = function()
+            local items = nodes(202, 202)
+            items[1].scanlator = "Group B"
+            return page(items, 1, false)
+        end
+        queue.downloader.chapterExists = function() return true end
+        settings:getStore().io.write = function() return false, "injected write failure" end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        assert.are.equal(context, plugin.current_chapter_context)
+        assert.are.equal(menu, plugin.current_chapter_menu)
+        assert.are.equal("Group A", plugin.current_scanlator_filter)
+        assert.is_true(plugin:isChapterSelected(manga, chapter))
+        assert.is_true(plugin.selection_mode)
+        assert.are.same({ "201" }, chapterIds(plugin.current_chapter_context.chapters))
+    end)
+
     it("preserves the complete view and read ledger without admitting a failed reload action", function()
         respond = function() return page(nodes(1, 1), 1, false) end
         plugin:showChaptersForManga(manga)
