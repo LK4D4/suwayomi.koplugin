@@ -3,27 +3,46 @@
 ## Project
 
 - LuaJIT/Lua 5.1 KOReader plugin for Suwayomi. KOReader runtime modules are usually stubbed in specs.
-- Runtime payload is `_meta.lua`, `main.lua`, `README.md`, `suwayomi/`, and compiled `l10n/*/suwayomi.mo` catalogs when present. Specs, docs, CI files, worktrees, source `.po` files, template `.pot` files, and `AGENTS.md` are development-only.
 - `main.lua` is only lifecycle/composition glue. Put feature code in slash-style modules under `suwayomi/`, for example `require("suwayomi/api")`.
-- Use `docs/ARCHITECTURE.md` for the detailed module map. Update it when module ownership, facades, packaging boundaries, or test strategy change.
+- Update `docs/ARCHITECTURE.md` when module ownership, facades, packaging boundaries, or test strategy change.
+
+## Engineering defaults
+
+These defaults govern unspecified choices. They do not weaken explicit task requirements or accepted feature contracts.
+
+- This is a small KOReader plugin. Favor KISS, YAGNI, understandable code, and low maintenance cost.
+- Solve the requested workflow with the smallest coherent change. Prefer existing modules and KOReader helpers. Add abstractions only when they simplify current code.
+- Recoverable rough edges are acceptable. A clear error, manual retry, repeated transfer, or delayed cleanup can be preferable to complex recovery machinery. Describe deliberate behavior changes.
+- Target normal supported use. Add crash recovery, concurrency coordination, compatibility layers, or migration machinery only for an explicit requirement or demonstrated problem.
+- Small duplication is acceptable when extraction would add indirection. A possible future use is not enough reason to create a framework.
+- Validate external input at existing boundaries. Unsupported input may produce a clear failure instead of a compatibility fallback.
+- Preserve user archives, saved read state, and credentials. Keep uncertain files and report failed writes; simplicity does not justify destructive guesses.
+- Make routine tradeoffs directly when requirements leave them open. If an explicit requirement demands disproportionate complexity, propose a smaller contract before building it.
+
+## Proportionate workflow
+
+- Routine fixes need a short explanation and focused tests, not a new spec, ADR, ticket tree, or multi-agent workflow.
+- Test the reported bug, the normal workflow, and nearby failures relevant to the change. Reuse existing fixtures. Exhaustive edge-case matrices are not the default.
+- Run focused checks while editing and required full checks on the completed candidate. Repeat checks when changes invalidate their evidence.
+- When independent review is requested, use one full pass and targeted verification of repairs. Additional full passes need a concrete reason.
+- Fix concrete defects and documented violations. Treat speculative refactors and stylistic code smells as advisory.
+- Stop when the requested behavior works, relevant checks pass, and blocking findings are resolved. Leave unrelated improvements alone.
 
 ## Commands
 
 - Run commands from the plugin root so `package.path = "?.lua;" .. package.path` works.
 - Use LuaJIT locally. On fresh Ubuntu/dev containers: `sudo apt-get install -y luajit luarocks`.
 - Install local deps with user-local LuaRocks packages: `busted`, `dkjson`, `luasocket`, `luasec`, and `luacheck`.
-- POSIX lint: `luacheck --codes spec suwayomi main.lua _meta.lua`
-- POSIX tests: `busted spec`
+- POSIX and Windows PowerShell lint: `luacheck --codes spec suwayomi main.lua _meta.lua`
+- POSIX and Windows PowerShell tests: `busted spec`
 - POSIX l10n check: `./scripts/check-l10n.sh`
-- Windows PowerShell lint: `luacheck --codes spec suwayomi main.lua _meta.lua`
-- Windows PowerShell tests: `busted spec`
 - Run one spec file with `busted spec/<file>`. Do not add a separate `luac` syntax pass; Luacheck already parses the project paths.
 
 ## Verification
 
 - Before merging or pushing `master`, push the work branch and run GitHub Actions `Test` against that branch: `gh workflow run test.yml --ref <branch>`, then `gh run watch` or `gh run view --log-failed`.
 - If GitHub Actions cannot run because of auth, network, or GitHub availability, report that blocker. Do not treat local lint/tests as a substitute for required pre-merge Actions.
-- For docs-only changes, review the diff at minimum. Run Lua lint/tests only when docs affect commands, runtime layout, or agent/code behavior.
+- For prose and guidance changes, review the diff, links, consistency, and scope. Run relevant executable checks when documentation changes executable examples, commands, packaging, or other behavior those checks can validate.
 
 ## Code Rules
 
@@ -51,7 +70,8 @@
 ## Android Packaging
 
 - Release zips and manual device pushes include only `_meta.lua`, `main.lua`, `README.md`, `suwayomi/`, and compiled `l10n/*/suwayomi.mo` catalogs when present.
-- For Android QA, push the runtime payload to `/sdcard/koreader/plugins/suwayomi.koplugin/`; do not push `.git`, `spec`, docs, CI files, worktrees, `.po`, or `.pot` files.
+- Exclude `.git`, `spec`, docs, CI files, worktrees, `AGENTS.md`, source `.po` files, and template `.pot` files from release zips and manual device pushes.
+- For Android QA, push this runtime payload to `/sdcard/koreader/plugins/suwayomi.koplugin/`.
 
 ## Maintenance
 
@@ -72,4 +92,4 @@ Use the five canonical triage labels. Before triage, read `docs/agents/triage-la
 
 ### Domain docs
 
-Use a single-context layout. Before codebase exploration, read `docs/agents/domain.md`.
+For changes involving domain terminology, ownership, persistence, lifecycle, or module boundaries, consult `docs/agents/domain.md` and the relevant sections of `docs/ARCHITECTURE.md`. Read relevant ADRs when their decisions govern the change. Small unrelated fixes do not require loading every domain document.
