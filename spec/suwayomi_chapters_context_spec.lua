@@ -21,6 +21,17 @@ describe("suwayomi/chapters/context", function()
         package.loaded["ffi/util"] = nil
         package.loaded["suwayomi/settings"] = nil
         package.loaded["suwayomi/readsync/ledger"] = nil
+        for _, name in ipairs({
+            "suwayomi/downloads/controller",
+            "suwayomi/downloads/queue",
+            "suwayomi/downloads/active_jobs",
+            "suwayomi/downloads/status_formatter",
+            "suwayomi/downloads/refill",
+            "suwayomi/ui",
+        }) do
+            package.loaded[name] = nil
+        end
+        package.preload["suwayomi/ui"] = function() return {} end
         package.preload.gettext = function()
             return function(text) return text end
         end
@@ -57,6 +68,17 @@ describe("suwayomi/chapters/context", function()
         package.preload["suwayomi/i18n"] = nil
         package.preload["suwayomi/settings"] = nil
         package.preload["suwayomi/readsync/ledger"] = nil
+        for _, name in ipairs({
+            "suwayomi/downloads/controller",
+            "suwayomi/downloads/queue",
+            "suwayomi/downloads/active_jobs",
+            "suwayomi/downloads/status_formatter",
+            "suwayomi/downloads/refill",
+            "suwayomi/ui",
+        }) do
+            package.loaded[name] = nil
+        end
+        package.preload["suwayomi/ui"] = nil
     end)
 
     it("exports chapter context and selection methods", function()
@@ -361,31 +383,47 @@ describe("suwayomi/chapters/context", function()
         assert.matches("No chapters match the saved scanlator filter", plugin.message)
     end)
 
-    it("saves scanlator filter changes for the current manga", function()
-        local controller = require("suwayomi/chapters/context")
-        local manga = { id = "m1", title = "Manga" }
-        local saved_filter
-        local plugin = {
-            current_chapter_context = {
-                manga = manga,
-                chapters = {},
-            },
-            clearChapterSelection = function() end,
-            refreshChapterMenu = function() end,
-        }
-        function fake_settings:saveMangaScanlatorFilter(target_manga, scanlator)
-            assert.are.same(manga, target_manga)
-            saved_filter = scanlator
-            return scanlator
+    it("persists scanlator changes and requests refill through the composed controllers", function()
+        helper.stubControllerDependencies()
+        local checked = require("spec/support/checked_queue_settings")()
+        fake_settings.getStore = checked.getStore
+        for name, method in pairs(dofile("suwayomi/settings.lua")) do
+            if fake_settings[name] == nil then fake_settings[name] = method end
         end
-        for name, method in pairs(controller.methods) do
+        assert(fake_settings:save({ server_url = "https://suwayomi.example" }))
+        local manga = { id = "m1", title = "Manga", endpoint_scope = "https://suwayomi.example" }
+        local chapters = {
+            { id = "c1", name = "One", scanlator = "Team A" },
+            { id = "c2", name = "Two", scanlator = "Team B" },
+        }
+        local queue = require("suwayomi/downloads/queue"):new{ settings = fake_settings }
+        queue.refill = require("suwayomi/downloads/refill"):new{
+            settings = fake_settings, queue = queue,
+            ui_manager = { scheduleIn = function() end, unschedule = function() end },
+        }
+        assert(queue.refill:associate(manga))
+        assert(fake_settings:saveMangaKeepNextUnreadDownloads(manga, 5))
+        local plugin = installPlugin({
+            current_chapter_context = { manga = manga, chapters = chapters },
+            selected_chapters = { ["m1:c2"] = true },
+            getDownloadQueue = function() return queue end,
+            refreshChapterMenu = function() end,
+        })
+        for name, method in pairs(require("suwayomi/downloads/controller").methods) do
             plugin[name] = method
         end
 
-        plugin:setScanlatorFilter("Team A")
-        assert.are.equal("Team A", saved_filter)
+        assert.is_true(plugin:setScanlatorFilter("Team A"))
+        assert.are.equal("Team A", fake_settings:loadMangaScanlatorFilter(manga))
+        assert.are.same({ chapters[1] }, plugin:getVisibleChapters(chapters))
+        assert.are.same({}, plugin.selected_chapters)
+        local requests = queue.refill:snapshot()
+        assert.are.equal(1, #requests)
+        assert.are.equal("m1", requests[1].manga_id)
+        assert.are.equal("pending", requests[1].state)
 
-        plugin:setScanlatorFilter(nil)
-        assert.is_nil(saved_filter)
+        assert.is_true(plugin:setScanlatorFilter(nil))
+        assert.is_nil(fake_settings:loadMangaScanlatorFilter(manga))
+        assert.are.same(chapters, plugin:getVisibleChapters(chapters))
     end)
 end)

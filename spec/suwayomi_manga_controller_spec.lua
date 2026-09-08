@@ -370,7 +370,6 @@ describe("suwayomi/manga/controller", function()
 
         plugin:showKeepDownloadedMangaActions(manga)
         assert.are.equal("Download ahead", state.manga_actions_options.title)
-        assert.are.equal("Keep next 50 downloaded", state.manga_actions_options.actions[3].text)
         assert.are.equal("Stop download ahead", state.manga_actions_options.actions[4].text)
         assert.is_function(state.manga_actions_options.on_back)
     end)

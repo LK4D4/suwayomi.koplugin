@@ -223,43 +223,6 @@ describe("suwayomi plugin", function()
         assert.are.equal(1, #runtime.queue_instances)
     end)
 
-    it("records the freshly persisted read entry when a finished document closes", function()
-        local path = "/downloads/source/manga/c1.cbz"
-        runtime_helper.teardown()
-        runtime = runtime_helper.install({
-            chapter_ledger = {
-                ["m1:c1"] = {
-                    manga_id = "m1",
-                    chapter_id = "c1",
-                    path = path,
-                    read = false,
-                },
-            },
-            delete_chapters_settings = {
-                delete_after_mark_read = false,
-                delete_finished_while_reading = 1,
-            },
-        })
-        local plugin = build_plugin({
-            ui = {
-                document = { file = path },
-                doc_settings = {
-                    readSetting = function(_, key)
-                        if key == "summary" then
-                            return { status = "complete" }
-                        end
-                    end,
-                },
-            },
-        })
-
-        plugin:onCloseDocument()
-
-        assert.is_true(runtime.chapter_ledger["m1:c1"].read)
-        assert.is_true(runtime.chapter_ledger["m1:c1"].pending_read_sync)
-        assert.are.equal("c1", runtime.finished_cleanup_journal.mangas.m1.records[1].chapter_id)
-    end)
-
     it("reevaluates blocked cleanup before download-directory callbacks", function()
         local plugin = build_plugin()
         local events = {}

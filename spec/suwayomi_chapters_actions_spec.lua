@@ -27,6 +27,9 @@ describe("suwayomi/chapters/actions", function()
             "suwayomi/i18n",
             "suwayomi/settings",
             "suwayomi/downloads/downloader",
+            "suwayomi/downloads/queue",
+            "suwayomi/downloads/active_jobs",
+            "suwayomi/downloads/status_formatter",
             "suwayomi/downloads/refill",
             "suwayomi/ui",
             "suwayomi/debug",
@@ -294,7 +297,7 @@ describe("suwayomi/chapters/actions", function()
         return plugin, queue
     end
 
-    local function install_bulk_admission(plugin)
+    local function install_download_queue(plugin)
         plugin.max_batch_queue_chapters = 50
         plugin.queue = require("suwayomi/downloads/queue"):new{ downloader = downloader }
         plugin.queue.manual_deletion = require("suwayomi/chapters/manual_deletion"):new{
@@ -515,17 +518,20 @@ describe("suwayomi/chapters/actions", function()
             }
         end
         local plugin = build_plugin({
-            queue = {
-                verifyArchive = function(_, _, _, _, callback)
-                    complete = callback
-                    return true
-                end,
-            },
             ledger = { ["m1:c1"] = { read = true, last_page = 7 } },
             existing = {
                 ["/downloads/Manga/Chapter 1.cbz"] = true,
             },
         })
+        install_download_queue(plugin)
+        plugin.queue.verifyArchive = function(_, _, _, _, callback)
+            complete = callback
+            return true
+        end
+        for name, method in pairs(dofile("suwayomi/readsync/ledger.lua").methods) do
+            plugin[name] = method
+        end
+        plugin.getChapterDownloadKey = require("suwayomi/chapters/context").methods.getChapterDownloadKey
 
         assert.is_true(plugin:openChapter(manga, chapter))
         assert.are.same({}, opened_paths)
@@ -537,9 +543,11 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(manga, plugin.reader_return_contexts[1].manga)
         assert.are.equal(chapter, plugin.reader_return_contexts[1].chapter)
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.reader_return_contexts[1].path)
-        assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.ledger["m1:c1"].path)
-        assert.is_true(plugin.ledger["m1:c1"].read)
-        assert.are.equal(7, plugin.ledger["m1:c1"].last_page)
+        local entry = settings:loadChapterLedger()["m1:c1"]
+        assert.are.equal("/downloads/Manga/Chapter 1.cbz", entry.path)
+        assert.is_true(entry.read)
+        assert.are.equal(7, entry.last_page)
+        assert.are.same({}, plugin.metadata_updates)
         package.preload["apps/reader/readerui"] = nil
         package.loaded["apps/reader/readerui"] = nil
     end)
@@ -1157,7 +1165,7 @@ describe("suwayomi/chapters/actions", function()
             },
         })
         plugin.current_scanlator_filter = "Team A"
-        install_bulk_admission(plugin)
+        install_download_queue(plugin)
         function plugin:getDownloadDirectoryOrChoose()
             return "/downloads"
         end
@@ -1215,7 +1223,7 @@ describe("suwayomi/chapters/actions", function()
             return true
         end
 
-        install_bulk_admission(plugin)
+        install_download_queue(plugin)
         plugin:confirmNextUnreadChapterDownloads(2)
 
         assert.is_truthy(plugin.confirmation.text:find("tx:Queue up to 2 new chapter downloads?", 1, true))
