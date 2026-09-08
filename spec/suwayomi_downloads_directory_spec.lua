@@ -11,6 +11,7 @@ describe("suwayomi/downloads/directory", function()
     local lfs
     local device
     local marker_installed = false
+    local service
 
     local function installMarker()
         if not marker_installed then
@@ -27,6 +28,19 @@ describe("suwayomi/downloads/directory", function()
             "suwayomi/fs",
             "lfs",
             "device",
+            "datastorage", "luasettings", "ffi/util", "ui/uimanager",
+            "suwayomi/downloads/service", "suwayomi/downloads/refill",
+            "suwayomi/downloads/queue", "suwayomi/downloads/cleanup_adapter",
+            "suwayomi/downloads/active_jobs", "suwayomi/downloads/job_store",
+            "suwayomi/downloads/progress_file", "suwayomi/downloads/status_formatter",
+            "suwayomi/downloads/archive", "suwayomi/downloads/downloader",
+            "suwayomi/chapters/manual_deletion", "suwayomi/chapters/archive_identity",
+            "suwayomi/chapters/finished_cleanup", "suwayomi/chapters/local_downloads",
+            "suwayomi/chapters/delete_actions", "suwayomi/readsync/ledger",
+            "suwayomi/readsync/koreader_metadata", "suwayomi/reader_return",
+            "suwayomi/subprocess/job", "suwayomi/debug",
+            "suwayomi/network/request_job", "suwayomi/network/request_worker",
+            "suwayomi/api",
         }) do
             package.loaded[name] = nil
             package.preload[name] = nil
@@ -37,19 +51,11 @@ describe("suwayomi/downloads/directory", function()
 
     local function load_directory(options)
         options = options or {}
-        helper.stubControllerDependencies()
         reset_modules()
-
-        settings = {
-            download_directory = options.download_directory or "",
-            loadDownloadDirectory = function(self)
-                return self.download_directory
-            end,
-            saveDownloadDirectory = function(self, path)
-                self.download_directory = path
-                return path
-            end,
-        }
+        helper.stubControllerDependencies()
+        settings = dofile("suwayomi/settings.lua")
+        settings:setStore(require("spec/support/checked_queue_settings")():getStore())
+        assert(settings:getStore():saveKey("download_directory", options.download_directory or ""))
         ui = {
             calls = {},
             showDirectoryChooser = function(callback, start_dir)
@@ -91,7 +97,28 @@ describe("suwayomi/downloads/directory", function()
         return require("suwayomi/downloads/directory")
     end
 
+    local function installPlugin(Directory, plugin)
+        plugin = plugin or {}
+        for name, method in pairs(Directory.methods) do
+            plugin[name] = method
+        end
+        function plugin:getDownloadQueue()
+            if not service then
+                service = require("suwayomi/downloads/service"):new{
+                    settings = settings,
+                    ui_manager = {
+                        scheduleIn = function() end,
+                        unschedule = function() end,
+                    },
+                }
+            end
+            return service:getQueue()
+        end
+        return plugin
+    end
+
     after_each(function()
+        if service then service:shutdown(); service = nil end
         if marker_installed then
             Marker.uninstall()
             marker_installed = false
@@ -117,10 +144,7 @@ describe("suwayomi/downloads/directory", function()
                 ["/books/Manga"] = "directory",
             },
         })
-        local plugin = {}
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        local plugin = installPlugin(Directory)
 
         assert.are.equal("/books/Manga", plugin:getDownloadDirectoryChooserStartDir())
     end)
@@ -142,10 +166,7 @@ describe("suwayomi/downloads/directory", function()
                 return nil
             end,
         }
-        local plugin = {}
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        local plugin = installPlugin(Directory)
 
         assert.are.equal("/reader-home", plugin:getDownloadDirectoryChooserStartDir())
     end)
@@ -158,10 +179,7 @@ describe("suwayomi/downloads/directory", function()
             },
             device = { home_dir = "/device-home" },
         })
-        local plugin = {}
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        local plugin = installPlugin(Directory)
 
         assert.are.equal("/device-home/Books/Manga", plugin:getDownloadDirectoryChooserStartDir())
         assert.are.same({ "/device-home/Books/Manga" }, lfs.created)
@@ -171,14 +189,11 @@ describe("suwayomi/downloads/directory", function()
         local Directory = load_directory({
             download_directory = "/storage/emulated/0/Books/Manga/",
         })
-        local plugin = {}
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        local plugin = installPlugin(Directory)
 
         assert.are.equal("Books/Manga", plugin:getDownloadDirectorySummary())
 
-        settings.download_directory = ""
+        assert(settings:saveDownloadDirectory(""))
         assert.are.equal("not set", plugin:getDownloadDirectorySummary())
     end)
 
@@ -191,19 +206,16 @@ describe("suwayomi/downloads/directory", function()
             download_directory = "",
         })
         local callback_path
-        local plugin = {
+        local plugin = installPlugin(Directory, {
             messages = {},
             showMessage = function(self, message)
                 table.insert(self.messages, message)
             end,
-        }
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        })
 
         assert.are.equal("tx:not set", plugin:getDownloadDirectorySummary())
 
-        settings.download_directory = "/start"
+        assert(settings:saveDownloadDirectory("/start"))
         plugin:chooseDownloadDirectory(function(path)
             callback_path = path
         end)
@@ -221,15 +233,12 @@ describe("suwayomi/downloads/directory", function()
             download_directory = "/start",
         })
         local callback_path
-        local plugin = {
+        local plugin = installPlugin(Directory, {
             messages = {},
             showMessage = function(self, message)
                 table.insert(self.messages, message)
             end,
-        }
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        })
 
         plugin:chooseDownloadDirectory(function(path)
             callback_path = path
@@ -237,7 +246,7 @@ describe("suwayomi/downloads/directory", function()
         ui.calls[1].callback("/chosen")
 
         assert.are.equal("/start", ui.calls[1].start_dir)
-        assert.are.equal("/chosen", settings.download_directory)
+        assert.are.equal("/chosen", settings:loadDownloadDirectory())
         assert.are.equal("/chosen", callback_path)
         assert.are.same({ "Suwayomi download directory saved." }, plugin.messages)
     end)
@@ -245,22 +254,19 @@ describe("suwayomi/downloads/directory", function()
     it("can choose a directory without showing the save toast", function()
         local Directory = load_directory()
         local callback_path
-        local plugin = {
+        local plugin = installPlugin(Directory, {
             messages = {},
             showMessage = function(self, message)
                 table.insert(self.messages, message)
             end,
-        }
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        })
 
         plugin:chooseDownloadDirectory(function(path)
             callback_path = path
         end, { suppress_saved_message = true })
         ui.calls[1].callback("/chosen")
 
-        assert.are.equal("/chosen", settings.download_directory)
+        assert.are.equal("/chosen", settings:loadDownloadDirectory())
         assert.are.equal("/chosen", callback_path)
         assert.are.same({}, plugin.messages)
     end)
@@ -269,10 +275,7 @@ describe("suwayomi/downloads/directory", function()
         local Directory = load_directory({
             download_directory = "/books",
         })
-        local plugin = {}
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        local plugin = installPlugin(Directory)
 
         assert.are.equal("/books", plugin:getDownloadDirectoryOrChoose(function() end))
         assert.are.equal(0, #ui.calls)
@@ -282,15 +285,12 @@ describe("suwayomi/downloads/directory", function()
         local Directory = load_directory({
             download_directory = { path = "/books" },
         })
-        local plugin = {
+        local plugin = installPlugin(Directory, {
             messages = {},
             showMessage = function(self, message)
                 table.insert(self.messages, message)
             end,
-        }
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        })
 
         assert.is_nil(plugin:getDownloadDirectoryOrChoose(function() end))
         assert.are.equal(1, #ui.calls)
@@ -299,15 +299,12 @@ describe("suwayomi/downloads/directory", function()
     it("opens the chooser and retries via callback when no directory is saved", function()
         local Directory = load_directory()
         local callback_path
-        local plugin = {
+        local plugin = installPlugin(Directory, {
             messages = {},
             showMessage = function(self, message)
                 table.insert(self.messages, message)
             end,
-        }
-        for name, method in pairs(Directory.methods) do
-            plugin[name] = method
-        end
+        })
 
         assert.is_nil(plugin:getDownloadDirectoryOrChoose(function(path)
             callback_path = path

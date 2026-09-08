@@ -18,6 +18,8 @@ describe("Downloads chapter navigation", function()
         "suwayomi/ui/list_rows", "suwayomi/ui/browse", "suwayomi/ui/directory", "suwayomi/ui/manga_info",
         "suwayomi/ui/choice_dialogs", "suwayomi/network/request_job", "suwayomi/manga/action_menu",
         "ui/widget/buttondialog", "ui/widget/confirmbox", "ui/widget/multiinputdialog",
+        "suwayomi/downloads/archive", "suwayomi/chapters/manual_deletion",
+        "suwayomi/chapters/archive_identity",
     }
     for _, name in ipairs(widget_modules) do table.insert(extra_modules, name) end
     local plugin, queue, stack, ui, request, messages
@@ -35,6 +37,13 @@ describe("Downloads chapter navigation", function()
     before_each(function()
         runtime_helper.install({ max_parallel_chapter_downloads = 1 })
         clearExtras()
+        local settings = dofile("suwayomi/settings.lua")
+        settings:setStore(require("spec/support/checked_queue_settings")():getStore())
+        assert(settings:save({ server_url = "https://suwayomi.example" }))
+        assert(settings:saveMaxParallelChapterDownloads(1))
+        assert(settings:saveDownloadDirectory("/books"))
+        package.loaded["suwayomi/settings"] = nil
+        package.preload["suwayomi/settings"] = function() return settings end
         stack, messages = {}, {}
         request = nil
         package.preload["suwayomi/downloads/queue"] = nil

@@ -2,6 +2,7 @@ package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/controller_module_spec_helper")
 
+local service
 local modules_to_clear = {
     "ffi/util",
     "gettext",
@@ -13,6 +14,19 @@ local modules_to_clear = {
     "suwayomi/settings/retention_labels",
     "suwayomi/ui",
     "suwayomi/plugin/settings_controller",
+    "datastorage", "luasettings", "suwayomi/fs",
+    "suwayomi/downloads/service", "suwayomi/downloads/refill",
+    "suwayomi/downloads/queue", "suwayomi/downloads/cleanup_adapter",
+    "suwayomi/downloads/active_jobs", "suwayomi/downloads/job_store",
+    "suwayomi/downloads/progress_file", "suwayomi/downloads/status_formatter",
+    "suwayomi/downloads/archive", "suwayomi/downloads/downloader",
+    "suwayomi/chapters/manual_deletion", "suwayomi/chapters/archive_identity",
+    "suwayomi/chapters/finished_cleanup", "suwayomi/chapters/local_downloads",
+    "suwayomi/chapters/delete_actions", "suwayomi/readsync/ledger",
+    "suwayomi/readsync/koreader_metadata", "suwayomi/reader_return",
+    "suwayomi/debug",
+    "suwayomi/network/request_job", "suwayomi/network/request_worker",
+    "suwayomi/api",
 }
 
 local function clearModules()
@@ -50,7 +64,9 @@ end
 
 local function installController(options)
     options = options or {}
+    if service then service:shutdown(); service = nil end
     clearModules()
+    helper.stubControllerDependencies()
     local state = {
         events = {},
         messages = {},
@@ -101,14 +117,14 @@ local function installController(options)
         }
     end
     package.preload["suwayomi/settings"] = function()
+        local persisted = dofile("suwayomi/settings.lua")
         local settings = {
-            load = function()
-                return state.credentials
-            end,
-            save = function(_, credentials)
-                state.saved_credentials = credentials
-                state.credentials = credentials
-                return credentials
+            save = function(self, credentials)
+                local saved, err = persisted.save(self, credentials)
+                if not saved then return nil, err end
+                state.saved_credentials = saved
+                state.credentials = saved
+                return saved
             end,
             loadSourceLanguages = function()
                 return state.saved_languages
@@ -149,6 +165,11 @@ local function installController(options)
                 return behavior
             end,
         }
+        for name, method in pairs(persisted) do
+            if settings[name] == nil then settings[name] = method end
+        end
+        settings:setStore(require("spec/support/checked_queue_settings")():getStore())
+        assert(persisted.save(settings, state.credentials))
         if options.no_category_persistence then
             settings.loadLibraryCategoryPickerBehavior = nil
             settings.saveLibraryCategoryPickerBehavior = nil
@@ -245,10 +266,21 @@ local function installController(options)
     local controller = require("suwayomi/plugin/settings_controller")
     local plugin = {
         messages = state.messages,
-        download_queue = { stale = true },
     }
     for name, method in pairs(controller.methods) do
         plugin[name] = method
+    end
+    function plugin:getDownloadQueue()
+        if not service then
+            service = require("suwayomi/downloads/service"):new{
+                settings = require("suwayomi/settings"),
+                ui_manager = {
+                    scheduleIn = function() end,
+                    unschedule = function() end,
+                },
+            }
+        end
+        return service:getQueue()
     end
     function plugin:showMessage(message)
         table.insert(self.messages, message)
@@ -301,6 +333,7 @@ end
 
 describe("suwayomi/plugin/settings_controller", function()
     after_each(function()
+        if service then service:shutdown(); service = nil end
         package.preload["suwayomi/i18n"] = nil
         package.loaded["suwayomi/i18n"] = nil
     end)
@@ -1123,7 +1156,6 @@ describe("suwayomi/plugin/settings_controller", function()
         state.parallel_menu_options.onSelect(3)
 
         assert.are.equal(3, state.saved_parallel)
-        assert.are.equal(3, plugin.download_queue.max_active_chapters)
         assert.is_nil(state.unexpected_parallel_menu_update)
         assert.are.equal(1, state.refresh_count)
         assert.are.same({}, state.messages)
@@ -1132,21 +1164,22 @@ describe("suwayomi/plugin/settings_controller", function()
 
     it("updates an existing download queue limit without abandoning active jobs", function()
         local plugin, state = installController()
-        local process_count = 0
-        plugin.download_queue = {
-            max_active_chapters = 2,
-            process = function()
-                process_count = process_count + 1
-            end,
-        }
+        local queue = plugin:getDownloadQueue()
+        local manga, chapter = { id = "manga" }, { id = "chapter" }
+        queue:setActiveJob({
+            key = queue:getKey(manga, chapter),
+            manga = manga,
+            chapter = chapter,
+            download_directory = "/books",
+        })
         local download_items = findMenuItem(plugin:buildSettingsMenu(), "Downloads").sub_item_table
 
         download_items[2].callback(state.touchmenu)
         state.parallel_menu_options.onSelect(4)
 
         assert.are.equal(4, state.saved_parallel)
-        assert.are.equal(4, plugin.download_queue.max_active_chapters)
-        assert.are.equal(1, process_count)
+        assert.is_true(queue:isChapterBusy("manga:chapter"))
+        assert.are.equal("chapter", queue:getSnapshot().active[1].chapter.id)
         assert.are.same({}, state.messages)
     end)
 
