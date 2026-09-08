@@ -164,6 +164,29 @@ describe("suwayomi settings atomic failure handling", function()
         package.preload.luasettings = nil
     end)
 
+    it("restores failed chapter status alongside Downloads after a cold restart", function()
+        local manga = { id = "m1", title = "Example" }
+        local chapter = { id = "c1", name = "One" }
+        assert(SuwayomiSettings:saveDownloadQueue({ {
+            key = "m1:c1", state = "failed", download_directory = "/books",
+            manga = manga, chapter = chapter,
+            progress = { state = "failed", error = "No address associated with hostname" },
+        } }))
+        SuwayomiSettings:setStore(SettingsStore:new({
+            path = settings_path, io = io_adapter, luasettings = SuwayomiSettings:open(),
+        }))
+        local queue = DownloadQueue:new{
+            settings = SuwayomiSettings,
+            ui_manager = { scheduleIn = function() end },
+        }
+        assert(queue:recover())
+        local status = queue:getStatus(manga, chapter)
+        assert.is_not_nil(status)
+        assert.are.equal("failed", status.state)
+        assert.are.equal("Failed", queue:formatChapterMenuStatus(chapter, status))
+        assert.are.equal("failed", queue:getSnapshot().failed[1].state)
+    end)
+
     it("reports failure on preference save when write fails, and does not leak rejected mutation to next save", function()
         -- Initial state
         assert.is_false(SuwayomiSettings:loadBrowseSettings().show_nsfw_sources)

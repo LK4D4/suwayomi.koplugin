@@ -134,12 +134,15 @@ local function isRetryableTransportCode(code)
         or normalized:match("timed? ?out") ~= nil
         or normalized:match("connection.*reset") ~= nil
         or normalized:match("connection.*refused") ~= nil
+        or normalized:match("connection.*abort") ~= nil
+        or normalized == "software caused connection abor"
         or normalized:match("network.*unreachable") ~= nil
         or normalized:match("network.*down") ~= nil
         or normalized:match("no route to host") ~= nil
         or normalized:match("host.*not.*found") ~= nil
         or normalized:match("name or service not known") ~= nil
         or normalized:match("host or service not provided") ~= nil
+        or normalized:match("no address associated with hostname") ~= nil
 end
 
 local function isRetryableHttpStatus(code)

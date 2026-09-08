@@ -485,6 +485,11 @@ function SettingsStore:reconcile()
 
     local disk_tx = parsed.store_transaction
     local disk_tx_id = type(disk_tx) == "table" and disk_tx.id
+    -- Cached LuaSettings reads may precede the first document load after restart.
+    if self.committed_data == nil and not self.pending_tx_id then
+        self.last_tx_id = disk_tx_id
+        self.last_tx_version = type(disk_tx) == "table" and disk_tx.version or nil
+    end
 
     if self.pending_tx_id and disk_tx_id == self.pending_tx_id then
         self.committed_data = parsed
