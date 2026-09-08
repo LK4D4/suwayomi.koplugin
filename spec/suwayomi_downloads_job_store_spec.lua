@@ -1,23 +1,14 @@
 package.path = "?.lua;" .. package.path
 
+local checkedQueueSettings = require("spec/support/checked_queue_settings")
+
 describe("suwayomi/downloads/job_store", function()
     local JobStore
 
     local function build_store(saved_jobs)
         package.loaded["suwayomi/downloads/job_store"] = nil
         JobStore = require("suwayomi/downloads/job_store")
-        local stored = saved_jobs or {}
-        local save_count = 0
-        local settings = {
-            loadDownloadQueue = function()
-                return stored
-            end,
-            saveDownloadQueue = function(_, jobs)
-                stored = jobs
-                save_count = save_count + 1
-                return stored
-            end,
-        }
+        local settings, save_count = checkedQueueSettings(saved_jobs)
         local store = JobStore:new{
             settings = settings,
             getKey = function(manga, chapter)
@@ -25,10 +16,8 @@ describe("suwayomi/downloads/job_store", function()
             end,
         }
         return store, function()
-            return stored
-        end, function()
-            return save_count
-        end
+            return settings:loadDownloadQueue()
+        end, save_count
     end
 
     after_each(function()

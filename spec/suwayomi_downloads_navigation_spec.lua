@@ -20,7 +20,7 @@ describe("Downloads chapter navigation", function()
         "ui/widget/buttondialog", "ui/widget/confirmbox", "ui/widget/multiinputdialog",
     }
     for _, name in ipairs(widget_modules) do table.insert(extra_modules, name) end
-    local plugin, queue, stack, saved, ui, request, messages
+    local plugin, queue, stack, ui, request, messages
     local function clearExtras()
         for _, name in ipairs(extra_modules) do package.loaded[name], package.preload[name] = nil, nil end
     end
@@ -35,14 +35,10 @@ describe("Downloads chapter navigation", function()
     before_each(function()
         runtime_helper.install({ max_parallel_chapter_downloads = 1 })
         clearExtras()
-        stack, saved, messages = {}, "[]", {}
+        stack, messages = {}, {}
         request = nil
         package.preload["suwayomi/downloads/queue"] = nil
         package.preload["suwayomi/navigation"] = nil
-        local settings = require("suwayomi/settings")
-        local json = require("dkjson")
-        settings.loadDownloadQueue = function() return json.decode(saved) end
-        settings.saveDownloadQueue = function(_, jobs) saved = json.encode(jobs) end
         local debug = require("suwayomi/debug")
         debug.now, debug.elapsedMs = function() return 0 end, function() return 0 end
         debug.time = function(_, _, callback) return callback() end

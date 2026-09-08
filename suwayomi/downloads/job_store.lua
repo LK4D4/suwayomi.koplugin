@@ -207,6 +207,8 @@ function JobStore:buildJob(manga, chapter, download_directory, state, details)
         manga = self:copyMangaMetadata(manga),
         chapter = self:copyChapterMetadata(chapter),
     }
+    job.archive_generation = details.archive_generation
+    job.provenance = details.provenance
     if details.started_at ~= nil then
         job.started_at = tonumber(details.started_at) or details.started_at
     end
@@ -280,6 +282,54 @@ function JobStore:upsertMany(new_jobs)
     return new_jobs
 end
 
+function JobStore:admit(new_jobs, provenance, manual_deletion)
+    if not self.settings or not self.settings.getStore then
+        return nil, "checked_store_unavailable"
+    end
+    local call_ok, ok, err = pcall(function()
+        return self.settings:getStore():saveDocument(function(doc)
+            if doc.download_queue ~= nil and type(doc.download_queue) ~= "table" then
+                error("unsupported_download_queue", 0)
+            end
+            local jobs = doc.download_queue or {}
+            local indexes, last_index = {}, 0
+            for index, existing in pairs(jobs) do
+                if type(index) == "number" and index > last_index and index == math.floor(index) then
+                    last_index = index
+                end
+                if hasValidJobKey(existing) then
+                    if indexes[existing.key] then error("duplicate_download_job", 0) end
+                    indexes[existing.key] = index
+                end
+            end
+            for _, job in ipairs(new_jobs) do
+                local index = indexes[job.key]
+                local existing = index and jobs[index]
+                if existing and (existing.state ~= "failed" or existing.version ~= nil) then
+                    error("download_job_owned_or_unsupported", 0)
+                end
+            end
+            if manual_deletion then
+                manual_deletion:admitDownloads(doc, new_jobs, provenance)
+            end
+            for _, job in ipairs(new_jobs) do
+                job.provenance = provenance
+                local index = indexes[job.key]
+                if not index then
+                    last_index = last_index + 1
+                    index = last_index
+                    indexes[job.key] = index
+                end
+                jobs[index] = job
+            end
+            doc.download_queue = jobs
+        end)
+    end)
+    if not call_ok then return nil, ok end
+    if not ok then return nil, err end
+    return new_jobs
+end
+
 function JobStore:remove(key)
     local remaining = {}
     for _, job in ipairs(self:load()) do
@@ -303,6 +353,8 @@ function JobStore:copySnapshotJob(job, state)
         chapter = copyMetadata(job.chapter),
         retry_count = job.retry_count,
         retry_at = job.retry_at,
+        archive_generation = job.archive_generation,
+        provenance = job.provenance,
     }
     local progress = self:normalizeProgress(job.progress)
     if progress then

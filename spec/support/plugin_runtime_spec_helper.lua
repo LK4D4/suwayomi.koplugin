@@ -261,7 +261,7 @@ function Helper.install(options)
             end
 
             function instance:getSnapshot()
-                return { active = {}, queued = {}, failed = {} }
+                return { active = {}, queued = {}, failed = {}, manual_deletion = {} }
             end
 
             function instance:checkStoreFence() return true end
@@ -309,6 +309,7 @@ function Helper.install(options)
     end
 
     package.preload["suwayomi/settings"] = function()
+        local checked = require("spec/support/checked_queue_settings")()
         return {
             load = function()
                 return options.credentials or {
@@ -325,12 +326,11 @@ function Helper.install(options)
                 options.download_directory = path
                 return path
             end,
-            loadDownloadQueue = function()
-                return {}
-            end,
-            saveDownloadQueue = function(_, jobs)
-                return jobs
-            end,
+            getStore = checked.getStore,
+            isBlocked = checked.isBlocked,
+            reconcile = checked.reconcile,
+            loadDownloadQueue = checked.loadDownloadQueue,
+            saveDownloadQueue = checked.saveDownloadQueue,
             loadDeleteChaptersSettings = function()
                 return options.delete_chapters_settings or {
                     delete_after_mark_read = false,

@@ -96,27 +96,24 @@ local function isStrictDescendant(root, candidate)
     return candidate:sub(1, #root + 1) == root .. "/"
 end
 
-local function clearMatchingLedgerPath(self, ledger, entry, path)
-    if not entry or entry.path ~= path then
-        return false
-    end
-    entry.path = nil
-    self:saveChapterLedger(ledger)
-    return true
-end
-
-local function convergeMissingDownload(self, ledger, entry, manga_id, chapter_id, path, changed_mangas)
-    if entry.path and entry.path ~= path then
-        return
-    end
-    clearMatchingLedgerPath(self, ledger, entry, path)
+local function convergeMissingDownload(self, ledger, _entry, manga_id, chapter_id, path, changed_mangas, target)
     local queue = self:getDownloadQueue()
-    local manga, chapter = { id = manga_id }, { id = chapter_id }
-    local status = queue:getStatus(manga, chapter)
-    if status and status.state ~= "queued" and status.state ~= "downloading" then
-        queue:clearStatus(manga, chapter, { quiet = true })
+    local removal = queue.manual_deletion
+    if not removal or not target or target.path ~= path then return false end
+    local valid, reason = removal:validateTarget(target, true)
+    if valid or reason ~= "missing" then return false end
+    local saved = SuwayomiSettings:getStore():saveDocument(function(doc)
+        removal:retire(doc, target)
+    end)
+    if not saved then return false end
+    local key = manga_id .. ":" .. chapter_id
+    ledger[key] = self:loadChapterLedger()[key]
+    local status = queue:getStatus({ id = manga_id }, { id = chapter_id })
+    if status and status.archive_generation == target.generation and not queue:isChapterBusy(key) then
+        queue.statuses[key] = nil
     end
     changed_mangas[manga_id] = true
+    return true
 end
 
 local function refreshChangedDownloadViews(self, changed_mangas)
@@ -223,11 +220,19 @@ function Methods:recordFinishedChapter(entry)
     end
     local manga_id = tostring(entry.manga_id)
     local chapter_id = tostring(entry.chapter_id)
+    local archive_target = entry.archive_target
+    if entry.path and not archive_target and entry.archive_generation then
+        local removal = self:getDownloadQueue().manual_deletion
+        local current = removal and removal:getTarget(manga_id .. ":" .. chapter_id, entry.path)
+        if current and current.generation == entry.archive_generation then archive_target = current end
+    end
     removeRecord(journal, manga_id, chapter_id)
     journal.mangas[manga_id] = journal.mangas[manga_id] or { records = {} }
     table.insert(journal.mangas[manga_id].records, {
         chapter_id = chapter_id,
         path = entry.path,
+        archive_target = archive_target,
+        archive_retired = entry.archive_retired,
         sequence = journal.next_sequence,
         retry_count = 0,
         retry_after = 0,
@@ -524,7 +529,7 @@ local function processFinishedChapterCleanup(self, summary)
                 end
                 saveJournal(journal)
                 logTransition("converged", "unread", 1)
-            elseif not record.path then
+            elseif not record.path or record.archive_retired then
                 -- A completion without a captured file only occupies retention.
                 -- Never attach it to a download that appeared after completion.
                 table.remove(manga.records, index)
@@ -532,17 +537,24 @@ local function processFinishedChapterCleanup(self, summary)
                 clearRetryReason(self, manga_id, chapter_id)
                 if #manga.records == 0 then journal.mangas[manga_id] = nil end
                 saveJournal(journal)
-            elseif archive_exists == false and not archive_error then
-                convergeMissingDownload(self, ledger, ledger_entry, manga_id, chapter_id, record.path, changed_mangas)
-                table.remove(manga.records, index)
-                candidate_count = candidate_count - 1
-                summary.missing = summary.missing + 1
+            elseif not record.archive_target then
+                rejectCandidate(journal, record, "unproved_generation", summary, reasons)
                 clearRetryReason(self, manga_id, chapter_id)
-                if #manga.records == 0 then
-                    journal.mangas[manga_id] = nil
+                index = index + 1
+            elseif archive_exists == false and not archive_error then
+                if convergeMissingDownload(self, ledger, ledger_entry, manga_id, chapter_id,
+                    record.path, changed_mangas, record.archive_target) then
+                    table.remove(manga.records, index)
+                    candidate_count = candidate_count - 1
+                    summary.missing = summary.missing + 1
+                    clearRetryReason(self, manga_id, chapter_id)
+                    if #manga.records == 0 then journal.mangas[manga_id] = nil end
+                    saveJournal(journal)
+                    logTransition("converged", "missing", 1)
+                else
+                    rejectCandidate(journal, record, "unproved_generation", summary, reasons)
+                    index = index + 1
                 end
-                saveJournal(journal)
-                logTransition("converged", "missing", 1)
             elseif ledger_entry.path and ledger_entry.path ~= record.path then
                 rejectCandidate(journal, record, "path_mismatch", summary, reasons)
                 clearRetryReason(self, manga_id, chapter_id)
@@ -615,6 +627,7 @@ local function processFinishedChapterCleanup(self, summary)
                             {
                                 ledger = ledger,
                                 chapter_path = record.path,
+                                archive_generation = record.archive_target.generation,
                                 quiet_active = true,
                                 quiet_delete_failed = true,
                                 quiet_missing = true,
@@ -624,11 +637,11 @@ local function processFinishedChapterCleanup(self, summary)
                         if state == "deleted" or state == "missing" or (ok and state == nil) then
                             if state == "missing" then
                                 convergeMissingDownload(
-                                    self, ledger, ledger_entry, manga_id, chapter_id, record.path, changed_mangas
+                                    self, ledger, ledger_entry, manga_id, chapter_id,
+                                    record.path, changed_mangas, record.archive_target
                                 )
                                 summary.missing = summary.missing + 1
                             else
-                                self:saveChapterLedger(ledger)
                                 summary.deleted = summary.deleted + 1
                                 changed_mangas[manga_id] = true
                             end

@@ -450,64 +450,6 @@ describe("suwayomi settings atomic failure handling", function()
         assert.are.equal(0, #queue:getSnapshot().queued)
     end)
 
-    for _, transition in ipairs({ "ledger", "supplied_ledger", "status", "ambiguous_ledger", "ambiguous_status" }) do
-        it("reports rejected post-delete " .. transition .. " bookkeeping without leaking staged ledger state", function()
-            local queue = build_test_queue()
-            local manga, chapter = { id = "m1" }, { id = "c1" }
-            local path = "/books/chapter.cbz"
-            local ambiguous = transition:match("^ambiguous") ~= nil
-            local ledger = transition:match("status$") and {} or { ["m1:c1"] = { path = path, read = true } }
-            assert.is_truthy(SuwayomiSettings:saveChapterLedger(ledger))
-            assert.is_truthy(SuwayomiSettings:saveDownloadQueue({ queue:buildPersistentJob(manga, chapter, "/books", "failed") }))
-            local plugin = {
-                getDownloadQueue = function() return queue end,
-                isChapterDownloaded = function() return true, path end,
-                getKoreaderMetadataPathForDocument = function() return path .. ".sdr/metadata.lua" end,
-                removeChapterArchiveAndSidecars = function()
-                    if ambiguous then io_adapter.fail_sync_dir = true
-                    else io_adapter.fail_write = true end
-                    return true
-                end,
-                loadChapterLedger = function() return SuwayomiSettings:loadChapterLedger() end,
-                saveChapterLedger = function(_, value) return SuwayomiSettings:saveChapterLedger(value) end,
-                getChapterLedgerKey = function() return "m1:c1" end,
-                showMessage = function() end,
-                refreshChapterMenu = function() error("failed deletion must not report refreshed success") end,
-            }
-            for name, method in pairs(require("suwayomi/chapters/delete_actions").methods) do plugin[name] = method end
-            local ok, state, err = plugin:deleteChapterFromDeviceWithOptions(manga, chapter, {
-                ledger = transition == "supplied_ledger" and ledger or nil,
-            })
-            assert.is_false(ok)
-            assert.are.equal(ambiguous and "store_blocked" or "delete_failed", state)
-            assert.is_truthy(err)
-            assert.are.same(ledger, SuwayomiSettings:loadChapterLedger())
-            if transition == "supplied_ledger" then assert.are.equal(path, ledger["m1:c1"].path) end
-            assert.are.equal(1, #SuwayomiSettings:loadDownloadQueue())
-        end)
-    end
-
-    it("commits supplied deletion ledger before reporting success and preserves pending read state", function()
-        local queue = build_test_queue()
-        local manga, chapter = { id = "m1" }, { id = "c1" }
-        local ledger = { ["m1:c1"] = { path = "/books/chapter.cbz", read = true, pending_read_sync = true } }
-        assert.is_truthy(SuwayomiSettings:saveChapterLedger(ledger))
-        local plugin = {
-            getDownloadQueue = function() return queue end,
-            isChapterDownloaded = function() return true, "/books/chapter.cbz" end,
-            getKoreaderMetadataPathForDocument = function() return "/books/chapter.sdr/metadata.lua" end,
-            removeChapterArchiveAndSidecars = function() return true end,
-            saveChapterLedger = function(_, value) return SuwayomiSettings:saveChapterLedger(value) end,
-            getChapterLedgerKey = function() return "m1:c1" end,
-            refreshChapterMenu = function() end,
-        }
-        for name, method in pairs(require("suwayomi/chapters/delete_actions").methods) do plugin[name] = method end
-        assert.is_true(plugin:deleteChapterFromDeviceWithOptions(manga, chapter, { ledger = ledger }))
-        local stored = assert(loadstring(io_adapter.files[settings_path]))().chapter_ledger
-        assert.is_nil(ledger["m1:c1"].path)
-        assert.are.same(ledger, stored)
-        assert.is_true(stored["m1:c1"].pending_read_sync)
-    end)
 
     it("DownloadQueue:enqueue returns false, save_failed and does not modify in-memory items or statuses on failure", function()
         local queue = build_test_queue()

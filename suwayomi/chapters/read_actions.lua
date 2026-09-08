@@ -1,11 +1,9 @@
 -- Boundary: ChapterReadActions.
---
--- Responsibility: Mark chapters read/unread and coordinate metadata, persisted ledger, explicit completion, and read-sync side effects.
--- Owned state: Owns operation-local manual read ledgers and completion buffers; mutates chapter context through plugin methods.
--- Dependencies: Plugin mixin methods, Suwayomi debug timing, and i18n.
--- External data: Manga/chapter tables may come from API responses or cached UI state and are matched by stable ids.
+-- Owns checked manual read transactions, captured completions, and immediate outcomes.
+-- Filesystem removal belongs to the process-owned manual deletion coordinator.
 
 local SuwayomiDebug = require("suwayomi/debug")
+local SuwayomiSettings = require("suwayomi/settings")
 local I18n = require("suwayomi/i18n")
 
 local ChapterReadActions = {}
@@ -13,227 +11,280 @@ ChapterReadActions.__index = ChapterReadActions
 
 function ChapterReadActions:new(deps)
     deps = deps or {}
-    return setmetatable({
-        plugin = deps.plugin,
-    }, self)
+    return setmetatable({ plugin = deps.plugin }, self)
 end
 
 local Methods = {}
 
-local function processChapterRead(self, manga, chapter, ledger, skip_delete_after_mark_read)
-    local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
-    local metadata_updated = false
-    if downloaded and chapter_path then
-        metadata_updated = self:setKoreaderChapterReadState(chapter_path, true)
-    end
-    local updates = {
-        path = chapter_path,
-        read = true,
-        pending_read_sync = true,
-        pending_read_state = true,
-    }
-    local entry
-    if ledger then
-        entry = self:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, updates)
-    else
-        entry = self:upsertChapterLedgerEntry(manga, chapter, updates)
-    end
-
-    if self.current_chapter_context and self.current_chapter_context.chapters then
-        for _, current in ipairs(self.current_chapter_context.chapters) do
-            if tostring(current.id or "") == tostring(chapter.id or "") then
-                current.is_read = true
-                break
-            end
+local function copyLedger(ledger)
+    local copy = {}
+    for key, entry in pairs(ledger) do
+        if type(entry) == "table" then
+            copy[key] = {}
+            for field, value in pairs(entry) do copy[key][field] = value end
+        else
+            copy[key] = entry
         end
     end
-    local deleted_after_mark_read = 0
-    if not skip_delete_after_mark_read and self.deleteChaptersAfterManualMarkRead then
-        deleted_after_mark_read = self:deleteChaptersAfterManualMarkRead(manga, { chapter }, {
-            ledger = ledger,
-        })
-    end
-    local completion
-    if self.recordFinishedChapter then
-        -- Capture eligibility before a later download or menu refresh can change it.
-        completion = {
-            manga_id = entry.manga_id,
-            chapter_id = entry.chapter_id,
-            read = entry.read,
-            path = downloaded and deleted_after_mark_read == 0 and chapter_path or nil,
-        }
-    end
-    return completion, downloaded, metadata_updated, deleted_after_mark_read
+    return copy
 end
 
-function Methods:markChapterRead(manga, chapter, options)
-    local started_at = SuwayomiDebug.now()
-    options = options or {}
-    local completion, downloaded, metadata_updated, deleted_after_mark_read = processChapterRead(
-        self, manga, chapter, options.ledger, options.skip_delete_after_mark_read
-    )
-    if completion then
-        if options.finished_entries then
-            -- Retain compatibility for callers supplying a completion buffer.
-            table.insert(options.finished_entries, completion)
-        else
-            if options.ledger then
-                self:saveChapterLedger(options.ledger)
+local function copyTarget(target)
+    if type(target) ~= "table" then return target end
+    local copy = {}
+    for key, value in pairs(target) do copy[key] = copyTarget(value) end
+    return copy
+end
+
+local function updateContext(self, manga, chapter, read)
+    local context = self.current_chapter_context
+    if not context or not context.manga or tostring(context.manga.id) ~= tostring(manga.id) then return end
+    for _, current in ipairs(context.chapters or {}) do
+        if tostring(current.id or "") == tostring(chapter.id or "") then
+            current.is_read = read
+            break
+        end
+    end
+end
+
+local function captureContext(self)
+    local previous = {}
+    local context = self.current_chapter_context
+    for _, chapter in ipairs(context and context.chapters or {}) do
+        previous[chapter] = { read = chapter.is_read, pending = chapter.pending_read_sync }
+    end
+    return previous
+end
+
+local function refreshCommitted(self, options, supplied, previous)
+    local ledger = self:loadChapterLedger()
+    if supplied then
+        for key in pairs(supplied) do supplied[key] = nil end
+        for key, entry in pairs(ledger) do supplied[key] = entry end
+    end
+    local context = self.current_chapter_context
+    if context and context.manga then
+        for _, chapter in ipairs(context.chapters or {}) do
+            local entry = ledger[self:getChapterLedgerKey(context.manga, chapter)]
+            if type(entry) == "table" then
+                chapter.is_read = entry.read == true
+                chapter.pending_read_sync = entry.pending_read_sync
+            elseif previous and previous[chapter] then
+                chapter.is_read = previous[chapter].read
+                chapter.pending_read_sync = previous[chapter].pending
+            elseif chapter._suwayomi_is_read ~= nil then
+                chapter.is_read = chapter._suwayomi_is_read == true
+                chapter.pending_read_sync = nil
             end
-            self:recordFinishedChapter(completion)
         end
     end
     if not options.skip_refresh then
-        self:refreshChapterMenu()
+        -- A quick rebuild does not reconcile sidecars or write an old ledger over
+        -- an uncertain replacement. Only the store may reconcile that uncertainty.
+        self:refreshChapterMenu({ quick = true })
     end
-    if not options.skip_schedule then
-        self:schedulePendingReadSync()
+end
+
+local function showReadSummary(self, result, options)
+    local message = I18n.f(
+        "Marked read: %1. Archives removed: %2. Pending: %3. Busy (not accepted): %4. Blocked: %5.",
+        result.marked_read, result.removed, result.pending, result.busy, result.blocked
+    )
+    if not result.committed then
+        message = message .. " " .. I18n.t("Read state could not be confirmed saved. No deletion was started by this action; reading metadata may already have changed.")
     end
+    if result.removed > 0 or result.pending > 0 or result.busy > 0 or result.blocked > 0 then
+        message = message .. " " .. I18n.t("Only chapter archives are removed. Reading metadata and backups are retained.")
+    end
+    if result.busy > 0 then
+        message = message .. " " .. I18n.t("Downloads are busy and were not changed. Request deletion again after they finish.")
+    end
+    if result.blocked > 0 then
+        message = message .. " " .. I18n.t("Unverified archives are preserved. No replacement archive will be deleted by this request.")
+    end
+    result.message = message
+    if not options.quiet then
+        self:showMessage(message)
+        result.summary_shown = true
+    end
+end
+
+local function readResult(core, outcomes, count)
+    local result = { committed = true, marked_read = count, removed = 0, pending = 0, busy = 0, blocked = 0 }
+    local snapshot = core:snapshot()
+    for key, outcome in pairs(outcomes or {}) do
+        local current = snapshot[key]
+        if current and outcome.revision and current.revision == outcome.revision then
+            outcome = current
+        end
+        local state = outcome.state
+        if state == "removed" then result.removed = result.removed + 1
+        elseif state == "pending" then result.pending = result.pending + 1
+        elseif state == "busy" then result.busy = result.busy + 1
+        elseif state ~= "missing" and state ~= "revoked" then result.blocked = result.blocked + 1 end
+    end
+    return result
+end
+
+local function markRead(self, manga, chapters, options, batch, clear_selection)
+    local started_at = SuwayomiDebug.now()
+    local core = self:getDownloadQueue().manual_deletion
+    local ledger = copyLedger(options.ledger or self:loadChapterLedger())
+    local previous = captureContext(self)
+    local delete_settings = SuwayomiSettings:loadDeleteChaptersSettings()
+    local capture_deletion = delete_settings.delete_after_mark_read == true and not options.skip_delete_after_mark_read
+    local root = SuwayomiSettings:loadDownloadDirectory()
+    local captures, prepared = {}, {}
+    -- Capture every target before metadata or a menu rebuild can change the view.
+    for _, chapter in ipairs(chapters) do
+        local downloaded, path = self:isChapterDownloaded(manga, chapter)
+        local key = self:getChapterLedgerKey(manga, chapter)
+        local capture = capture_deletion and core:capture(key, path, root) or nil
+        if capture then captures[#captures + 1] = capture end
+        prepared[#prepared + 1] = {
+            chapter = chapter, downloaded = downloaded, path = path, capture = capture,
+            target = downloaded and path and core:getTarget(key, path) or nil,
+        }
+    end
+    for _, item in ipairs(prepared) do
+        if item.downloaded and item.path then self:setKoreaderChapterReadState(item.path, true) end
+        local entry = self:upsertChapterLedgerEntryInLedger(ledger, manga, item.chapter, {
+            path = item.path, read = true, pending_read_sync = true, pending_read_state = true,
+        })
+        item.completion = {
+            manga_id = entry.manga_id, chapter_id = entry.chapter_id, read = true,
+            path = item.downloaded and item.path or nil,
+            archive_generation = item.target and item.target.generation or nil,
+            archive_target = copyTarget(item.target),
+        }
+        updateContext(self, manga, item.chapter, true)
+    end
+    if clear_selection then self:clearChapterSelection(true) end
+    if batch then
+        -- Include reconciliation of visible non-target chapters in the same save.
+        self:refreshChapterMenu({ ledger = ledger })
+    end
+    local ok, err, outcomes = core:commitRead(ledger, captures, {})
+    if not ok then
+        refreshCommitted(self, options, options.ledger, previous)
+        local result = { committed = false, error = err, marked_read = 0, removed = 0, pending = 0, busy = 0, blocked = #captures }
+        showReadSummary(self, result, options)
+        return 0, result
+    end
+    for _, item in ipairs(prepared) do
+        local completion = item.completion
+        if item.capture and item.capture.target and item.capture.target.generation then
+            completion.archive_generation = item.capture.target.generation
+            completion.archive_target = copyTarget(item.capture.target)
+        end
+        if self.recordFinishedChapter then
+            if options.finished_entries then
+                options.finished_entries[#options.finished_entries + 1] = completion
+            else
+                self:recordFinishedChapter(completion)
+            end
+        end
+    end
+    -- A caller-owned completion buffer retains publication ordering: do not run
+    -- deletion before the caller has had a chance to publish its snapshots.
+    if not options.finished_entries then
+        core:process()
+        core:wake()
+    end
+    if not options.skip_refresh then self:refreshChapterMenu() end
+    if not options.skip_schedule then self:schedulePendingReadSync() end
     if not options.skip_keep_policy and self.applyMangaKeepNextUnreadDownloadsPolicy then
         self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
     end
-    if not options.skip_refresh or not options.skip_schedule then
-        SuwayomiDebug.log({
-            operation = "markChapterRead",
-            event = "end",
-            manga_id = manga and manga.id,
-            chapter_id = chapter and chapter.id,
-            downloaded = downloaded == true,
-            metadata_updated = metadata_updated == true,
-            deleted_after_mark_read = deleted_after_mark_read,
-            skip_refresh = options.skip_refresh == true,
-            skip_schedule = options.skip_schedule == true,
-            elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
-        })
+    if options.ledger then
+        local committed = self:loadChapterLedger()
+        for key in pairs(options.ledger) do options.ledger[key] = nil end
+        for key, entry in pairs(committed) do options.ledger[key] = entry end
     end
-    return true
+    local result = readResult(core, outcomes, #chapters)
+    showReadSummary(self, result, options)
+    SuwayomiDebug.log({ operation = "manual_mark_read", event = "end", chapter_count = #chapters,
+        removed = result.removed, pending = result.pending, busy = result.busy, blocked = result.blocked,
+        elapsed_ms = SuwayomiDebug.elapsedMs(started_at) })
+    return #chapters, result
+end
+
+function Methods:markChapterRead(manga, chapter, options)
+    local count, result = markRead(self, manga, { chapter }, options or {}, false)
+    return count == 1, result
+end
+
+local function markUnread(self, manga, chapters, options, batch, clear_selection)
+    local core = self:getDownloadQueue().manual_deletion
+    local ledger = copyLedger(options.ledger or self:loadChapterLedger())
+    local previous = captureContext(self)
+    local keys = {}
+    for _, chapter in ipairs(chapters) do
+        local downloaded, path = self:isChapterDownloaded(manga, chapter)
+        if downloaded and path then self:setKoreaderChapterReadState(path, false) end
+        self:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, {
+            path = path, read = false, pending_read_sync = true, pending_read_state = false,
+        })
+        keys[#keys + 1] = self:getChapterLedgerKey(manga, chapter)
+        updateContext(self, manga, chapter, false)
+    end
+    if clear_selection then self:clearChapterSelection(true) end
+    if batch then self:refreshChapterMenu({ ledger = ledger }) end
+    -- Metadata reconciliation must not undo an explicit unread choice.
+    for index, chapter in ipairs(chapters) do
+        ledger[keys[index]].read = false
+        ledger[keys[index]].pending_read_sync = true
+        ledger[keys[index]].pending_read_state = false
+        updateContext(self, manga, chapter, false)
+    end
+    local ok, err = core:commitRead(ledger, {}, keys)
+    if not ok then
+        refreshCommitted(self, options, options.ledger, previous)
+        local result = { committed = false, marked_unread = 0, error = err }
+        if not options.quiet then
+            self:showMessage(I18n.t("Unread state could not be confirmed saved. Deletion revocation was not confirmed; reading metadata may already have changed."))
+            result.summary_shown = true
+        end
+        return 0, result
+    end
+    for _, chapter in ipairs(chapters) do
+        if self.cancelFinishedChapter then self:cancelFinishedChapter(manga.id, chapter.id) end
+    end
+    core:wake()
+    refreshCommitted(self, options, options.ledger)
+    if not options.skip_schedule then self:schedulePendingReadSync() end
+    return #chapters, { committed = true, marked_unread = #chapters }
 end
 
 function Methods:markChapterUnread(manga, chapter, options)
-    local started_at = SuwayomiDebug.now()
-    options = options or {}
-    local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
-    local metadata_updated = false
-    if downloaded and chapter_path then
-        metadata_updated = self:setKoreaderChapterReadState(chapter_path, false)
-    end
-    local updates = {
-        path = chapter_path,
-        read = false,
-        pending_read_sync = true,
-        pending_read_state = false,
-    }
-    if options.ledger then
-        self:upsertChapterLedgerEntryInLedger(options.ledger, manga, chapter, updates)
-    else
-        self:upsertChapterLedgerEntry(manga, chapter, updates)
-    end
-    if self.cancelFinishedChapter then
-        self:cancelFinishedChapter(manga.id, chapter.id)
-    end
-
-    if self.current_chapter_context and self.current_chapter_context.chapters then
-        for _, current in ipairs(self.current_chapter_context.chapters) do
-            if tostring(current.id or "") == tostring(chapter.id or "") then
-                current.is_read = false
-                break
-            end
-        end
-    end
-
-    if not options.skip_refresh then
-        self:refreshChapterMenu()
-    end
-    if not options.skip_schedule then
-        self:schedulePendingReadSync()
-    end
-    if not options.skip_refresh or not options.skip_schedule then
-        SuwayomiDebug.log({
-            operation = "markChapterUnread",
-            event = "end",
-            manga_id = manga and manga.id,
-            chapter_id = chapter and chapter.id,
-            downloaded = downloaded == true,
-            metadata_updated = metadata_updated == true,
-            skip_refresh = options.skip_refresh == true,
-            skip_schedule = options.skip_schedule == true,
-            elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
-        })
-    end
-    return true
+    local count, result = markUnread(self, manga, { chapter }, options or {}, false)
+    return count == 1, result
 end
 
-local function markReadBatch(self, manga, chapters, clear_selection)
-    local ledger = self:loadChapterLedger()
-    local completions = {}
-    for _, chapter in ipairs(chapters) do
-        local completion = processChapterRead(self, manga, chapter, ledger)
-        if completion then
-            completions[#completions + 1] = completion
-        end
-    end
-
-    if clear_selection then
-        self:clearChapterSelection(true)
-    end
-    -- Menu reconciliation can update visible chapters outside this batch.
-    self:refreshChapterMenu({ ledger = ledger })
-    self:saveChapterLedger(ledger)
-    for _, completion in ipairs(completions) do
-        self:recordFinishedChapter(completion)
-    end
-    self:schedulePendingReadSync()
-    if self.applyMangaKeepNextUnreadDownloadsPolicy then
-        self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
-    end
+function Methods:markChapterListUnread(manga, chapters, clear_selection)
+    if #chapters == 0 then return 0 end
+    return markUnread(self, manga, chapters, {}, true, clear_selection)
 end
 
 function Methods:markChapterListRead(manga, chapters)
-    local started_at = SuwayomiDebug.now()
-    if #chapters == 0 then
-        return 0
-    end
-
-    markReadBatch(self, manga, chapters)
-    SuwayomiDebug.log({
-        operation = "markChapterListRead",
-        event = "end",
-        manga_id = manga and manga.id,
-        chapter_count = #chapters,
-        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
-    })
-    return #chapters
+    if #chapters == 0 then return 0 end
+    return markRead(self, manga, chapters, {}, true)
 end
 
 function Methods:markSelectedChaptersRead()
-    local started_at = SuwayomiDebug.now()
-    if not self.current_chapter_context then
-        return 0
-    end
-
+    if not self.current_chapter_context then return 0 end
     local manga = self.current_chapter_context.manga
     local chapters = self:getSelectedChapters(manga, self.current_chapter_context.chapters)
     if #chapters == 0 then
         self:showMessage(I18n.t("No chapters selected."))
         return 0
     end
-
-    markReadBatch(self, manga, chapters, true)
-    SuwayomiDebug.log({
-        operation = "markSelectedChaptersRead",
-        event = "end",
-        manga_id = manga and manga.id,
-        chapter_count = #chapters,
-        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
-    })
-    return #chapters
+    return markRead(self, manga, chapters, {}, true, true)
 end
-
 
 function Methods:markChaptersBeforeRead(manga, chapter)
     return self:markChapterListRead(manga, self:getChaptersBefore(chapter))
 end
 
 ChapterReadActions.methods = Methods
-
 return ChapterReadActions

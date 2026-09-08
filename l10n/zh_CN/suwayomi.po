@@ -120,6 +120,21 @@ msgstr "应用筛选"
 msgid "Apply saved filter"
 msgstr "应用已保存的筛选器"
 
+msgid "Archive deletion blocked; file preserved"
+msgstr ""
+
+msgid "Archive deletion pending"
+msgstr ""
+
+msgid "Archive deletion pending: close reader"
+msgstr ""
+
+msgid "Archive removed; bookkeeping pending"
+msgstr ""
+
+msgid "Archive removed; metadata retained"
+msgstr ""
+
 msgid "Artist"
 msgstr "画师"
 
@@ -423,6 +438,9 @@ msgid "Deleted %1 selected chapter from device."
 msgid_plural "Deleted %1 selected chapters from device."
 msgstr[0] "已从设备删除 %1 个选中章节。"
 
+msgid "Deletion not accepted: download busy; request again"
+msgstr ""
+
 msgctxt "source filter sort direction"
 msgid "Descending"
 msgstr "降序"
@@ -521,6 +539,11 @@ msgstr "正在下载 %1/%2"
 
 msgid "Downloads"
 msgstr "下载"
+
+msgid ""
+"Downloads are busy and were not changed. Request deletion again after they "
+"finish."
+msgstr ""
 
 msgid "Downloads · %1 failed"
 msgid_plural "Downloads · %1 failed"
@@ -748,6 +771,11 @@ msgstr "标记已读"
 msgid "Mark unread"
 msgstr "标记未读"
 
+msgid ""
+"Marked read: %1. Archives removed: %2. Pending: %3. Busy (not accepted): %4. "
+"Blocked: %5."
+msgstr ""
+
 msgid "Never ask"
 msgstr "从不询问"
 
@@ -848,6 +876,10 @@ msgid "Ongoing"
 msgstr "连载中"
 
 msgid ""
+"Only chapter archives are removed. Reading metadata and backups are retained."
+msgstr ""
+
+msgid ""
 "Only this batch will be queued. If availability changes, fewer downloads may "
 "be added. Run another action for more."
 msgstr ""
@@ -918,6 +950,11 @@ msgstr[0] "已将 %1 个选中章节下载加入队列。"
 
 msgid "Read"
 msgstr "已读"
+
+msgid ""
+"Read state could not be confirmed saved. No deletion was started by this "
+"action; reading metadata may already have changed."
+msgstr ""
 
 msgid "Read state is already synced."
 msgstr "阅读状态已同步。"
@@ -1233,8 +1270,18 @@ msgstr "未知错误"
 msgid "Unread"
 msgstr "未读"
 
+msgid ""
+"Unread state could not be confirmed saved. Deletion revocation was not "
+"confirmed; reading metadata may already have changed."
+msgstr ""
+
 msgid "Unsupported"
 msgstr "不支持"
+
+msgid ""
+"Unverified archives are preserved. No replacement archive will be deleted by "
+"this request."
+msgstr ""
 
 msgctxt "extension action"
 msgid "Update"

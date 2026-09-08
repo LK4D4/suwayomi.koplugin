@@ -143,6 +143,21 @@ msgstr "Применить фильтры"
 msgid "Apply saved filter"
 msgstr "Применить сохранённый фильтр"
 
+msgid "Archive deletion blocked; file preserved"
+msgstr ""
+
+msgid "Archive deletion pending"
+msgstr ""
+
+msgid "Archive deletion pending: close reader"
+msgstr ""
+
+msgid "Archive removed; bookkeeping pending"
+msgstr ""
+
+msgid "Archive removed; metadata retained"
+msgstr ""
+
 msgid "Artist"
 msgstr "Художник"
 
@@ -458,6 +473,9 @@ msgstr[0] "Удалена %1 выбранная глава с устройств
 msgstr[1] "Удалены %1 выбранные главы с устройства."
 msgstr[2] "Удалено %1 выбранных глав с устройства."
 
+msgid "Deletion not accepted: download busy; request again"
+msgstr ""
+
 msgctxt "source filter sort direction"
 msgid "Descending"
 msgstr "По убыванию"
@@ -556,6 +574,11 @@ msgstr "Скачивание %1/%2"
 
 msgid "Downloads"
 msgstr "Загрузки"
+
+msgid ""
+"Downloads are busy and were not changed. Request deletion again after they "
+"finish."
+msgstr ""
 
 msgid "Downloads · %1 failed"
 msgid_plural "Downloads · %1 failed"
@@ -791,6 +814,11 @@ msgstr "Отметить прочитанным"
 msgid "Mark unread"
 msgstr "Отметить непрочитанным"
 
+msgid ""
+"Marked read: %1. Archives removed: %2. Pending: %3. Busy (not accepted): %4. "
+"Blocked: %5."
+msgstr ""
+
 msgid "Never ask"
 msgstr "Никогда не спрашивать"
 
@@ -891,6 +919,10 @@ msgid "Ongoing"
 msgstr "Выходит"
 
 msgid ""
+"Only chapter archives are removed. Reading metadata and backups are retained."
+msgstr ""
+
+msgid ""
 "Only this batch will be queued. If availability changes, fewer downloads may "
 "be added. Run another action for more."
 msgstr ""
@@ -975,6 +1007,11 @@ msgstr[2] "В очередь добавлено %1 выбранных глав."
 
 msgid "Read"
 msgstr "Прочитано"
+
+msgid ""
+"Read state could not be confirmed saved. No deletion was started by this "
+"action; reading metadata may already have changed."
+msgstr ""
 
 msgid "Read state is already synced."
 msgstr "Состояние прочтения уже синхронизировано."
@@ -1300,8 +1337,18 @@ msgstr "Неизвестная ошибка"
 msgid "Unread"
 msgstr "Непрочитано"
 
+msgid ""
+"Unread state could not be confirmed saved. Deletion revocation was not "
+"confirmed; reading metadata may already have changed."
+msgstr ""
+
 msgid "Unsupported"
 msgstr "Не поддерживается"
+
+msgid ""
+"Unverified archives are preserved. No replacement archive will be deleted by "
+"this request."
+msgstr ""
 
 msgctxt "extension action"
 msgid "Update"

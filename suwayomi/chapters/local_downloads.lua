@@ -69,11 +69,12 @@ local function removeFile(path)
     return removed == true or code == 2 or code == 20
 end
 
-function Methods:removeChapterArchiveAndSidecars(chapter_path, metadata_paths)
+function Methods:removeChapterArchiveAndSidecars(chapter_path, metadata_paths, validate_archive)
     -- Keep the archive until metadata removal succeeds. A failed attempt or
     -- restart can still resolve hash-based sidecars from the original archive.
     if type(metadata_paths) ~= "table" then metadata_paths = { metadata_paths } end
     for _, metadata_path in ipairs(metadata_paths) do
+        if validate_archive and not validate_archive() then return false end
         if not removeFile(metadata_path) or not removeFile(metadata_path .. ".old") then
             return false
         end
@@ -85,6 +86,7 @@ function Methods:removeChapterArchiveAndSidecars(chapter_path, metadata_paths)
             os.remove(metadata_dir)
         end
     end
+    if validate_archive and not validate_archive() then return false end
     return removeFile(chapter_path)
 end
 

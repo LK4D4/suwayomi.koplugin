@@ -700,6 +700,9 @@ describe("suwayomi/manga/controller", function()
         function queue:getStatus(target_manga, chapter)
             return self.status[self:getKey(target_manga, chapter)]
         end
+        function queue:getSnapshot()
+            return { active = {}, queued = {}, failed = {}, manual_deletion = {} }
+        end
         function queue:formatChapterMenuStatus()
             return nil
         end

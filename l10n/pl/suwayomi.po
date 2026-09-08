@@ -142,6 +142,21 @@ msgstr ""
 msgid "Apply saved filter"
 msgstr ""
 
+msgid "Archive deletion blocked; file preserved"
+msgstr ""
+
+msgid "Archive deletion pending"
+msgstr ""
+
+msgid "Archive deletion pending: close reader"
+msgstr ""
+
+msgid "Archive removed; bookkeeping pending"
+msgstr ""
+
+msgid "Archive removed; metadata retained"
+msgstr ""
+
 msgid "Artist"
 msgstr ""
 
@@ -452,6 +467,9 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
+msgid "Deletion not accepted: download busy; request again"
+msgstr ""
+
 msgctxt "source filter sort direction"
 msgid "Descending"
 msgstr ""
@@ -545,6 +563,11 @@ msgid "Downloading %1/%2"
 msgstr ""
 
 msgid "Downloads"
+msgstr ""
+
+msgid ""
+"Downloads are busy and were not changed. Request deletion again after they "
+"finish."
 msgstr ""
 
 msgid "Downloads · %1 failed"
@@ -775,6 +798,11 @@ msgstr ""
 msgid "Mark unread"
 msgstr ""
 
+msgid ""
+"Marked read: %1. Archives removed: %2. Pending: %3. Busy (not accepted): %4. "
+"Blocked: %5."
+msgstr ""
+
 msgid "Never ask"
 msgstr ""
 
@@ -872,6 +900,10 @@ msgid "Ongoing"
 msgstr ""
 
 msgid ""
+"Only chapter archives are removed. Reading metadata and backups are retained."
+msgstr ""
+
+msgid ""
 "Only this batch will be queued. If availability changes, fewer downloads may "
 "be added. Run another action for more."
 msgstr ""
@@ -947,6 +979,11 @@ msgstr[1] ""
 msgstr[2] ""
 
 msgid "Read"
+msgstr ""
+
+msgid ""
+"Read state could not be confirmed saved. No deletion was started by this "
+"action; reading metadata may already have changed."
 msgstr ""
 
 msgid "Read state is already synced."
@@ -1267,7 +1304,17 @@ msgstr ""
 msgid "Unread"
 msgstr ""
 
+msgid ""
+"Unread state could not be confirmed saved. Deletion revocation was not "
+"confirmed; reading metadata may already have changed."
+msgstr ""
+
 msgid "Unsupported"
+msgstr ""
+
+msgid ""
+"Unverified archives are preserved. No replacement archive will be deleted by "
+"this request."
 msgstr ""
 
 msgctxt "extension action"

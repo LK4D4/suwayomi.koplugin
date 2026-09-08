@@ -36,19 +36,29 @@ describe("download failure user actions", function()
 
     local function newQueue()
         local json = require("dkjson")
+        local settings = require("spec/support/checked_queue_settings")(json.decode(saved))
+        local store = settings:getStore()
+        local write, rename = store.io.write, store.io.rename
+        store.io.write = function(handle, content)
+            if save_error and not save_error:match("^ambiguous_post_replacement") then
+                return nil, save_error:gsub("^write_failed: ", "")
+            end
+            return write(handle, content)
+        end
+        store.io.rename = function(from, to)
+            local ok = rename(from, to)
+            saved = json.encode(assert(loadstring(store.io.read(to)))().download_queue)
+            return ok
+        end
+        store.io.sync_dir = function()
+            if save_error and save_error:match("^ambiguous_post_replacement") then
+                blocked = true
+                return nil, "injected directory sync failure"
+            end
+            return true
+        end
         return require("suwayomi/downloads/queue"):new{
-            settings = {
-                loadDownloadQueue = function() return json.decode(saved) end,
-                saveDownloadQueue = function(_, jobs)
-                    if save_error and save_error:match("^ambiguous_post_replacement") then
-                        saved = json.encode(jobs)
-                        blocked = true
-                    end
-                    if save_error then return false, save_error end
-                    saved = json.encode(jobs)
-                end,
-                isBlocked = function() return blocked end,
-            },
+            settings = settings,
             downloader = {
                 chapterExists = function() return false end,
                 getTargetPath = function() return "/unused", "/unused/chapter.cbz" end,

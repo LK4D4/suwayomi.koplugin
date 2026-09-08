@@ -120,11 +120,10 @@ local function normalizeFinishedCleanupJournal(value)
                         local retry_count = finiteNonNegative(record.retry_count)
                         local retry_after = finiteNonNegative(record.retry_after)
                         if sequence and retry_count and retry_after then
-                            local normalized_record = { chapter_id = record.chapter_id, path = record.path,
-                                sequence = sequence, retry_count = retry_count, retry_after = retry_after }
-                            if record.blocked_reason == "unsafe_path" then
-                                normalized_record.blocked_reason = "unsafe_path"
-                            end
+                            local normalized_record = copyTable(record)
+                            normalized_record.sequence = sequence
+                            normalized_record.retry_count = retry_count
+                            normalized_record.retry_after = retry_after
                             table.insert(manga_records[key], normalized_record)
                             if sequence > max_sequence then max_sequence = sequence end
                         end

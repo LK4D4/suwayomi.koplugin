@@ -14,6 +14,7 @@ describe("process-owned download navigation", function()
         "suwayomi/downloads/service", "suwayomi/downloads/cleanup_adapter", "suwayomi/settings/store",
         "suwayomi/ui/downloads", "suwayomi/ui/menu_utils", "suwayomi/ui/list_menu",
         "suwayomi/ui/list_rows", "docsettings",
+        "suwayomi/chapters/manual_deletion", "suwayomi/chapters/archive_identity",
     }
     local function clear()
         runtime_helper.clearModules()
@@ -132,6 +133,11 @@ describe("process-owned download navigation", function()
         ui = require("ui/uimanager")
         ui.quit = function(_, ...) return select("#", ...), ... end
         ui.scheduleIn = function(_, delay, callback) timers[#timers + 1] = { at = clock + delay, callback = callback } end
+        ui.unschedule = function(_, callback)
+            for index = #timers, 1, -1 do
+                if timers[index].callback == callback then table.remove(timers, index) end
+            end
+        end
         ui.nextTick = function(_, callback) ui:scheduleIn(0, callback) end
         ui.broadcastEvent = function(_, event)
             local recipients = {}
@@ -181,6 +187,9 @@ describe("process-owned download navigation", function()
     after_each(function()
         os.time = original_time
         for path in pairs(files or {}) do os.remove(path) end
+        if directory then
+            for _, chapter in ipairs(chapters) do require("lfs").rmdir(directory .. "/" .. chapter.id .. ".cbz.sdr") end
+        end
         if directory then require("lfs").rmdir(directory) end
         clear()
     end)
@@ -484,7 +493,8 @@ describe("process-owned download navigation", function()
             local active = queue:getActiveJob("m1:c1")
             active.retry_count = retry_count
             assert(queue:upsertPersistentJob(queue:buildPersistentJob(manga, chapters[1], directory,
-                "downloading", { retry_count = retry_count })))
+                "downloading", { retry_count = retry_count, archive_generation = active.archive_generation,
+                    provenance = active.provenance })))
             local path = directory .. "/c1.cbz"
             write(path, "synthetic archive")
             write(active.progress_path, "state=downloaded\ncurrent=8\ntotal=8\npath=" .. path .. "\n")
@@ -578,12 +588,14 @@ describe("process-owned download navigation", function()
         assert(settings:saveChapterLedger({ ["m1:c2"] = {
             manga_id = "m1", chapter_id = "c2", path = cleanup_path, read = true,
         } }))
+        local target = assert(queue.manual_deletion:prepareRemoval("m1:c2", cleanup_path, directory))
         -- Seed durable work after startup has drained. No UI cleanup action or
         -- existing cleanup timer can wake it; the next queue transition must.
         assert(settings:saveFinishedChapterCleanupJournal({
             version = 1, next_sequence = 2,
             mangas = { m1 = { records = { {
                 chapter_id = "c2", path = cleanup_path, sequence = 1, retry_count = 0, retry_after = 0,
+                archive_target = target,
             } } } },
         }))
         owner:close()
@@ -699,6 +711,8 @@ describe("process-owned download navigation", function()
         local ledger = settings:loadChapterLedger()
         ledger["m1:c1"].read = true
         assert(settings:saveChapterLedger(ledger))
+        assert(affected:getDownloadQueue().manual_deletion:prepareRemoval("m1:c1", cleanup_path, directory))
+        ledger = settings:loadChapterLedger()
         assert(affected:recordFinishedChapter(ledger["m1:c1"]))
         advance(0)
         assert.is_nil(read(cleanup_path))
@@ -757,6 +771,7 @@ describe("process-owned download navigation", function()
         assert(settings:saveChapterLedger({ ["m1:c1"] = {
             manga_id = "m1", chapter_id = "c1", path = path, read = true,
         } }))
+        assert(plugin:getDownloadQueue().manual_deletion:prepareRemoval("m1:c1", path, directory))
         assert(plugin:recordFinishedChapter(settings:loadChapterLedger()["m1:c1"]))
         owner:close()
         local reader, reader_owner = host("reader-a")
@@ -820,6 +835,378 @@ describe("process-owned download navigation", function()
         assert.are.same({}, healthy.download_snapshot.active)
         assert.are.equal(path, settings:loadChapterLedger()["m1:c1"].path)
         assert.are.equal("synthetic archive", read(path))
+    end)
+
+    local function manualHost(retention, reader)
+        assert(settings:saveDeleteChaptersSettings{
+            delete_after_mark_read = true, delete_finished_while_reading = retention or 0,
+        })
+        local ffi = require("ffi")
+        ffi.cdef[[char *realpath(const char *path, char *resolved_path); void free(void *ptr);]]
+        require("ffi/util").realpath = function(path)
+            local resolved = ffi.C.realpath(path, nil)
+            if resolved == nil then return nil end
+            local result = ffi.string(resolved)
+            ffi.C.free(resolved)
+            return result
+        end
+        local plugin, owner = host(reader and "reader" or "files", directory .. "/c1.cbz")
+        plugin.current_chapter_context = { manga = manga, chapters = chapters }
+        plugin.current_chapter_menu = { item_table = {} }
+        plugin.manual_messages = {}
+        plugin.showMessage = function(_, message)
+            plugin.manual_messages[#plugin.manual_messages + 1] = message
+        end
+        return plugin, owner
+    end
+
+    for _, retention in ipairs({ 0, 3 }) do
+        it("commits manual read before physically unlinking only the selected archive with retention " .. retention, function()
+            local plugin = manualHost(retention)
+            local path = directory .. "/c1.cbz"
+            write(path, "captured archive")
+            assert(require("lfs").mkdir(path .. ".sdr"))
+            write(path .. ".sdr/metadata.lua", "return { custom = 'reading metadata' }")
+            write(path .. ".sdr/metadata.lua.old", "metadata backup")
+            write(directory .. "/c2.cbz", "non-target archive")
+            local original_remove = os.remove
+            local saw_committed
+            os.remove = function(value)
+                if value == path then
+                    local durable = assert(loadfile(settings.store.path))()
+                    assert.is_true(durable.chapter_ledger["m1:c1"].read)
+                    assert.is_true(durable.chapter_ledger["m1:c1"].pending_read_sync)
+                    assert.is_not_nil(durable.manual_archive_state.requests["m1:c1"].target)
+                    saw_committed = true
+                end
+                return original_remove(value)
+            end
+            local ok, result = pcall(plugin.performChapterAction, plugin, manga, chapters[1], "mark_read")
+            os.remove = original_remove
+            assert.is_true(ok, result)
+            assert.is_true(result)
+            assert.is_true(saw_committed)
+            assert.is_nil(read(path))
+            assert.is_not_nil(read(path .. ".sdr/metadata.lua"))
+            assert.are.equal("metadata backup", read(path .. ".sdr/metadata.lua.old"))
+            assert.are.equal("non-target archive", read(directory .. "/c2.cbz"))
+            assert.is_true(settings:loadChapterLedger()["m1:c1"].read)
+            assert.is_nil(settings:loadChapterLedger()["m1:c1"].path)
+            assert.are.equal(1, #plugin.manual_messages)
+        end)
+    end
+
+    it("keeps accepted archive removal through a live reader, disabled settings, and zero hosts", function()
+        local plugin, owner = manualHost(0, true)
+        local path = directory .. "/c1.cbz"
+        write(path, "live archive")
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        local pending_request = settings.store:readKey("manual_archive_state").requests["m1:c1"]
+        assert.is_not_nil(pending_request.target)
+        assert.are.equal("live archive", read(path))
+        assert(settings:saveDeleteChaptersSettings{ delete_after_mark_read = false, delete_finished_while_reading = 0 })
+        assert(settings:saveDownloadDirectory(directory .. "/elsewhere"))
+        owner:close()
+        advance(5)
+        assert.is_nil(read(path))
+        assert.is_true(settings:loadChapterLedger()["m1:c1"].read)
+        assert.is_nil(settings:loadChapterLedger()["m1:c1"].path)
+    end)
+
+    it("rejects busy manual removal without changing queued work or promising later removal", function()
+        local plugin = manualHost(0)
+        local queue = plugin:getDownloadQueue()
+        assert(queue:enqueue(manga, chapters[1], directory, { provenance = "explicit" }))
+        local original_jobs = settings:loadDownloadQueue()
+        write(directory .. "/c1.cbz", "busy archive")
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        assert.are.same(original_jobs, settings:loadDownloadQueue())
+        assert.are.equal("busy archive", read(directory .. "/c1.cbz"))
+        assert.is_true(settings:loadChapterLedger()["m1:c1"].read)
+        local state = settings.store:readKey("manual_archive_state", {})
+        local request = (state.requests or {})["m1:c1"]
+        assert.is_true(request == nil or request.target == nil)
+        assert.matches("again", plugin.manual_messages[1])
+    end)
+
+    it("revokes accepted removal in the checked unread transaction", function()
+        local plugin, owner = manualHost(0, true)
+        local path = directory .. "/c1.cbz"
+        write(path, "keep unread archive")
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_unread"))
+        assert.is_false(settings:loadChapterLedger()["m1:c1"].read)
+        assert.is_false(settings:loadChapterLedger()["m1:c1"].pending_read_state)
+        owner:close()
+        advance(300)
+        assert.are.equal("keep unread archive", read(path))
+    end)
+
+    for _, failure in ipairs({ "write", "sync_dir" }) do
+        it("preserves archives without claiming durable read after " .. failure .. " admission failure", function()
+            local plugin = manualHost(0)
+            local path = directory .. "/c1.cbz"
+            write(path, "not authorized")
+            local original = settings.store.io[failure]
+            settings.store.io[failure] = function() return nil, "injected admission failure" end
+            local ok = plugin:performChapterAction(manga, chapters[1], "mark_read")
+            settings.store.io[failure] = original
+            assert.is_false(ok)
+            assert.are.equal("not authorized", read(path))
+            assert.are.equal(1, #plugin.manual_messages)
+            if failure == "write" then
+                assert.is_nil(settings:loadChapterLedger()["m1:c1"])
+            else
+                assert.is_true(settings:isBlocked())
+                assert(plugin:getDownloadQueue():reconcile())
+                advance(5)
+                assert.is_nil(read(path))
+            end
+        end)
+    end
+
+    it("handles a selected mixed batch with live-reader, busy, and removable archives together", function()
+        local plugin = manualHost(3, true)
+        local queue = plugin:getDownloadQueue()
+        assert(queue:enqueue(manga, chapters[2], directory, { provenance = "explicit" }))
+        for index = 1, 4 do write(directory .. "/c" .. index .. ".cbz", "archive " .. index) end
+        plugin.selected_chapters = { ["m1:c1"] = true, ["m1:c2"] = true, ["m1:c3"] = true }
+        plugin.selection_mode = true
+        local count = plugin:markSelectedChaptersRead()
+        assert.are.equal(3, count)
+        assert.are.same({}, plugin.selected_chapters)
+        assert.is_false(plugin.selection_mode)
+        local ledger = settings:loadChapterLedger()
+        for index = 1, 3 do assert.is_true(ledger["m1:c" .. index].read) end
+        assert.are.equal("archive 1", read(directory .. "/c1.cbz"))
+        assert.are.equal("archive 2", read(directory .. "/c2.cbz"))
+        assert.is_nil(read(directory .. "/c3.cbz"))
+        assert.are.equal("archive 4", read(directory .. "/c4.cbz"))
+        assert.are.equal("queued", queue:getStatus(manga, chapters[2]).state)
+        assert.are.equal(1, #plugin.manual_messages)
+    end)
+
+    it("protects a same-path same-content deliberate replacement from old removal", function()
+        local plugin, owner = manualHost(0, true)
+        local path = directory .. "/c1.cbz"
+        write(path, "same contents")
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        local queue = plugin:getDownloadQueue()
+        local before = settings.store:readKey("manual_archive_state").requests["m1:c1"]
+        local duplicate = queue:enqueue(manga, chapters[1], directory, { provenance = "explicit" })
+        assert.is_false(duplicate)
+        assert.are.same(before, settings.store:readKey("manual_archive_state").requests["m1:c1"])
+        assert(os.remove(path))
+        local automatic = queue:enqueue(manga, chapters[1], directory, { provenance = "automatic" })
+        assert.is_false(automatic)
+        assert.are.same(before, settings.store:readKey("manual_archive_state").requests["m1:c1"])
+        local original_write = settings.store.io.write
+        settings.store.io.write = function() return nil, "injected admission failure" end
+        local failed = queue:enqueue(manga, chapters[1], directory, { provenance = "explicit" })
+        settings.store.io.write = original_write
+        assert.is_false(failed)
+        assert.are.same(before, settings.store:readKey("manual_archive_state").requests["m1:c1"])
+        assert(queue:enqueue(manga, chapters[1], directory, { provenance = "explicit" }))
+        advance(0)
+        local active = assert(queue:getActiveJob("m1:c1"))
+        write(path, "same contents")
+        write(active.progress_path, "state=downloaded\ncurrent=1\ntotal=1\npath=" .. path .. "\n")
+        workers[active.pid].alive = false
+        advance(0.5)
+        local replacement = settings.store:readKey("manual_archive_state").archives["m1:c1"]
+        assert.are_not.equal(before.target.generation, replacement.generation)
+        owner:close()
+        advance(300)
+        assert.are.equal("same contents", read(path))
+        assert.are.equal(path, settings:loadChapterLedger()["m1:c1"].path)
+        assert.are.equal(replacement.generation, settings:loadChapterLedger()["m1:c1"].archive_generation)
+    end)
+
+    it("recovers a real unlink whose progress save failed without requiring a shutdown save", function()
+        local plugin, owner = manualHost(0, true)
+        local path = directory .. "/c1.cbz"
+        write(path, "archive before crash")
+        write(path .. ".old", "unrelated backup")
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        owner:close()
+        local original_remove, original_write = os.remove, settings.store.io.write
+        os.remove = function(value)
+            local removed, message, code = original_remove(value)
+            if value == path and removed then
+                settings.store.io.write = function() return nil, "crash after unlink" end
+            end
+            return removed, message, code
+        end
+        local ran, error_message = pcall(advance, 5)
+        os.remove, settings.store.io.write = original_remove, original_write
+        assert.is_true(ran, error_message)
+        assert.is_nil(read(path))
+        assert.are.equal("unrelated backup", read(path .. ".old"))
+        local store_path = settings.store.path
+        local old_service = require("suwayomi/downloads/service").get()
+        old_service:shutdown()
+        timers = {}
+        settings.store = require("suwayomi/settings/store"):new{ path = store_path }
+        package.loaded["suwayomi/downloads/service"] = nil
+        local restarted = require("suwayomi/downloads/service").get()
+        restarted:start()
+        advance(300)
+        assert.is_nil(settings:loadChapterLedger()["m1:c1"].path)
+        assert.is_true(settings:loadChapterLedger()["m1:c1"].read)
+        assert.are.equal("unrelated backup", read(path .. ".old"))
+        assert.are.equal("removed", restarted.manual_deletion:snapshot()["m1:c1"].state)
+    end)
+
+    it("blocks a symlink escaping the captured managed root", function()
+        local plugin = manualHost(0)
+        local outside, path = directory .. "-outside.cbz", directory .. "/c1.cbz"
+        write(outside, "outside archive")
+        assert(require("lfs").link(outside, path, true))
+        files[path] = true
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        advance(300)
+        assert.are.equal("outside archive", read(outside))
+        assert.are.equal("outside archive", read(path))
+        assert.matches("Blocked", plugin.manual_messages[1])
+    end)
+
+    it("preserves unknown manual state and never grants deletion authority over it", function()
+        local plugin = manualHost(0)
+        local path = directory .. "/c1.cbz"
+        write(path, "unknown ownership")
+        local unknown = { version = 99, requests = { opaque = "keep" } }
+        assert(settings.store:saveKey("manual_archive_state", unknown))
+        plugin:performChapterAction(manga, chapters[1], "mark_read")
+        advance(300)
+        assert.are.same(unknown, settings.store:readKey("manual_archive_state"))
+        assert.are.equal("unknown ownership", read(path))
+    end)
+
+    it("preserves newer read and return context changes between unlink and bookkeeping", function()
+        local plugin = manualHost(0)
+        local path = directory .. "/c1.cbz"
+        write(path, "captured archive")
+        assert(settings.store:saveKey("reader_return_contexts", {
+            [path] = { path = path, manga_id = "m1", chapter_id = "c1", visit = "original" },
+        }))
+        local original_remove = os.remove
+        os.remove = function(value)
+            local removed, message, code = original_remove(value)
+            if value == path and removed then
+                assert(settings.store:saveDocument(function(doc)
+                    doc.chapter_ledger["m1:c1"].read = false
+                    doc.chapter_ledger["m1:c1"].pending_read_state = false
+                    doc.reader_return_contexts[path].visit = "newer"
+                end))
+            end
+            return removed, message, code
+        end
+        local ran, result = pcall(plugin.performChapterAction, plugin, manga, chapters[1], "mark_read")
+        os.remove = original_remove
+        assert.is_true(ran, result)
+        assert.is_nil(read(path))
+        assert.is_false(settings:loadChapterLedger()["m1:c1"].read)
+        assert.is_false(settings:loadChapterLedger()["m1:c1"].pending_read_state)
+        assert.are.equal("newer", settings:loadReaderReturnContexts()[path].visit)
+    end)
+
+    for _, failure in ipairs({ "write", "sync_dir" }) do
+        it("reports ordinary Delete bookkeeping failure after physical unlink with " .. failure, function()
+            local plugin = manualHost(0)
+            local path = directory .. "/c1.cbz"
+            write(path, "ordinary archive")
+            assert(settings:saveChapterLedger{ ["m1:c1"] = {
+                manga_id = "m1", chapter_id = "c1", path = path, read = true, pending_read_sync = true,
+            } })
+            local draft = settings:loadChapterLedger()
+            local original_remove, original_failure = os.remove, settings.store.io[failure]
+            os.remove = function(value)
+                local removed, message, code = original_remove(value)
+                if value == path and removed then
+                    settings.store.io[failure] = function() return nil, "post-unlink failure" end
+                end
+                return removed, message, code
+            end
+            local ran, ok, state = pcall(plugin.deleteChapterFromDeviceWithOptions, plugin, manga, chapters[1],
+                { ledger = draft })
+            os.remove, settings.store.io[failure] = original_remove, original_failure
+            assert.is_true(ran, ok)
+            assert.is_false(ok)
+            assert.are.equal(failure == "sync_dir" and "store_blocked" or "delete_failed", state)
+            assert.is_nil(read(path))
+            assert.are.equal(path, draft["m1:c1"].path)
+            assert.is_true(settings:loadChapterLedger()["m1:c1"].pending_read_sync)
+            if failure == "sync_dir" then
+                assert(settings:reconcile())
+                assert.is_nil(settings:loadChapterLedger()["m1:c1"].path)
+            end
+        end)
+    end
+
+    for _, ownership in ipairs({ "running", "stopping", "finalizing" }) do
+        it("requires a fresh manual action after " .. ownership .. " ownership finishes", function()
+            local plugin = manualHost(0)
+            local queue = plugin:getDownloadQueue()
+            assert(queue:enqueue(manga, chapters[1], directory, { provenance = "explicit" }))
+            advance(0)
+            local active = assert(queue:getActiveJob("m1:c1"))
+            if ownership == "stopping" then queue:cancelPending(manga, chapters[1]) end
+            local path = directory .. "/c1.cbz"
+            write(path, "owned archive")
+            write(active.progress_path, "state=downloaded\ncurrent=1\ntotal=1\npath=" .. path .. "\n")
+            if ownership == "finalizing" then
+                workers[active.pid].alive = false
+                local original_write = settings.store.io.write
+                settings.store.io.write = function() return nil, "completion save rejected" end
+                queue:poll()
+                settings.store.io.write = original_write
+                assert.is_not_nil(queue:getActiveJob("m1:c1"))
+            end
+            local ok, result = plugin:performChapterAction(manga, chapters[1], "mark_read")
+            assert.is_true(ok)
+            assert.are.equal(1, result.busy)
+            local requests = settings.store:readKey("manual_archive_state").requests
+            assert.is_nil(requests["m1:c1"])
+            assert.are.equal("owned archive", read(path))
+            workers[active.pid].alive = false
+            advance(1)
+            advance(1)
+            assert.are.equal("owned archive", read(path))
+            assert.is_false(queue:isChapterBusy("m1:c1"))
+            assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+            assert.is_nil(read(path))
+        end)
+    end
+
+    it("persists capped retries without abandonment while another archive completes", function()
+        local plugin = manualHost(0)
+        local blocked, ready = directory .. "/c1.cbz", directory .. "/c2.cbz"
+        write(blocked, "temporarily locked")
+        write(ready, "ready archive")
+        local original_remove = os.remove
+        os.remove = function(path)
+            if path == blocked then return nil, "permission denied", 13 end
+            return original_remove(path)
+        end
+        local ran, failure = pcall(function()
+            assert.are.equal(2, plugin:markChapterListRead(manga, { chapters[1], chapters[2] }))
+            assert.is_nil(read(ready))
+            local request = settings.store:readKey("manual_archive_state").requests["m1:c1"]
+            assert.are.equal(5, request.retry_after - clock)
+            for _ = 1, 9 do
+                advance(request.retry_after - clock)
+                request = settings.store:readKey("manual_archive_state").requests["m1:c1"]
+            end
+            assert.are.equal("pending", request.state)
+            assert.is_true(request.retry_count >= 10)
+            assert.are.equal(300, request.retry_after - clock)
+            assert.are.equal("temporarily locked", read(blocked))
+            assert.are.equal(1, #plugin.manual_messages)
+        end)
+        os.remove = original_remove
+        assert.is_true(ran, failure)
+        advance(300)
+        assert.is_nil(read(blocked))
     end)
 
 end)

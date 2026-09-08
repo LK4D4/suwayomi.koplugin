@@ -219,6 +219,8 @@ describe("download retry across live menus", function()
                 os.remove(active.progress_path)
                 table.insert(temporary_paths, active.progress_path)
                 local archive = os.tmpname()
+                os.remove(archive)
+                archive = archive .. ".cbz"
                 table.insert(temporary_paths, archive)
                 local handle = assert(io.open(archive, "wb"))
                 handle:write("PK\005\006", string.rep("\0", 18))

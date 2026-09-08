@@ -463,7 +463,8 @@ function Methods:enqueueKeepNextUnreadDownloads(manga, chapters, download_direct
 
     local queued = 0
     self:withChapterMenuRefreshSuppressed(function()
-        queued = self:getDownloadQueue():enqueueBatch(manga, queueable, download_directory, { quiet_duplicate = true })
+        queued = self:getDownloadQueue():enqueueBatch(manga, queueable, download_directory,
+            { quiet_duplicate = true, provenance = "automatic" })
     end)
     if queued > 0 then
         self:refreshChapterMenu({ quick = true })

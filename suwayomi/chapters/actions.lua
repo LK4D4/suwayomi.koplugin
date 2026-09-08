@@ -260,7 +260,7 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
     if not stale then
         self:withChapterMenuRefreshSuppressed(function()
             queued, enqueue_err, outcome = queue:enqueueBatch(batch.manga, candidates, batch.download_directory,
-                { quiet_duplicate = true })
+                { quiet_duplicate = true, provenance = "explicit" })
         end)
     end
     if not enqueue_err and not stale then
@@ -575,7 +575,6 @@ end
 
 
 function Methods:markSelectedChaptersUnread()
-    local started_at = SuwayomiDebug.now()
     if not self.current_chapter_context then
         return 0
     end
@@ -587,27 +586,7 @@ function Methods:markSelectedChaptersUnread()
         return 0
     end
 
-    local ledger = self:loadChapterLedger()
-    for _index, chapter in ipairs(chapters) do
-        self:markChapterUnread(manga, chapter, {
-            ledger = ledger,
-            skip_refresh = true,
-            skip_schedule = true,
-        })
-    end
-
-    self:clearChapterSelection(true)
-    self:refreshChapterMenu({ ledger = ledger })
-    self:saveChapterLedger(ledger)
-    self:schedulePendingReadSync()
-    SuwayomiDebug.log({
-        operation = "markSelectedChaptersUnread",
-        event = "end",
-        manga_id = manga and manga.id,
-        chapter_count = #chapters,
-        elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
-    })
-    return #chapters
+    return self:markChapterListUnread(manga, chapters, true)
 end
 
 
@@ -697,7 +676,7 @@ function Methods:enqueueChapterDownload(manga, chapter)
 
     local queued, state
     self:withChapterMenuRefreshSuppressed(function()
-        queued, state = self:getDownloadQueue():enqueue(manga, chapter, download_directory)
+        queued, state = self:getDownloadQueue():enqueue(manga, chapter, download_directory, { provenance = "explicit" })
     end)
     if not queued and state and state ~= "queued" and state ~= "downloading" then
         self:showMessage(I18n.f("Could not queue download: %1", state))

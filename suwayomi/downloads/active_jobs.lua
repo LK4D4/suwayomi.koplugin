@@ -171,6 +171,8 @@ function ActiveJobs:startQueuedJob(queued)
         queue:setStatus(queued.manga, queued.chapter, { state = "downloading" })
         return false, "already_active"
     end
+    local valid, reason = queue:validateJob(queued)
+    if not valid then return false, reason end
     if queued.start_failure then
         local saved, save_err = self:finishWithFailure(queued, queued.start_failure)
         return false, saved and "terminal_failure" or save_err
@@ -187,6 +189,8 @@ function ActiveJobs:startQueuedJob(queued)
         started_at = queued.started_at,
         last_progress_at = queued.last_progress_at,
         retry_count = queued.retry_count,
+        archive_generation = queued.archive_generation,
+        provenance = queued.provenance,
         progress = {
             state = "downloading",
             current = 0,
@@ -197,6 +201,8 @@ function ActiveJobs:startQueuedJob(queued)
     if not ok then
         return false, err
     end
+    valid, reason = queue:validateJob(queued)
+    if not valid then return false, reason end
     os.remove(queued.progress_path)
 
     local pid, subproc_err = queue.ffi_util.runInSubProcess(function()
@@ -333,6 +339,8 @@ function ActiveJobs:scheduleTransientRetry(active, progress)
     if queue and queue.checkStoreFence and not queue:checkStoreFence() then
         return false, "store_blocked"
     end
+    local valid, reason = queue:validateJob(active)
+    if not valid then return false, reason end
     local retry_count = (tonumber(active.retry_count) or 0) + 1
     local base_retry_delay = queue.RETRY_DELAYS_SECONDS[retry_count]
     local retry_delay = base_retry_delay and (base_retry_delay + retryJitterSeconds(active.key, retry_count))
@@ -344,6 +352,8 @@ function ActiveJobs:scheduleTransientRetry(active, progress)
     local persistent_job = active.pending_retry or queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "queued", {
         retry_count = retry_count,
         retry_at = retry_at,
+        archive_generation = active.archive_generation,
+        provenance = active.provenance,
         progress = {
             state = "queued",
             current = progress and progress.current or active.last_progress_current or 0,
@@ -373,6 +383,8 @@ function ActiveJobs:scheduleTransientRetry(active, progress)
         retry_at = retry_at,
         previous_pid = active.pid,
         progress = persistent_job.progress,
+        archive_generation = active.archive_generation,
+        provenance = active.provenance,
     }
     table.insert(queue.items, queued)
     queue:setStatus(active.manga, active.chapter, {
@@ -410,6 +422,8 @@ function ActiveJobs:finishWithFailure(active, message)
     local ok, err = queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
         started_at = active.started_at,
         last_progress_at = queue.now(),
+        archive_generation = active.archive_generation,
+        provenance = active.provenance,
         progress = {
             state = "failed",
             current = active.last_progress_current or 0,
@@ -508,6 +522,8 @@ function ActiveJobs:recordProgress(active, progress)
                 started_at = active.started_at,
                 last_progress_at = active.last_progress_at,
                 retry_count = active.retry_count,
+                archive_generation = active.archive_generation,
+                provenance = active.provenance,
                 progress = {
                     state = progress.state,
                     current = progress.current,

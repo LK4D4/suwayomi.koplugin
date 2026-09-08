@@ -20,15 +20,6 @@ end
 
 local Methods = {}
 
-local function loadDeleteChaptersSettings()
-    if SuwayomiSettings.loadDeleteChaptersSettings then
-        return SuwayomiSettings:loadDeleteChaptersSettings()
-    end
-    return {
-        delete_after_mark_read = false,
-        delete_finished_while_reading = 0,
-    }
-end
 
 -- Return states are part of the actions facade contract:
 -- deleted, queued, missing, downloading, delete_failed, and store_blocked.
@@ -104,52 +95,41 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
         return false, cancelled and "queued" or "missing"
     end
 
+    local removal = queue.manual_deletion
+    if not removal then return deletionFailed("identity_unavailable") end
+    local target, target_error = removal:prepareRemoval(
+        queue:getKey(manga, chapter), chapter_path, SuwayomiSettings:loadDownloadDirectory(),
+        options.archive_generation
+    )
+    if not target then return deletionFailed(target_error) end
+
     local resolved, metadata_path, metadata_paths = pcall(self.getKoreaderMetadataPathForDocument, self, chapter_path)
     if not resolved or not metadata_path then
         return deletionFailed()
     end
-    local removed = self:removeChapterArchiveAndSidecars(chapter_path, metadata_paths or metadata_path)
+    local removed = self:removeChapterArchiveAndSidecars(chapter_path, metadata_paths or metadata_path, function()
+        return removal:validateTarget(target)
+    end)
     if not removed then
         return deletionFailed()
     end
 
-    local ledger = options.ledger or self:loadChapterLedger()
-    local key = self:getChapterLedgerKey(manga, chapter)
-    local entry = ledger[key]
-    if not entry then
-        for existing_key, existing in pairs(ledger) do
-            if tostring(existing.manga_id or "") == tostring(manga.id or "")
-                and tostring(existing.chapter_id or "") == tostring(chapter.id or "")
-            then
-                key = existing_key
-                entry = existing
-                break
-            end
-        end
+    local store = SuwayomiSettings:getStore()
+    local called, saved, save_error = pcall(store.saveDocument, store, function(doc)
+        if not removal:retire(doc, target) then error("archive_generation_changed") end
+    end)
+    if not called or not saved then return deletionFailed(save_error or "bookkeeping_failed") end
+    if options.ledger then
+        local key = queue:getKey(manga, chapter)
+        options.ledger[key] = self:loadChapterLedger()[key]
     end
-    if entry then
-        local staged_ledger, staged_entry = {}, {}
-        for entry_key, value in pairs(ledger) do staged_ledger[entry_key] = value end
-        for field, value in pairs(entry) do staged_entry[field] = value end
-        staged_entry.path = nil
-        -- Keep read or pending entries so read-sync can still reconcile them;
-        -- remove only entries whose sole useful state was the local file path.
-        if staged_entry.read ~= true and staged_entry.pending_read_sync ~= true then
-            staged_ledger[key] = nil
-        else
-            staged_ledger[key] = staged_entry
-        end
-        local saved, save_err = self:saveChapterLedger(staged_ledger)
-        if not saved then
-            return deletionFailed(save_err or "save_failed")
-        end
-        -- Keep the caller's batch draft aligned with the committed deletion.
-        if options.ledger then options.ledger[key] = staged_ledger[key] end
+    local current = queue:getStatus(manga, chapter)
+    if current and not queue:isChapterBusy(target.key)
+        and (current.state == "downloaded" or current.state == "skipped" or current.state == "failed")
+        and (current.archive_generation == nil or current.archive_generation == target.generation) then
+        queue.statuses[target.key] = nil
     end
-    local cleared, clear_err = queue:clearStatus(manga, chapter, { quiet = true })
-    if not cleared then
-        return deletionFailed(clear_err or "save_failed")
-    end
+    removal:wake()
 
     if not options.skip_refresh then
         self:refreshChapterMenu()
@@ -157,28 +137,6 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
     return true, cancelled and "queued" or "deleted"
 end
 
-function Methods:deleteChaptersAfterManualMarkRead(manga, chapters, options)
-    options = options or {}
-    local settings = loadDeleteChaptersSettings()
-    if settings.delete_after_mark_read ~= true then
-        return 0
-    end
-
-    local deleted = 0
-    for _index, chapter in ipairs(chapters or {}) do
-        local ok = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
-            ledger = options.ledger,
-            quiet_active = true,
-            quiet_delete_failed = true,
-            quiet_missing = true,
-            skip_refresh = true,
-        })
-        if ok then
-            deleted = deleted + 1
-        end
-    end
-    return deleted
-end
 
 ChapterDeleteActions.methods = Methods
 

@@ -102,11 +102,23 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
     local metadata_write_count = 0
     local ledger_upsert_count = 0
     local reader_return_entries = {}
+    local snapshot = self:getDownloadQueue():getSnapshot()
+    local manual_snapshot, manual_error = snapshot.manual_deletion, snapshot.manual_deletion_error
+    local read_ledger = ledger or self:loadChapterLedger()
 
     for _index, chapter in ipairs(chapters or {}) do
         local item = {}
         for key, value in pairs(chapter) do
             item[key] = value
+        end
+        item._suwayomi_manual_deletion = manual_snapshot[self:getChapterDownloadKey(manga, item)]
+            or (manual_error and { state = "blocked", reason = manual_error } or nil)
+        local read_entry = read_ledger[self:getChapterLedgerKey(manga, item)]
+        local explicit_unread = type(read_entry) == "table"
+            and read_entry.pending_read_sync == true and read_entry.pending_read_state == false
+        if explicit_unread then
+            -- Older history/sidecar evidence cannot undo a pending explicit unread.
+            item.is_read, chapter.is_read = false, false
         end
 
         local chapter_exists = false
@@ -128,7 +140,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
             if history_read then
                 history_read_count = history_read_count + 1
             end
-            if metadata_finished or history_read then
+            if (metadata_finished or history_read) and not explicit_unread then
                 item.is_read = true
                 if chapter.is_read ~= true then
                     chapter.is_read = true
@@ -165,7 +177,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         local status = self:getChapterDownloadStatus(manga, item)
         if chapter_exists and status and status.state == "failed" then
             -- A recovered archive is more trustworthy than stale queue status from an interrupted worker.
-            self:getDownloadQueue():clearStatus(manga, item, { quiet = true })
+            if not ledger then self:getDownloadQueue():clearStatus(manga, item, { quiet = true }) end
             status = { state = "downloaded" }
         end
         if not status then
@@ -187,7 +199,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         table.insert(items, item)
     end
 
-    if self.saveReaderReturnContextsForChapters then
+    if not ledger and self.saveReaderReturnContextsForChapters then
         self:saveReaderReturnContextsForChapters(manga, reader_return_entries)
     end
 
@@ -232,11 +244,15 @@ end
 function Methods:buildQuickChapterMenuItems(manga, chapters)
     local cached_items = self:buildCachedChapterMenuMap()
     local items = {}
+    local snapshot = self:getDownloadQueue():getSnapshot()
+    local manual_snapshot, manual_error = snapshot.manual_deletion, snapshot.manual_deletion_error
     for _index, chapter in ipairs(chapters or {}) do
         local item = {}
         for key, value in pairs(chapter) do
             item[key] = value
         end
+        item._suwayomi_manual_deletion = manual_snapshot[self:getChapterDownloadKey(manga, item)]
+            or (manual_error and { state = "blocked", reason = manual_error } or nil)
 
         local cached = cached_items[self:getChapterDownloadKey(manga, item)]
         local status = self:getChapterDownloadStatus(manga, item)
@@ -248,9 +264,9 @@ function Methods:buildQuickChapterMenuItems(manga, chapters)
             item.menu_text = item.name
             item._suwayomi_download_status = copyDownloadStatus(cached._suwayomi_download_status)
             item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, item._suwayomi_download_status)
-        elseif item.is_read then
+        elseif item.is_read or item._suwayomi_manual_deletion then
             item.menu_text = item.name
-            item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, { state = "read" })
+            item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, item.is_read and { state = "read" } or nil)
         elseif item.is_read == nil and cached and cached.menu_text then
             item.menu_text = self:stripChapterSelectionMarker(cached.menu_text)
             item.menu_status = self:stripChapterSelectionStatus(cached.menu_status)
@@ -306,6 +322,12 @@ function Methods:getChapterActions(manga, chapter)
 
     if chapter.is_read == true then
         table.insert(actions, { id = "mark_unread", text = I18n.t("Mark as unread") })
+        -- A busy rejection or an unproved old target needs a fresh explicit action,
+        -- not a deletion Retry control or an unread/read round trip.
+        local settings = SuwayomiSettings:loadDeleteChaptersSettings()
+        if settings.delete_after_mark_read == true and downloaded then
+            table.insert(actions, { id = "mark_read", text = I18n.t("Mark as read") })
+        end
     else
         table.insert(actions, { id = "mark_read", text = I18n.t("Mark as read") })
         table.insert(actions, { id = "mark_previous_read", text = I18n.t("Mark previous as read") })

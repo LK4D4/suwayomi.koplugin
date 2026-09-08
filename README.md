@@ -84,6 +84,12 @@ After KOReader quits or restarts, unfinished downloads become **Failed** with **
 
 A normal KOReader restart loads an upgrade; no device reboot or directory change is required. If an earlier KOReader process dies abruptly, an untracked child may still write shared files and conflict with Retry. Retry may fail or repeat a transfer. Hot reload and simultaneous writable KOReader processes are unsupported.
 
+With **Delete after manually marking read** enabled, single, selected, and previous-chapter mark-read actions save read state and accepted removal requests before removing only the captured CBZ. Reading metadata, backups, and directories are retained. The immediate summary reports marked-read, removed, pending, busy/not accepted, and blocked outcomes separately; chapter status shows outstanding removal.
+
+An accepted request continues across navigation and restart, even with finish retention off, the manual setting later disabled, or the download folder changed. It keeps its original archive and folder. Live readers delay removal; transient failures retry quietly from five seconds up to five minutes. If download work already owns the chapter, removal is **not accepted**: let the download finish, then use **Mark as read** again. Marking unread or successfully admitting a new deliberate Download/Retry revokes outstanding removal; duplicate, failed, or automatic downloads do not.
+
+Blocked identity or containment checks preserve the file. No old cleanup record is assigned to a later replacement, even at the same pathname with identical contents. A fresh manual action can authorize a currently verified archive. Filesystems without reliable file identity remain blocked; concurrent external file writers, hot reload, and multiple writable KOReader processes are outside the safety guarantee. Ordinary **Delete** keeps its separate metadata-removal policy. Device acceptance for this feature remains tracked in [#37](https://github.com/LK4D4/suwayomi.koplugin/issues/37).
+
 Downloaded files use this layout:
 
 ```text

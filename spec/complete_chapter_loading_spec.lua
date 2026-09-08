@@ -101,14 +101,23 @@ describe("complete stored chapter loading", function()
             getSettingsDir = function() return "." end,
             loadChapterLedger = function() return json.decode(saved_ledger) end,
             saveChapterLedger = function(_, value) saved_ledger = json.encode(value); return value end,
-            loadDownloadQueue = function() return json.decode(saved_jobs) end,
-            saveDownloadQueue = function(_, value) saved_jobs = json.encode(value); return true end,
             loadDownloadDirectory = function() return download_directory end,
             saveDownloadDirectory = function(_, path) download_directory = path; return path end,
             normalizeMangaKeepNextUnreadDownloads = function(_, limit) return limit end,
             saveMangaKeepNextUnreadDownloads = function(_, _, limit) return limit end,
             loadMangaScanlatorFilter = function() return saved_filter end,
         }
+        local checked = require("spec/support/checked_queue_settings")()
+        for _, name in ipairs({ "getStore", "isBlocked", "reconcile", "loadDownloadQueue", "saveDownloadQueue" }) do
+            settings[name] = checked[name]
+        end
+        local store = settings:getStore()
+        local saveDocument = store.saveDocument
+        function store:saveDocument(mutator)
+            local ok, err = saveDocument(self, mutator)
+            if ok then saved_jobs = json.encode(self:readKey("download_queue", {})) end
+            return ok, err
+        end
         package.preload["suwayomi/settings"] = function() return settings end
         package.preload.gettext = function() return function(value) return value end end
         package.preload["ffi/archiver"] = function() return {} end
@@ -503,7 +512,7 @@ describe("complete stored chapter loading", function()
                 local failed = queue:buildPersistentJob(manga, chapter, download_directory, "failed", {
                     error = "Example transfer failure.", retry_count = 3,
                 })
-                assert.is_true(queue:savePersistentJobs({ failed }))
+                assert(queue:savePersistentJobs({ failed }))
                 queue:setStatus(manga, chapter, { state = "failed" })
                 plugin:showChapterActions(manga, chapter)
                 local retry = function() return chapter_action_callback({ id = "retry_download" }) end

@@ -44,6 +44,16 @@ describe("suwayomi/chapters/finished_cleanup", function()
                 state.journal = { version = 1, next_sequence = 1, mangas = {} }
                 return clone(state.journal)
             end,
+            getStore = function()
+                return {
+                    saveDocument = function(_, mutate)
+                        local doc = { chapter_ledger = clone(state.plugin.ledger) }
+                        mutate(doc)
+                        state.plugin.ledger = doc.chapter_ledger
+                        return true
+                    end,
+                }
+            end,
         }
         local ui_manager = {
             scheduleIn = function(_, delay, callback)
@@ -170,6 +180,23 @@ describe("suwayomi/chapters/finished_cleanup", function()
                 table.insert(self.messages, message)
             end,
         }
+        state.plugin = plugin
+        queue.statuses = queue_status
+        queue.isChapterBusy = function() return false end
+        queue.manual_deletion = {
+            validateTarget = function(_, target)
+                if not plugin.existing[target.path] then return false, "missing" end
+                return true
+            end,
+            retire = function(_, doc, target)
+                local entry = doc.chapter_ledger[target.key]
+                if entry and entry.path == target.path and entry.archive_generation == target.generation then
+                    entry.path = nil
+                    return true
+                end
+                return false
+            end,
+        }
         for name, method in pairs(module.methods) do
             plugin[name] = method
         end
@@ -202,6 +229,8 @@ describe("suwayomi/chapters/finished_cleanup", function()
             chapter_id = tostring(chapter_id),
             path = path,
             read = options.read ~= false,
+            archive_generation = 1,
+            archive_target = path and { key = key, path = path, generation = 1 } or nil,
         }
         plugin.ledger[key] = clone(entry)
         if options.exists ~= false then
@@ -336,9 +365,10 @@ describe("suwayomi/chapters/finished_cleanup", function()
         local old_local = package.loaded["suwayomi/chapters/local_downloads"]
         package.loaded["suwayomi/chapters/delete_actions"] = nil
         package.loaded["suwayomi/chapters/local_downloads"] = nil
-        local delete_methods = require("suwayomi/chapters/delete_actions").methods
         local local_methods = require("suwayomi/chapters/local_downloads").methods
         local function installBoundary(subject)
+            package.loaded["suwayomi/chapters/delete_actions"] = nil
+            local delete_methods = require("suwayomi/chapters/delete_actions").methods
             subject.deleteChapterFromDeviceWithOptions = delete_methods.deleteChapterFromDeviceWithOptions
             subject.removeChapterArchiveAndSidecars = local_methods.removeChapterArchiveAndSidecars
             subject.getChapterLedgerKey = function() return "m1:c1" end
@@ -347,10 +377,13 @@ describe("suwayomi/chapters/finished_cleanup", function()
                 assert.is_true(subject.existing[path])
                 return metadata_path
             end
-            subject.getDownloadQueue = function() return {
-                getStatus = function() end, cancelPending = function() return false end,
-                clearStatus = function() return true end,
-            } end
+            local queue = subject:getDownloadQueue()
+            queue.getKey = function() return "m1:c1" end
+            queue.cancelPending = function() return false end
+            queue.manual_deletion.prepareRemoval = function()
+                return journalRecord(subject, "m1", "c1").archive_target
+            end
+            queue.manual_deletion.wake = function() end
         end
         os.remove = function(candidate)
             if candidate == metadata_path .. ".old" and fail_backup then
@@ -520,7 +553,8 @@ describe("suwayomi/chapters/finished_cleanup", function()
             existing = { [path] = true },
             ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path, read = true } },
             journal = { version = 1, next_sequence = 2, mangas = { m1 = { records = {
-                { chapter_id = "c1", path = path, sequence = 1, retry_count = 100, retry_after = 100 },
+                { chapter_id = "c1", path = path, sequence = 1, retry_count = 100, retry_after = 100,
+                    archive_target = { key = "m1:c1", path = path, generation = 1 } },
             } } } },
         })
         plugin:processFinishedChapterCleanup()
@@ -756,10 +790,13 @@ describe("suwayomi/chapters/finished_cleanup", function()
             batch_size = 2,
             journal = { version = 1, next_sequence = 4, mangas = {
                 m1 = { records = { { chapter_id = "c1", path = waiting_path_1,
+                    archive_target = { key = "m1:c1", path = waiting_path_1, generation = 1 },
                     sequence = 1, retry_count = 1, retry_after = 300 } } },
                 m2 = { records = { { chapter_id = "c1", path = waiting_path_2,
+                    archive_target = { key = "m2:c1", path = waiting_path_2, generation = 1 },
                     sequence = 2, retry_count = 1, retry_after = 250 } } },
                 m3 = { records = { { chapter_id = "c1", path = ready_path,
+                    archive_target = { key = "m3:c1", path = ready_path, generation = 1 },
                     sequence = 3, retry_count = 0, retry_after = 0 } } },
             } },
             ledger = {
@@ -828,7 +865,8 @@ describe("suwayomi/chapters/finished_cleanup", function()
         local plugin = buildPlugin({
             setting = 1,
             journal = { version = 1, next_sequence = 2, mangas = { m1 = { records = {
-                { chapter_id = "c1", path = path, sequence = 1, retry_count = 0, retry_after = 0 },
+                { chapter_id = "c1", path = path, sequence = 1, retry_count = 0, retry_after = 0,
+                    archive_target = { key = "m1:c1", path = path, generation = 1 } },
             } } } },
             ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path, read = true } },
             existing = { [path] = true },

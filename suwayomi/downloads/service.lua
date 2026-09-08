@@ -1,7 +1,8 @@
--- Boundary: process-owned download queue, completion, and disposable view subscriptions.
+-- Boundary: process-owned downloads, durable manual deletion, completion, and disposable views.
 -- Dependencies are process modules; no host owns workers or durable completion.
 
 local Queue = require("suwayomi/downloads/queue")
+local ManualDeletion = require("suwayomi/chapters/manual_deletion")
 local Settings = require("suwayomi/settings")
 local UIManager = require("ui/uimanager")
 local Debug = require("suwayomi/debug")
@@ -36,6 +37,14 @@ function Service:new(options)
         onMessage = function(message) service:notify(message) end,
         commitChapterArchive = function(job, path) return service:commitCompletion(job, path) end,
     }
+    service.manual_deletion = ManualDeletion:new{
+        settings = service.settings,
+        queue = service.queue,
+        ui_manager = service.ui_manager,
+        now = options.now,
+        onChanged = function() service:notify(nil, true) end,
+    }
+    service.queue.manual_deletion = service.manual_deletion
     service.cleanup = require("suwayomi/downloads/cleanup_adapter").new(service)
     return service
 end
@@ -56,6 +65,7 @@ function Service:start()
     self.started = true
     self:installQuit()
     self.queue:recover()
+    self.manual_deletion:start()
     self.cleanup:processFinishedChapterCleanup()
 end
 
@@ -108,33 +118,65 @@ end
 function Service:statusChanged()
     if self.stopped then return end
     if self.cleanup then self.cleanup:scheduleFinishedChapterCleanup(0) end
+    if self.manual_deletion then self.manual_deletion:wake() end
     self:notify()
 end
 
 function Service:commitCompletion(job, path)
     local key = self.queue:getKey(job.manga, job.chapter)
-    return self.settings:getStore():saveDocument(function(doc)
-        local remaining = {}
-        for _, stored in ipairs(doc.download_queue or {}) do
-            if (stored.key or self.queue:getKey(stored.manga, stored.chapter)) ~= key then
-                remaining[#remaining + 1] = stored
-            end
+    if job.pending_archive_generation and not self.settings:isBlocked() then
+        local state = self.settings:getStore():readKey("manual_archive_state")
+        local archive = type(state) == "table" and type(state.archives) == "table" and state.archives[key]
+        if type(archive) == "table" and archive.generation == job.pending_archive_generation
+            and archive.path == path then
+            job.archive_generation = job.pending_archive_generation
         end
-        doc.download_queue = remaining
-        if type(doc.chapter_ledger) ~= "table" then doc.chapter_ledger = {} end
-        local entry = type(doc.chapter_ledger[key]) == "table" and doc.chapter_ledger[key] or {}
-        entry.manga_id, entry.chapter_id = tostring(job.manga.id or ""), tostring(job.chapter.id or "")
-        entry.manga_title, entry.chapter_name = job.manga.title, job.chapter.name
-        entry.path = path
-        doc.chapter_ledger[key] = entry
-        if type(doc.reader_return_contexts) ~= "table" then doc.reader_return_contexts = {} end
-        local context = type(doc.reader_return_contexts[path]) == "table" and doc.reader_return_contexts[path] or {}
-        context.path = path
-        context.manga_id, context.manga_title = entry.manga_id, entry.manga_title
-        context.chapter_id, context.chapter_name = entry.chapter_id, entry.chapter_name
-        context.in_library, context.source = job.manga.in_library, copy(job.manga.source)
-        doc.reader_return_contexts[path] = context
+    end
+    local valid, reason = self.manual_deletion:validateJob(job)
+    if not valid then return nil, reason end
+    local published_generation
+    local call_ok, ok, err = pcall(function()
+        return self.settings:getStore():saveDocument(function(doc)
+            if doc.download_queue ~= nil and type(doc.download_queue) ~= "table" then
+                error("unsupported_download_queue", 0)
+            end
+            local jobs, remove_indexes = doc.download_queue or {}, {}
+            for index, stored in pairs(jobs) do
+                if type(stored) == "table" and stored.key == key then
+                    if stored.archive_generation ~= job.archive_generation or stored.version ~= nil
+                        or type(index) ~= "number" or index < 1 or index ~= math.floor(index) then
+                        error("download_job_replaced_or_unsupported", 0)
+                    end
+                    remove_indexes[#remove_indexes + 1] = index
+                end
+            end
+            if type(doc.chapter_ledger) ~= "table" then doc.chapter_ledger = {} end
+            local entry = type(doc.chapter_ledger[key]) == "table" and doc.chapter_ledger[key] or {}
+            entry.manga_id, entry.chapter_id = tostring(job.manga.id or ""), tostring(job.chapter.id or "")
+            entry.manga_title, entry.chapter_name = job.manga.title, job.chapter.name
+            entry.path = path
+            doc.chapter_ledger[key] = entry
+            if type(doc.reader_return_contexts) ~= "table" then doc.reader_return_contexts = {} end
+            local context = type(doc.reader_return_contexts[path]) == "table" and doc.reader_return_contexts[path] or {}
+            context.path = path
+            context.manga_id, context.manga_title = entry.manga_id, entry.manga_title
+            context.chapter_id, context.chapter_name = entry.chapter_id, entry.chapter_name
+            context.in_library, context.source = job.manga.in_library, copy(job.manga.source)
+            doc.reader_return_contexts[path] = context
+            published_generation = self.manual_deletion:publish(doc, job, path)
+            table.sort(remove_indexes, function(a, b) return a > b end)
+            for _, index in ipairs(remove_indexes) do table.remove(jobs, index) end
+            doc.download_queue = jobs
+        end)
     end)
+    if not call_ok then return nil, ok end
+    if ok then
+        job.archive_generation = published_generation
+        job.pending_archive_generation = nil
+    elseif self.settings:isBlocked() then
+        job.pending_archive_generation = published_generation
+    end
+    return ok, err
 end
 
 function Service:installQuit()
@@ -155,6 +197,7 @@ function Service:shutdown()
     for subscription in pairs(self.subscribers) do subscription.callback = nil end
     self.subscribers = {}
     pcall(self.cleanup.cancelFinishedChapterCleanup, self.cleanup)
+    pcall(self.manual_deletion.stop, self.manual_deletion)
     self.queue.active_job_lifecycle:shutdown()
 end
 

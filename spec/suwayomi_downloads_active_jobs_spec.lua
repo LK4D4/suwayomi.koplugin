@@ -3,6 +3,7 @@ package.path = "?.lua;" .. package.path
 -- Active job specs exercise subprocess lifecycle and progress polling behind
 -- the queue facade. Queue persistence/facade behavior stays in queue specs.
 local Marker = require("spec/support/i18n_marker")
+local checkedQueueSettings = require("spec/support/checked_queue_settings")
 
 describe("suwayomi/downloads/active_jobs", function()
     local original_io_open
@@ -97,8 +98,7 @@ describe("suwayomi/downloads/active_jobs", function()
         package.loaded["suwayomi/downloads/queue"] = nil
         local DownloadQueue = require("suwayomi/downloads/queue")
         local scheduled = {}
-        local saved_queue = options.saved_queue or {}
-        local save_count = 0
+        local settings, save_count = checkedQueueSettings(options.saved_queue)
         local now = options.now or 100
         local messages = {}
         local status_changes = 0
@@ -140,19 +140,7 @@ describe("suwayomi/downloads/active_jobs", function()
         }
 
         local queue = DownloadQueue:new{
-            settings = {
-                load = function()
-                    return { server_url = "https://suwayomi.example" }
-                end,
-                loadDownloadQueue = function()
-                    return saved_queue
-                end,
-                saveDownloadQueue = function(_, jobs)
-                    save_count = save_count + 1
-                    saved_queue = jobs
-                    return jobs
-                end,
-            },
+            settings = settings,
             downloader = downloader,
             ui_manager = {
                 scheduleIn = function(_, delay, callback)
@@ -205,8 +193,8 @@ describe("suwayomi/downloads/active_jobs", function()
         context = {
             queue = queue,
             scheduled = scheduled,
-            saved_queue = function() return saved_queue end,
-            save_count = function() return save_count end,
+            saved_queue = function() return settings:loadDownloadQueue() end,
+            save_count = save_count,
             messages = messages,
             archive_ready_calls = archive_ready_calls,
             status_changes = function() return status_changes end,
