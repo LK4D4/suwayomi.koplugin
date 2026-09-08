@@ -248,17 +248,6 @@ function ActiveJobs:process()
         if terminating_pending then
             break
         end
-        local active_retry = false
-        for _key, active in pairs(self.jobs or {}) do
-            if (tonumber(active.retry_count) or 0) > 0 then
-                active_retry = true
-                break
-            end
-        end
-        if active_retry then
-            break
-        end
-
         local ready_retry_index
         local ready_fresh_index
         local delayed_retry_at
@@ -286,7 +275,7 @@ function ActiveJobs:process()
         if delayed_retry_at and (not earliest_retry_at or delayed_retry_at < earliest_retry_at) then
             earliest_retry_at = delayed_retry_at
         end
-        local ready_index = ready_retry_index or (not delayed_retry_at and ready_fresh_index)
+        local ready_index = ready_retry_index or ready_fresh_index
         local queued = ready_index and table.remove(queue.items, ready_index) or nil
         if not queued then
             break

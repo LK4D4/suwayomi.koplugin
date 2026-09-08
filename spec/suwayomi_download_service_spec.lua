@@ -279,7 +279,7 @@ describe("process-owned download navigation", function()
         assert.are.equal(1, failed_rows)
         advance(899)
         advance(0)
-        assert.are.equal(1, #workers)
+        assert.are.equal("downloading", queue:getStatus(manga, chapters[2]).state)
         local active = queue:getActiveJob("m1:c1")
         local retried_path = directory .. "/c1.cbz"
         write(retried_path, "worker validated restart completion")

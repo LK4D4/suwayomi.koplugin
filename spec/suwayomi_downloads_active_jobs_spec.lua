@@ -548,36 +548,44 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.equal(0, context.download_calls())
     end)
 
-    it("pauses fresh queued work while one transient retry probes the network", function()
-        local context = build_queue({
-            max_active_chapters = 1,
-            subprocess_done = false,
-            skip_subprocess_callback = true,
-        })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
-        local chapters = {
-            { id = "398", name = "Official_Vol. 1 Ch. 1" },
-            { id = "399", name = "Official_Vol. 1 Ch. 2" },
-        }
+    for _, scenario in ipairs({
+        { name = "fills both slots while retries wait", times = { 110, 120 }, active = { [3] = true, [4] = true } },
+        { name = "starts fresh work beside a due retry", times = { 100, 120 }, active = { [1] = true, [3] = true } },
+        { name = "prioritizes two due retries over fresh work", times = { 100, 100 }, active = { [1] = true, [2] = true } },
+    }) do
+        it(scenario.name, function()
+            local manga = { id = "m1", title = "Example" }
+            local chapters, jobs = {}, {}
+            for index = 1, 4 do
+                chapters[index] = { id = tostring(index), name = "Chapter " .. index }
+            end
+            -- Fresh work appears first so retry priority cannot depend on list order.
+            for _, index in ipairs({ 3, 4, 1, 2 }) do
+                jobs[#jobs + 1] = {
+                    key = "m1:" .. index, manga = manga, chapter = chapters[index],
+                    state = "queued", download_directory = "/books",
+                    retry_count = index <= 2 and 1 or nil,
+                    retry_at = scenario.times[index],
+                }
+            end
+            local context = build_queue({
+                max_active_chapters = 2, subprocess_done = false,
+                skip_subprocess_callback = true, saved_queue = jobs,
+            })
+            assert(context.queue:recover())
+            context.queue:process()
 
-        context.queue:enqueueBatch(manga, chapters, "/books")
-        table.remove(context.scheduled, 1).callback()
-        context.write_progress(manga, chapters[1], "failed", 0, 5, "", "network timeout", true)
-        table.remove(context.scheduled, 1).callback()
-
-        assert.is_nil(context.active_job(manga, chapters[1]))
-        assert.is_nil(context.active_job(manga, chapters[2]))
-        assert.are.equal(chapters[2].id, context.queue.items[1].chapter.id)
-        assert.are.equal(chapters[1].id, context.queue.items[2].chapter.id)
-
-        local retry_at = context.saved_queue()[1].retry_at
-        context.set_subprocess_done(1234, true)
-        context.advance(retry_at - 100)
-        table.remove(context.scheduled, 1).callback()
-
-        assert.is_not_nil(context.active_job(manga, chapters[1]))
-        assert.is_nil(context.active_job(manga, chapters[2]))
-    end)
+            assert.are.equal(2, context.active_count())
+            for index, chapter in ipairs(chapters) do
+                local status = context.queue:getStatus(manga, chapter)
+                assert.are.equal(scenario.active[index] and "downloading" or "queued", status.state)
+                if index <= 2 and not scenario.active[index] then
+                    assert.are.equal(scenario.times[index], status.retry_at)
+                    assert.are.equal(1, status.retry_count)
+                end
+            end
+        end)
+    end
 
     it("backfills a completed active slot while another chapter keeps downloading", function()
         local first_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
