@@ -1,7 +1,7 @@
 -- Boundary: Downloads hub menu UI.
 --
--- Responsibility: format active, queued, and failed download rows and
--- wire row callbacks to the downloads controller and display full error details.
+-- Responsibility: format chapter download and pending refill rows, wire commands
+-- to the downloads controller, and display full error and refill details.
 -- Owned state: none.
 -- Dependencies: shared list menu widget, KOReader TextViewer/UIManager, plugin
 -- i18n facade, and shared menu utilities.
@@ -97,10 +97,105 @@ local function formatFailedDownloadText(job)
     return StatusFormatter.shortenChapterTitle(summary, 0, 100)
 end
 
+local function formatRefillReason(reason)
+    if reason == "endpoint_changed" then
+        return I18n.t("Server changed. Open this manga on the current server and choose Download ahead again.")
+    elseif reason == "origin_unknown" then
+        return I18n.t("Server association unknown. Open this manga on the current server and choose Download ahead again.")
+    elseif reason == "configuration_missing" then
+        return I18n.t("Check the connection and download folder in Settings.")
+    elseif reason == "metadata_missing" then
+        return I18n.t("Manga or source details are unavailable. Refresh the chapter list.")
+    elseif reason == "unsupported_state" then
+        return I18n.t("Saved refill state is unsupported. Existing data is preserved.")
+    elseif reason == "scanlator_missing" then
+        return I18n.t("No chapters match the saved scanlator filter. Other scanlators are not selected.")
+    elseif reason == "terminal_failure" then
+        return I18n.t("A chapter in the buffer failed. Use that chapter's Retry or Redownload action.")
+    elseif reason == "manual_delete_pending" then
+        return I18n.t("A chapter in the buffer has pending manual deletion. Automatic refill cannot replace it.")
+    elseif reason == "ownership_unproved" then
+        return I18n.t("Archive or download ownership is not verified. Existing files and work are preserved.")
+    elseif reason == "fetch_failed" then
+        return I18n.t("Could not load chapters. Refill will retry automatically.")
+    elseif reason == "persistence_failed" then
+        return I18n.t("Could not confirm saved refill work. No new downloads are confirmed.")
+    elseif reason == "choices_changed" then
+        return I18n.t("Reading or download choices changed. Refill will use the current choices.")
+    end
+    return I18n.t("Waiting to evaluate the unread buffer.")
+end
+
+local function formatRefillState(state)
+    if state == "blocked" then
+        return I18n.t("Ahead blocked")
+    elseif state == "waiting" then
+        return I18n.t("Ahead waiting")
+    end
+    return I18n.t("Ahead pending")
+end
+
+function DownloadsUI.formatRefillStatus(request)
+    local text = formatRefillState(request.state) .. "\n" .. formatRefillReason(request.reason)
+    if request.next_retry_at then
+        text = text .. "\n\n" .. I18n.t("Retry scheduled") .. "\n"
+            .. StatusFormatter.formatRetryTime(request.next_retry_at)
+    end
+    return text
+end
+
+local function showRefillDetails(request, callbacks)
+    local TextViewer = require("ui/widget/textviewer")
+    local UIManager = require("ui/uimanager")
+    local text = DownloadsUI.formatRefillStatus(request)
+    text = text .. "\n\n" .. I18n.t("Refill Retry reevaluates current unread positions. It does not retry a failed chapter or override pending manual deletion.")
+        .. "\n\n" .. I18n.t("Stop download ahead turns this manga's policy Off and stops pending refill. Already accepted chapter downloads remain.")
+    local viewer
+    viewer = TextViewer:new{
+        title = I18n.f("Download ahead: %1", request.manga_title or tostring(request.manga_id or "")),
+        text = text,
+        buttons_table = {
+            {
+                {
+                    id = "retry_refill",
+                    text = I18n.t("Retry refill"),
+                    enabled = callbacks.retry_refill ~= nil,
+                    callback = function()
+                        if callbacks.retry_refill then
+                            viewer:onClose()
+                            callbacks.retry_refill(request)
+                        end
+                    end,
+                },
+                {
+                    id = "stop_refill",
+                    text = I18n.t("Stop download ahead"),
+                    enabled = callbacks.stop_refill ~= nil,
+                    callback = function()
+                        if callbacks.stop_refill then
+                            viewer:onClose()
+                            callbacks.stop_refill(request)
+                        end
+                    end,
+                },
+            },
+            {
+                {
+                    id = "close",
+                    text = I18n.t("Close"),
+                    callback = function() viewer:onClose() end,
+                },
+            },
+        },
+    }
+    UIManager:show(viewer)
+end
+
 local function isDownloadsSnapshotEmpty(snapshot)
     return #(snapshot.active or {}) == 0
         and #(snapshot.queued or {}) == 0
         and #(snapshot.failed or {}) == 0
+        and #(snapshot.refills or {}) == 0
 end
 
 local function buildMenuOptions(snapshot, callbacks, options)
@@ -206,6 +301,22 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
                 elseif callbacks.onRetryFailed then
                     callbacks.onRetryFailed(job, menu)
                 end
+            end,
+        })
+    end
+
+    for _, request in ipairs(snapshot.refills or {}) do
+        local subtitle = formatRefillReason(request.reason)
+        if request.next_retry_at then
+            subtitle = subtitle .. "\n" .. StatusFormatter.formatRetryTime(request.next_retry_at)
+        end
+        table.insert(menu_table, {
+            text = request.manga_title or tostring(request.manga_id or ""),
+            keep_menu_open = true,
+            mandatory = formatRefillState(request.state),
+            subtitle = subtitle,
+            callback = function()
+                showRefillDetails(request, callbacks)
             end,
         })
     end

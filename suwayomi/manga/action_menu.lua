@@ -107,9 +107,9 @@ end
 
 function MangaActionMenu.buildKeepDownloadedActions()
     return {
-        { id = "keep_next_5_unread", text = I18n.t("Keep next 5 downloaded") },
-        { id = "keep_next_10_unread", text = I18n.t("Keep next 10 downloaded") },
-        { id = "keep_next_50_unread", text = I18n.t("Keep next 50 downloaded") },
+        { id = "keep_next_5_unread", text = I18n.t("Keep first 5 unread") },
+        { id = "keep_next_10_unread", text = I18n.t("Keep first 10 unread") },
+        { id = "keep_next_50_unread", text = I18n.t("Keep first 50 unread") },
         { id = "keep_next_0_unread", text = I18n.t("Stop download ahead") },
     }
 end

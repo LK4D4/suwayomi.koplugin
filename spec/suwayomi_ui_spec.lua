@@ -28,6 +28,7 @@ describe("suwayomi/ui", function()
 
         package.loaded["suwayomi/ui"] = nil
         package.loaded["suwayomi/i18n"] = nil
+        package.loaded["suwayomi/settings/retention_labels"] = nil
         package.loaded["suwayomi/ui/browse"] = nil
         package.loaded["suwayomi/ui/directory"] = nil
         package.loaded["suwayomi/ui/downloads"] = nil
@@ -594,6 +595,7 @@ describe("suwayomi/ui", function()
 
     after_each(function()
         package.loaded["suwayomi/i18n"] = nil
+        package.loaded["suwayomi/settings/retention_labels"] = nil
         package.preload.gettext = nil
         package.preload["suwayomi/i18n"] = nil
         package.preload["ui/widget/menu"] = nil
@@ -2096,27 +2098,33 @@ describe("suwayomi/ui", function()
         assert.are.equal("never", selected)
     end)
 
-    it("renders delete-finished choices as a choice dialog", function()
+    it("preserves all six retention choices through repeated picker navigation", function()
+        Marker.install()
         local ui = require("suwayomi/ui")
-        local selected
-
-        ui.showDeleteFinishedWhileReadingMenu({
-            current = 2,
-            choices = { 0, 1, 2 },
-            onSelect = function(value)
-                selected = value
-            end,
-        })
-
-        assert.are.equal("Delete finished chapters", shown_dialog.title)
-        assert.are.equal("Disabled", shown_dialog.buttons[1][1].text)
-        assert.is_false(shown_dialog.buttons[1][1].checked_func())
-        assert.are.equal("Second to last read chapter", shown_dialog.buttons[3][1].text)
-        assert.is_true(shown_dialog.buttons[3][1].checked_func())
-
-        shown_dialog.buttons[2][1].callback()
-
-        assert.are.equal(1, selected)
+        local current = 0
+        local labels = {
+            [0] = "tx:Off",
+            "tx:Keep 0 newest completions",
+            "tx:Keep 1 newest completion",
+            "tx:Keep 2 newest completions",
+            "tx:Keep 3 newest completions",
+            "tx:Keep 4 newest completions",
+        }
+        for value = 0, 5 do
+            ui.showDeleteFinishedWhileReadingMenu({
+                current = current,
+                onSelect = function(selected) current = selected end,
+            })
+            for choice = 0, 5 do
+                local button = shown_dialog.buttons[choice + 1][1]
+                assert.are.equal(labels[choice], button.text)
+                assert.are.equal(choice == current, button.checked_func())
+            end
+            local picker = shown_dialog
+            picker.buttons[value + 1][1].callback()
+            assert.are.equal(picker, closed_dialog)
+            assert.are.equal(value, current)
+        end
     end)
 
     it("routes setup and settings choice dialog labels through i18n", function()
@@ -2139,14 +2147,6 @@ describe("suwayomi/ui", function()
         assert.are.equal("tx:Always ask", shown_dialog.buttons[2][1].text)
         assert.are.equal("tx:Never ask", shown_dialog.buttons[3][1].text)
 
-        ui.showDeleteFinishedWhileReadingMenu({
-            current = 2,
-            choices = { 0, 1, 2 },
-        })
-        assert.are.equal("tx:Delete finished chapters", shown_dialog.title)
-        assert.are.equal("tx:Disabled", shown_dialog.buttons[1][1].text)
-        assert.are.equal("tx:Last read chapter", shown_dialog.buttons[2][1].text)
-        assert.are.equal("tx:Second to last read chapter", shown_dialog.buttons[3][1].text)
     end)
 
     it("shows the language menu as a checklist dialog", function()

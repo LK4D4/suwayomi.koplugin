@@ -11,6 +11,7 @@ local ButtonDialog = require("ui/widget/buttondialog")
 local ConfirmBox = require("ui/widget/confirmbox")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local I18n = require("suwayomi/i18n")
+local RetentionLabels = require("suwayomi/settings/retention_labels")
 
 local BrowseUI = require("suwayomi/ui/browse")
 local ChoiceDialogs = require("suwayomi/ui/choice_dialogs")
@@ -58,6 +59,7 @@ SuwayomiUI.buildDownloadsMenuTable = DownloadsUI.buildDownloadsMenuTable
 SuwayomiUI.showDownloadsMenu = DownloadsUI.showDownloadsMenu
 SuwayomiUI.updateDownloadsMenu = DownloadsUI.updateDownloadsMenu
 SuwayomiUI.showDownloadErrorDetails = DownloadsUI.showDownloadErrorDetails
+SuwayomiUI.formatRefillStatus = DownloadsUI.formatRefillStatus
 SuwayomiUI.buildMangaInformationText = MangaInfoUI.buildText
 SuwayomiUI.showMangaInformation = MangaInfoUI.show
 SuwayomiUI.showChoiceDialog = ChoiceDialogs.showChoiceDialog
@@ -473,21 +475,13 @@ local function buildLibraryCategoryPickerBehaviorChoices(choices)
 end
 
 local function buildDeleteFinishedWhileReadingChoices(choices)
-    local labels = {
-        [0] = I18n.t("Disabled"),
-        [1] = I18n.t("Last read chapter"),
-        [2] = I18n.t("Second to last read chapter"),
-        [3] = I18n.t("Third to last read chapter"),
-        [4] = I18n.t("Fourth to last read chapter"),
-        [5] = I18n.t("Fifth to last read chapter"),
-    }
-
     local dialog_choices = {}
-    for value_index = 1, #(choices or { 0, 1, 2, 3, 4, 5 }) do
+    choices = choices or { 0, 1, 2, 3, 4, 5 }
+    for value_index = 1, #choices do
         local value = choices[value_index]
         table.insert(dialog_choices, {
             value = value,
-            text = labels[value] or tostring(value),
+            text = RetentionLabels.format(value),
         })
     end
 

@@ -12,6 +12,7 @@ local OnboardingConnectionWorker = require("suwayomi/plugin/onboarding_connectio
 local SubprocessJob = require("suwayomi/subprocess/job")
 local I18n = require("suwayomi/i18n")
 local FFIUtil = require("ffi/util")
+local RetentionLabels = require("suwayomi/settings/retention_labels")
 
 local SettingsController = {}
 SettingsController.__index = SettingsController
@@ -444,15 +445,7 @@ function Methods:getDeleteChaptersSettingSummary(key)
 end
 
 function Methods:getDeleteFinishedWhileReadingLabel(value)
-    local labels = {
-        [0] = I18n.t("Disabled"),
-        [1] = I18n.t("Last read chapter"),
-        [2] = I18n.t("Second to last read chapter"),
-        [3] = I18n.t("Third to last read chapter"),
-        [4] = I18n.t("Fourth to last read chapter"),
-        [5] = I18n.t("Fifth to last read chapter"),
-    }
-    return labels[tonumber(value) or 0] or labels[0]
+    return RetentionLabels.format(value)
 end
 
 function Methods:toggleDeleteAfterMarkRead(touchmenu_instance)
@@ -634,6 +627,7 @@ function Methods:buildSettingsMenu()
                             self:getDeleteChaptersSettingSummary("delete_after_mark_read")
                         )
                     end,
+                    help_text = I18n.t("New manual mark-read actions may remove only the local archive. Busy downloads keep running; request deletion again after they finish. Accepted removal continues with this setting Off."),
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:toggleDeleteAfterMarkRead(touchmenu_instance)
@@ -642,14 +636,53 @@ function Methods:buildSettingsMenu()
                 {
                     text_func = function()
                         return I18n.f(
-                            "Delete while reading: %1",
+                            "Finish retention: %1",
                             self:getDeleteChaptersSettingSummary("delete_finished_while_reading")
                         )
                     end,
+                    help_text = I18n.t("Keep the newest recorded completions per manga, not chapter-list positions. Completion requires completed status and close, or a plugin manual mark-read action. Live readers remain protected."),
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
                     end,
+                },
+                {
+                    text = I18n.t("Download help"),
+                    keep_menu_open = true,
+                    sub_item_table = {
+                        {
+                            text = I18n.t("Next downloads and download ahead"),
+                            callback = function()
+                                self:showMessage(I18n.t("Download next adds eligible unread downloads. Download ahead fills the earliest unread positions; existing downloads and queue work count. Both use source order and the exact saved scanlator filter, never a silent fallback to All.")
+                                    .. "\n\n" .. I18n.t("Ahead five with two existing positions needs only three downloads. Next five can add five more. Neither starts at the current reader page."))
+                            end,
+                        },
+                        {
+                            text = I18n.t("When download ahead runs"),
+                            callback = function()
+                                self:showMessage(I18n.t("Refill follows completed close, including native next-file reading; manual read/unread; actual read reconciliation; successful chapter load/return/refresh; and ahead or scanlator changes. Repaint, progress, and cancellation do not create refill requests. Pending work survives offline operation and restart."))
+                            end,
+                        },
+                        {
+                            text = I18n.t("Retry, Stop, and Cancel"),
+                            callback = function()
+                                self:showMessage(I18n.t("Refill Retry reevaluates the buffer; it does not retry failed chapters or override pending deletion. Stop download ahead turns the policy Off but keeps accepted jobs. Cancel retires the current refill for that manga; Cancel all retires every refill. Cancellation keeps ahead enabled for later reading or chapter actions."))
+                            end,
+                        },
+                        {
+                            text = I18n.t("Completion and archive removal"),
+                            callback = function()
+                                self:showMessage(I18n.t("Completed status plus close counts; reaching the last page alone does not. Manual completions also count for retention. Historical read flags do not authorize deletion. A completion without an archive occupies a position but cannot authorize deleting a later download.")
+                                    .. "\n\n" .. I18n.t("Keep 2 newest completions: after completing A, B, then C in one manga, A becomes eligible for removal. B and C remain. Live readers stay protected."))
+                            end,
+                        },
+                        {
+                            text = I18n.t("Accepted manual deletion"),
+                            callback = function()
+                                self:showMessage(I18n.t("Mark-read can succeed even when deletion is busy or blocked. Accepted removal keeps sidecars, backups, and reading metadata. Unread or a later accepted deliberate Download/Retry revokes remaining removal; failed, uncertain, duplicate, or automatic downloads do not. See the README for examples and safety details."))
+                            end,
+                        },
+                    },
                 },
             },
         },

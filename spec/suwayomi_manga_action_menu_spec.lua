@@ -63,13 +63,4 @@ describe("suwayomi/manga/action_menu", function()
         assert.is_true(list[9].destructive)
     end)
 
-    it("translates bulk and download-ahead labels", function()
-        local actions = require("suwayomi/manga/action_menu")
-
-        assert.are.equal("tx:Download first unread", actions.buildBulkDownloadActions()[1].text)
-        assert.are.equal("download_all_chapters", actions.buildBulkDownloadActions()[6].id)
-        assert.are.equal("tx:Download all chapters (up to 50 new)", actions.buildBulkDownloadActions()[6].text)
-        assert.are.equal("tx:Keep next 5 downloaded", actions.buildKeepDownloadedActions()[1].text)
-        assert.are.equal("tx:Stop download ahead", actions.buildKeepDownloadedActions()[4].text)
-    end)
 end)

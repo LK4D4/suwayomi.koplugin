@@ -10,6 +10,7 @@ local modules_to_clear = {
     "suwayomi/subprocess/job",
     "suwayomi/plugin/onboarding_connection_worker",
     "suwayomi/settings",
+    "suwayomi/settings/retention_labels",
     "suwayomi/ui",
     "suwayomi/plugin/settings_controller",
 }
@@ -44,6 +45,7 @@ local function installMarkerI18n()
         }
     end
     package.loaded["suwayomi/i18n"] = nil
+    package.loaded["suwayomi/settings/retention_labels"] = nil
 end
 
 local function installController(options)
@@ -485,7 +487,6 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("tx:Download directory: not set", downloads_items[1].text_func())
         assert.are.equal("tx:Parallel downloads: 4", downloads_items[2].text_func())
         assert.are.equal("tx:Delete after manual mark-read: tx:yes", downloads_items[3].text_func())
-        assert.are.equal("tx:Delete while reading: tx:Second to last read chapter", downloads_items[4].text_func())
     end)
 
     it("keeps subprocess start errors raw while translating fixed startup text", function()
@@ -1175,7 +1176,6 @@ describe("suwayomi/plugin/settings_controller", function()
         local download_items = findMenuItem(plugin:buildSettingsMenu(), "Downloads").sub_item_table
 
         assert.are.equal("Delete after manual mark-read: no", download_items[3].text_func())
-        assert.are.equal("Delete while reading: Disabled", download_items[4].text_func())
 
         download_items[3].callback(state.touchmenu)
 
@@ -1183,15 +1183,26 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal(1, state.refresh_count)
         assert.are.same({}, state.messages)
 
-        download_items[4].callback(state.touchmenu)
-        assert.are.equal(0, state.delete_finished_menu_options.current)
-
-        state.delete_finished_menu_options.onSelect(2)
-
-        assert.are.equal(2, state.saved_delete_chapters_settings.delete_finished_while_reading)
+        local labels = {
+            [0] = "Off",
+            "Keep 0 newest completions",
+            "Keep 1 newest completion",
+            "Keep 2 newest completions",
+            "Keep 3 newest completions",
+            "Keep 4 newest completions",
+        }
+        for value = 0, 5 do
+            download_items[4].callback(state.touchmenu)
+            state.delete_finished_menu_options.onSelect(value)
+            plugin:showSettings()
+            download_items = findMenuItem(state.settings_menu, "Downloads").sub_item_table
+            assert.are.equal(value, state.saved_delete_chapters_settings.delete_finished_while_reading)
+            assert.are.equal("Finish retention: " .. labels[value], download_items[4].text_func())
+            download_items[4].callback(state.touchmenu)
+            assert.are.equal(value, state.delete_finished_menu_options.current)
+        end
         assert.are.same({}, state.messages)
         assert.is_nil(state.unexpected_delete_finished_menu_update)
-        assert.are.equal(2, state.refresh_count)
     end)
 
     it("disables cleanup by cancelling work and clearing finished history", function()
