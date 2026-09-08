@@ -32,6 +32,11 @@ local function cancellationFailureMessage(state)
     end
 end
 
+local function currentDownloadJob(queue, job)
+    local current = job and queue:findPersistentJob(job.key)
+    return current and queue:copySnapshotJob(current, current.state)
+end
+
 function Methods:getDownloadJobTitle(job)
     local manga_title = job and job.manga and job.manga.title or nil
     local chapter_name = job and job.chapter and job.chapter.name or nil
@@ -166,27 +171,93 @@ function Methods:retryDownloadJob(job)
 end
 
 
+function Methods:redownloadDownloadJob(job)
+    if self.suwayomi_host_retired then return false end
+    self.chapter_archive_request = nil
+    local queue = self:getDownloadQueue()
+    local current = currentDownloadJob(queue, job)
+    if not current or current.state ~= "failed"
+        or not (current.repair or current.progress and current.progress.archive_state == "damaged") then
+        self:showMessage(I18n.t("Download error is no longer available."))
+        return false
+    end
+    local ok, state = queue:redownload(current.manga, current.chapter,
+        current.download_directory or SuwayomiSettings:loadDownloadDirectory())
+    if not ok then self:showMessage(I18n.t("Could not redownload chapter.")) end
+    if self.refreshChapterMenu then self:refreshChapterMenu() end
+    self:refreshDownloadsMenu()
+    return ok, state
+end
+
+function Methods:verifyDownloadJob(job, is_current)
+    if self.suwayomi_host_retired or (is_current and not is_current()) then return false end
+    local request = {}
+    self.chapter_archive_request = request
+    local queue = self:getDownloadQueue()
+    local current = currentDownloadJob(queue, job)
+    if not current or current.state ~= "failed" or not (current.progress and current.progress.archive_state) then
+        self:showMessage(I18n.t("Download error is no longer available."))
+        return false
+    end
+    local function live()
+        return not self.suwayomi_host_retired and self.chapter_archive_request == request
+            and (not is_current or is_current())
+    end
+    local accepted, err = queue:verifyArchive(current.manga, current.chapter,
+        current.progress and current.progress.path, function(result)
+            if not live() then return end
+            if self.refreshChapterMenu then self:refreshChapterMenu() end
+            self:refreshDownloadsMenu()
+            if result.state == "valid" then
+                self:showMessage(I18n.t("Download verified."))
+            else
+                self:showDownloadJobError(current, is_current)
+            end
+        end, { is_current = live })
+    if not accepted then
+        self:showMessage(err == "verification_busy" and I18n.t("Another download is being verified.")
+            or I18n.t("Could not verify download"))
+    end
+    return accepted, err
+end
+
 function Methods:showDownloadJobError(job, is_current)
     local queue = self:getDownloadQueue()
-    local current = job and queue:findPersistentJob(job.key)
+    local current = currentDownloadJob(queue, job)
     if not current or not (current.state == "failed" or (current.state == "queued" and current.retry_at)) then
         self:showMessage(I18n.t("Download error is no longer available."))
         return false
     end
 
+    local archive_state = current.progress and current.progress.archive_state
+    local function live()
+        return not self.suwayomi_host_retired and (not is_current or is_current())
+    end
     return SuwayomiUI.showDownloadErrorDetails(current, {
         context = self:getDownloadJobTitle(current),
-        -- Scheduled retries remain automatic. A stale Retry button must check
-        -- the live queue again after the reader dismisses the details.
-        onRetry = current.state == "failed" and function()
-            if is_current and not is_current() then return false end
-            return self:retryDownloadJob(current)
+        -- Only an explicitly authorized repair may use ordinary Retry.
+        onRetry = current.state == "failed" and (not archive_state or current.repair) and function()
+            if not live() then return false end
+            local latest = currentDownloadJob(queue, current)
+            if latest and latest.state == "failed"
+                and latest.progress and latest.progress.archive_state and not latest.repair then return false end
+            return self:retryDownloadJob(latest or current)
+        end or nil,
+        onVerify = archive_state and current.state == "failed" and function()
+            if not live() then return false end
+            return self:verifyDownloadJob(current, live)
+        end or nil,
+        onRedownload = archive_state == "damaged" and current.state == "failed" and function()
+            if not live() then return false end
+            return self:redownloadDownloadJob(current)
         end or nil,
     })
 end
 
-function Methods:showFailedDownloadActions(job)
-    return self:showDownloadJobError(job)
+function Methods:showFailedDownloadActions(job, menu)
+    return self:showDownloadJobError(job, function()
+        return not self.suwayomi_host_retired and (not menu or self.current_downloads_menu == menu)
+    end)
 end
 
 function Methods:showChapterDownloadError(manga, chapter)
@@ -444,6 +515,8 @@ function Methods:getQueueableKeepNextUnreadDownloads(manga, chapters)
                 or status.state == "downloading"
                 or status.state == "downloaded"
                 or status.state == "skipped"
+                or status.archive_state == "damaged"
+                or status.archive_state == "unverified"
         )) then
             if #queueable >= max_chapters then
                 break

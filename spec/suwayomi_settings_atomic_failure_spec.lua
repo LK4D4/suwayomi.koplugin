@@ -164,6 +164,29 @@ describe("suwayomi settings atomic failure handling", function()
         package.preload.luasettings = nil
     end)
 
+    it("restores failed chapter status alongside Downloads after a cold restart", function()
+        local manga = { id = "m1", title = "Example" }
+        local chapter = { id = "c1", name = "One" }
+        assert(SuwayomiSettings:saveDownloadQueue({ {
+            key = "m1:c1", state = "failed", download_directory = "/books",
+            manga = manga, chapter = chapter,
+            progress = { state = "failed", error = "No address associated with hostname" },
+        } }))
+        SuwayomiSettings:setStore(SettingsStore:new({
+            path = settings_path, io = io_adapter, luasettings = SuwayomiSettings:open(),
+        }))
+        local queue = DownloadQueue:new{
+            settings = SuwayomiSettings,
+            ui_manager = { scheduleIn = function() end },
+        }
+        assert(queue:recover())
+        local status = queue:getStatus(manga, chapter)
+        assert.is_not_nil(status)
+        assert.are.equal("failed", status.state)
+        assert.are.equal("Failed", queue:formatChapterMenuStatus(chapter, status))
+        assert.are.equal("failed", queue:getSnapshot().failed[1].state)
+    end)
+
     it("reports failure on preference save when write fails, and does not leak rejected mutation to next save", function()
         -- Initial state
         assert.is_false(SuwayomiSettings:loadBrowseSettings().show_nsfw_sources)
@@ -252,7 +275,7 @@ describe("suwayomi settings atomic failure handling", function()
         local manga, chapter = { id = "m1" }, { id = "c1" }
         assert.is_true(queue:enqueue(manga, chapter, "."))
         queue:process()
-        local path = queue:buildProgressPath(manga, chapter, ".")
+        local path = queue:getActiveJob(queue:getKey(manga, chapter)).progress_path
         local ProgressFile = require("suwayomi/downloads/progress_file")
         ProgressFile.writeFallback(path, "failed", 2, 10, nil, "network failure", true)
         local write = io_adapter.write
@@ -348,7 +371,7 @@ describe("suwayomi settings atomic failure handling", function()
         local manga, chapter = { id = "m1" }, { id = "c1" }
         assert.is_true(queue:enqueue(manga, chapter, "."))
         queue:process()
-        local path = queue:buildProgressPath(manga, chapter, ".")
+        local path = queue:getActiveJob(queue:getKey(manga, chapter)).progress_path
         require("suwayomi/downloads/progress_file").writeFallback(path, "failed", 2, 10, nil, "network failure", true)
         io_adapter.fail_sync_dir = true
         queue:poll()
@@ -399,7 +422,7 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_truthy(SuwayomiSettings:saveDownloadQueue({
             queue:buildPersistentJob(manga, chapter, ".", "downloading"),
         }))
-        local path = queue:buildProgressPath(manga, chapter, ".")
+        local path = os.tmpname()
         local ProgressFile = require("suwayomi/downloads/progress_file")
         ProgressFile.writeFallback(path, "downloading", 2, 10)
         io_adapter.fail_write = true
@@ -412,8 +435,9 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_false(ok)
         assert.are.equal("downloading", progress and progress.state)
         assert.are.equal(0, #snapshot.queued)
-        assert.are.equal(1, #queue:getSnapshot().failed)
-        assert.are.equal("failed", SuwayomiSettings:loadDownloadQueue()[1].state)
+        assert.are.equal(0, #queue:getSnapshot().failed)
+        assert.are.equal(1, #queue:getSnapshot().queued)
+        assert.are.equal("queued", SuwayomiSettings:loadDownloadQueue()[1].state)
     end)
 
     it("reports rejected single and capped batch download actions without claiming queued work", function()

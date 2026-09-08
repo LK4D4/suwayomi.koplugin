@@ -129,6 +129,9 @@ msgstr ""
 msgid "Always ask"
 msgstr ""
 
+msgid "Another download is being verified."
+msgstr ""
+
 msgctxt "source filter tri-state"
 msgid "Any"
 msgstr ""
@@ -367,10 +370,16 @@ msgstr ""
 msgid "Could not queue downloads: %1"
 msgstr ""
 
+msgid "Could not redownload chapter."
+msgstr ""
+
 msgid "Could not retry download."
 msgstr ""
 
 msgid "Could not save saved filter."
+msgstr ""
+
+msgid "Could not start chapter download"
 msgstr ""
 
 msgid "Could not start chapter download: %1"
@@ -407,6 +416,9 @@ msgid "Could not start source loading: unknown error"
 msgstr ""
 
 msgid "Could not update library."
+msgstr ""
+
+msgid "Could not verify download"
 msgstr ""
 
 msgid "Delete"
@@ -491,6 +503,9 @@ msgstr ""
 msgid "Download all unread (up to 50 new)"
 msgstr ""
 
+msgid "Download damaged; redownload"
+msgstr ""
+
 msgid "Download directory: %1"
 msgstr ""
 
@@ -537,6 +552,9 @@ msgid "Download selected (up to 50 new)"
 msgstr ""
 
 msgid "Download the chapter first."
+msgstr ""
+
+msgid "Download verified."
 msgstr ""
 
 msgid "Download-ahead buffer is already downloaded or queued."
@@ -701,9 +719,6 @@ msgid "Installed"
 msgstr ""
 
 msgid "Installing extension..."
-msgstr ""
-
-msgid "Interrupted; retry download"
 msgstr ""
 
 msgid "KOReader could not open this chapter right now."
@@ -997,6 +1012,9 @@ msgid "Read state sync is already running."
 msgstr ""
 
 msgid "Read state sync started."
+msgstr ""
+
+msgid "Redownload"
 msgstr ""
 
 msgid "Refresh chapters"
@@ -1338,6 +1356,12 @@ msgid "Use this folder"
 msgstr ""
 
 msgid "Username"
+msgstr ""
+
+msgid "Verify download"
+msgstr ""
+
+msgid "Verifying download"
 msgstr ""
 
 msgid "You can continue."

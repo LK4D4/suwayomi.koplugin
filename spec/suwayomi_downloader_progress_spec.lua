@@ -18,6 +18,7 @@ describe("suwayomi/downloads/downloader progress writing", function()
                     end,
                     close = function()
                         files[path] = table.concat(chunks)
+                        return true
                     end,
                 }
             end
@@ -57,6 +58,7 @@ describe("suwayomi/downloads/downloader progress writing", function()
     before_each(function()
         package.loaded["suwayomi/downloads/downloader"] = nil
         package.loaded["suwayomi/downloads/progress_file"] = nil
+        package.loaded["suwayomi/downloads/archive"] = nil
         package.loaded["suwayomi/paths"] = nil
         package.loaded["suwayomi/api"] = nil
         package.loaded["suwayomi/fs"] = nil
@@ -94,6 +96,7 @@ describe("suwayomi/downloads/downloader progress writing", function()
 
         package.loaded["suwayomi/downloads/downloader"] = nil
         package.loaded["suwayomi/downloads/progress_file"] = nil
+        package.loaded["suwayomi/downloads/archive"] = nil
         package.loaded["suwayomi/paths"] = nil
         package.loaded["suwayomi/api"] = nil
         package.loaded["suwayomi/fs"] = nil

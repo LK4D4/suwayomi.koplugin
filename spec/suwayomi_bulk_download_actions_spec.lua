@@ -308,7 +308,7 @@ describe("bounded bulk download actions", function()
         local items = openChapters(chapters(1))
         assert.is_truthy(queue:savePersistentJobs({ queue:buildPersistentJob(manga, items[1], "/books", "failed") }))
         assert.is_true(queue:recover())
-        local progress_path = queue:buildProgressPath(manga, items[1], "/books")
+        local progress_path = "/books/unknown-attempt.progress"
         files[progress_path], files["/books/m1-c1.cbz.part"] = "old progress", "old partial"
         plugin:performMangaAction(manga, "download_all_chapters")
         assert.is_truthy(stack[#stack].text:find("Queue up to 1 new chapter download?", 1, true))
@@ -361,8 +361,8 @@ describe("bounded bulk download actions", function()
             archives["/books/m1-c8.cbz"], archives["/books/m1-c9.cbz"] = true, true
             assert.is_truthy(queue:upsertPersistentJob(queue:buildPersistentJob(manga, items[10], "/books", "failed")))
             queue:setStatus(manga, items[10], { state = "failed" })
-            local owner_progress = queue:buildProgressPath(manga, items[4], "/books")
-            local retry_progress = queue:buildProgressPath(manga, items[10], "/books")
+            local owner_progress = owner.progress_path
+            local retry_progress = "/books/unknown-attempt.progress"
             files[owner_progress], files[retry_progress] = "owned progress", "failed progress"
             plugin:performMangaAction(manga, action)
             local dialog = stack[#stack]
@@ -374,7 +374,7 @@ describe("bounded bulk download actions", function()
             assert.are.equal(52, #storedJobs())
             assert.are.equal(owner, queue:getActiveJob("m1:c4"))
             assert.are.equal("owned progress", files[owner_progress])
-            assert.is_nil(files[retry_progress])
+            assert.are.equal("failed progress", files[retry_progress])
             assert.are.equal("queued", queue:findPersistentJob("m1:c10").state)
             assert.is_nil(queue:findPersistentJob("m1:c60"))
             assert.are.equal(action == "download_all_chapters", queue:findPersistentJob("m1:c1") ~= nil)
@@ -521,7 +521,7 @@ describe("bounded bulk download actions", function()
         local items = openChapters(chapters(1))
         assert.is_truthy(queue:savePersistentJobs({ queue:buildPersistentJob(manga, items[1], "/books", "failed") }))
         assert.is_true(queue:recover())
-        local progress_path = queue:buildProgressPath(manga, items[1], "/books")
+        local progress_path = "/books/unknown-attempt.progress"
         files[progress_path] = "old progress"
         plugin:performMangaAction(manga, "download_all_chapters")
         failure = "sync_dir"
@@ -618,7 +618,7 @@ describe("bounded bulk download actions", function()
             local items = openChapters(chapters(1))
             queue:savePersistentJobs({ queue:buildPersistentJob(manga, items[1], "/books", "failed") })
             queue:recover()
-            local progress_path = queue:buildProgressPath(manga, items[1], "/books")
+            local progress_path = "/books/unknown-attempt.progress"
             files[progress_path] = "old progress"
             failure = storage_failure
             local accepted, state = queue:enqueue(manga, items[1], "/books")

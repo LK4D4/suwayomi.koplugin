@@ -132,6 +132,10 @@ msgstr "Усі сканлейтори"
 msgid "Always ask"
 msgstr "Завжди питати"
 
+#, fuzzy
+msgid "Another download is being verified."
+msgstr "Завантаження більше не перебуває у стані помилки."
+
 msgctxt "source filter tri-state"
 msgid "Any"
 msgstr "Будь-який"
@@ -373,11 +377,19 @@ msgstr "Не вдалося почати завантаження розділу
 msgid "Could not queue downloads: %1"
 msgstr "Не вдалося почати завантаження розділу: %1"
 
+#, fuzzy
+msgid "Could not redownload chapter."
+msgstr "Не вдалося завантажити розділи."
+
 msgid "Could not retry download."
 msgstr "Не вдалося повторити завантаження."
 
 msgid "Could not save saved filter."
 msgstr "Не вдалося зберегти фільтр."
+
+#, fuzzy
+msgid "Could not start chapter download"
+msgstr "Не вдалося почати завантаження розділу: %1"
 
 msgid "Could not start chapter download: %1"
 msgstr "Не вдалося почати завантаження розділу: %1"
@@ -414,6 +426,10 @@ msgstr "Не вдалося почати завантаження джерела
 
 msgid "Could not update library."
 msgstr "Не вдалося оновити бібліотеку."
+
+#, fuzzy
+msgid "Could not verify download"
+msgstr "Не вдалося повторити завантаження."
 
 msgid "Delete"
 msgstr "Видалити"
@@ -503,6 +519,10 @@ msgstr "Завантажити всі розділи"
 msgid "Download all unread (up to 50 new)"
 msgstr "Завантажити всі непрочитані"
 
+#, fuzzy
+msgid "Download damaged; redownload"
+msgstr "Завантаження вже виконується."
+
 msgid "Download directory: %1"
 msgstr "Тека завантажень: %1"
 
@@ -552,6 +572,10 @@ msgstr "Завантажити вибране"
 
 msgid "Download the chapter first."
 msgstr "Спочатку завантажте розділ."
+
+#, fuzzy
+msgid "Download verified."
+msgstr "Завантажено"
 
 msgid "Download-ahead buffer is already downloaded or queued."
 msgstr "Буфер завантаження наперед уже завантажено або додано в чергу."
@@ -713,10 +737,6 @@ msgstr "Встановлено"
 
 msgid "Installing extension..."
 msgstr "Встановлення розширення..."
-
-#, fuzzy
-msgid "Interrupted; retry download"
-msgstr "Не вдалося повторити завантаження."
 
 msgid "KOReader could not open this chapter right now."
 msgstr "KOReader не може відкрити цей розділ зараз."
@@ -1020,6 +1040,10 @@ msgstr "Синхронізація стану прочитання вже вик
 
 msgid "Read state sync started."
 msgstr "Синхронізацію стану прочитання почато."
+
+#, fuzzy
+msgid "Redownload"
+msgstr "Завантажити"
 
 msgid "Refresh chapters"
 msgstr "Оновити розділи"
@@ -1367,6 +1391,14 @@ msgstr "Використати цю теку"
 
 msgid "Username"
 msgstr "Ім'я користувача"
+
+#, fuzzy
+msgid "Verify download"
+msgstr "Зберігати завантаження"
+
+#, fuzzy
+msgid "Verifying download"
+msgstr "%1 відсутнє завантаження."
 
 msgid "You can continue."
 msgstr "Можна продовжувати."

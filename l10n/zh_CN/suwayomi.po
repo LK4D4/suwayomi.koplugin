@@ -110,6 +110,10 @@ msgstr "所有汉化组"
 msgid "Always ask"
 msgstr "总是询问"
 
+#, fuzzy
+msgid "Another download is being verified."
+msgstr "下载已不再处于失败状态。"
+
 msgctxt "source filter tri-state"
 msgid "Any"
 msgstr "任意"
@@ -347,11 +351,19 @@ msgstr "无法开始章节下载：%1"
 msgid "Could not queue downloads: %1"
 msgstr "无法开始章节下载：%1"
 
+#, fuzzy
+msgid "Could not redownload chapter."
+msgstr "无法加载章节。"
+
 msgid "Could not retry download."
 msgstr "无法重试下载。"
 
 msgid "Could not save saved filter."
 msgstr "无法保存筛选器。"
+
+#, fuzzy
+msgid "Could not start chapter download"
+msgstr "无法开始章节下载：%1"
 
 msgid "Could not start chapter download: %1"
 msgstr "无法开始章节下载：%1"
@@ -388,6 +400,10 @@ msgstr "无法开始加载源：未知错误"
 
 msgid "Could not update library."
 msgstr "无法更新书架。"
+
+#, fuzzy
+msgid "Could not verify download"
+msgstr "无法重试下载。"
 
 msgid "Delete"
 msgstr "删除"
@@ -469,6 +485,10 @@ msgstr "下载全部章节"
 msgid "Download all unread (up to 50 new)"
 msgstr "下载全部未读"
 
+#, fuzzy
+msgid "Download damaged; redownload"
+msgstr "下载已在进行中。"
+
 msgid "Download directory: %1"
 msgstr "下载目录：%1"
 
@@ -518,6 +538,10 @@ msgstr "下载选中的"
 
 msgid "Download the chapter first."
 msgstr "请先下载此章节。"
+
+#, fuzzy
+msgid "Download verified."
+msgstr "已下载"
 
 msgid "Download-ahead buffer is already downloaded or queued."
 msgstr "提前下载缓冲中的章节已下载或已加入队列。"
@@ -673,10 +697,6 @@ msgstr "已安装"
 
 msgid "Installing extension..."
 msgstr "正在安装扩展..."
-
-#, fuzzy
-msgid "Interrupted; retry download"
-msgstr "无法重试下载。"
 
 msgid "KOReader could not open this chapter right now."
 msgstr "KOReader 现在无法打开此章节。"
@@ -964,6 +984,10 @@ msgstr "阅读状态同步已在运行。"
 
 msgid "Read state sync started."
 msgstr "阅读状态同步已开始。"
+
+#, fuzzy
+msgid "Redownload"
+msgstr "下载"
 
 msgid "Refresh chapters"
 msgstr "刷新章节"
@@ -1301,6 +1325,14 @@ msgstr "使用此文件夹"
 
 msgid "Username"
 msgstr "用户名"
+
+#, fuzzy
+msgid "Verify download"
+msgstr "保留下载"
+
+#, fuzzy
+msgid "Verifying download"
+msgstr "缺少 %1 个下载。"
 
 msgid "You can continue."
 msgstr "你可以继续。"

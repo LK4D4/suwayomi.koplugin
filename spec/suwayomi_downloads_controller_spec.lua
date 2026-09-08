@@ -9,6 +9,9 @@ local modules_to_clear = {
     "suwayomi/settings",
     "suwayomi/ui",
     "suwayomi/downloads/controller",
+    "suwayomi/downloads/queue",
+    "suwayomi/downloads/active_jobs",
+    "suwayomi/downloads/status_formatter",
 }
 
 local function clearModules()
@@ -80,6 +83,7 @@ local function installController(options)
                 return { name = "confirm-dialog" }
             end,
             showDownloadErrorDetails = function(job, details_options)
+                state.error_details_job = job
                 state.error_details = job.progress and job.progress.error
                 state.error_details_options = details_options
             end,
@@ -115,6 +119,9 @@ local function installController(options)
                 end
             end
         end
+    end
+    function queue:copySnapshotJob(job, job_state)
+        return require("suwayomi/downloads/job_store"):copySnapshotJob(job, job_state)
     end
     function queue:cancelPending(manga, chapter)
         self.cancelled = { manga = manga, chapter = chapter }
@@ -233,6 +240,7 @@ end
 
 describe("suwayomi/downloads/controller", function()
     local marker_installed = false
+    local archive_path
 
     local function installMarker()
         if not marker_installed then
@@ -242,6 +250,10 @@ describe("suwayomi/downloads/controller", function()
     end
 
     after_each(function()
+        if archive_path then
+            os.remove(archive_path)
+            archive_path = nil
+        end
         if marker_installed then
             Marker.uninstall()
             marker_installed = false
@@ -436,7 +448,7 @@ describe("suwayomi/downloads/controller", function()
             retry_ok = false,
         })
 
-        plugin:showFailedDownloadActions(job, { name = "downloads-menu" })
+        plugin:showFailedDownloadActions(job, plugin:showDownloads())
 
         assert.are.equal("Frieren / Chapter 1", state.error_details_options.context)
 
@@ -459,6 +471,160 @@ describe("suwayomi/downloads/controller", function()
         assert.are.same({}, state.closed_menus)
         assert.are.same({}, state.messages)
         assert.are.equal(1, state.downloads_count)
+    end)
+
+    it("retries verification from Downloads without chapter context and offers repair only for damage", function()
+        local job = {
+            key = "m1:c1", download_directory = "/original",
+            manga = { id = "m1", title = "Manga" }, chapter = { id = "c1", name = "Chapter" },
+            progress = { archive_state = "unverified", path = "/original/chapter.cbz" },
+        }
+        local callback, guard, repaired
+        local queue = {
+            snapshot = { active = {}, queued = {}, failed = { job } },
+            verifyArchive = function(_, _, _, path, on_done, options)
+                assert.are.equal("/original/chapter.cbz", path)
+                callback, guard = on_done, options.is_current
+                return true
+            end,
+            redownload = function(_, _, _, directory)
+                repaired = directory
+                return true
+            end,
+        }
+        local plugin, state = installController({ queue = queue, download_directory = "/changed" })
+        local menu = plugin:showDownloads()
+        state.downloads_menu_callbacks.onSelectFailed(job, menu)
+        assert.is_nil(state.error_details_options.onRetry)
+        assert.is_nil(state.error_details_options.onRedownload)
+        assert.is_true(state.error_details_options.onVerify())
+        assert.is_true(guard())
+        callback({ state = "unverified" })
+        assert.is_true(state.error_details_options.onVerify())
+        assert.is_true(guard())
+        job.progress.archive_state = "damaged"
+        callback({ state = "damaged" })
+        assert.is_true(state.error_details_options.onRedownload())
+        assert.are.equal("/original", repaired)
+        assert.is_nil(plugin.current_chapter_context)
+    end)
+
+    it("discards replaced archive damage in details and rejects retained recovery callbacks", function()
+        local plugin, state = installController()
+        local Archive = require("suwayomi/downloads/archive")
+        local DownloadQueue = require("suwayomi/downloads/queue")
+        archive_path = os.tmpname()
+        local file = assert(io.open(archive_path, "wb"))
+        assert(file:write("damaged"))
+        assert(file:close())
+        local job = {
+            key = "m1:c1", state = "failed", download_directory = "/books",
+            manga = { id = "m1", title = "Manga" }, chapter = { id = "c1", name = "Chapter" },
+            progress = {
+                state = "failed", archive_state = "damaged", path = archive_path,
+                identity = assert(Archive.identity(archive_path)), error = "Archive checksum failed.",
+            },
+        }
+        local queue = DownloadQueue:new{
+            settings = { loadDownloadQueue = function() return { job } end },
+        }
+        queue.redownload = function() error("stale damage authorized forced repair") end
+        queue.verifyArchive = function() error("stale details started verification") end
+        plugin.queue = queue
+        local menu = plugin:showDownloads()
+        state.downloads_menu_callbacks.onSelectFailed(job, menu)
+        assert.are.equal("damaged", state.error_details_job.progress.archive_state)
+        local retained = state.error_details_options
+        assert.is_function(retained.onRedownload)
+        assert.is_function(retained.onVerify)
+
+        -- Row rendering and retained dialogs must both follow the current bytes,
+        -- even though the persisted observation still describes the old file.
+        file = assert(io.open(archive_path, "wb"))
+        assert(file:write("replacement archive with a different identity"))
+        assert(file:close())
+        assert.are_not.equal(job.progress.identity, Archive.identity(archive_path))
+        plugin:refreshDownloadsMenu()
+        assert.is_nil(state.updated_downloads_menu_snapshot.failed[1].progress.archive_state)
+        state.downloads_menu_callbacks.onSelectFailed(job, menu)
+        assert.is_nil(state.error_details_job.progress.archive_state)
+        assert.is_nil(state.error_details_options.onRedownload)
+        assert.is_nil(state.error_details_options.onVerify)
+        assert.is_false(retained.onRedownload())
+        assert.is_false(retained.onVerify())
+        assert.are.equal("damaged", job.progress.archive_state)
+    end)
+
+    it("keeps authorized repair retries available without fresh damage evidence", function()
+        local job = {
+            key = "m1:c1", repair = true,
+            manga = { id = "m1" }, chapter = { id = "c1" },
+            progress = { archive_state = "unverified", path = "/books/chapter.cbz" },
+        }
+        local plugin, state = installController({
+            queue = { snapshot = { active = {}, queued = {}, failed = { job } } },
+        })
+        plugin:showFailedDownloadActions(job, plugin:showDownloads())
+        local retry = state.error_details_options.onRetry
+        job.progress.archive_state = nil
+        assert.is_true(retry())
+        assert.are.equal(job.key, plugin.queue.retried_key)
+    end)
+
+    it("rejects retained recovery actions after the failed job is removed or requeued", function()
+        local job = {
+            key = "m1:c1", manga = { id = "m1" }, chapter = { id = "c1" },
+            progress = { archive_state = "damaged", path = "/books/chapter.cbz" },
+        }
+        local queue = {
+            snapshot = { active = {}, queued = {}, failed = { job } },
+            redownload = function() error("obsolete failure authorized repair") end,
+            verifyArchive = function() error("obsolete failure started verification") end,
+        }
+        local plugin, state = installController({ queue = queue })
+        plugin:showFailedDownloadActions(job, plugin:showDownloads())
+        local retained = state.error_details_options
+        queue.snapshot.failed = {}
+        assert.is_false(retained.onRedownload())
+        assert.is_false(retained.onVerify())
+        queue.snapshot.queued = { job }
+        assert.is_false(retained.onRedownload())
+        assert.is_false(retained.onVerify())
+    end)
+
+    it("does not act on recovery details after Downloads closes or the host retires", function()
+        local job = {
+            key = "m1:c1", manga = { id = "m1" }, chapter = { id = "c1" },
+            progress = { archive_state = "damaged", path = "/books/chapter.cbz" },
+        }
+        local queue = {
+            snapshot = { active = {}, queued = {}, failed = { job } },
+            redownload = function() error("stale repair") end,
+            verifyArchive = function() error("stale verification") end,
+        }
+        local plugin, state = installController({ queue = queue })
+        local menu = plugin:showDownloads()
+        state.downloads_menu_callbacks.onSelectFailed(job, menu)
+        state.downloads_menu_options.close_callback()
+        assert.is_false(state.error_details_options.onVerify())
+        assert.is_false(state.error_details_options.onRedownload())
+        menu = plugin:showDownloads()
+        state.downloads_menu_callbacks.onSelectFailed(job, menu)
+        plugin.suwayomi_host_retired = true
+        assert.is_false(state.error_details_options.onVerify())
+        assert.is_false(state.error_details_options.onRedownload())
+    end)
+
+    it("excludes unresolved local archive evidence from Download ahead even without a local path", function()
+        local manga = { id = "m1" }
+        local damaged, unverified, missing = { id = "c1" }, { id = "c2" }, { id = "c3" }
+        local plugin = installController({
+            queue = { status = {
+                ["m1:c1"] = { state = "failed", archive_state = "damaged" },
+                ["m1:c2"] = { state = "failed", archive_state = "unverified" },
+            } },
+        })
+        assert.are.same({ missing }, plugin:getQueueableKeepNextUnreadDownloads(manga, { damaged, unverified, missing }))
     end)
 
     it("wires queued and active cancellation actions to the queue", function()

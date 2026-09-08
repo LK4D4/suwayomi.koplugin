@@ -1,8 +1,7 @@
 -- Boundary: device-local progress file paths and parsing.
 --
--- Responsibility: keep the hidden progress filename contract, parse downloader
--- progress files, and provide the fallback writer used by legacy downloader
--- flows.
+-- Responsibility: keep attempt-private progress paths and atomic line-oriented
+-- progress IO shared by the downloader and its owner.
 -- Owned state: none.
 -- Injected dependencies: Lua io/os.
 -- External data: filesystem paths and line-oriented progress files, treated as
@@ -10,10 +9,6 @@
 
 local ProgressFile = {}
 
-local function buildLegacyName(key)
-    local sanitized_key = tostring(key or ""):gsub("[^%w%-_%.]", "_")
-    return sanitized_key
-end
 
 local function encodeKey(key)
     local encoded = {}
@@ -31,18 +26,15 @@ function ProgressFile.lineSafe(value)
     return lineSafe(value)
 end
 
-function ProgressFile.buildPath(key, download_directory)
+function ProgressFile.buildPath(key, download_directory, attempt_id)
+    assert(type(attempt_id) == "string" and #attempt_id == 32 and attempt_id:match("^[0-9a-f]+$"), "Invalid download attempt ID")
     local encoded_key = encodeKey(tostring(key or ""))
     if encoded_key == "" then
         encoded_key = "empty"
     end
-    return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_progress_" .. encoded_key .. ".txt"
+    return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_progress_" .. encoded_key .. "_" .. attempt_id .. ".txt"
 end
 
-function ProgressFile.buildLegacyPath(key, download_directory)
-    local sanitized_key = buildLegacyName(key)
-    return (download_directory or ""):gsub("/+$", "") .. "/.suwayomi_progress_" .. sanitized_key .. ".txt"
-end
 
 function ProgressFile.read(progress_path)
     local handle = io.open(progress_path, "r")
@@ -71,7 +63,7 @@ function ProgressFile.read(progress_path)
     return status
 end
 
-function ProgressFile.writeFallback(progress_path, state, current, total, path, error_message, retryable)
+function ProgressFile.writeFallback(progress_path, state, current, total, path, error_message, retryable, details)
     -- Polling reads this file from another code path, so write a full temp file
     -- before renaming it into place to avoid observing partial key/value state.
     local tmp_path = tostring(progress_path or "") .. ".tmp"
@@ -89,7 +81,15 @@ function ProgressFile.writeFallback(progress_path, state, current, total, path, 
     if retryable ~= nil then
         handle:write("retryable=", retryable == true and "true" or "false", "\n")
     end
-    handle:close()
+    if type(details) == "table" then
+        if details.archive_state then handle:write("archive_state=", lineSafe(details.archive_state), "\n") end
+        if details.identity then handle:write("identity=", lineSafe(details.identity), "\n") end
+    end
+    local closed = handle:close()
+    if not closed then
+        os.remove(tmp_path)
+        return
+    end
     if not os.rename(tmp_path, progress_path) then
         os.remove(tmp_path)
     end

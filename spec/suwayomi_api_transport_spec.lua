@@ -424,6 +424,22 @@ describe("suwayomi/api/transport", function()
         assert.are.equal("Chapter page not found.", not_found.error)
     end)
 
+    for _, network_error in ipairs({
+        "No address associated with hostname",
+        "Software caused connection abort",
+        "Software caused connection abor",
+    }) do
+        it("keeps Android connection loss retryable: " .. network_error, function()
+            install_ltn12()
+            package.preload["ssl.https"] = function()
+                return { request = function() return nil, network_error end }
+            end
+            local result = transport.downloadBinary(valid_credentials(), "/page/1")
+            assert.is_false(result.ok)
+            assert.is_true(result.retryable)
+        end)
+    end
+
     it("marks only transient binary HTTP statuses as retryable", function()
         install_ltn12()
         local statuses = {

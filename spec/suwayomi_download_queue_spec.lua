@@ -101,8 +101,8 @@ describe("suwayomi/downloads/queue", function()
                 return download_directory .. "/" .. manga.title,
                     download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
             end,
-            getPartialPath = function(_, chapter_path)
-                return chapter_path .. ".part"
+            getPartialPath = function(_, chapter_path, attempt_id)
+                return chapter_path .. "." .. attempt_id .. ".part"
             end,
             writeProgress = function(_, progress_path, state, current, total, path, error_message)
                 local handle = assert(io.open(progress_path, "w"))
@@ -204,7 +204,7 @@ describe("suwayomi/downloads/queue", function()
                 return context.queue:getActiveJob(context.queue:getKey(manga, chapter))
             end,
             write_progress = function(manga, chapter, state, current, total, path, error_message)
-                local progress_path = context.queue:buildProgressPath(manga, chapter, "/books")
+                local progress_path = context.active_job(manga, chapter).progress_path
                 local handle = assert(io.open(progress_path, "w"))
                 handle:write("state=", tostring(state or ""), "\n")
                 handle:write("current=", tostring(current or 0), "\n")
@@ -544,7 +544,7 @@ describe("suwayomi/downloads/queue", function()
         }, context.saved_queue()[1].chapter)
     end)
 
-    it("reports retry state and clears failed artifacts before retrying", function()
+    it("retries a failure without deleting unknown artifacts", function()
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
         local context = build_queue({
@@ -565,7 +565,7 @@ describe("suwayomi/downloads/queue", function()
                 },
             },
         })
-        local progress_path = context.queue:buildProgressPath(manga, chapter, "/books")
+        local progress_path = "/books/.suwayomi_progress_m1_398.txt"
         context.progress_files[progress_path] = "state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n"
 
         context.queue:recover()
@@ -577,10 +577,8 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal("retry", state)
         assert.are.equal("queued", context.saved_queue()[1].state)
         assert.is_nil(context.saved_queue()[1].progress)
-        assert.are.equal("/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz.part", removed_paths[1])
-        assert.are.equal(progress_path, removed_paths[2])
-        assert.are.equal("/books/.suwayomi_progress_m1_398.txt", removed_paths[3])
-        assert.is_nil(context.progress_files[progress_path])
+        assert.are.same({}, removed_paths)
+        assert.is_not_nil(context.progress_files[progress_path])
 
         context.run_scheduled()
 
@@ -700,7 +698,6 @@ describe("suwayomi/downloads/queue", function()
         })
 
         context.queue:recover()
-        assert(context.queue:retryFailed('m-queued:192'))
 
         local cleared = context.queue:clearFailed()
 
@@ -768,7 +765,6 @@ describe("suwayomi/downloads/queue", function()
             },
         })
         context.queue:recover()
-        assert(context.queue:retryFailed('m-queued:192'))
         context.queue.items = {
             {
                 key = "m-queued:192",
@@ -846,9 +842,9 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal("m-failed:205", context.saved_queue()[1].key)
     end)
 
-    it("fails unfinished queued and downloading records without launching or removing files", function()
+    it("requeues startup work without consuming retries or touching unknown files", function()
         for _, state in ipairs({ "queued", "downloading" }) do
-            local context = build_queue({ saved_queue = { {
+            local context = build_queue({ skip_subprocess_callback = true, subprocess_done = false, saved_queue = { {
                 key = "m1:c1", state = state, download_directory = "/books",
                 manga = { id = "m1", title = "Example" }, chapter = { id = "c1", name = "One" },
                 retry_count = 2, retry_at = 130,
@@ -856,16 +852,19 @@ describe("suwayomi/downloads/queue", function()
             } } })
             assert(context.queue:recover())
             assert(context.queue:recover())
-            context.run_scheduled()
+            context.queue:process()
             local job = context.saved_queue()[1]
-            assert.are.equal("failed", job.state)
-            assert.are.equal("Interrupted; retry download", job.progress.error)
+            assert.are.equal("queued", job.state)
             assert.are.equal(2, job.progress.current)
             assert.are.equal(2, job.retry_count)
-            assert.is_nil(job.retry_at)
-            assert.are.equal(0, context.download_calls())
-            assert.are.same({}, context.queue.items)
+            assert.are.equal(130, job.retry_at)
+            assert.are.equal(0, context.active_count())
+            assert.are.equal(1, #context.queue.items)
             assert.are.same({}, removed_paths)
+            context.advance(30)
+            context.queue:process()
+            assert.are.equal(1, context.active_count())
+            assert.are.equal(2, context.saved_queue()[1].retry_count)
         end
     end)
 
@@ -905,7 +904,36 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal(2, #context.saved_queue())
         assert.are.equal("m1:c1", context.saved_queue()[1].key)
         assert.are.equal("m1:c2", context.saved_queue()[2].key)
-        assert.are.equal(2, context.queue:getFailedCount())
-        assert.are.same({}, context.queue.items)
+        assert.are.equal(0, context.queue:getFailedCount())
+        assert.are.equal(2, #context.queue.items)
+    end)
+
+    it("requires explicit repair and preserves damage through queued cancellation and restart", function()
+        local manga, chapter = { id = "m1", title = "Example" }, { id = "c1", name = "One" }
+        local context = build_queue({ skip_subprocess_callback = true, subprocess_done = false, saved_queue = { {
+            key = "m1:c1", state = "failed", download_directory = "/original",
+            manga = manga, chapter = chapter,
+            progress = { archive_state = "unverified", path = "/unreadable.cbz", error = "Permission denied" },
+        } } })
+        assert(context.queue:recover())
+        assert.is_false(context.queue:enqueue(manga, chapter, "/new"))
+        assert.are.equal(0, context.queue:enqueueBatch(manga, { chapter }, "/new"))
+        assert.are.equal(0, context.queue:clearFailed())
+        assert(context.queue:redownload(manga, chapter, "/new"))
+        assert.is_true(context.saved_queue()[1].repair)
+        assert.are.equal("/original", context.saved_queue()[1].download_directory)
+        assert.are.equal("unverified", context.queue:getStatus(manga, chapter).archive_state)
+        assert(context.queue:cancelPending(manga, chapter))
+        assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.are.equal("unverified", context.saved_queue()[1].progress.archive_state)
+        assert.is_false(context.queue:enqueue(manga, chapter, "/new"))
+        assert(context.queue:retryFailed("m1:c1"))
+        local restarted = build_queue({ saved_queue = context.saved_queue(), skip_subprocess_callback = true, subprocess_done = false })
+        assert(restarted.queue:recover())
+        restarted.queue:process()
+        local active = restarted.active_job(manga, chapter)
+        assert.is_true(active.repair)
+        assert.are.equal("/original", active.download_directory)
+        assert.are.equal("unverified", restarted.queue:getStatus(manga, chapter).archive_state)
     end)
 end)

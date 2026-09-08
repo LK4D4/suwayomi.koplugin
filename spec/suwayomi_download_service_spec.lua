@@ -163,6 +163,8 @@ describe("process-owned download navigation", function()
         local downloader = require("suwayomi/downloads/downloader")
         downloader.getTargetPath = function(_, _, _, chapter) return directory, directory .. "/" .. chapter.id .. ".cbz" end
         downloader.chapterExists = function(_, path) return read(path) ~= nil end
+        downloader.getPartialPath = function(_, path, id) return path .. "." .. id .. ".part" end
+        downloader.getDirectPartialPath = function(_, path, id) return path .. "." .. id .. ".direct.part" end
         package.preload.docsettings = function()
             return {
                 findSidecarFile = function() end,
@@ -251,7 +253,7 @@ describe("process-owned download navigation", function()
     end)
     end
 
-    it("fails unfinished startup jobs quietly, preserves files and diagnostics, and permits explicit retry", function()
+    it("requeues startup work with its retry budget and leaves final adoption to workers", function()
         local jobs = {}
         for index, chapter in ipairs(chapters) do
             jobs[index] = { key = "m1:" .. chapter.id, manga = manga, chapter = chapter,
@@ -269,29 +271,27 @@ describe("process-owned download navigation", function()
         local queue = plugin:getDownloadQueue()
         advance(0)
         assert.are.equal(0, #workers)
-        assert.are.equal(3, queue:getFailedCount())
-        assert.are.equal("failed", queue:getStatus(manga, chapters[1]).state)
-        assert.are.equal("failed", queue:getStatus(manga, chapters[2]).state)
-        assert.is_nil(queue:findPersistentJob("m1:c2").retry_at)
+        assert.are.equal(1, queue:getFailedCount())
+        assert.are.equal("queued", queue:getStatus(manga, chapters[1]).state)
+        assert.are.equal("queued", queue:getStatus(manga, chapters[2]).state)
+        assert.are.equal(999, queue:findPersistentJob("m1:c2").retry_at)
         assert.are.equal(3, queue:findPersistentJob("m1:c2").retry_count)
-        assert.are.equal("Interrupted; retry download", queue:findPersistentJob("m1:c2").progress.error)
         assert.are.equal("HTTP 401: full original diagnostic", queue:findPersistentJob("m1:c3").progress.error)
         assert.are.same(jobs[5], queue:findPersistentJob("future"))
-        assert.are.equal(path, settings:loadChapterLedger()["m1:c4"].path)
-        assert.are.equal(path, settings:loadReaderReturnContexts()[path].path)
+        assert.is_nil(settings:loadChapterLedger()["m1:c4"])
+        assert.is_nil(settings:loadReaderReturnContexts()[path])
         assert.are.equal("old untracked partial", read(directory .. "/c1.cbz.part"))
         local failed_rows = 0
         for _, row in ipairs(plugin:showDownloads().item_table) do
             if row.mandatory == "Failed" then failed_rows = failed_rows + 1 end
         end
-        assert.are.equal(3, failed_rows)
-        assert.are.equal("Downloads · 3 failed", plugin:showHome().actions[3].text)
-        plugin:retryDownloadJob(queue:findPersistentJob("m1:c1"))
+        assert.are.equal(1, failed_rows)
+        advance(899)
         advance(0)
-        assert.are.equal(1, #workers)
+        assert.are.equal("downloading", queue:getStatus(manga, chapters[2]).state)
         local active = queue:getActiveJob("m1:c1")
         local retried_path = directory .. "/c1.cbz"
-        write(retried_path, "explicit retry complete")
+        write(retried_path, "worker validated restart completion")
         write(active.progress_path, "state=downloaded\npath=" .. retried_path .. "\n")
         workers[active.pid].alive = false
         advance(0.5)
@@ -307,7 +307,13 @@ describe("process-owned download navigation", function()
         advance(0)
         local active = queue:getActiveJob("m1:c1")
         write(active.progress_path, "state=downloading\ncurrent=1\ntotal=8\n")
-        write(directory .. "/c1.cbz.part", "partial")
+        local legacy_path = directory .. "/Chapter 1.cbz"
+        queue.downloader.getChapterPathCandidates = function()
+            return { directory .. "/c1.cbz", legacy_path }
+        end
+        local partial = queue.downloader:getPartialPath(legacy_path, active.attempt_id)
+        write(legacy_path .. ".part", "unknown worker")
+        write(partial, "partial")
         local confirm
         require("suwayomi/ui").showConfirm = function(options) confirm = options.ok_callback end
         assert(plugin:performDownloadsTitleAction({ id = "cancel_all" }, plugin:showDownloads()))
@@ -316,7 +322,7 @@ describe("process-owned download navigation", function()
         assert.is_true(workers[active.pid].terminated)
         assert.are.equal(2, queue:getActiveCount())
         assert.is_not_nil(read(active.progress_path))
-        assert.are.equal("partial", read(directory .. "/c1.cbz.part"))
+        assert.are.equal("partial", read(partial))
         assert.is_false(queue:enqueue(manga, chapters[1], directory))
         assert.is_false(plugin:deleteChapterFromDevice(manga, chapters[1]))
         write(directory .. "/c1.cbz", "finished during cancellation")
@@ -327,15 +333,17 @@ describe("process-owned download navigation", function()
         advance(1)
         assert.are.equal(0, queue:getActiveCount())
         assert.is_nil(read(active.progress_path))
-        assert.is_nil(read(directory .. "/c1.cbz.part"))
+        assert.is_nil(read(partial))
+        assert.are.equal("unknown worker", read(legacy_path .. ".part"))
         assert.are.equal("finished during cancellation", read(directory .. "/c1.cbz"))
-        assert.are.equal(directory .. "/c1.cbz", settings:loadChapterLedger()["m1:c1"].path)
+        assert.is_nil(settings:loadChapterLedger()["m1:c1"])
+        assert.is_nil(queue:findPersistentJob("m1:c1"))
         assert(queue:enqueue(manga, chapters[2], directory))
         advance(0)
         assert.are.equal(3, #workers)
     end)
 
-    it("chains quit once, invalidates callbacks, preserves unconfirmed files and fails unfinished work on relaunch", function()
+    it("chains quit once, invalidates callbacks, and restarts unfinished work with isolated files", function()
         local plugin, owner = host("files")
         local queue = plugin:getDownloadQueue()
         for _, chapter in ipairs(chapters) do assert(queue:enqueue(manga, chapter, directory)) end
@@ -370,14 +378,15 @@ describe("process-owned download navigation", function()
         local restarted = host("files")
         assert.are_not.equal(queue, restarted:getDownloadQueue())
         advance(0)
-        assert.are.equal(4, restarted:getDownloadQueue():getFailedCount())
-        assert.are.equal(2, #workers)
+        assert.are.equal(0, restarted:getDownloadQueue():getFailedCount())
+        assert.are.equal(4, #workers)
+        assert.are_not.equal(active.progress_path, restarted:getDownloadQueue():getActiveJob("m1:c1").progress_path)
         assert.is_not_nil(read(active.progress_path))
     end)
 
     it("retries startup saves as service work while admission stays fenced through navigation", function()
         assert(settings:saveDownloadQueue({ {
-            key = "m1:c1", state = "queued", manga = manga, chapter = chapters[1], download_directory = directory,
+            key = "m1:c1", state = "downloading", manga = manga, chapter = chapters[1], download_directory = directory,
         } }))
         local write_file = settings.store.io.write
         settings.store.io.write = function() return nil, "injected write failure" end
@@ -388,13 +397,13 @@ describe("process-owned download navigation", function()
         local next_plugin, next_owner = host("reader-a")
         assert.are.equal(queue, next_plugin:getDownloadQueue())
         next_owner:close()
-        assert.are.equal("queued", settings:loadDownloadQueue()[1].state)
+        assert.are.equal("downloading", settings:loadDownloadQueue()[1].state)
         assert.are.equal(0, #workers)
         settings.store.io.write = write_file
         advance(1)
-        assert.are.equal("failed", settings:loadDownloadQueue()[1].state)
-        assert.are.equal(1, queue:getFailedCount())
-        assert.are.equal(0, #workers)
+        assert.are.equal("downloading", settings:loadDownloadQueue()[1].state)
+        assert.are.equal(0, queue:getFailedCount())
+        assert.are.equal(1, #workers)
         assert(queue:enqueue(manga, chapters[2], directory))
     end)
 
@@ -405,7 +414,8 @@ describe("process-owned download navigation", function()
         advance(0)
         local active = queue:getActiveJob("m1:c1")
         write(active.progress_path, "state=failed\nerror=full worker diagnostic\n")
-        write(directory .. "/c1.cbz.part", "worker may still write")
+        local partial = queue.downloader:getPartialPath(directory .. "/c1.cbz", active.attempt_id)
+        write(partial, "worker may still write")
         advance(0.5)
         assert.are.equal(1, queue:getFailedCount())
         assert.is_false(plugin:retryDownloadJob(queue:findPersistentJob("m1:c1")))
@@ -413,11 +423,11 @@ describe("process-owned download navigation", function()
         assert.are.equal(0, queue:getFailedCount())
         assert.is_true(queue:isChapterBusy("m1:c1"))
         assert.is_false(queue:enqueue(manga, chapters[1], directory))
-        assert.are.equal("worker may still write", read(directory .. "/c1.cbz.part"))
+        assert.are.equal("worker may still write", read(partial))
         workers[active.pid].alive = false
         advance(1)
         assert.is_nil(read(active.progress_path))
-        assert.is_nil(read(directory .. "/c1.cbz.part"))
+        assert.is_nil(read(partial))
         assert(queue:enqueue(manga, chapters[1], directory))
         advance(0)
         assert.are.equal(2, #workers)
@@ -442,7 +452,8 @@ describe("process-owned download navigation", function()
         assert.is_false(queue:enqueue(manga, chapters[1], directory))
         workers[active.pid].alive = false
         advance(0.5)
-        assert.are.equal(path, settings:loadChapterLedger()["m1:c1"].path)
+        assert.is_nil(settings:loadChapterLedger()["m1:c1"])
+        assert.are.equal("final archive", read(path))
         assert.is_nil(read(active.progress_path))
         assert.are.equal(1, #workers)
     end)
@@ -1282,6 +1293,76 @@ describe("process-owned download navigation", function()
         assert.is_nil(read(path))
         assert.is_not_nil(read(path .. ".sdr/metadata.lua"))
         assert.are.equal("keep backup", read(path .. ".sdr/metadata.lua.old"))
+    end)
+
+    it("verifies legacy and pending-removal archives without publishing download authority", function()
+        local plugin, owner = manualHost(0, true)
+        local path = directory .. "/c1.cbz"
+        local native = require("spec/support/native_archiver")
+        local writer = native.Writer:new()
+        files[path] = true
+        assert(writer:open(path, "zip"))
+        assert(writer:addFileFromMemory("1.png", "test page"))
+        assert(writer:close())
+        local queue = plugin:getDownloadQueue()
+        local function verify()
+            local outcome
+            assert(queue:verifyArchive(manga, chapters[1], path, function(result) outcome = result.state end))
+            local worker = workers[#workers]
+            local previous_archiver, previous_headers = package.loaded["ffi/archiver"], package.loaded["ffi/libarchive_h"]
+            local restore = native.install()
+            local ran, err = pcall(worker.callback)
+            restore()
+            package.loaded["ffi/archiver"], package.loaded["ffi/libarchive_h"] = previous_archiver, previous_headers
+            assert.is_true(ran, err)
+            worker.alive = false
+            advance(0)
+            assert.are.equal("valid", outcome)
+            assert.is_nil(queue.verification)
+        end
+        verify()
+        assert.is_nil(queue.manual_deletion:getTarget("m1:c1", path))
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        local before = settings.store:readKey("manual_archive_state").requests["m1:c1"]
+        verify()
+        local after = settings.store:readKey("manual_archive_state").requests["m1:c1"]
+        assert.are.equal(before.revision, after.revision)
+        assert.are.equal(before.target.generation, after.target.generation)
+        assert.are.equal("pending", after.state)
+        owner:close()
+        advance(300)
+        assert.is_nil(read(path))
+    end)
+
+    it("keeps explicit repair authority through cancellation and late publication", function()
+        local plugin, owner = manualHost(0, true)
+        local queue = plugin:getDownloadQueue()
+        local path = directory .. "/c1.cbz"
+        write(path, "original damaged archive")
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        local original = settings.store:readKey("manual_archive_state").requests["m1:c1"]
+        assert(queue:upsertPersistentJob(queue:buildPersistentJob(manga, chapters[1], directory, "failed", {
+            archive_generation = original.target.generation,
+            progress = { state = "failed", archive_state = "damaged",
+                identity = require("suwayomi/downloads/archive").identity(path), path = path },
+        })))
+        assert(queue:redownload(manga, chapters[1], directory))
+        assert.are.equal("original damaged archive", read(path))
+        assert.are.equal("revoked", settings.store:readKey("manual_archive_state").requests["m1:c1"].state)
+        advance(0)
+        local active = assert(queue:getActiveJob("m1:c1"))
+        assert(queue:cancelPending(manga, chapters[1]))
+        write(path, "validated late replacement")
+        write(active.progress_path, "state=downloaded\ncurrent=1\ntotal=1\npath=" .. path .. "\n")
+        workers[active.pid].alive = false
+        advance(0.5)
+        assert(queue:commitChapterCompletion(active, path))
+        owner:close()
+        advance(300)
+        assert.are.equal("validated late replacement", read(path))
+        assert.are.equal(path, settings:loadChapterLedger()["m1:c1"].path)
+        assert.are_not.equal(original.target.generation, settings:loadChapterLedger()["m1:c1"].archive_generation)
+        assert.are.same({}, settings:loadDownloadQueue())
     end)
 
 end)

@@ -61,6 +61,18 @@ describe("suwayomi/downloads/status_formatter", function()
         ))
     end)
 
+    it("preserves damage evidence while repair is active and never calls inconclusive inspection damage", function()
+        local damaged = formatter.formatArchiveStatus({ archive_state = "damaged" })
+        local unverified = formatter.formatArchiveStatus({ archive_state = "unverified" })
+        assert.are_not.equal(damaged, unverified)
+        assert.are.same({ "Read", damaged, "Downloading 2/5" }, formatter.buildChapterStatusSymbols(
+            { is_read = true }, { state = "downloading", archive_state = "damaged", current = 2, total = 5 }))
+        assert.are.same({ unverified }, formatter.buildChapterStatusSymbols(
+            {}, { state = "failed", archive_state = "unverified" }))
+        assert.are.same({ "Verifying download" }, formatter.buildChapterStatusSymbols(
+            {}, { state = "downloaded", verifying = true }))
+    end)
+
     it("uses a fixed local retry timestamp and handles missing or invalid timestamps", function()
         local timestamp = os.time({ year = 2026, month = 9, day = 6, hour = 14, min = 30, sec = 15 })
         assert.are.equal("Next retry: 2026-09-06 14:30:15", formatter.formatRetryTime(timestamp))
@@ -85,6 +97,8 @@ describe("suwayomi/downloads/status_formatter", function()
             { name = "Chapter" }, { state = "queued", retry_at = 130 }
         ))
         assert.are.equal("tx:Retry time unavailable.", formatter.formatRetryTime(nil))
+        assert.are.equal("tx:Download damaged; redownload", formatter.formatArchiveStatus({ archive_state = "damaged" }))
+        assert.are.equal("tx:Could not verify download", formatter.formatArchiveStatus({ archive_state = "unverified" }))
         local timestamp = os.time({ year = 2026, month = 9, day = 6, hour = 14, min = 30, sec = 15 })
         assert.are.equal("tx:Next retry: 2026-09-06 14:30:15", formatter.formatRetryTime(timestamp))
 

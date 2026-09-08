@@ -133,6 +133,10 @@ msgstr "Все сканлейторы"
 msgid "Always ask"
 msgstr "Всегда спрашивать"
 
+#, fuzzy
+msgid "Another download is being verified."
+msgstr "Загрузка больше не находится в состоянии ошибки."
+
 msgctxt "source filter tri-state"
 msgid "Any"
 msgstr "Любые"
@@ -374,11 +378,19 @@ msgstr "Не удалось начать загрузку главы: %1"
 msgid "Could not queue downloads: %1"
 msgstr "Не удалось начать загрузку главы: %1"
 
+#, fuzzy
+msgid "Could not redownload chapter."
+msgstr "Не удалось загрузить главы."
+
 msgid "Could not retry download."
 msgstr "Не удалось повторить загрузку."
 
 msgid "Could not save saved filter."
 msgstr "Не удалось сохранить фильтр."
+
+#, fuzzy
+msgid "Could not start chapter download"
+msgstr "Не удалось начать загрузку главы: %1"
 
 msgid "Could not start chapter download: %1"
 msgstr "Не удалось начать загрузку главы: %1"
@@ -415,6 +427,10 @@ msgstr "Не удалось начать загрузку источников: 
 
 msgid "Could not update library."
 msgstr "Не удалось обновить библиотеку."
+
+#, fuzzy
+msgid "Could not verify download"
+msgstr "Не удалось повторить загрузку."
 
 msgid "Delete"
 msgstr "Удалить"
@@ -504,6 +520,10 @@ msgstr "Скачать все главы"
 msgid "Download all unread (up to 50 new)"
 msgstr "Скачать все непрочитанные"
 
+#, fuzzy
+msgid "Download damaged; redownload"
+msgstr "Загрузка уже выполняется."
+
 msgid "Download directory: %1"
 msgstr "Папка загрузок: %1"
 
@@ -553,6 +573,10 @@ msgstr "Скачать выбранное"
 
 msgid "Download the chapter first."
 msgstr "Сначала скачайте главу."
+
+#, fuzzy
+msgid "Download verified."
+msgstr "Скачано"
 
 msgid "Download-ahead buffer is already downloaded or queued."
 msgstr "Буфер предварительной загрузки уже скачан или стоит в очереди."
@@ -714,10 +738,6 @@ msgstr "Установлено"
 
 msgid "Installing extension..."
 msgstr "Установка расширения..."
-
-#, fuzzy
-msgid "Interrupted; retry download"
-msgstr "Не удалось повторить загрузку."
 
 msgid "KOReader could not open this chapter right now."
 msgstr "KOReader не смог открыть эту главу сейчас."
@@ -1021,6 +1041,10 @@ msgstr "Синхронизация состояния прочтения уже 
 
 msgid "Read state sync started."
 msgstr "Синхронизация состояния прочтения началась."
+
+#, fuzzy
+msgid "Redownload"
+msgstr "Скачать"
 
 msgid "Refresh chapters"
 msgstr "Обновить главы"
@@ -1368,6 +1392,14 @@ msgstr "Использовать эту папку"
 
 msgid "Username"
 msgstr "Имя пользователя"
+
+#, fuzzy
+msgid "Verify download"
+msgstr "Сохранять загрузки"
+
+#, fuzzy
+msgid "Verifying download"
+msgstr "%1 отсутствующая загрузка."
 
 msgid "You can continue."
 msgstr "Можно продолжить."

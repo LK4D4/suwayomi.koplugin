@@ -128,6 +128,23 @@ describe("suwayomi/ui/downloads", function()
         assert.are.equal("Clear failed", rows[4].text)
     end)
 
+    it("retains distinct archive evidence in failed and repairing rows", function()
+        local downloads = require("suwayomi/ui/downloads")
+        local formatter = require("suwayomi/downloads/status_formatter")
+        local damaged = { archive_state = "damaged", error = "CRC mismatch" }
+        local unverified = { archive_state = "unverified", error = "Permission denied" }
+        local rows = downloads.buildDownloadsMenuTable({
+            active = { { progress = damaged } },
+            queued = { { progress = damaged } },
+            failed = { { progress = damaged }, { progress = unverified } },
+        })
+        assert.are.equal(formatter.formatArchiveStatus(damaged), rows[1].subtitle)
+        assert.are.equal(formatter.formatArchiveStatus(damaged), rows[2].subtitle)
+        assert.are.equal(formatter.formatArchiveStatus(damaged), rows[3].mandatory)
+        assert.are.equal(formatter.formatArchiveStatus(unverified), rows[4].mandatory)
+        assert.are.equal("Permission denied", rows[4].subtitle)
+    end)
+
     it("builds persistent empty-state rows with folder and queue summary", function()
         local downloads = require("suwayomi/ui/downloads")
 

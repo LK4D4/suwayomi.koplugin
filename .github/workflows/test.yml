@@ -32,8 +32,8 @@ jobs:
         luarocks install luasec
         luarocks install luacheck
 
-    - name: Install gettext tools
-      run: sudo apt-get update && sudo apt-get install -y gettext
+    - name: Install gettext and native archive test dependencies
+      run: sudo apt-get update && sudo apt-get install -y gettext libarchive-dev
 
     - name: Run lint
       run: luacheck --codes spec suwayomi main.lua _meta.lua

@@ -208,11 +208,6 @@ function Methods:getChapterDownloadKey(manga, chapter)
 end
 
 
-function Methods:getChapterProgressPath(manga, chapter, download_directory)
-    return self:getDownloadQueue():buildProgressPath(manga, chapter, download_directory)
-end
-
-
 function Methods:getChapterDownloadStatus(manga, chapter)
     return self:getDownloadQueue():getStatus(manga, chapter)
 end

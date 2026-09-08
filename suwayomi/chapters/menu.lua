@@ -175,11 +175,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         end
 
         local status = self:getChapterDownloadStatus(manga, item)
-        if chapter_exists and status and status.state == "failed" then
-            -- A recovered archive is more trustworthy than stale queue status from an interrupted worker.
-            if not ledger then self:getDownloadQueue():clearStatus(manga, item, { quiet = true }) end
-            status = { state = "downloaded" }
-        end
+
         if not status then
             if chapter_exists then
                 status = { state = "downloaded" }
@@ -309,12 +305,20 @@ function Methods:getChapterActions(manga, chapter)
 
     if status and (status.state == "queued" or status.state == "downloading") then
         table.insert(actions, { id = "cancel_download", text = I18n.t("Cancel download"), destructive = true })
+    elseif status and status.archive_state == "damaged" then
+        table.insert(actions, { id = "redownload", text = I18n.t("Redownload") })
+    elseif status and status.archive_state == "unverified" then
+        table.insert(actions, { id = "verify_download", text = I18n.t("Verify download") })
     elseif downloaded then
         table.insert(actions, { id = "open", text = I18n.c("chapter action", "Open") })
     elseif status and status.state == "failed" then
         table.insert(actions, { id = "retry_download", text = I18n.t("Retry") })
     else
         table.insert(actions, { id = "download", text = I18n.c("chapter action", "Download") })
+    end
+    if downloaded and not (status and (status.archive_state == "unverified"
+        or status.state == "queued" or status.state == "downloading")) then
+        table.insert(actions, { id = "verify_download", text = I18n.t("Verify download") })
     end
     if status and (status.state == "failed" or (status.state == "queued" and status.retry_at)) then
         table.insert(actions, { id = "download_error", text = I18n.t("Download error") })
