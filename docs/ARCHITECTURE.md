@@ -2,6 +2,8 @@
 
 This document describes the current runtime boundaries after the module refactor. It is the active architecture reference for humans and AI agents working in the repo.
 
+The module map describes existing boundaries; it does not require every new behavior to gain another facade, adapter, or service.
+
 ## Runtime Shape
 
 KOReader loads `_meta.lua` and `main.lua` from the plugin root. `main.lua` is the plugin shell: it registers the dispatcher action, wires the main menu entry, constructs shared dependencies, restores the download queue, and installs controller methods onto the KOReader plugin object. Feature behavior belongs under `suwayomi/`.

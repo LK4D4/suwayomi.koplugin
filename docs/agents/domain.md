@@ -1,18 +1,20 @@
 # Domain docs
 
 This repository uses a single-context layout:
-- CONTEXT.md at the repository root holds domain terminology.
+- CONTEXT.md at the repository root is a glossary of domain terminology.
 - docs/adr/ holds architectural decision records.
 - docs/ARCHITECTURE.md holds the existing module map and boundary guidance.
 
-## Before exploring
+## When to consult
 
-Read CONTEXT.md when present and ADRs relevant to the work.
-Read docs/ARCHITECTURE.md for module ownership and architecture.
+Consult relevant sections of CONTEXT.md and docs/ARCHITECTURE.md when the task
+involves their terminology, ownership, persistence, lifecycle, or module boundaries.
+Read relevant ADRs when their decisions govern the change. Small unrelated fixes
+do not require reading every domain document.
 
 If CONTEXT.md or docs/adr/ is absent, proceed silently.
-Create domain documentation lazily through domain-modeling when terminology
-or decisions are resolved.
+Ordinary fixes do not require new domain documentation. Use domain-modeling when
+the task calls for resolving terminology or recording architectural decisions.
 
 ## Vocabulary and decisions
 
