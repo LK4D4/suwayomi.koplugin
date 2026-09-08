@@ -155,6 +155,7 @@ function Refill:request(manga, options)
 end
 function Refill:enrollLedger(doc, ledger, mangas)
     local affected = {}
+    local enrolled = false
     for _, manga in pairs(mangas or {}) do
         local id = mangaId(manga)
         if id then affected[id] = manga end
@@ -168,7 +169,10 @@ function Refill:enrollLedger(doc, ledger, mangas)
                 endpoint_scope = entry.endpoint_scope, require_origin = entry.path ~= nil }
         end
     end
-    for _, manga in pairs(affected) do self:enroll(doc, manga) end
+    for _, manga in pairs(affected) do
+        if self:enroll(doc, manga) then enrolled = true end
+    end
+    return enrolled
 end
 function Refill:commitLedger(ledger, mangas)
     -- The manual coordinator already owns the merge that preserves archive generations.
@@ -313,7 +317,10 @@ function Refill:_apply(active, result)
     end
     if not result or not result.ok then
         local unsupported = result and (result.error_kind == "too_large" or result.error_kind == "unsupported")
-        self:_transition(request, unsupported and "blocked" or "waiting", unsupported and "unsupported_state" or "fetch_failed", not unsupported)
+        local rejected = result and (result.retryable == false or result.status_code == 401 or result.status_code == 403)
+        local blocked = unsupported or rejected
+        self:_transition(request, blocked and "blocked" or "waiting",
+            unsupported and "unsupported_state" or rejected and "fetch_rejected" or "fetch_failed", not blocked)
         return
     end
     if type(result.chapters) ~= "table" then self:_transition(request, "blocked", "unsupported_state"); return end

@@ -228,8 +228,9 @@ end
 
 function ManualDeletion:commitRead(ledger, captures, unread_keys, mangas, replace_read_state)
     local outcomes = {}
+    local enrolled = false
     local ok, err = self:_save(function(doc)
-        if self.queue.refill then self.queue.refill:enrollLedger(doc, ledger, mangas) end
+        if self.queue.refill then enrolled = self.queue.refill:enrollLedger(doc, ledger, mangas) end
         mergeLedger(doc, ledger, replace_read_state)
         local state, state_error = collection(doc, #(captures or {}) > 0)
         if state then
@@ -299,7 +300,10 @@ function ManualDeletion:commitRead(ledger, captures, unread_keys, mangas, replac
             captured.target = copy(outcomes[captured.key].target)
         end
     end
-    if self.queue.refill then self.queue.refill:wake(); self.queue.refill.onChanged() end
+    if self.queue.refill then
+        self.queue.refill:wake()
+        if enrolled then self.queue.refill.onChanged() end
+    end
     return true, nil, outcomes
 end
 

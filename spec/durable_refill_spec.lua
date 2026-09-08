@@ -273,4 +273,22 @@ describe("durable refill through the process service", function()
         assert.same({ "1", "2", "3", "4", "5" }, jobIds())
         assert.same({}, service:getSnapshot().refills)
     end)
+
+    it("blocks rejected server requests until explicit Retry rather than treating authentication as an outage", function()
+        responses["1"] = { ok = false, status_code = 401, retryable = false, error = "HTTP 401" }
+        assert.are.equal(5, service.refill:setPolicy(manga(), 5))
+        advance(0)
+        finishContext()
+        local request = service:getSnapshot().refills[1]
+        assert.are.equal("blocked", request.state)
+        assert.are.equal("fetch_rejected", request.reason)
+        advance(300)
+        assert.are.equal(1, #workers)
+        assert.same({}, jobIds())
+        responses["1"] = { ok = true, chapters = {} }
+        assert(service.refill:retry("1", request.revision))
+        advance(0)
+        finishContext()
+        assert.same({}, service:getSnapshot().refills)
+    end)
 end)

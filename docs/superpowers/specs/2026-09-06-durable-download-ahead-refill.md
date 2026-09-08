@@ -77,7 +77,7 @@ Fetch a complete ordinary chapter result under the complete-retrieval specificat
 
 Reuse the existing one-shot subprocess helper's result allocation, request tokens, and known-child termination/completion checks. Helpers write only their result files, never shared settings or archives. Reject obsolete results through the current request revision and defer known active helper-file cleanup until the existing helper reports completion. Revised #5 supplies no inherited locks or durable launch/publication protocol; do not add those as navigation prerequisites.
 
-After a genuine restart, recover the durable refill request and fetch a fresh context through existing helper facilities; do not salvage an old helper result. Do not sweep untracked old helper files or claim isolation from surviving legacy workers. Include known helper workers in #5's single total two-second best-effort shutdown budget; no extra quit wrapper, required final save, or second deadline. Refill-request recovery does not automatically retry chapter jobs marked interrupted/failed by revised #3.
+After a genuine restart, recover the durable refill request and fetch a fresh context through existing helper facilities; do not salvage an old helper result. Do not sweep untracked old helper files or claim isolation from surviving legacy workers. Include known helper workers in #5's single total two-second best-effort shutdown budget; no extra quit wrapper, required final save, or second deadline. Chapter jobs retain [ADR-0005](../../adr/0005-automatic-download-restart.md)'s automatic restart policy, which supersedes revised #3's interruption policy. Refill never resets terminal chapter failures.
 
 ### Current policy and atomic queue admission
 

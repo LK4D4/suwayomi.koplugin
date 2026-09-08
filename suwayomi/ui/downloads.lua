@@ -118,6 +118,8 @@ local function formatRefillReason(reason)
         return I18n.t("Archive or download ownership is not verified. Existing files and work are preserved.")
     elseif reason == "fetch_failed" then
         return I18n.t("Could not load chapters. Refill will retry automatically.")
+    elseif reason == "fetch_rejected" then
+        return I18n.t("The server rejected the chapter request. Check connection settings, then choose Retry refill.")
     elseif reason == "persistence_failed" then
         return I18n.t("Could not confirm saved refill work. No new downloads are confirmed.")
     elseif reason == "choices_changed" then
@@ -161,6 +163,7 @@ local function showRefillDetails(request, callbacks)
                     text = I18n.t("Retry refill"),
                     enabled = callbacks.retry_refill ~= nil,
                     callback = function()
+                        if callbacks.refill_is_current and not callbacks.refill_is_current(request) then return end
                         if callbacks.retry_refill then
                             viewer:onClose()
                             callbacks.retry_refill(request)
@@ -172,6 +175,7 @@ local function showRefillDetails(request, callbacks)
                     text = I18n.t("Stop download ahead"),
                     enabled = callbacks.stop_refill ~= nil,
                     callback = function()
+                        if callbacks.refill_is_current and not callbacks.refill_is_current(request) then return end
                         if callbacks.stop_refill then
                             viewer:onClose()
                             callbacks.stop_refill(request)
@@ -316,6 +320,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
             mandatory = formatRefillState(request.state),
             subtitle = subtitle,
             callback = function()
+                if callbacks.refill_is_current and not callbacks.refill_is_current(request) then return end
                 showRefillDetails(request, callbacks)
             end,
         })

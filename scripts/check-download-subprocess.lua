@@ -53,3 +53,60 @@ assert(all_ready, "children did not reach the helper's process group setup")
 assert(elapsed < 2, "shutdown exceeded its total two-second budget")
 assert(all_done, "a known child remained alive after helper termination")
 print(string.format("KOReader helper: four children stopped; shutdown added %.6f seconds", elapsed))
+
+-- Result publication is not child completion. A canceled request must keep its
+-- files until the known child exits, and must never deliver the obsolete result.
+local Job = require("suwayomi/subprocess/job")
+local function exists(path)
+    local file = io.open(path, "rb")
+    if not file then return false end
+    file:close()
+    return true
+end
+local function await(predicate, message)
+    local limit = socket.gettime() + 3
+    repeat
+        if predicate() then return end
+        socket.sleep(0.01)
+    until socket.gettime() >= limit
+    error(message)
+end
+for _, cancel in ipairs({ false, true }) do
+    local result_path, release_path = os.tmpname(), os.tmpname()
+    os.remove(result_path)
+    os.remove(release_path)
+    local delivered
+    local active = assert(Job.start{
+        result_path = result_path,
+        ffi_util = util,
+        ui_manager = { scheduleIn = function() end },
+        run = function(path)
+            assert(Job.writeResult(path, { ok = true, chapter_id = "6" }))
+            local release_deadline = socket.gettime() + 5
+            while not exists(release_path) and socket.gettime() < release_deadline do socket.sleep(0.01) end
+        end,
+        on_finish = function(_, result) delivered = result end,
+    })
+    await(function() return exists(result_path) end, "context child did not publish its result")
+    Job.poll(active)
+    assert(not delivered, "result delivered before known-child completion")
+    assert(exists(result_path), "running child's result was removed")
+    if cancel then
+        Job.cancel(active)
+        assert(exists(result_path), "cancel removed a result without confirmed child completion")
+    else
+        local release = assert(io.open(release_path, "wb"))
+        assert(release:close())
+    end
+    await(function() return util.isSubProcessDone(active.pid) end, "context child failed to exit")
+    Job.poll(active)
+    if cancel then
+        assert(not delivered, "canceled context result was delivered")
+    else
+        assert(delivered and delivered.chapter_id == "6", "completed context result was lost")
+    end
+    assert(not exists(result_path), "known exited child's result was not cleaned")
+    assert(not exists(result_path .. ".tmp"), "known exited child's temporary result was not cleaned")
+    os.remove(release_path)
+end
+print("KOReader helper: result lifetime, completed delivery, cancellation rejection, and known-child cleanup passed")

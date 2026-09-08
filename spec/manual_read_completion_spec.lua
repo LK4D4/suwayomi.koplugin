@@ -147,6 +147,8 @@ describe("manual read completion integration", function()
             }
         end
         local facade = require("suwayomi/ui")
+        facade.formatRefillStatus = require("suwayomi/ui/downloads").formatRefillStatus
+        facade.showChapterMenu = function(options) return { chapters = options.chapters, title = options.title } end
         facade.updateChapterMenu = function(menu, options)
             if menu then menu.chapters, menu.title = options.chapters, options.title end
         end

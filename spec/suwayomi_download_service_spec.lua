@@ -15,6 +15,8 @@ describe("process-owned download navigation", function()
         "suwayomi/ui/downloads", "suwayomi/ui/menu_utils", "suwayomi/ui/list_menu",
         "suwayomi/ui/list_rows", "docsettings",
         "suwayomi/chapters/manual_deletion", "suwayomi/chapters/archive_identity",
+        "suwayomi/downloads/refill", "suwayomi/network/request_worker", "suwayomi/network/request_job",
+        "ui/widget/textviewer",
     }
     local function clear()
         runtime_helper.clearModules()
@@ -1248,7 +1250,10 @@ describe("process-owned download navigation", function()
         write(path, "original archive")
         assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
         assert.is_nil(read(path))
-        assert(plugin:performChapterAction(manga, chapters[1], "download"))
+        assert(settings:save({ server_url = "https://example.invalid" }))
+        local scoped = { id = manga.id, title = manga.title, source = manga.source, endpoint_scope = "https://example.invalid" }
+        plugin:setCurrentMangaChapterContext(scoped, chapters)
+        assert(plugin:performChapterAction(scoped, chapters[1], "download"))
         local function rowStatus()
             for _, row in ipairs(plugin.current_chapter_options.chapters) do
                 if row.id == chapters[1].id then return row.menu_status end
@@ -1364,5 +1369,200 @@ describe("process-owned download navigation", function()
         assert.are_not.equal(original.target.generation, settings:loadChapterLedger()["m1:c1"].archive_generation)
         assert.are.same({}, settings:loadDownloadQueue())
     end)
+
+    it("refills the sixth position after completed native reader navigation without a chapter view", function()
+        assert(settings:save({ server_url = "https://example.invalid" }))
+        local scoped = {
+            id = "m1", title = "Example", source = manga.source,
+            endpoint_scope = "https://example.invalid",
+        }
+        local complete, ledger = {}, {}
+        for index = 1, 6 do
+            complete[index] = { id = "c" .. index, name = "Chapter " .. index, source_order = index, is_read = false }
+            if index <= 5 then
+                local path = directory .. "/c" .. index .. ".cbz"
+                write(path, "existing archive")
+                ledger["m1:c" .. index] = {
+                    manga_id = "m1", chapter_id = "c" .. index, path = path, read = false,
+                    endpoint_scope = scoped.endpoint_scope,
+                }
+            end
+        end
+        assert(settings:saveChapterLedger(ledger))
+        local api = require("suwayomi/api")
+        api.fetchChaptersForManga = function() return { ok = true, chapters = complete } end
+        api.fetchMangaById = function() return { ok = true, manga = scoped } end
+        local plugin, files_owner = host("files")
+        local queue = plugin:getDownloadQueue()
+        assert(queue.refill:associate(scoped))
+        assert(settings:saveMangaKeepNextUnreadDownloads(scoped, 5))
+        runtime.reader_ui:showReader(directory .. "/c1.cbz")
+        advance(0)
+        assert.is_true(files_owner.closed)
+        local reader_a = runtime.reader_ui.instance
+        reader_a.doc_settings = { readSetting = function(_, key)
+            if key == "summary" then return { status = "complete" } end
+        end }
+        reader_a:handleEvent("CloseDocument")
+        runtime.reader_ui:showReader(directory .. "/c2.cbz")
+        assert.is_true(reader_a.closed)
+        assert.are.equal(0, #workers, "close must only admit durable work, never launch network inline")
+        local entry = settings:loadChapterLedger()["m1:c1"]
+        assert.is_true(entry.read)
+        assert.is_true(entry.pending_read_sync)
+        assert.are.equal(1, #queue:getSnapshot().refills)
+        advance(0)
+        local reader_b = runtime.reader_ui.instance
+        assert.are.equal(directory .. "/c2.cbz", reader_b.document.file)
+        assert.is_nil(reader_b.plugin.current_chapter_context)
+        assert.are.equal(1, #workers, "duplicate closes must coalesce into one context helper")
+        reader_b:close()
+        assert.is_nil(runtime.reader_ui.instance)
+        local before_result = read(settings.store.path)
+        workers[1].callback()
+        assert.are.equal(before_result, read(settings.store.path), "the context child only writes its result")
+        advance(1)
+        assert.are.same({}, settings:loadDownloadQueue(), "a result file does not prove known-child exit")
+        workers[1].alive = false
+        advance(1)
+        local jobs = settings:loadDownloadQueue()
+        assert.are.equal(1, #jobs)
+        assert.are.equal("c6", jobs[1].chapter.id)
+        assert.are.equal(directory, jobs[1].download_directory)
+        assert.are.same({}, queue:getSnapshot().refills)
+        assert.is_true(settings:loadChapterLedger()["m1:c1"].pending_read_sync)
+        assert.are.equal("existing archive", read(directory .. "/c1.cbz"))
+        local returned = host("files")
+        local snapshot = returned:getDownloadQueue():getSnapshot()
+        assert.are.equal("c6", snapshot.active[1].chapter.id)
+        local visible
+        for _, row in ipairs(returned:showDownloads().item_table) do
+            if row.text == "Example / Chapter 6" then visible = row end
+        end
+        assert.is_not_nil(visible)
+        assert.are.equal("Downloading", visible.mandatory)
+    end)
+
+    it("ignores final-page-only, unfinished, and unlinked completed reader closes", function()
+        assert(settings:save({ server_url = "https://example.invalid" }))
+        local plugin, owner = host("files")
+        local queue = plugin:getDownloadQueue()
+        assert(queue.refill:associate({
+            id = "m1", title = "Example", source = manga.source,
+            endpoint_scope = "https://example.invalid",
+        }))
+        assert(settings:saveMangaKeepNextUnreadDownloads(manga, 5))
+        local path = directory .. "/c1.cbz"
+        write(path, "managed archive")
+        assert(settings:saveChapterLedger({
+            ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path, read = false },
+        }))
+        owner:close()
+        for _, control in ipairs({
+            { path = path, summary = { status = "reading" }, percent = 1 },
+            { path = path, summary = { status = "reading" }, percent = 0.5 },
+            { path = directory .. "/unlinked.cbz", summary = { status = "complete" }, percent = 1 },
+        }) do
+            local _, reader = host("reader", control.path)
+            reader.doc_settings = { readSetting = function(_, key)
+                if key == "summary" then return control.summary end
+                if key == "percent_finished" then return control.percent end
+            end }
+            reader:close()
+            advance(0)
+            assert.are.same({}, queue:getSnapshot().refills)
+            assert.are.same({}, settings:loadDownloadQueue())
+            assert.is_false(settings:loadChapterLedger()["m1:c1"].read)
+            assert.are.equal(0, #workers)
+        end
+    end)
+
+    it("renders durable retry deadlines and rejects retired refill controls", function()
+        assert(settings:save({ server_url = "https://example.invalid" }))
+        local scoped = {
+            id = "m1", title = "Example", source = manga.source,
+            endpoint_scope = "https://example.invalid",
+        }
+        local api = require("suwayomi/api")
+        api.fetchChaptersForManga = function()
+            return { ok = false, error = "offline", retryable = true }
+        end
+        local shown
+        package.preload["ui/widget/textviewer"] = function() return {
+            new = function(_, options)
+                options.onClose = function() end
+                return options
+            end,
+        } end
+        ui.show = function(_, widget) shown = widget end
+        local plugin, owner = host("files")
+        local queue = plugin:getDownloadQueue()
+        assert(queue.refill:setPolicy(scoped, 5))
+        advance(0)
+        workers[1].callback()
+        workers[1].alive = false
+        advance(1)
+        local request = assert(queue:getSnapshot().refills[1])
+        assert.are.equal("waiting", request.state)
+        assert.is_true(request.next_retry_at > clock)
+        local function refillRow(menu)
+            for _, row in ipairs(menu.item_table) do
+                if row.text == "Example" then return row end
+            end
+            error("pending refill must be visible in Downloads")
+        end
+        local row = refillRow(plugin:showDownloads())
+        assert.are.equal("Ahead waiting", row.mandatory)
+        local subtitle = row.subtitle
+        assert.is_not_nil(subtitle:find(require("suwayomi/downloads/status_formatter").formatRetryTime(request.next_retry_at), 1, true))
+        plugin:refreshDownloadsMenu()
+        row = refillRow(plugin.current_downloads_menu)
+        assert.are.equal(subtitle, row.subtitle, "repainting must retain the fixed retry time")
+        row.callback()
+        local retired_controls = assert(shown).buttons_table[1]
+        local committed = read(settings.store.path)
+        owner:close()
+        shown = nil
+        row.callback()
+        assert.is_nil(shown, "retired rows must not open overlays")
+        retired_controls[1].callback()
+        retired_controls[2].callback()
+        assert.are.equal(committed, read(settings.store.path))
+        local current = host("files")
+        refillRow(current:showDownloads()).callback()
+        shown.buttons_table[1][2].callback()
+        assert.are.equal(0, settings:loadMangaKeepNextUnreadDownloads(scoped))
+        assert.are.same({}, queue:getSnapshot().refills)
+        advance(300)
+        assert.are.equal(1, #workers, "Stop must retire the delayed retry without a replacement helper")
+        assert.are.same({}, settings:loadDownloadQueue())
+    end)
+
+    for _, already_read in ipairs({ false, true }) do
+    it("records completed close for retention with ahead Off and prior read " .. tostring(already_read), function()
+        local path = directory .. "/c1.cbz"
+        write(path, "completed archive")
+        assert(settings:saveDeleteChaptersSettings({ delete_finished_while_reading = 3 }))
+        assert(settings:saveChapterLedger({ ["m1:c1"] = {
+            manga_id = "m1", chapter_id = "c1", path = path, read = already_read,
+        } }))
+        local plugin, owner = host("reader", path)
+        owner.doc_settings = { readSetting = function(_, key)
+            if key == "summary" then return { status = "complete" } end
+        end }
+        owner:close()
+        advance(0)
+        local entry = settings:loadChapterLedger()["m1:c1"]
+        assert.is_true(entry.read)
+        if not already_read then assert.is_true(entry.pending_read_sync) end
+        local records = settings:loadFinishedChapterCleanupJournal().mangas.m1.records
+        assert.are.equal(1, #records)
+        assert.are.equal("c1", records[1].chapter_id)
+        assert.are.equal(path, records[1].path)
+        assert.are.equal("completed archive", read(path))
+        assert.are.same({}, plugin:getDownloadQueue():getSnapshot().refills)
+        assert.are.equal(0, #workers)
+    end)
+    end
 
 end)
