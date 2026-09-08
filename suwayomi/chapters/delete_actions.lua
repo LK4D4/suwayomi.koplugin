@@ -97,11 +97,27 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
 
     local removal = queue.manual_deletion
     if not removal then return deletionFailed("identity_unavailable") end
-    local target, target_error = removal:prepareRemoval(
-        queue:getKey(manga, chapter), chapter_path, SuwayomiSettings:loadDownloadDirectory(),
-        options.archive_generation
-    )
-    if not target then return deletionFailed(target_error) end
+    local target, target_error
+    if options.retention then
+        -- A retained record is never a fresh authorization, even if malformed.
+        if type(options.archive_target) ~= "table" or options.archive_target.path ~= chapter_path
+            or options.archive_target.key ~= queue:getKey(manga, chapter) then
+            return false, "blocked", "unproved_target"
+        end
+        local valid, reason = removal:validateTarget(options.archive_target, true)
+        if not valid then
+            if reason == "busy" or reason == "current_document" then return false, "downloading", reason end
+            if reason == "stat_failed" or reason == "realpath_failed" or reason == "reader_unavailable"
+                or reason == "persistence_failed" then return deletionFailed(reason) end
+            return false, "blocked", reason
+        end
+        target = options.archive_target
+    else
+        target, target_error = removal:prepareRemoval(
+            queue:getKey(manga, chapter), chapter_path, SuwayomiSettings:loadDownloadDirectory()
+        )
+        if not target then return deletionFailed(target_error) end
+    end
 
     local resolved, metadata_path, metadata_paths = pcall(self.getKoreaderMetadataPathForDocument, self, chapter_path)
     if not resolved or not metadata_path then

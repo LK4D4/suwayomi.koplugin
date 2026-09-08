@@ -93,8 +93,10 @@ function StatusFormatter.buildChapterStatusSymbols(chapter, status)
     local deletion = chapter and chapter._suwayomi_manual_deletion
     if type(deletion) == "table" then
         if deletion.state == "removed" then
-            table.insert(symbols, I18n.t("Archive removed; metadata retained"))
-            return symbols
+            if not status or status.state == "read" then
+                table.insert(symbols, I18n.t("Archive removed; metadata retained"))
+                return symbols
+            end
         elseif deletion.state == "pending" then
             if deletion.archive_removed then
                 table.insert(symbols, I18n.t("Archive removed; bookkeeping pending"))

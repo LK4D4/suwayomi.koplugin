@@ -396,14 +396,7 @@ function ManualDeletion:validateTarget(target, allow_missing)
     return true
 end
 
-function ManualDeletion:prepareRemoval(key, path, root, expected_generation)
-    if expected_generation ~= nil then
-        local target, err = self:getTarget(key, path)
-        if not target or target.generation ~= expected_generation then return nil, err or "generation_changed" end
-        local ok, reason = self:validateTarget(target, true)
-        if not ok and reason ~= "missing" then return nil, reason end
-        return target
-    end
+function ManualDeletion:prepareRemoval(key, path, root)
     local captured = self:capture(key, path, root)
     if captured.reason then return nil, captured.reason end
     local target

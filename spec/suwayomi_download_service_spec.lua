@@ -1209,4 +1209,53 @@ describe("process-owned download navigation", function()
         assert.is_nil(read(blocked))
     end)
 
+    it("preserves a replacement when a historical retention target is malformed", function()
+        local plugin = manualHost(1)
+        local path = directory .. "/c1.cbz"
+        write(path, "replacement without original authority")
+        assert(settings:saveChapterLedger{ ["m1:c1"] = {
+            manga_id = "m1", chapter_id = "c1", path = path, read = true,
+        } })
+        assert(settings:saveFinishedChapterCleanupJournal{
+            version = 1, next_sequence = 2, mangas = { m1 = { records = {
+                { chapter_id = "c1", path = path, sequence = 1, retry_count = 0,
+                    retry_after = 0, archive_target = {} },
+            } } },
+        })
+        plugin:processFinishedChapterCleanup()
+        assert.are.equal("replacement without original authority", read(path))
+        local record = settings:loadFinishedChapterCleanupJournal().mangas.m1.records[1]
+        assert.are.equal(1, record.sequence)
+        assert.are.same({}, record.archive_target)
+        assert.is_not_nil(record.blocked_reason)
+        assert.is_nil((settings.store:readKey("manual_archive_state", {}).archives or {})["m1:c1"])
+    end)
+
+    it("renders replacement download state instead of obsolete removed history", function()
+        local plugin = manualHost(0)
+        local path = directory .. "/c1.cbz"
+        write(path, "original archive")
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        assert.is_nil(read(path))
+        assert(plugin:performChapterAction(manga, chapters[1], "download"))
+        local function rowStatus()
+            for _, row in ipairs(plugin.current_chapter_options.chapters) do
+                if row.id == chapters[1].id then return row.menu_status end
+            end
+        end
+        assert.matches("Queued", rowStatus())
+        assert.is_nil(rowStatus():find("Archive removed", 1, true))
+        advance(0)
+        local queue = plugin:getDownloadQueue()
+        local active = assert(queue:getActiveJob("m1:c1"))
+        write(path, "replacement archive")
+        write(active.progress_path, "state=downloaded\ncurrent=1\ntotal=1\npath=" .. path .. "\n")
+        workers[active.pid].alive = false
+        advance(0.5)
+        plugin:refreshChapterMenu()
+        assert.are.equal("replacement archive", read(path))
+        assert.matches("Downloaded", rowStatus())
+        assert.is_nil(rowStatus():find("Archive removed", 1, true))
+    end)
+
 end)

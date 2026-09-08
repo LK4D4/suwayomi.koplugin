@@ -380,9 +380,6 @@ describe("suwayomi/chapters/finished_cleanup", function()
             local queue = subject:getDownloadQueue()
             queue.getKey = function() return "m1:c1" end
             queue.cancelPending = function() return false end
-            queue.manual_deletion.prepareRemoval = function()
-                return journalRecord(subject, "m1", "c1").archive_target
-            end
             queue.manual_deletion.wake = function() end
         end
         os.remove = function(candidate)

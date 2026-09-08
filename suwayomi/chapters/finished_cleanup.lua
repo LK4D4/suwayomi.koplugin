@@ -99,7 +99,8 @@ end
 local function convergeMissingDownload(self, ledger, _entry, manga_id, chapter_id, path, changed_mangas, target)
     local queue = self:getDownloadQueue()
     local removal = queue.manual_deletion
-    if not removal or not target or target.path ~= path then return false end
+    if not removal or type(target) ~= "table" or target.path ~= path
+        or target.key ~= manga_id .. ":" .. chapter_id then return false end
     local valid, reason = removal:validateTarget(target, true)
     if valid or reason ~= "missing" then return false end
     local saved = SuwayomiSettings:getStore():saveDocument(function(doc)
@@ -537,7 +538,7 @@ local function processFinishedChapterCleanup(self, summary)
                 clearRetryReason(self, manga_id, chapter_id)
                 if #manga.records == 0 then journal.mangas[manga_id] = nil end
                 saveJournal(journal)
-            elseif not record.archive_target then
+            elseif type(record.archive_target) ~= "table" or type(record.archive_target.generation) ~= "number" then
                 rejectCandidate(journal, record, "unproved_generation", summary, reasons)
                 clearRetryReason(self, manga_id, chapter_id)
                 index = index + 1
@@ -627,7 +628,8 @@ local function processFinishedChapterCleanup(self, summary)
                             {
                                 ledger = ledger,
                                 chapter_path = record.path,
-                                archive_generation = record.archive_target.generation,
+                                retention = true,
+                                archive_target = record.archive_target,
                                 quiet_active = true,
                                 quiet_delete_failed = true,
                                 quiet_missing = true,
@@ -653,6 +655,10 @@ local function processFinishedChapterCleanup(self, summary)
                             end
                             saveJournal(journal)
                             logTransition("converged", state or "deleted", 1)
+                        elseif state == "blocked" then
+                            rejectCandidate(journal, record, "unproved_generation", summary, reasons)
+                            clearRetryReason(self, manga_id, chapter_id)
+                            index = index + 1
                         else
                             local is_transient = state == "queued" or state == "downloading"
                                 or state == "delete_failed"
