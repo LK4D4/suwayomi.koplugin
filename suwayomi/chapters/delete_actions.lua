@@ -111,6 +111,11 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
                 or reason == "persistence_failed" then return deletionFailed(reason) end
             return false, "blocked", reason
         end
+        local request = removal:snapshot()[options.archive_target.key]
+        if request and (request.state == "pending" or request.state == "blocked") then
+            -- Retention cannot turn an archive-only request into metadata removal.
+            return false, "manual_pending"
+        end
         target = options.archive_target
     else
         target, target_error = removal:prepareRemoval(

@@ -184,6 +184,7 @@ describe("suwayomi/chapters/finished_cleanup", function()
         queue.statuses = queue_status
         queue.isChapterBusy = function() return false end
         queue.manual_deletion = {
+            snapshot = function() return {} end,
             validateTarget = function(_, target)
                 if not plugin.existing[target.path] then return false, "missing" end
                 return true

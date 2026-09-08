@@ -36,6 +36,8 @@ New queue admissions carry explicit/automatic provenance and allocate an archive
 
 The manual processor revalidates request revision, generation, device/inode plus change evidence, resolved containment/aliases, live reader, and download ownership before unlinking only the CBZ. Leaf symlinks and unsupported file identities block removal. Progress and matching bookkeeping are separate checked saves; confirmed absence after a crash completes only the original obligation. Newer read/sync, queue, archive, and reader-return state survives. Five-second exponential retries cap at five minutes without abandonment; bounded fair passes continue without views. Quit only cancels its timer and retains the existing total shutdown budget.
 
+Retention leaves a generation with pending or blocked manual intent to the archive-only processor rather than invoking its metadata-removal boundary. Its eligibility and completion positions remain unchanged; matching manual retirement marks the retained authority resolved. A transient manual unlink failure therefore cannot let competing retention remove metadata.
+
 ## Public Facades
 
 The public runtime facades are intentionally small and stable:

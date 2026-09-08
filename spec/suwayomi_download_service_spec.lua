@@ -1258,4 +1258,30 @@ describe("process-owned download navigation", function()
         assert.is_nil(rowStatus():find("Archive removed", 1, true))
     end)
 
+    it("does not let retention remove metadata while manual archive-only removal is pending", function()
+        local plugin = manualHost(1)
+        local path = directory .. "/c1.cbz"
+        write(path, "pending archive")
+        assert(require("lfs").mkdir(path .. ".sdr"))
+        write(path .. ".sdr/metadata.lua", "return { custom = 'keep' }")
+        write(path .. ".sdr/metadata.lua.old", "keep backup")
+        local original_remove = os.remove
+        os.remove = function(value)
+            if value == path then return nil, "temporarily busy", 13 end
+            return original_remove(value)
+        end
+        local ran, result = pcall(plugin.performChapterAction, plugin, manga, chapters[1], "mark_read")
+        os.remove = original_remove
+        assert.is_true(ran, result)
+        assert.is_true(result)
+        plugin:processFinishedChapterCleanup()
+        assert.are.equal("pending archive", read(path))
+        assert.is_not_nil(read(path .. ".sdr/metadata.lua"))
+        assert.are.equal("keep backup", read(path .. ".sdr/metadata.lua.old"))
+        advance(5)
+        assert.is_nil(read(path))
+        assert.is_not_nil(read(path .. ".sdr/metadata.lua"))
+        assert.are.equal("keep backup", read(path .. ".sdr/metadata.lua.old"))
+    end)
+
 end)

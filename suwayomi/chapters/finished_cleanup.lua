@@ -655,6 +655,10 @@ local function processFinishedChapterCleanup(self, summary)
                             end
                             saveJournal(journal)
                             logTransition("converged", state or "deleted", 1)
+                        elseif state == "manual_pending" then
+                            -- The manual processor owns this generation's removal.
+                            summary.deferred = summary.deferred + 1
+                            index = index + 1
                         elseif state == "blocked" then
                             rejectCandidate(journal, record, "unproved_generation", summary, reasons)
                             clearRetryReason(self, manga_id, chapter_id)
