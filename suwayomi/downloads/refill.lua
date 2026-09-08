@@ -245,7 +245,7 @@ function Refill:snapshot()
         if valid(request, id) then
             result[#result + 1] = { manga_id = id, manga_title = request.manga and request.manga.title,
                 revision = request.revision, state = request.state, reason = request.reason,
-                next_retry_at = request.next_retry_at }
+                next_retry_at = request.next_retry_at > 0 and request.next_retry_at or nil }
         else result[#result + 1] = { manga_id = id, state = "blocked", reason = "unsupported_state" } end
     end
     table.sort(result, function(a, b) return tostring(a.manga_id) < tostring(b.manga_id) end)

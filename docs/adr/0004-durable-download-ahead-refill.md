@@ -7,7 +7,7 @@ date: 2026-09-06
 
 A completed chapter must request Download-ahead evaluation even when the reader never returns to a plugin chapter screen. Persist one coalesced refill request per manga in the existing checked shared store, owned by the process-wide service from [ADR-0002](0002-navigation-safe-download-ownership.md). Evaluate current policy after teardown using complete chapter data; do not persist a candidate list or keep the retiring reader alive.
 
-This decision covers [section 3 of the investigation](../superpowers/audits/2026-09-06-issue-2-investigation.md#3-finishing-a-document-does-not-itself-refill-download-ahead). The user authorized autonomous decisions and spec/ticket publication, favoring simplicity and requesting no further interview. Accepted means a decided architecture; runtime implementation and acceptance remain pending.
+This decision covers [section 3 of the investigation](../superpowers/audits/2026-09-06-issue-2-investigation.md#3-finishing-a-document-does-not-itself-refill-download-ahead). The user authorized autonomous decisions, favoring simplicity. The runtime implementation and automated/real-process evidence are described in [the architecture map](../ARCHITECTURE.md#download-ownership); physical-device acceptance remains separate.
 
 ## Durable boundary
 

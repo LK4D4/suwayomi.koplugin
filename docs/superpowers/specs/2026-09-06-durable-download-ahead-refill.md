@@ -1,6 +1,6 @@
 # durable completion-triggered download ahead
 
-Published as [GitHub issue #22](https://github.com/LK4D4/suwayomi.koplugin/issues/22), labeled ready-for-agent. Accepted for autonomous planning; implementation remains pending.
+Published as [GitHub issue #22](https://github.com/LK4D4/suwayomi.koplugin/issues/22). The runtime implementation and automated evidence are recorded in [the architecture map](../../ARCHITECTURE.md#download-ownership); physical-device acceptance remains separate.
 
 ## Problem Statement
 
@@ -125,6 +125,6 @@ New buffer sizes, automatic server library refresh, ongoing monitoring of every 
 
 ## Further Notes
 
-ADR-0004 records the durable coalesced-request architecture and why UI-owned callbacks and persisted candidate lists were rejected. Its accepted planning status follows the user's explicit authorization to make simple decisions autonomously, not an additional interview. Implementation remains pending.
+ADR-0004 records the durable coalesced-request architecture and why UI-owned callbacks and persisted candidate lists were rejected. Its accepted planning status follows the user's explicit authorization to make simple decisions autonomously. The implementation preserves that small service-owned request model; publication and physical-device acceptance remain separate.
 
 This public contract includes the relevant architectural obligations for future implementation through its linked dependency-aware tickets. The checked-in ADRs preserve decision history; publication does not establish runtime implementation or device acceptance.

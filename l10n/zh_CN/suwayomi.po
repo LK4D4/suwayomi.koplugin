@@ -85,6 +85,19 @@ msgid "1 selected"
 msgid_plural "%1 selected"
 msgstr[0] "已选择 1 项"
 
+msgid ""
+"A chapter in the buffer failed. Use that chapter's Retry or Redownload "
+"action."
+msgstr ""
+
+msgid ""
+"A chapter in the buffer has pending manual deletion. Automatic refill cannot "
+"replace it."
+msgstr ""
+
+msgid "Accepted manual deletion"
+msgstr ""
+
 msgid "Actions"
 msgstr "操作"
 
@@ -93,6 +106,21 @@ msgstr "添加到书架"
 
 msgid "Adding to library..."
 msgstr "正在添加到书架..."
+
+msgid "Ahead blocked"
+msgstr ""
+
+msgid ""
+"Ahead five with two existing positions needs only three downloads. Next five "
+"can add five more. Neither starts at the current reader page."
+msgstr ""
+
+#, fuzzy
+msgid "Ahead pending"
+msgstr "升序"
+
+msgid "Ahead waiting"
+msgstr ""
 
 msgid "All manga"
 msgstr "所有漫画"
@@ -124,6 +152,11 @@ msgid "Archive deletion pending"
 msgstr ""
 
 msgid "Archive deletion pending: close reader"
+msgstr ""
+
+msgid ""
+"Archive or download ownership is not verified. Existing files and work are "
+"preserved."
 msgstr ""
 
 msgid "Artist"
@@ -234,6 +267,10 @@ msgstr "章节"
 msgid "Chapters are loading."
 msgstr "章节正在加载。"
 
+#, fuzzy
+msgid "Check the connection and download folder in Settings."
+msgstr "请在“设置 > 下载”中设置下载文件夹。"
+
 msgid "Checking chapters"
 msgstr "正在检查章节"
 
@@ -262,6 +299,16 @@ msgstr "关闭插件"
 msgid "Completed"
 msgstr "已完结"
 
+msgid ""
+"Completed status plus close counts; reaching the last page alone does not. "
+"Manual completions also count for retention. Historical read flags do not "
+"authorize deletion. A completion without an archive occupies a position but "
+"cannot authorize deleting a later download."
+msgstr ""
+
+msgid "Completion and archive removal"
+msgstr ""
+
 msgid "Connection"
 msgstr "连接"
 
@@ -286,6 +333,9 @@ msgstr "无法开始章节下载：%1"
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] "无法开始章节下载：%1"
+
+msgid "Could not confirm saved refill work. No new downloads are confirmed."
+msgstr ""
 
 msgid ""
 "Could not confirm the read state was saved. No deletion was started. Reopen "
@@ -328,6 +378,9 @@ msgstr "无法加载 Suwayomi 书架。"
 
 msgid "Could not load chapters."
 msgstr "无法加载章节。"
+
+msgid "Could not load chapters. Refill will retry automatically."
+msgstr ""
 
 msgid "Could not load library categories."
 msgstr "无法加载书架分类。"
@@ -395,6 +448,10 @@ msgstr "无法开始加载源：%1"
 msgid "Could not start source loading: unknown error"
 msgstr "无法开始加载源：未知错误"
 
+#, fuzzy
+msgid "Could not update download ahead: %1"
+msgstr "无法开始章节下载：%1"
+
 msgid "Could not update library."
 msgstr "无法更新书架。"
 
@@ -440,9 +497,6 @@ msgstr "删除已保存的筛选器"
 msgid "Delete saved filter \"%1\"?"
 msgstr "要删除已保存的筛选器“%1”吗？"
 
-msgid "Delete while reading: %1"
-msgstr "阅读时删除：%1"
-
 msgid "Deletion not accepted: download busy; request again"
 msgstr ""
 
@@ -453,9 +507,6 @@ msgstr "降序"
 msgid "Details"
 msgstr "详情"
 
-msgid "Disabled"
-msgstr "禁用"
-
 msgid "Done"
 msgstr "已完成"
 
@@ -464,6 +515,10 @@ msgid "Download"
 msgstr "下载"
 
 msgid "Download ahead"
+msgstr "提前下载"
+
+#, fuzzy
+msgid "Download ahead: %1"
 msgstr "提前下载"
 
 #, fuzzy
@@ -493,6 +548,10 @@ msgstr "下载第一个未读章节"
 msgid "Download folder"
 msgstr "下载文件夹"
 
+#, fuzzy
+msgid "Download help"
+msgstr "提前下载"
+
 msgid "Download is already downloading."
 msgstr "下载已在进行中。"
 
@@ -518,6 +577,13 @@ msgstr "下载接下来 5 章"
 msgid "Download next 50"
 msgstr "下载接下来 50 章"
 
+msgid ""
+"Download next adds eligible unread downloads. Download ahead fills the "
+"earliest unread positions; existing downloads and queue work count. Both use "
+"source order and the exact saved scanlator filter, never a silent fallback "
+"to All."
+msgstr ""
+
 msgid "Download selected"
 msgstr "下载选中的"
 
@@ -527,9 +593,6 @@ msgstr "下载选中的"
 
 msgid "Download the chapter first."
 msgstr "请先下载此章节。"
-
-msgid "Download-ahead buffer is already downloaded or queued."
-msgstr "提前下载缓冲中的章节已下载或已加入队列。"
 
 msgid "Downloaded"
 msgstr "已下载"
@@ -558,6 +621,10 @@ msgstr "编辑筛选器"
 
 msgid "Edit search"
 msgstr "编辑搜索"
+
+#, fuzzy
+msgid "Enable download ahead"
+msgstr "停止提前下载"
 
 msgid "Enter a search query."
 msgstr "请输入搜索内容。"
@@ -627,20 +694,18 @@ msgstr "无法保存筛选器。"
 msgid "Failed to save settings."
 msgstr ""
 
-msgid "Fifth to last read chapter"
-msgstr "倒数第 5 个已读章节"
-
 msgid "Filter"
 msgstr "筛选"
 
 msgid "Filter name"
 msgstr "筛选器名称"
 
+#, fuzzy
+msgid "Finish retention: %1"
+msgstr "搜索扩展：%1"
+
 msgid "First unread"
 msgstr "第一个未读章节"
-
-msgid "Fourth to last read chapter"
-msgstr "倒数第 4 个已读章节"
 
 msgid "Genres"
 msgstr "题材"
@@ -677,20 +742,40 @@ msgstr "正在安装扩展..."
 msgid "KOReader could not open this chapter right now."
 msgstr "KOReader 现在无法打开此章节。"
 
+msgid "Keep %1 newest completion"
+msgid_plural "Keep %1 newest completions"
+msgstr[0] ""
+
+msgid ""
+"Keep 2 newest completions: after completing A, B, then C in one manga, A "
+"becomes eligible for removal. B and C remain. Live readers stay protected."
+msgstr ""
+
 msgid "Keep downloads"
 msgstr "保留下载"
 
-msgid "Keep next 10 downloaded"
-msgstr "保持后续 10 章已下载"
+#, fuzzy
+msgid "Keep first 10 unread"
+msgstr "打开第一个未读章节"
 
-msgid "Keep next 5 downloaded"
-msgstr "保持后续 5 章已下载"
+#, fuzzy
+msgid "Keep first 5 unread"
+msgstr "打开第一个未读章节"
 
-msgid "Keep next 50 downloaded"
-msgstr "保持后续 50 章已下载"
+#, fuzzy
+msgid "Keep first 50 unread"
+msgstr "打开第一个未读章节"
 
-msgid "Last read chapter"
-msgstr "最近阅读的章节"
+msgid ""
+"Keep the first 50 filtered unread chapters available? Existing downloads and "
+"queued chapters count toward this buffer."
+msgstr ""
+
+msgid ""
+"Keep the newest recorded completions per manga, not chapter-list positions. "
+"Completion requires completed status and close, or a plugin manual mark-read "
+"action. Live readers remain protected."
+msgstr ""
 
 msgctxt "source mode"
 msgid "Latest"
@@ -752,6 +837,9 @@ msgstr "漫画操作"
 msgid "Manga information"
 msgstr "漫画信息"
 
+msgid "Manga or source details are unavailable. Refresh the chapter list."
+msgstr ""
+
 msgid "Mark as read"
 msgstr "标记为已读"
 
@@ -767,11 +855,29 @@ msgstr "标记已读"
 msgid "Mark unread"
 msgstr "标记未读"
 
+msgid ""
+"Mark-read can succeed even when deletion is busy or blocked. Accepted "
+"removal keeps sidecars, backups, and reading metadata. Unread or a later "
+"accepted deliberate Download/Retry revokes remaining removal; failed, "
+"uncertain, duplicate, or automatic downloads do not. See the README for "
+"examples and safety details."
+msgstr ""
+
 msgid "Never ask"
 msgstr "从不询问"
 
 msgid "New folder"
 msgstr "新文件夹"
+
+msgid ""
+"New manual mark-read actions may remove only the local archive. Busy "
+"downloads keep running; request deletion again after they finish. Accepted "
+"removal continues with this setting Off."
+msgstr ""
+
+#, fuzzy
+msgid "Next downloads and download ahead"
+msgstr "停止提前下载"
 
 msgid "Next page"
 msgstr "下一页"
@@ -790,6 +896,12 @@ msgid ""
 "No chapters match the saved scanlator filter. Choose another scanlator or "
 "All scanlators."
 msgstr ""
+
+#, fuzzy
+msgid ""
+"No chapters match the saved scanlator filter. Other scanlators are not "
+"selected."
+msgstr "无法保存筛选器。"
 
 msgid "No chapters selected."
 msgstr "未选择章节。"
@@ -853,6 +965,10 @@ msgstr "未安装"
 msgid "Obsolete"
 msgstr "过时"
 
+#, fuzzy
+msgid "Off"
+msgstr "关"
+
 msgctxt "source filter state"
 msgid "Off"
 msgstr "关"
@@ -908,12 +1024,6 @@ msgstr "上一页"
 msgid "Queue"
 msgstr "队列"
 
-msgid ""
-"Queue %1 missing download to keep the next %2 unread chapters available?"
-msgid_plural ""
-"Queue %1 missing downloads to keep the next %2 unread chapters available?"
-msgstr[0] "要将缺少的 %1 个下载加入队列，以保留接下来 %2 个未读章节可用吗？"
-
 #, fuzzy
 msgid "Queue up to %1 new chapter download?"
 msgid_plural "Queue up to %1 new chapter downloads?"
@@ -935,9 +1045,34 @@ msgstr "阅读状态已同步。"
 msgid "Read state sync is already running."
 msgstr "阅读状态同步已在运行。"
 
+msgid ""
+"Reading or download choices changed. Refill will use the current choices."
+msgstr ""
+
 #, fuzzy
 msgid "Redownload"
 msgstr "下载"
+
+msgid ""
+"Refill Retry reevaluates current unread positions. It does not retry a "
+"failed chapter or override pending manual deletion."
+msgstr ""
+
+msgid ""
+"Refill Retry reevaluates the buffer; it does not retry failed chapters or "
+"override pending deletion. Stop download ahead turns the policy Off but "
+"keeps accepted jobs. Cancel retires the current refill for that manga; "
+"Cancel all retires every refill. Cancellation keeps ahead enabled for later "
+"reading or chapter actions."
+msgstr ""
+
+msgid ""
+"Refill follows completed close, including native next-file reading; manual "
+"read/unread; actual read reconciliation; successful chapter load/return/"
+"refresh; and ahead or scanlator changes. Repaint, progress, and cancellation "
+"do not create refill requests. Pending work survives offline operation and "
+"restart."
+msgstr ""
 
 msgid "Refresh chapters"
 msgstr "刷新章节"
@@ -972,11 +1107,21 @@ msgstr "重置筛选器"
 msgid "Retry"
 msgstr "重试"
 
+#, fuzzy
+msgid "Retry download ahead"
+msgstr "停止提前下载"
+
+msgid "Retry refill"
+msgstr ""
+
 msgid "Retry scheduled"
 msgstr "已安排重试"
 
 msgid "Retry time unavailable."
 msgstr "重试时间不可用。"
+
+msgid "Retry, Stop, and Cancel"
+msgstr ""
 
 msgid "Save"
 msgstr "保存"
@@ -1004,6 +1149,10 @@ msgstr "此服务器不支持已保存的筛选器。"
 
 msgid "Saved filters metadata is not valid JSON."
 msgstr "已保存筛选器的元数据不是有效的 JSON。"
+
+#, fuzzy
+msgid "Saved refill state is unsupported. Existing data is preserved."
+msgstr "此服务器不支持已保存的筛选器。"
 
 msgid "Scanlator filter"
 msgstr "汉化组筛选器"
@@ -1048,14 +1197,21 @@ msgctxt "source mode"
 msgid "Search: %1"
 msgstr "搜索：%1"
 
-msgid "Second to last read chapter"
-msgstr "倒数第 2 个已读章节"
-
 msgid "Select all"
 msgstr "全选"
 
 msgid "Server URL"
 msgstr "服务器 URL"
+
+msgid ""
+"Server association unknown. Open this manga on the current server and choose "
+"Download ahead again."
+msgstr ""
+
+msgid ""
+"Server changed. Open this manga on the current server and choose Download "
+"ahead again."
+msgstr ""
 
 msgid "Set a download folder in Settings > Downloads."
 msgstr "请在“设置 > 下载”中设置下载文件夹。"
@@ -1096,6 +1252,11 @@ msgstr "状态"
 
 msgid "Stop download ahead"
 msgstr "停止提前下载"
+
+msgid ""
+"Stop download ahead turns this manga's policy Off and stops pending refill. "
+"Already accepted chapter downloads remain."
+msgstr ""
 
 msgid "Suwayomi"
 msgstr "Suwayomi"
@@ -1182,8 +1343,10 @@ msgstr "文本"
 msgid "Text filter"
 msgstr "文本筛选器"
 
-msgid "Third to last read chapter"
-msgstr "倒数第 3 个已读章节"
+msgid ""
+"The server rejected the chapter request. Check connection settings, then "
+"choose Retry refill."
+msgstr ""
 
 msgid "This book is not linked to Suwayomi chapters."
 msgstr "此书未关联 Suwayomi 章节。"
@@ -1263,6 +1426,13 @@ msgstr "保留下载"
 #, fuzzy
 msgid "Verifying download"
 msgstr "缺少 %1 个下载。"
+
+msgid "Waiting to evaluate the unread buffer."
+msgstr ""
+
+#, fuzzy
+msgid "When download ahead runs"
+msgstr "停止提前下载"
 
 msgid "You can continue."
 msgstr "你可以继续。"

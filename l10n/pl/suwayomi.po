@@ -103,6 +103,19 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
+msgid ""
+"A chapter in the buffer failed. Use that chapter's Retry or Redownload "
+"action."
+msgstr ""
+
+msgid ""
+"A chapter in the buffer has pending manual deletion. Automatic refill cannot "
+"replace it."
+msgstr ""
+
+msgid "Accepted manual deletion"
+msgstr ""
+
 msgid "Actions"
 msgstr ""
 
@@ -110,6 +123,20 @@ msgid "Add to library"
 msgstr ""
 
 msgid "Adding to library..."
+msgstr ""
+
+msgid "Ahead blocked"
+msgstr ""
+
+msgid ""
+"Ahead five with two existing positions needs only three downloads. Next five "
+"can add five more. Neither starts at the current reader page."
+msgstr ""
+
+msgid "Ahead pending"
+msgstr ""
+
+msgid "Ahead waiting"
 msgstr ""
 
 msgid "All manga"
@@ -141,6 +168,11 @@ msgid "Archive deletion pending"
 msgstr ""
 
 msgid "Archive deletion pending: close reader"
+msgstr ""
+
+msgid ""
+"Archive or download ownership is not verified. Existing files and work are "
+"preserved."
 msgstr ""
 
 msgid "Artist"
@@ -251,6 +283,9 @@ msgstr ""
 msgid "Chapters are loading."
 msgstr ""
 
+msgid "Check the connection and download folder in Settings."
+msgstr ""
+
 msgid "Checking chapters"
 msgstr ""
 
@@ -279,6 +314,16 @@ msgstr ""
 msgid "Completed"
 msgstr ""
 
+msgid ""
+"Completed status plus close counts; reaching the last page alone does not. "
+"Manual completions also count for retention. Historical read flags do not "
+"authorize deletion. A completion without an archive occupies a position but "
+"cannot authorize deleting a later download."
+msgstr ""
+
+msgid "Completion and archive removal"
+msgstr ""
+
 msgid "Connection"
 msgstr ""
 
@@ -302,6 +347,9 @@ msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
+
+msgid "Could not confirm saved refill work. No new downloads are confirmed."
+msgstr ""
 
 msgid ""
 "Could not confirm the read state was saved. No deletion was started. Reopen "
@@ -347,6 +395,9 @@ msgid "Could not load Suwayomi library."
 msgstr ""
 
 msgid "Could not load chapters."
+msgstr ""
+
+msgid "Could not load chapters. Refill will retry automatically."
 msgstr ""
 
 msgid "Could not load library categories."
@@ -412,6 +463,9 @@ msgstr ""
 msgid "Could not start source loading: unknown error"
 msgstr ""
 
+msgid "Could not update download ahead: %1"
+msgstr ""
+
 msgid "Could not update library."
 msgstr ""
 
@@ -460,9 +514,6 @@ msgstr ""
 msgid "Delete saved filter \"%1\"?"
 msgstr ""
 
-msgid "Delete while reading: %1"
-msgstr ""
-
 msgid "Deletion not accepted: download busy; request again"
 msgstr ""
 
@@ -473,9 +524,6 @@ msgstr ""
 msgid "Details"
 msgstr ""
 
-msgid "Disabled"
-msgstr ""
-
 msgid "Done"
 msgstr ""
 
@@ -484,6 +532,9 @@ msgid "Download"
 msgstr ""
 
 msgid "Download ahead"
+msgstr ""
+
+msgid "Download ahead: %1"
 msgstr ""
 
 msgid "Download all chapters (up to 50 new)"
@@ -510,6 +561,9 @@ msgstr ""
 msgid "Download folder"
 msgstr ""
 
+msgid "Download help"
+msgstr ""
+
 msgid "Download is already downloading."
 msgstr ""
 
@@ -534,6 +588,13 @@ msgstr ""
 msgid "Download next 50"
 msgstr ""
 
+msgid ""
+"Download next adds eligible unread downloads. Download ahead fills the "
+"earliest unread positions; existing downloads and queue work count. Both use "
+"source order and the exact saved scanlator filter, never a silent fallback "
+"to All."
+msgstr ""
+
 msgid "Download selected"
 msgstr ""
 
@@ -541,9 +602,6 @@ msgid "Download selected (up to 50 new)"
 msgstr ""
 
 msgid "Download the chapter first."
-msgstr ""
-
-msgid "Download-ahead buffer is already downloaded or queued."
 msgstr ""
 
 msgid "Downloaded"
@@ -574,6 +632,9 @@ msgid "Edit filters"
 msgstr ""
 
 msgid "Edit search"
+msgstr ""
+
+msgid "Enable download ahead"
 msgstr ""
 
 msgid "Enter a search query."
@@ -644,19 +705,16 @@ msgstr ""
 msgid "Failed to save settings."
 msgstr ""
 
-msgid "Fifth to last read chapter"
-msgstr ""
-
 msgid "Filter"
 msgstr ""
 
 msgid "Filter name"
 msgstr ""
 
-msgid "First unread"
+msgid "Finish retention: %1"
 msgstr ""
 
-msgid "Fourth to last read chapter"
+msgid "First unread"
 msgstr ""
 
 msgid "Genres"
@@ -694,19 +752,38 @@ msgstr ""
 msgid "KOReader could not open this chapter right now."
 msgstr ""
 
+msgid "Keep %1 newest completion"
+msgid_plural "Keep %1 newest completions"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid ""
+"Keep 2 newest completions: after completing A, B, then C in one manga, A "
+"becomes eligible for removal. B and C remain. Live readers stay protected."
+msgstr ""
+
 msgid "Keep downloads"
 msgstr ""
 
-msgid "Keep next 10 downloaded"
+msgid "Keep first 10 unread"
 msgstr ""
 
-msgid "Keep next 5 downloaded"
+msgid "Keep first 5 unread"
 msgstr ""
 
-msgid "Keep next 50 downloaded"
+msgid "Keep first 50 unread"
 msgstr ""
 
-msgid "Last read chapter"
+msgid ""
+"Keep the first 50 filtered unread chapters available? Existing downloads and "
+"queued chapters count toward this buffer."
+msgstr ""
+
+msgid ""
+"Keep the newest recorded completions per manga, not chapter-list positions. "
+"Completion requires completed status and close, or a plugin manual mark-read "
+"action. Live readers remain protected."
 msgstr ""
 
 msgctxt "source mode"
@@ -768,6 +845,9 @@ msgstr ""
 msgid "Manga information"
 msgstr ""
 
+msgid "Manga or source details are unavailable. Refresh the chapter list."
+msgstr ""
+
 msgid "Mark as read"
 msgstr ""
 
@@ -783,10 +863,27 @@ msgstr ""
 msgid "Mark unread"
 msgstr ""
 
+msgid ""
+"Mark-read can succeed even when deletion is busy or blocked. Accepted "
+"removal keeps sidecars, backups, and reading metadata. Unread or a later "
+"accepted deliberate Download/Retry revokes remaining removal; failed, "
+"uncertain, duplicate, or automatic downloads do not. See the README for "
+"examples and safety details."
+msgstr ""
+
 msgid "Never ask"
 msgstr ""
 
 msgid "New folder"
+msgstr ""
+
+msgid ""
+"New manual mark-read actions may remove only the local archive. Busy "
+"downloads keep running; request deletion again after they finish. Accepted "
+"removal continues with this setting Off."
+msgstr ""
+
+msgid "Next downloads and download ahead"
 msgstr ""
 
 msgid "Next page"
@@ -804,6 +901,11 @@ msgstr ""
 msgid ""
 "No chapters match the saved scanlator filter. Choose another scanlator or "
 "All scanlators."
+msgstr ""
+
+msgid ""
+"No chapters match the saved scanlator filter. Other scanlators are not "
+"selected."
 msgstr ""
 
 msgid "No chapters selected."
@@ -865,6 +967,9 @@ msgstr ""
 msgid "Obsolete"
 msgstr ""
 
+msgid "Off"
+msgstr ""
+
 msgctxt "source filter state"
 msgid "Off"
 msgstr ""
@@ -920,14 +1025,6 @@ msgstr ""
 msgid "Queue"
 msgstr ""
 
-msgid ""
-"Queue %1 missing download to keep the next %2 unread chapters available?"
-msgid_plural ""
-"Queue %1 missing downloads to keep the next %2 unread chapters available?"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
 msgid "Queue up to %1 new chapter download?"
 msgid_plural "Queue up to %1 new chapter downloads?"
 msgstr[0] ""
@@ -952,7 +1049,32 @@ msgstr ""
 msgid "Read state sync is already running."
 msgstr ""
 
+msgid ""
+"Reading or download choices changed. Refill will use the current choices."
+msgstr ""
+
 msgid "Redownload"
+msgstr ""
+
+msgid ""
+"Refill Retry reevaluates current unread positions. It does not retry a "
+"failed chapter or override pending manual deletion."
+msgstr ""
+
+msgid ""
+"Refill Retry reevaluates the buffer; it does not retry failed chapters or "
+"override pending deletion. Stop download ahead turns the policy Off but "
+"keeps accepted jobs. Cancel retires the current refill for that manga; "
+"Cancel all retires every refill. Cancellation keeps ahead enabled for later "
+"reading or chapter actions."
+msgstr ""
+
+msgid ""
+"Refill follows completed close, including native next-file reading; manual "
+"read/unread; actual read reconciliation; successful chapter load/return/"
+"refresh; and ahead or scanlator changes. Repaint, progress, and cancellation "
+"do not create refill requests. Pending work survives offline operation and "
+"restart."
 msgstr ""
 
 msgid "Refresh chapters"
@@ -988,10 +1110,19 @@ msgstr ""
 msgid "Retry"
 msgstr ""
 
+msgid "Retry download ahead"
+msgstr ""
+
+msgid "Retry refill"
+msgstr ""
+
 msgid "Retry scheduled"
 msgstr ""
 
 msgid "Retry time unavailable."
+msgstr ""
+
+msgid "Retry, Stop, and Cancel"
 msgstr ""
 
 msgid "Save"
@@ -1019,6 +1150,9 @@ msgid "Saved filters are not supported by this server."
 msgstr ""
 
 msgid "Saved filters metadata is not valid JSON."
+msgstr ""
+
+msgid "Saved refill state is unsupported. Existing data is preserved."
 msgstr ""
 
 msgid "Scanlator filter"
@@ -1063,13 +1197,20 @@ msgctxt "source mode"
 msgid "Search: %1"
 msgstr ""
 
-msgid "Second to last read chapter"
-msgstr ""
-
 msgid "Select all"
 msgstr ""
 
 msgid "Server URL"
+msgstr ""
+
+msgid ""
+"Server association unknown. Open this manga on the current server and choose "
+"Download ahead again."
+msgstr ""
+
+msgid ""
+"Server changed. Open this manga on the current server and choose Download "
+"ahead again."
 msgstr ""
 
 msgid "Set a download folder in Settings > Downloads."
@@ -1112,6 +1253,11 @@ msgid "Status"
 msgstr ""
 
 msgid "Stop download ahead"
+msgstr ""
+
+msgid ""
+"Stop download ahead turns this manga's policy Off and stops pending refill. "
+"Already accepted chapter downloads remain."
 msgstr ""
 
 msgid "Suwayomi"
@@ -1197,7 +1343,9 @@ msgstr ""
 msgid "Text filter"
 msgstr ""
 
-msgid "Third to last read chapter"
+msgid ""
+"The server rejected the chapter request. Check connection settings, then "
+"choose Retry refill."
 msgstr ""
 
 msgid "This book is not linked to Suwayomi chapters."
@@ -1275,6 +1423,12 @@ msgid "Verify download"
 msgstr ""
 
 msgid "Verifying download"
+msgstr ""
+
+msgid "Waiting to evaluate the unread buffer."
+msgstr ""
+
+msgid "When download ahead runs"
 msgstr ""
 
 msgid "You can continue."

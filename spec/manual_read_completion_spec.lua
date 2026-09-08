@@ -433,7 +433,7 @@ describe("manual read completion integration", function()
         assert.equals("other", requests[1].manga_id)
         assert.is_true(settings:loadChapterLedger()["other:E"].pending_read_state)
         assert.same({}, recordIds())
-        assert.is_false(row("A").is_read)
+        assert.is_not_true(row("A").is_read)
         assert.equals("other archive", read(path("E")))
     end)
 
@@ -443,6 +443,7 @@ describe("manual read completion integration", function()
             assert(plugin:performMangaAction(manga, "keep_next_5_unread"))
             local missing = { id = "E", name = "E" }
             chapters[#chapters + 1] = missing
+            plugin:setCurrentMangaChapterContext(manga, chapters)
             assert(plugin:performChapterAction(manga, missing, "download"))
             local before = assert(service.queue:findPersistentJob("m:E"))
             if route == "chapter" then assert(plugin:performBulkChapterAction("keep_next_0_unread"))

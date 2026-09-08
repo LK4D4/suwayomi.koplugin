@@ -282,6 +282,7 @@ describe("durable refill through the process service", function()
         local request = service:getSnapshot().refills[1]
         assert.are.equal("blocked", request.state)
         assert.are.equal("fetch_rejected", request.reason)
+        assert.is_nil(request.next_retry_at)
         advance(300)
         assert.are.equal(1, #workers)
         assert.same({}, jobIds())

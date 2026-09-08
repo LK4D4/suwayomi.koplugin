@@ -15,7 +15,7 @@ git_cmd() {
         git -C "$(pwd -W)" "$@"
     elif [ -f .git ] && grep -q '^gitdir: [A-Za-z]:' .git; then
         local gitdir drive rest
-        gitdir="$(sed 's/^gitdir: //' .git)"
+        gitdir="$(sed 's/^gitdir: //; s|\\|/|g' .git)"
         drive="$(printf '%s' "$gitdir" | cut -c1 | tr '[:upper:]' '[:lower:]')"
         rest="$(printf '%s' "$gitdir" | cut -c4-)"
         gitdir="/mnt/$drive/$rest"

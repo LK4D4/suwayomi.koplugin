@@ -215,6 +215,7 @@ local function mergeLedger(doc, ledger, replace_read_state)
         if type(supplied) == "table" then
             local current = doc.chapter_ledger[key]
             local merged = type(current) == "table" and copy(current) or {}
+            merged.read = supplied.read
             merged.pending_read_sync, merged.pending_read_state = supplied.pending_read_sync, supplied.pending_read_state
             for field, value in pairs(supplied) do merged[field] = copy(value) end
             -- Read reconciliation must not restore a stale archive association.
