@@ -35,22 +35,9 @@ msgctxt "source filter sort summary"
 msgid "%1 - Descending"
 msgstr "%1 - по убыванию"
 
-msgid "%1 active download."
-msgid_plural "%1 active downloads."
-msgstr[0] "%1 активная загрузка."
-msgstr[1] "%1 активные загрузки."
-msgstr[2] "%1 активных загрузок."
-
 #. Translators: %1 active downloads, %2 queued downloads, %3 failed downloads.
 msgid "%1 active, %2 queued, %3 failed"
 msgstr "Активных: %1, в очереди: %2, с ошибкой: %3"
-
-#, fuzzy
-msgid "%1 already downloaded or in the download queue."
-msgid_plural "%1 already downloaded or in the download queue."
-msgstr[0] "Пропущена %1 глава: уже скачана или в очереди."
-msgstr[1] "Пропущены %1 главы: уже скачаны или в очереди."
-msgstr[2] "Пропущено %1 глав: уже скачаны или в очереди."
 
 msgid "%1 chapter"
 msgid_plural "%1 chapters"
@@ -58,8 +45,14 @@ msgstr[0] "%1 глава"
 msgstr[1] "%1 главы"
 msgstr[2] "%1 глав"
 
-msgid "%1 eligible chapter left outside this batch."
-msgid_plural "%1 eligible chapters left outside this batch."
+msgid "%1 download is busy. Delete it after it finishes."
+msgid_plural "%1 downloads are busy. Delete them after they finish."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "%1 download is busy. Mark it read again after it finishes."
+msgid_plural "%1 downloads are busy. Mark them read again after they finish."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
@@ -76,11 +69,13 @@ msgstr[0] "%1 манга"
 msgstr[1] "%1 манги"
 msgstr[2] "%1 манг"
 
-msgid "%1 missing download."
-msgid_plural "%1 missing downloads."
-msgstr[0] "%1 отсутствующая загрузка."
-msgstr[1] "%1 отсутствующие загрузки."
-msgstr[2] "%1 отсутствующих загрузок."
+#, fuzzy
+msgid "%1 more chapter is available. Run this action again to download it."
+msgid_plural ""
+"%1 more chapters are available. Run this action again to download them."
+msgstr[0] "Нет непрочитанных глав для скачивания."
+msgstr[1] "Нет непрочитанных глав для скачивания."
+msgstr[2] "Нет непрочитанных глав для скачивания."
 
 msgid "%1 result"
 msgid_plural "%1 results"
@@ -102,12 +97,6 @@ msgid_plural "%1 selected chapters"
 msgstr[0] "%1 выбранная глава"
 msgstr[1] "%1 выбранные главы"
 msgstr[2] "%1 выбранных глав"
-
-msgid "1 download is still in progress."
-msgid_plural "%1 downloads are still in progress."
-msgstr[0] "Одна загрузка ещё выполняется."
-msgstr[1] "%1 загрузки ещё выполняются."
-msgstr[2] "%1 загрузок ещё выполняются."
 
 msgid "1 selected"
 msgid_plural "%1 selected"
@@ -156,12 +145,6 @@ msgstr ""
 msgid "Archive deletion pending: close reader"
 msgstr ""
 
-msgid "Archive removed; bookkeeping pending"
-msgstr ""
-
-msgid "Archive removed; metadata retained"
-msgstr ""
-
 msgid "Artist"
 msgstr "Художник"
 
@@ -175,18 +158,12 @@ msgstr "Автор"
 msgid "Automatic"
 msgstr "Автоматически"
 
-msgid "Automatic chapter cleanup has %1 pending files."
-msgstr ""
-
 msgid ""
 "Automatic chapter cleanup is paused because its saved data uses an "
 "unsupported version."
 msgstr ""
 
 msgid "Automatic chapter cleanup paused for %1 unsafe files."
-msgstr ""
-
-msgid "Automatic chapter cleanup will retry %1 files."
 msgstr ""
 
 msgid "Available"
@@ -227,12 +204,6 @@ msgstr "Отменить загрузку в очереди"
 
 msgid "Cancel search"
 msgstr "Отменить поиск"
-
-msgid "Canceled %1 queued download."
-msgid_plural "Canceled %1 queued downloads."
-msgstr[0] "Отменена %1 загрузка в очереди."
-msgstr[1] "Отменены %1 загрузки в очереди."
-msgstr[2] "Отменено %1 загрузок в очереди."
 
 msgid "Cannot cancel download: storage is ambiguous"
 msgstr ""
@@ -337,8 +308,33 @@ msgstr[0] "Не удалось начать загрузку главы: %1"
 msgstr[1] "Не удалось начать загрузку главы: %1"
 msgstr[2] "Не удалось начать загрузку главы: %1"
 
+msgid ""
+"Could not confirm the read state was saved. No deletion was started. Reopen "
+"the chapter list and try again."
+msgstr ""
+
+msgid ""
+"Could not confirm the unread state was saved. Pending deletion may still "
+"run. Reopen the chapter list and try again."
+msgstr ""
+
 msgid "Could not connect to Suwayomi."
 msgstr "Не удалось подключиться к Suwayomi."
+
+msgid ""
+"Could not delete %1 download safely. Check its status in the chapter list."
+msgid_plural ""
+"Could not delete %1 downloads safely. Check their status in the chapter list."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Could not delete %1 download. Reopen the chapter list and try again."
+msgid_plural ""
+"Could not delete %1 downloads. Reopen the chapter list and try again."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Could not delete saved filter."
 msgstr "Не удалось удалить сохранённый фильтр."
@@ -374,9 +370,8 @@ msgstr "Не удалось загрузить фильтры источника
 msgid "Could not queue download: %1"
 msgstr "Не удалось начать загрузку главы: %1"
 
-#, fuzzy
-msgid "Could not queue downloads: %1"
-msgstr "Не удалось начать загрузку главы: %1"
+msgid "Could not queue downloads. Reopen the chapter list and try again."
+msgstr ""
 
 #, fuzzy
 msgid "Could not redownload chapter."
@@ -477,18 +472,6 @@ msgstr "Удалить сохранённый фильтр \"%1\"?"
 msgid "Delete while reading: %1"
 msgstr "Удалять во время чтения: %1"
 
-msgid "Deleted %1 chapter from device."
-msgid_plural "Deleted %1 chapters from device."
-msgstr[0] "Удалена %1 глава с устройства."
-msgstr[1] "Удалены %1 главы с устройства."
-msgstr[2] "Удалено %1 глав с устройства."
-
-msgid "Deleted %1 selected chapter from device."
-msgid_plural "Deleted %1 selected chapters from device."
-msgstr[0] "Удалена %1 выбранная глава с устройства."
-msgstr[1] "Удалены %1 выбранные главы с устройства."
-msgstr[2] "Удалено %1 выбранных глав с устройства."
-
 msgid "Deletion not accepted: download busy; request again"
 msgstr ""
 
@@ -574,10 +557,6 @@ msgstr "Скачать выбранное"
 msgid "Download the chapter first."
 msgstr "Сначала скачайте главу."
 
-#, fuzzy
-msgid "Download verified."
-msgstr "Скачано"
-
 msgid "Download-ahead buffer is already downloaded or queued."
 msgstr "Буфер предварительной загрузки уже скачан или стоит в очереди."
 
@@ -598,11 +577,6 @@ msgstr "Скачивание %1/%2"
 
 msgid "Downloads"
 msgstr "Загрузки"
-
-msgid ""
-"Downloads are busy and were not changed. Request deletion again after they "
-"finish."
-msgstr ""
 
 msgid "Downloads · %1 failed"
 msgid_plural "Downloads · %1 failed"
@@ -671,12 +645,6 @@ msgstr "Истекло время ожидания обновления расш
 
 msgid "Failed"
 msgstr "Ошибка"
-
-msgid "Failed to delete %1 download."
-msgid_plural "Failed to delete %1 downloads."
-msgstr[0] "Не удалось удалить %1 загрузку."
-msgstr[1] "Не удалось удалить %1 загрузки."
-msgstr[2] "Не удалось удалить %1 загрузок."
 
 #, fuzzy
 msgid "Failed to queue %1 chapter download."
@@ -834,11 +802,6 @@ msgstr "Отметить прочитанным"
 msgid "Mark unread"
 msgstr "Отметить непрочитанным"
 
-msgid ""
-"Marked read: %1. Archives removed: %2. Pending: %3. Busy (not accepted): %4. "
-"Blocked: %5."
-msgstr ""
-
 msgid "Never ask"
 msgstr "Никогда не спрашивать"
 
@@ -903,14 +866,15 @@ msgstr "Новые загрузки не добавлены в очередь."
 msgid "No poster"
 msgstr "Нет обложки"
 
+#, fuzzy
+msgid "No read downloads to delete."
+msgstr "Новые загрузки не добавлены в очередь."
+
 msgid "No results"
 msgstr "Нет результатов"
 
 msgid "No saved filters."
 msgstr "Нет сохранённых фильтров."
-
-msgid "No selected chapters were deleted."
-msgstr "Выбранные главы не были удалены."
 
 msgid "No unread chapters available to download."
 msgstr "Нет непрочитанных глав для скачивания."
@@ -937,15 +901,6 @@ msgstr "Приостановлено"
 
 msgid "Ongoing"
 msgstr "Выходит"
-
-msgid ""
-"Only chapter archives are removed. Reading metadata and backups are retained."
-msgstr ""
-
-msgid ""
-"Only this batch will be queued. If availability changes, fewer downloads may "
-"be added. Run another action for more."
-msgstr ""
 
 msgctxt "chapter action"
 msgid "Open"
@@ -1012,13 +967,6 @@ msgstr[2] "Добавить в очередь %1 непрочитанных гл
 msgid "Queued"
 msgstr "В очереди"
 
-#, fuzzy
-msgid "Queued %1 chapter download."
-msgid_plural "Queued %1 chapter downloads."
-msgstr[0] "В очередь добавлена %1 выбранная глава."
-msgstr[1] "В очередь добавлены %1 выбранные главы."
-msgstr[2] "В очередь добавлено %1 выбранных глав."
-
 msgid "Queued %1 selected chapter download."
 msgid_plural "Queued %1 selected chapter downloads."
 msgstr[0] "В очередь добавлена %1 выбранная глава."
@@ -1028,19 +976,11 @@ msgstr[2] "В очередь добавлено %1 выбранных глав."
 msgid "Read"
 msgstr "Прочитано"
 
-msgid ""
-"Read state could not be confirmed saved. No deletion was started by this "
-"action; reading metadata may already have changed."
-msgstr ""
-
 msgid "Read state is already synced."
 msgstr "Состояние прочтения уже синхронизировано."
 
 msgid "Read state sync is already running."
 msgstr "Синхронизация состояния прочтения уже выполняется."
-
-msgid "Read state sync started."
-msgstr "Синхронизация состояния прочтения началась."
 
 #, fuzzy
 msgid "Redownload"
@@ -1069,6 +1009,9 @@ msgstr "Удалить из библиотеки"
 
 msgid "Removing from library..."
 msgstr "Удаление из библиотеки..."
+
+msgid "Reopen the chapter list and try again."
+msgstr ""
 
 msgid "Reset filters"
 msgstr "Сбросить фильтры"
@@ -1185,25 +1128,6 @@ msgid_plural "Skipped %1 already downloaded or queued."
 msgstr[0] "Пропущена %1 глава: уже скачана или в очереди."
 msgstr[1] "Пропущены %1 главы: уже скачаны или в очереди."
 msgstr[2] "Пропущено %1 глав: уже скачаны или в очереди."
-
-msgid "Skipped %1 chapter not downloaded."
-msgid_plural "Skipped %1 chapters not downloaded."
-msgstr[0] "Пропущена %1 нескачанная глава."
-msgstr[1] "Пропущены %1 нескачанные главы."
-msgstr[2] "Пропущено %1 нескачанных глав."
-
-#, fuzzy
-msgid "Skipped %1 chapter."
-msgid_plural "Skipped %1 chapters."
-msgstr[0] "Пропущена %1 нескачанная глава."
-msgstr[1] "Пропущены %1 нескачанные главы."
-msgstr[2] "Пропущено %1 нескачанных глав."
-
-msgid "Skipped %1 download."
-msgid_plural "Skipped %1 downloads."
-msgstr[0] "Пропущена %1 загрузка."
-msgstr[1] "Пропущены %1 загрузки."
-msgstr[2] "Пропущено %1 загрузок."
 
 msgid "Source"
 msgstr "Источник"
@@ -1361,18 +1285,8 @@ msgstr "Неизвестная ошибка"
 msgid "Unread"
 msgstr "Непрочитано"
 
-msgid ""
-"Unread state could not be confirmed saved. Deletion revocation was not "
-"confirmed; reading metadata may already have changed."
-msgstr ""
-
 msgid "Unsupported"
 msgstr "Не поддерживается"
-
-msgid ""
-"Unverified archives are preserved. No replacement archive will be deleted by "
-"this request."
-msgstr ""
 
 msgctxt "extension action"
 msgid "Update"

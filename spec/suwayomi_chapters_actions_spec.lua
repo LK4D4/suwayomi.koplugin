@@ -216,11 +216,6 @@ describe("suwayomi/chapters/actions", function()
             showMessage = function(self, message)
                 table.insert(self.messages, message)
             end,
-            formatBulkDeleteMessage = function(_, deleted, _, missing, active)
-                return "bulk deleted=" .. tostring(deleted)
-                    .. " missing=" .. tostring(missing)
-                    .. " active=" .. tostring(active)
-            end,
             refreshChapterMenu = function(self, refresh_options)
                 table.insert(self.refreshes, refresh_options or true)
             end,
@@ -842,7 +837,7 @@ describe("suwayomi/chapters/actions", function()
         assert.is_nil(plugin.ledger["m1:c1"].path)
         assert.is_nil(plugin.ledger["m1:c2"].path)
         assert.are.equal(true, plugin.selection_cleared)
-        assert.are.same({ "bulk deleted=2 missing=0 active=0" }, plugin.messages)
+        assert.are.same({}, plugin.messages)
         assert.are.same({
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua",
             "/downloads/Manga/Chapter 1.cbz.sdr/metadata.lua.old",
@@ -934,7 +929,7 @@ describe("suwayomi/chapters/actions", function()
         assert.is_nil(downloader.existing["/downloads/Manga/Chapter 1.cbz"])
     end)
 
-    it("deletes only read downloaded chapters and reports the deleted count", function()
+    it("deletes only read downloaded chapters without a success popup", function()
         local chapters = {
             { id = "c1", name = "Chapter 1", is_read = true },
             { id = "c2", name = "Chapter 2", is_read = true },
@@ -968,7 +963,7 @@ describe("suwayomi/chapters/actions", function()
         local deleted = plugin:deleteReadChaptersFromDevice()
 
         assert.are.equal(1, deleted)
-        assert.are.same({ "Deleted 1 chapter from device." }, plugin.messages)
+        assert.are.same({}, plugin.messages)
         assert.is_nil(plugin.ledger["m1:c1"].path)
         assert.are.equal("/downloads/Manga/Chapter 3.cbz", plugin.ledger["m1:c3"].path)
         assert.are.same({
@@ -980,7 +975,30 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(1, #plugin.refreshes)
     end)
 
-    it("reports zero deleted chapters when no read downloads exist", function()
+    it("reports fenced bulk deletion once without removing either archive", function()
+        local plugin, queue = build_plugin({
+            existing = {
+                ["/downloads/Manga/Chapter 1.cbz"] = true,
+                ["/downloads/Manga/Chapter 2.cbz"] = true,
+            },
+            current_chapter_context = {
+                manga = manga,
+                chapters = {
+                    { id = "c1", name = "Chapter 1", is_read = true },
+                    { id = "c2", name = "Chapter 2", is_read = true },
+                },
+            },
+        })
+        function queue:checkStoreFence() return false end
+
+        assert.are.equal(0, plugin:deleteReadChaptersFromDevice())
+        assert.are.same({}, removed_paths)
+        assert.are.equal(1, #plugin.messages)
+        assert.is_true(plugin:isChapterDownloaded(manga, plugin.current_chapter_context.chapters[1]))
+        assert.is_true(plugin:isChapterDownloaded(manga, plugin.current_chapter_context.chapters[2]))
+    end)
+
+    it("explains when no read downloads exist without deleting anything", function()
         local plugin = build_plugin({
             current_chapter_context = {
                 manga = manga,
@@ -994,7 +1012,7 @@ describe("suwayomi/chapters/actions", function()
         local deleted = plugin:deleteReadChaptersFromDevice()
 
         assert.are.equal(0, deleted)
-        assert.are.same({ "Deleted 0 chapters from device." }, plugin.messages)
+        assert.are.equal(1, #plugin.messages)
         assert.are.same({}, removed_paths)
     end)
 
@@ -1025,7 +1043,7 @@ describe("suwayomi/chapters/actions", function()
         local deleted = plugin:deleteReadChaptersFromDevice()
 
         assert.are.equal(0, deleted)
-        assert.are.same({ "Deleted 0 chapters from device. Skipped 1 download. Failed to delete 1 download." }, plugin.messages)
+        assert.are.equal(1, #plugin.messages)
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.ledger["m1:c1"].path)
         assert.are.equal(0, #queue.cleared)
     end)
@@ -1062,27 +1080,9 @@ describe("suwayomi/chapters/actions", function()
         local deleted = plugin:deleteReadChaptersFromDevice()
 
         assert.are.equal(1, deleted)
-        assert.are.same({
-            "Deleted 1 chapter from device. Skipped 3 downloads. 1 active download. 1 missing download. Failed to delete 1 download.",
-        }, plugin.messages)
+        assert.are.equal(1, #plugin.messages)
     end)
 
-    it("translates chapter delete result summaries", function()
-        Marker.install()
-        reset_modules()
-
-        local plugin = build_plugin()
-
-        assert.are.equal(
-            "tx:Deleted 2 chapters from device. tx:Skipped 1 download. tx:1 active download. tx:3 missing downloads. tx:Failed to delete 1 download.",
-            plugin:formatReadDownloadDeleteMessage(2, {
-                skipped = 1,
-                active = 1,
-                missing = 3,
-                failed = 1,
-            })
-        )
-    end)
 
     local manual_delete_contract_cases = {
         {

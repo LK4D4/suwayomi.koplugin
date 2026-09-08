@@ -233,7 +233,7 @@ describe("suwayomi/readsync/controller", function()
         assert.is_true(plugin:syncReadStateNow())
 
         assert.are.equal(1, plugin.reconcile_count)
-        assert.are.equal("Read state sync started.", plugin.messages[#plugin.messages])
+        assert.are.same({}, plugin.messages)
         assert.are.equal(1234, plugin.pending_read_sync_active.pid)
         assert.are.equal(1, #state.scheduled)
         assert.is_function(state.get_child_callback())
@@ -442,12 +442,32 @@ describe("suwayomi/readsync/controller", function()
         state.scheduled[1].callback()
 
         assert.are.equal(1, attempts)
-        assert.are.equal("Could not start read sync: fork failed", plugin.messages[#plugin.messages])
+        assert.are.same({}, plugin.messages)
         assert.are.equal(5, state.scheduled[2].delay)
 
         state.scheduled[2].callback()
         assert.are.equal(2, attempts)
         assert.are.equal(10, state.scheduled[3].delay)
+        assert.are.same({}, plugin.messages)
+        assert.is_false(plugin:syncReadStateNow())
+        assert.are.equal(1, #plugin.messages)
+        assert.is_nil(plugin.pending_read_sync_active)
+    end)
+
+    it("reports an explicit worker start failure even without an error detail", function()
+        local controller = installController({
+            runInSubProcess = function() return false end,
+        })
+        local plugin = buildPlugin(controller, {
+            ledger = {
+                ["m1:c1"] = { chapter_id = "c1", read = true, pending_read_sync = true },
+            },
+        })
+
+        assert.is_false(plugin:syncReadStateNow())
+        assert.are.equal(1, #plugin.messages)
+        assert.is_nil(plugin.pending_read_sync_active)
+        assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
     end)
 
     it("retries automatic read-sync after missing credentials are later saved", function()

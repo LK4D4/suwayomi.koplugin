@@ -635,30 +635,26 @@ describe("suwayomi/chapters/finished_cleanup", function()
         end
     end)
 
-    it("notifies once until a retry reason changes or pending count increases", function()
+    it("keeps retries quiet as reasons change and pending counts increase", function()
         local plugin = buildPlugin({ setting = 1, now = 100, delete_state = "delete_failed" })
         record(plugin, "m1", "c1", "/downloads/source/m1/c1.cbz")
         plugin:processFinishedChapterCleanup()
-        assert.are.equal(1, #plugin.messages)
+        assert.are.same({}, plugin.messages)
         plugin.state.now = 105
         plugin:cancelFinishedChapterCleanup()
         plugin:processFinishedChapterCleanup()
-        assert.are.equal(1, #plugin.messages)
+        assert.are.same({}, plugin.messages)
         plugin.state.now = 115
         plugin.queue_status["m1:c1"] = { state = "queued" }
         plugin:cancelFinishedChapterCleanup()
         plugin:processFinishedChapterCleanup()
-        assert.are.equal(2, #plugin.messages)
+        assert.are.same({}, plugin.messages)
         record(plugin, "m2", "c1", "/downloads/source/m2/c1.cbz")
         plugin.queue_status["m2:c1"] = { state = "queued" }
         plugin.state.now = 120
         plugin:cancelFinishedChapterCleanup()
         plugin:processFinishedChapterCleanup()
-        assert.are.equal(3, #plugin.messages)
-        for _, message in ipairs(plugin.messages) do
-            assert.is_nil(message:match("m1"))
-            assert.is_nil(message:match("/downloads"))
-        end
+        assert.are.same({}, plugin.messages)
     end)
 
     it("maps transient delete result states even when the delete boundary reports success", function()
@@ -745,18 +741,18 @@ describe("suwayomi/chapters/finished_cleanup", function()
         assert.are.equal("invalid_entry", reason)
     end)
 
-    it("allows a fresh failure notification after cleanup is disabled and re-enabled", function()
+    it("keeps transient failures quiet after cleanup is disabled and re-enabled", function()
         local plugin = buildPlugin({ setting = 1, delete_state = "delete_failed" })
         record(plugin, "m1", "c1", "/downloads/source/manga/c1.cbz")
         plugin:processFinishedChapterCleanup()
-        assert.are.equal(1, #plugin.messages)
+        assert.are.same({}, plugin.messages)
         plugin.state.setting = 0
         plugin:onFinishedCleanupSettingChanged(1, 0)
         plugin.state.setting = 1
         plugin:onFinishedCleanupSettingChanged(0, 1)
         record(plugin, "m1", "c1", "/downloads/source/manga/c1.cbz")
         plugin:processFinishedChapterCleanup()
-        assert.are.equal(2, #plugin.messages)
+        assert.are.same({}, plugin.messages)
     end)
 
     it("carries the bounded cursor past blocked records instead of spinning", function()
@@ -823,7 +819,6 @@ describe("suwayomi/chapters/finished_cleanup", function()
         assert.are.equal(0, #plugin.messages)
         plugin.state.scheduled[#plugin.state.scheduled].callback()
         assert.are.equal(1, #plugin.messages)
-        assert.is_not_nil(plugin.messages[1]:match("3"))
 
         plugin.state.now = 105
         plugin.state.scheduled[#plugin.state.scheduled].callback()

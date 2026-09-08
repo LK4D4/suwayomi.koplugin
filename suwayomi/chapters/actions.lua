@@ -67,7 +67,6 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
             return
         end
         if not open_when_valid then
-            self:showMessage(I18n.t("Download verified."))
             return
         end
         local ok, ReaderUI = pcall(require, "apps/reader/readerui")
@@ -223,9 +222,6 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
     return batch
 end
 
-local function cappedMessage(count)
-    return I18n.count(count, "%1 eligible chapter left outside this batch.", "%1 eligible chapters left outside this batch.")
-end
 
 local function noDownloadCandidatesMessage(batch)
     if batch.skipped > 0 then
@@ -247,10 +243,12 @@ function Methods:confirmChapterDownloadBatch(manga, chapters, download_directory
         batch.scope or I18n.t("Download selected (up to 50 new)"),
         manga.title or I18n.t("Manga"),
         I18n.count(#batch.chapters, "Queue up to %1 new chapter download?", "Queue up to %1 new chapter downloads?"),
-        I18n.count(batch.skipped, "%1 already downloaded or in the download queue.", "%1 already downloaded or in the download queue."),
-        cappedMessage(batch.capped),
-        I18n.t("Only this batch will be queued. If availability changes, fewer downloads may be added. Run another action for more."),
     }
+    if batch.capped > 0 then
+        parts[#parts + 1] = I18n.count(batch.capped,
+            "%1 more chapter is available. Run this action again to download it.",
+            "%1 more chapters are available. Run this action again to download them.")
+    end
     if batch.saved_filter or batch.filter then
         table.insert(parts, 3, I18n.f("Scanlator: %1", batch.saved_filter or batch.filter))
     end
@@ -305,25 +303,33 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
         self:clearChapterSelection(true)
         self:refreshChapterMenu({ quick = true })
     end
-    local parts = {
-        I18n.count(queued, "Queued %1 chapter download.", "Queued %1 chapter downloads."),
-        I18n.count(batch.skipped + #batch.chapters - #candidates + outcome.skipped,
-            "Skipped %1 chapter.", "Skipped %1 chapters."),
-        cappedMessage(batch.capped),
-    }
+    SuwayomiDebug.log({
+        operation = "enqueueSelectedChapterDownloads", event = "end",
+        queued_count = queued, skipped_count = batch.skipped + #batch.chapters - #candidates + outcome.skipped,
+        capped_count = batch.capped, failed_count = outcome.failed, unconfirmed_count = outcome.unconfirmed,
+        status = stale and "stale" or (enqueue_err and "failed" or "accepted"),
+        code = enqueue_err and tostring(enqueue_err):match("^([%w_]+)"),
+    })
+    if not enqueue_err and not stale and outcome.failed == 0 and outcome.unconfirmed == 0 then
+        return queued, enqueue_err
+    end
+    local parts = {}
     if outcome.failed > 0 then
         table.insert(parts, I18n.count(outcome.failed, "Failed to queue %1 chapter download.", "Failed to queue %1 chapter downloads."))
     end
     if outcome.unconfirmed > 0 then
         table.insert(parts, I18n.count(outcome.unconfirmed, "Could not confirm %1 chapter download.", "Could not confirm %1 chapter downloads."))
     end
-    if enqueue_err then
-        table.insert(parts, I18n.f("Could not queue downloads: %1", enqueue_err))
+    if outcome.failed > 0 or outcome.unconfirmed > 0 then
+        parts[#parts + 1] = I18n.t("Reopen the chapter list and try again.")
+    end
+    if enqueue_err and outcome.failed == 0 and outcome.unconfirmed == 0 then
+        table.insert(parts, I18n.t("Could not queue downloads. Reopen the chapter list and try again."))
     end
     if stale then
         table.insert(parts, I18n.t("Chapter view changed. Run this download action again."))
     end
-    self:showMessage(table.concat(parts, "\n"))
+    if #parts > 0 then self:showMessage(table.concat(parts, "\n")) end
     return queued, enqueue_err
 end
 
@@ -403,6 +409,22 @@ function Methods:downloadSelectedChapters()
 end
 
 
+local function reportDeletionProblems(self, active, failed)
+    if active == 0 and failed == 0 then return end
+    local parts = {}
+    if active > 0 then
+        parts[#parts + 1] = I18n.count(active,
+            "%1 download is busy. Delete it after it finishes.",
+            "%1 downloads are busy. Delete them after they finish.")
+    end
+    if failed > 0 then
+        parts[#parts + 1] = I18n.count(failed,
+            "Could not delete %1 download. Reopen the chapter list and try again.",
+            "Could not delete %1 downloads. Reopen the chapter list and try again.")
+    end
+    if #parts > 0 then self:showMessage(table.concat(parts, "\n")) end
+end
+
 function Methods:deleteSelectedChapters()
     local started_at = SuwayomiDebug.now()
     if not self.current_chapter_context then
@@ -420,11 +442,13 @@ function Methods:deleteSelectedChapters()
     local canceled = 0
     local missing = 0
     local active = 0
+    local failed = 0
     self:withChapterMenuRefreshSuppressed(function()
         for _index, chapter in ipairs(chapters) do
             local ok, state = self:deleteChapterFromDeviceWithOptions(manga, chapter, {
                 quiet_active = true,
                 quiet_missing = true,
+                quiet_delete_failed = true,
                 skip_refresh = true,
             })
             if ok then
@@ -438,6 +462,8 @@ function Methods:deleteSelectedChapters()
                 canceled = canceled + 1
             elseif state == "missing" then
                 missing = missing + 1
+            else
+                failed = failed + 1
             end
         end
     end)
@@ -445,9 +471,7 @@ function Methods:deleteSelectedChapters()
     self:clearChapterSelection(true)
     self:refreshChapterMenu()
 
-    if deleted > 0 or canceled > 0 or missing > 0 or active > 0 then
-        self:showMessage(self:formatBulkDeleteMessage(deleted, canceled, missing, active))
-    end
+    reportDeletionProblems(self, active, failed)
     SuwayomiDebug.log({
         operation = "deleteSelectedChapters",
         event = "end",
@@ -456,6 +480,7 @@ function Methods:deleteSelectedChapters()
         missing_count = missing,
         active_count = active,
         canceled_count = canceled,
+        failed_count = failed,
         elapsed_ms = SuwayomiDebug.elapsedMs(started_at),
     })
     return deleted
@@ -503,7 +528,7 @@ function Methods:deleteReadChaptersFromDevice()
     local read_chapters = self:getReadDownloadedChaptersFromCurrentContext()
 
     if #read_chapters == 0 then
-        self:showMessage(self:formatReadDownloadDeleteMessage(0))
+        self:showMessage(I18n.t("No read downloads to delete."))
         return 0
     end
 
@@ -525,19 +550,14 @@ function Methods:deleteReadChaptersFromDevice()
                 active = active + 1
             elseif state == "missing" then
                 missing = missing + 1
-            elseif state == "delete_failed" then
+            elseif state ~= "queued" then
                 failed = failed + 1
             end
         end
     end)
 
     self:refreshChapterMenu()
-    self:showMessage(self:formatReadDownloadDeleteMessage(deleted, {
-        skipped = missing + active + failed,
-        missing = missing,
-        active = active,
-        failed = failed,
-    }))
+    reportDeletionProblems(self, active, failed)
     SuwayomiDebug.log({
         operation = "deleteReadChaptersFromDevice",
         event = "end",
@@ -559,7 +579,7 @@ function Methods:confirmDeleteReadChaptersFromDevice()
 
     local read_chapters = self:getReadDownloadedChaptersFromCurrentContext()
     if #read_chapters == 0 then
-        self:showMessage(self:formatReadDownloadDeleteMessage(0))
+        self:showMessage(I18n.t("No read downloads to delete."))
         return 0
     end
 
@@ -588,28 +608,6 @@ function Methods:getReadDownloadedChaptersFromCurrentContext()
     return chapters
 end
 
-function Methods:formatReadDownloadDeleteMessage(deleted, details)
-    local message = I18n.count(deleted, "Deleted %1 chapter from device.", "Deleted %1 chapters from device.")
-    details = details or {}
-    local skipped = details.skipped or (details.active or 0) + (details.missing or 0) + (details.failed or 0)
-    if skipped > 0 then
-        message = message .. " " .. I18n.count(skipped, "Skipped %1 download.", "Skipped %1 downloads.")
-    end
-    if (details.active or 0) > 0 then
-        message = message .. " " .. I18n.count(details.active, "%1 active download.", "%1 active downloads.")
-    end
-    if (details.missing or 0) > 0 then
-        message = message .. " " .. I18n.count(details.missing, "%1 missing download.", "%1 missing downloads.")
-    end
-    if (details.failed or 0) > 0 then
-        message = message .. " " .. I18n.count(
-            details.failed,
-            "Failed to delete %1 download.",
-            "Failed to delete %1 downloads."
-        )
-    end
-    return message
-end
 
 
 function Methods:markSelectedChaptersUnread()

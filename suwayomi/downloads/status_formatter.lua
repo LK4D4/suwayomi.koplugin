@@ -100,14 +100,8 @@ function StatusFormatter.buildChapterStatusSymbols(chapter, status)
     end
     local deletion = chapter and chapter._suwayomi_manual_deletion
     if type(deletion) == "table" then
-        if deletion.state == "removed" then
-            if not status or status.state == "read" then
-                table.insert(symbols, I18n.t("Archive removed; metadata retained"))
-                return symbols
-            end
-        elseif deletion.state == "pending" then
+        if deletion.state == "pending" then
             if deletion.archive_removed then
-                table.insert(symbols, I18n.t("Archive removed; bookkeeping pending"))
                 return symbols
             elseif deletion.reason == "current_document" then
                 table.insert(symbols, I18n.t("Archive deletion pending: close reader"))
@@ -116,7 +110,7 @@ function StatusFormatter.buildChapterStatusSymbols(chapter, status)
             end
         elseif deletion.state == "busy" then
             table.insert(symbols, I18n.t("Deletion not accepted: download busy; request again"))
-        elseif deletion.state ~= "missing" and deletion.state ~= "revoked" then
+        elseif deletion.state ~= "missing" and deletion.state ~= "revoked" and deletion.state ~= "removed" then
             table.insert(symbols, I18n.t("Archive deletion blocked; file preserved"))
         end
     end

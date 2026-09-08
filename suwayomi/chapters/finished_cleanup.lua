@@ -157,38 +157,15 @@ local function addReason(reasons, reason)
 end
 
 local function reportPending(self, reasons)
-    local keys = {}
-    local count = 0
-    local rejected = 0
-    for reason, reason_count in pairs(reasons) do
-        table.insert(keys, reason)
-        count = count + reason_count
-        if reason == "unsafe_path" or reason == "path_mismatch" then
-            rejected = rejected + reason_count
-        end
-    end
-    if count == 0 then
+    local rejected = (reasons.unsafe_path or 0) + (reasons.path_mismatch or 0)
+    if rejected == 0 then
         self.finished_cleanup_notification_state = nil
         return
     end
-    table.sort(keys)
-    local signature = table.concat(keys, ",")
     local previous = self.finished_cleanup_notification_state
-    local should_notify = not previous or previous.signature ~= signature or count > previous.count
-    self.finished_cleanup_notification_state = { signature = signature, count = count }
-    if not should_notify then
-        return
-    end
-
-    local message
-    if rejected > 0 and rejected == count then
-        message = I18n.f("Automatic chapter cleanup paused for %1 unsafe files.", count)
-    elseif rejected == 0 then
-        message = I18n.f("Automatic chapter cleanup will retry %1 files.", count)
-    else
-        message = I18n.f("Automatic chapter cleanup has %1 pending files.", count)
-    end
-    self:showMessage(message)
+    self.finished_cleanup_notification_state = rejected
+    if previous and rejected <= previous then return end
+    self:showMessage(I18n.f("Automatic chapter cleanup paused for %1 unsafe files.", rejected))
 end
 
 local function notifyCompatibility(self, error_code)

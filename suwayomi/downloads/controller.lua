@@ -208,9 +208,7 @@ function Methods:verifyDownloadJob(job, is_current)
             if not live() then return end
             if self.refreshChapterMenu then self:refreshChapterMenu() end
             self:refreshDownloadsMenu()
-            if result.state == "valid" then
-                self:showMessage(I18n.t("Download verified."))
-            else
+            if result.state ~= "valid" then
                 self:showDownloadJobError(current, is_current)
             end
         end, { is_current = live })
@@ -434,30 +432,6 @@ function Methods:reconcileDownloadedChapterLedger(ledger)
 end
 
 
-function Methods:formatActiveDownloadCount(count)
-    return I18n.count(count, "1 download is still in progress.", "%1 downloads are still in progress.")
-end
-
-
-function Methods:formatBulkDeleteMessage(deleted, canceled, missing, active)
-    local parts = {}
-    if deleted > 0 then
-        table.insert(parts, I18n.count(deleted, "Deleted %1 selected chapter from device.", "Deleted %1 selected chapters from device."))
-    end
-    if canceled > 0 then
-        table.insert(parts, I18n.count(canceled, "Canceled %1 queued download.", "Canceled %1 queued downloads."))
-    end
-    if missing > 0 then
-        table.insert(parts, I18n.count(missing, "Skipped %1 chapter not downloaded.", "Skipped %1 chapters not downloaded."))
-    end
-    if active > 0 then
-        table.insert(parts, self:formatActiveDownloadCount(active))
-    end
-    if #parts == 0 then
-        return I18n.t("No selected chapters were deleted.")
-    end
-    return I18n.join(parts, " ")
-end
 
 
 function Methods:getUnreadDownloadBufferCandidates(manga, limit)

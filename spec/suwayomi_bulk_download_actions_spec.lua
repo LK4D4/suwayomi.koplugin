@@ -132,15 +132,12 @@ describe("bounded bulk download actions", function()
         local dialog = stack[#stack]
         assert.is_truthy(dialog.text:find("Download all chapters (up to 50 new)", 1, true))
         assert.is_truthy(dialog.text:find("Queue up to 50 new chapter downloads?", 1, true))
-        assert.is_truthy(dialog.text:find("0 already downloaded or in the download queue.", 1, true))
-        assert.is_truthy(dialog.text:find("1 eligible chapter left outside this batch.", 1, true))
         assert.are.same({}, storedJobs())
         dialog.ok_callback()
         assert.are.equal(50, #storedJobs())
         assert.are.equal("c50", storedJobs()[50].chapter.id)
         assert.is_nil(queue:findPersistentJob("m1:c51"))
-        assert.is_truthy(messages[#messages]:find("Queued 50 chapter downloads.", 1, true))
-        assert.is_truthy(messages[#messages]:find("1 eligible chapter left outside this batch.", 1, true))
+        assert.are.same({}, messages)
     end)
 
     it("revalidates captured unread identities without backfilling after availability changes", function()
@@ -152,9 +149,6 @@ describe("bounded bulk download actions", function()
         assert.is_true(queue:enqueue(manga, items[2], "/books"))
         archives["/books/m1-c3.cbz"] = true
         dialog.ok_callback()
-        assert.is_truthy(messages[#messages]:find("Queued 47 chapter downloads.", 1, true))
-        assert.is_truthy(messages[#messages]:find("Skipped 3 chapters.", 1, true))
-        assert.is_truthy(messages[#messages]:find("1 eligible chapter left outside this batch.", 1, true))
         assert.are.equal(48, #storedJobs())
         assert.is_nil(queue:findPersistentJob("m1:c1"))
         assert.is_nil(queue:findPersistentJob("m1:c3"))
@@ -180,10 +174,9 @@ describe("bounded bulk download actions", function()
             plugin:performMangaAction(manga, "download_all_chapters")
             local dialog = stack[#stack]
             assert.is_truthy(dialog.text:find("Queue up to 50 new chapter downloads?", 1, true))
-            assert.is_truthy(dialog.text:find("2 already downloaded or in the download queue.", 1, true))
-            assert.is_truthy(dialog.text:find("8948 eligible chapters left outside this batch.", 1, true))
             assert.are.equal(1, #storedJobs())
             if stale then plugin:setCurrentMangaChapterContext(manga, {}) end
+            messages = {}
             dialog.ok_callback()
             local expected = { "c2" }
             if not stale then
@@ -195,9 +188,7 @@ describe("bounded bulk download actions", function()
             local admitted = {}
             for _, job in ipairs(storedJobs()) do admitted[#admitted + 1] = job.chapter.id end
             assert.are.same(expected, admitted)
-            assert.is_truthy(messages[#messages]:find(stale and "Queued 0 chapter downloads." or "Queued 50 chapter downloads.", 1, true))
-            assert.is_truthy(messages[#messages]:find(stale and "Skipped 52 chapters." or "Skipped 2 chapters.", 1, true))
-            assert.is_truthy(messages[#messages]:find("8948 eligible chapters left outside this batch.", 1, true))
+            assert.are.equal(stale and 1 or 0, #messages)
         end)
     end
 
@@ -210,7 +201,6 @@ describe("bounded bulk download actions", function()
         plugin:performBulkChapterAction(action.id)
         local dialog = stack[#stack]
         assert.is_truthy(dialog.text:find("Queue up to 50 new chapter downloads?", 1, true))
-        assert.is_truthy(dialog.text:find("2 eligible chapters left outside this batch.", 1, true))
         assert.are.same({}, storedJobs())
         plugin:clearChapterSelection(true)
         plugin:toggleChapterSelection(manga, items[52])
@@ -251,8 +241,6 @@ describe("bounded bulk download actions", function()
                 assert.are.same({}, messages)
             else
                 assert.is_truthy(messages[#messages]:find("Chapter view changed. Run this download action again.", 1, true))
-                assert.is_truthy(messages[#messages]:find("Queued 0 chapter downloads.", 1, true))
-                assert.is_truthy(messages[#messages]:find("Skipped 50 chapters.", 1, true))
             end
             assert.are.same({}, storedJobs())
             assert.are.equal(selected, plugin:getSelectedChapterCount())
@@ -275,13 +263,10 @@ describe("bounded bulk download actions", function()
             local dialog = stack[#stack]
             assert.is_truthy(dialog.text:find("Download next 60 (up to 50 new)", 1, true))
             assert.is_truthy(dialog.text:find("Queue up to 50 new chapter downloads?", 1, true))
-            assert.is_truthy(dialog.text:find("2 already downloaded or in the download queue.", 1, true))
-            assert.is_truthy(dialog.text:find("10 eligible chapters left outside this batch.", 1, true))
             dialog.ok_callback()
             assert.are.equal(51, #storedJobs())
             assert.is_not_nil(queue:findPersistentJob("m1:c53"))
             assert.is_nil(queue:findPersistentJob("m1:c54"))
-            assert.is_truthy(messages[#messages]:find("Queued 50 chapter downloads.", 1, true))
         end)
     end
 
@@ -339,8 +324,7 @@ describe("bounded bulk download actions", function()
                 dialog.ok_callback()
                 assert.are.equal(expected_count, #storedJobs())
                 assert.are.equal(expected_count, #queue:getSnapshot().queued)
-                assert.is_truthy(messages[#messages]:find("Queued " .. expected_count .. " chapter download", 1, true))
-                assert.is_truthy(messages[#messages]:find(size > 50 and (size - 50) .. " eligible chapter" or "0 eligible chapters", 1, true))
+                assert.are.same({}, messages)
             end)
         end
 
@@ -367,9 +351,6 @@ describe("bounded bulk download actions", function()
             plugin:performMangaAction(manga, action)
             local dialog = stack[#stack]
             assert.is_truthy(dialog.text:find("Queue up to 50 new chapter downloads?", 1, true))
-            assert.is_truthy(dialog.text:find("8 already downloaded or in the download queue.", 1, true))
-            assert.is_truthy(dialog.text:find(action == "download_all_chapters"
-                and "2 eligible chapters left outside this batch." or "1 eligible chapter left outside this batch.", 1, true))
             dialog.ok_callback()
             assert.are.equal(52, #storedJobs())
             assert.are.equal(owner, queue:getActiveJob("m1:c4"))
@@ -378,8 +359,6 @@ describe("bounded bulk download actions", function()
             assert.are.equal("queued", queue:findPersistentJob("m1:c10").state)
             assert.is_nil(queue:findPersistentJob("m1:c60"))
             assert.are.equal(action == "download_all_chapters", queue:findPersistentJob("m1:c1") ~= nil)
-            assert.is_truthy(messages[#messages]:find("Queued 50 chapter downloads.", 1, true))
-            assert.is_truthy(messages[#messages]:find("Skipped 8 chapters.", 1, true))
         end)
     end
 
@@ -388,7 +367,6 @@ describe("bounded bulk download actions", function()
         plugin:selectAllChapters()
         local menu = plugin.current_chapter_menu
         plugin:performBulkChapterAction("download_selected")
-        assert.is_truthy(stack[#stack].text:find("1 eligible chapter left outside this batch.", 1, true))
         require("ui/uimanager"):close(stack[#stack])
         assert.are.same({}, stack)
         assert.are.same({}, storedJobs())
@@ -405,20 +383,16 @@ describe("bounded bulk download actions", function()
         local first = stack[#stack]
         plugin:performMangaAction(manga, "download_all_chapters")
         local second = stack[#stack]
-        assert.is_truthy(first.text:find("1 eligible chapter left outside this batch.", 1, true))
         first.ok_callback()
         second.ok_callback()
         second.ok_callback()
         assert.are.equal(50, #storedJobs())
         assert.are.equal(50, #queue:getSnapshot().queued)
-        assert.is_truthy(messages[#messages]:find("Queued 0 chapter downloads.", 1, true))
-        assert.is_truthy(messages[#messages]:find("Skipped 50 chapters.", 1, true))
         assert.is_nil(queue:findPersistentJob("m1:c51"))
         plugin:performMangaAction(manga, "download_all_chapters")
         assert.is_truthy(stack[#stack].text:find("Queue up to 1 new chapter download?", 1, true))
         stack[#stack].ok_callback()
         assert.are.equal(51, #storedJobs())
-        assert.is_truthy(messages[#messages]:find("Queued 1 chapter download.", 1, true))
     end)
 
     it("retains authoritative single and batch admission guards for files, ownership, and duplicate identities", function()
@@ -483,7 +457,6 @@ describe("bounded bulk download actions", function()
                         assert.is_not_nil(dialog)
                         assert.is_truthy(dialog.text:find("Queue up to 1 new chapter download?", 1, true))
                         dialog.ok_callback()
-                        assert.is_truthy(messages[#messages]:find("Queued 1 chapter download.", 1, true))
                     end
                     local jobs = storedJobs()
                     assert.are.equal(1, #jobs)
@@ -510,9 +483,7 @@ describe("bounded bulk download actions", function()
             end
             assert.are.same({}, stack)
             assert.are.equal(action == "download_selected" and 4 or 6, #storedJobs())
-            assert.is_truthy(messages[#messages]:find(action == "download_selected"
-                and "Queued 3 chapter downloads." or "Queued 5 chapter downloads.", 1, true))
-            assert.is_truthy(messages[#messages]:find("Skipped 2 chapters.", 1, true))
+            assert.are.same({}, messages)
             assert.are.equal(0, plugin:getSelectedChapterCount())
         end)
     end
@@ -546,11 +517,9 @@ describe("bounded bulk download actions", function()
         plugin:performMangaAction(manga, "download_next_60_unread")
         local dialog = stack[#stack]
         assert.is_truthy(dialog.text:find("Queue up to 50 new chapter downloads?", 1, true))
-        assert.is_truthy(dialog.text:find("1 eligible chapter left outside this batch.", 1, true))
         dialog.ok_callback()
         assert.are.equal(50, #storedJobs())
         assert.is_nil(queue:findPersistentJob("m1:c51"))
-        assert.is_truthy(messages[#messages]:find("Queued 50 chapter downloads.", 1, true))
     end)
 
     it("does not replace a captured chapter with its mutated or newly inserted identity", function()
@@ -564,8 +533,6 @@ describe("bounded bulk download actions", function()
         assert.is_nil(queue:findPersistentJob("m1:unrelated"))
         assert.is_nil(queue:findPersistentJob("m1:new"))
         assert.is_nil(queue:findPersistentJob("m1:c51"))
-        assert.is_truthy(messages[#messages]:find("Queued 49 chapter downloads.", 1, true))
-        assert.is_truthy(messages[#messages]:find("Skipped 1 chapter.", 1, true))
     end)
 
     for _, action in ipairs({ "download_all_chapters", "download_all_unread", "download_selected", "download_next_5_unread" }) do
@@ -589,7 +556,6 @@ describe("bounded bulk download actions", function()
             assert.are.equal(action == "download_next_5_unread" and 5 or 50, #storedJobs())
             for _, job in ipairs(storedJobs()) do assert.are.equal("Saved group", job.chapter.scanlator) end
             assert.are.equal(action == "download_all_chapters" or action == "download_selected", queue:findPersistentJob("m1:c10") ~= nil)
-            assert.is_truthy(messages[#messages]:find("Skipped 0 chapters.", 1, true))
         end)
     end
 
@@ -600,14 +566,9 @@ describe("bounded bulk download actions", function()
             plugin:performMangaAction(manga, "download_all_chapters")
             local dialog = stack[#stack]
             assert.is_truthy(dialog.text:find("Queue up to 50 new chapter downloads?", 1, true))
-            assert.is_truthy(dialog.text:find("1 already downloaded or in the download queue.", 1, true))
-            assert.is_truthy(dialog.text:find("1 eligible chapter left outside this batch.", 1, true))
             assert.is_true(queue:enqueue(manga, items[2], "/books"))
             failure = storage_failure
             dialog.ok_callback()
-            assert.is_truthy(messages[#messages]:find("Queued 0 chapter downloads.", 1, true))
-            assert.is_truthy(messages[#messages]:find("Skipped 2 chapters.", 1, true))
-            assert.is_truthy(messages[#messages]:find("1 eligible chapter left outside this batch.", 1, true))
             assert.is_truthy(messages[#messages]:find(storage_failure == "write"
                 and "Failed to queue 49 chapter downloads." or "Could not confirm 49 chapter downloads.", 1, true))
             assert.are.equal(storage_failure == "write" and 1 or 50, #storedJobs())
@@ -644,15 +605,12 @@ describe("bounded bulk download actions", function()
         plugin:performMangaAction(manga, "download_all_chapters")
         local dialog = stack[#stack]
         assert.is_truthy(dialog.text:find("tx:Queue up to 50 new chapter downloads?", 1, true))
-        assert.is_truthy(dialog.text:find("tx:1 already downloaded or in the download queue.", 1, true))
-        assert.is_truthy(dialog.text:find("tx:1 eligible chapter left outside this batch.", 1, true))
         assert.is_truthy(dialog.text:find("\nExample manga\n", 1, true))
         assert.is_truthy(dialog.text:find("tx:Scanlator: Saved group", 1, true))
         assert.are.equal("tx:Queue", dialog.ok_text)
         dialog.ok_callback()
         assert.are.equal(50, #storedJobs())
-        assert.is_truthy(messages[#messages]:find("tx:Queued 50 chapter downloads.", 1, true))
-        assert.is_truthy(messages[#messages]:find("tx:Skipped 1 chapter.", 1, true))
+        assert.are.same({}, messages)
     end)
 
     for _, storage_failure in ipairs({ "write", "sync_dir" }) do
@@ -664,11 +622,9 @@ describe("bounded bulk download actions", function()
             assert.is_truthy(dialog.text:find("Queue up to 2 new chapter downloads?", 1, true))
             failure = storage_failure
             dialog.ok_callback()
-            assert.is_truthy(messages[#messages]:find("Queued 0 chapter downloads.", 1, true))
             assert.is_truthy(messages[#messages]:find(storage_failure == "write"
                 and "Failed to queue 2 chapter downloads."
                 or "Could not confirm 2 chapter downloads.", 1, true))
-            assert.is_truthy(messages[#messages]:find("Skipped 0 chapters.", 1, true))
             assert.are.equal(storage_failure == "write" and 0 or 2, #storedJobs())
             assert.are.equal(0, #queue:getSnapshot().queued)
             assert.are.equal(storage_failure == "sync_dir", settings:isBlocked())

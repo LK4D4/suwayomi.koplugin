@@ -86,25 +86,26 @@ local function refreshCommitted(self, options, supplied, previous)
 end
 
 local function showReadSummary(self, result, options)
-    local message = I18n.f(
-        "Marked read: %1. Archives removed: %2. Pending: %3. Busy (not accepted): %4. Blocked: %5.",
-        result.marked_read, result.removed, result.pending, result.busy, result.blocked
-    )
+    if result.committed and result.busy == 0 and result.blocked == 0 then return end
+    local parts = {}
     if not result.committed then
-        message = message .. " " .. I18n.t("Read state could not be confirmed saved. No deletion was started by this action; reading metadata may already have changed.")
+        parts[1] = I18n.t("Could not confirm the read state was saved. No deletion was started. Reopen the chapter list and try again.")
+    else
+        if result.busy > 0 then
+            parts[#parts + 1] = I18n.count(result.busy,
+                "%1 download is busy. Mark it read again after it finishes.",
+                "%1 downloads are busy. Mark them read again after they finish.")
+        end
+        if result.blocked > 0 then
+            parts[#parts + 1] = I18n.count(result.blocked,
+                "Could not delete %1 download safely. Check its status in the chapter list.",
+                "Could not delete %1 downloads safely. Check their status in the chapter list.")
+        end
     end
-    if result.removed > 0 or result.pending > 0 or result.busy > 0 or result.blocked > 0 then
-        message = message .. " " .. I18n.t("Only chapter archives are removed. Reading metadata and backups are retained.")
-    end
-    if result.busy > 0 then
-        message = message .. " " .. I18n.t("Downloads are busy and were not changed. Request deletion again after they finish.")
-    end
-    if result.blocked > 0 then
-        message = message .. " " .. I18n.t("Unverified archives are preserved. No replacement archive will be deleted by this request.")
-    end
-    result.message = message
+    if #parts == 0 then return end
+    result.message = table.concat(parts, "\n")
     if not options.quiet then
-        self:showMessage(message)
+        self:showMessage(result.message)
         result.summary_shown = true
     end
 end
@@ -168,6 +169,9 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
     if not ok then
         refreshCommitted(self, options, options.ledger, previous)
         local result = { committed = false, error = err, marked_read = 0, removed = 0, pending = 0, busy = 0, blocked = #captures }
+        SuwayomiDebug.log({ operation = "manual_mark_read", event = "error",
+            code = tostring(err):match("^([%w_]+)"), chapter_count = #chapters,
+            elapsed_ms = SuwayomiDebug.elapsedMs(started_at) })
         showReadSummary(self, result, options)
         return 0, result
     end
@@ -204,7 +208,7 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
     local result = readResult(core, outcomes, #chapters)
     showReadSummary(self, result, options)
     SuwayomiDebug.log({ operation = "manual_mark_read", event = "end", chapter_count = #chapters,
-        removed = result.removed, pending = result.pending, busy = result.busy, blocked = result.blocked,
+        removed_count = result.removed, pending_count = result.pending, busy_count = result.busy, blocked_count = result.blocked,
         elapsed_ms = SuwayomiDebug.elapsedMs(started_at) })
     return #chapters, result
 end
@@ -242,7 +246,7 @@ local function markUnread(self, manga, chapters, options, batch, clear_selection
         refreshCommitted(self, options, options.ledger, previous)
         local result = { committed = false, marked_unread = 0, error = err }
         if not options.quiet then
-            self:showMessage(I18n.t("Unread state could not be confirmed saved. Deletion revocation was not confirmed; reading metadata may already have changed."))
+            self:showMessage(I18n.t("Could not confirm the unread state was saved. Pending deletion may still run. Reopen the chapter list and try again."))
             result.summary_shown = true
         end
         return 0, result

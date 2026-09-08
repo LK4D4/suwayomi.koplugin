@@ -350,9 +350,6 @@ describe("suwayomi/downloads/controller", function()
         assert.are.equal("tx:Open chapter list", state.actions_menu_options.actions[1].text)
         assert.are.equal("tx:Cancel download", state.actions_menu_options.actions[2].text)
 
-        assert.are.equal("tx:Deleted 2 selected chapters from device.tx: tx:Canceled 1 queued download.tx: tx:Skipped 3 chapters not downloaded.tx: tx:1 download is still in progress.", plugin:formatBulkDeleteMessage(2, 1, 3, 1))
-        assert.are.equal("tx:Skipped 1 chapter not downloaded.", plugin:formatBulkDeleteMessage(0, 0, 1, 0))
-        assert.are.equal("tx:No selected chapters were deleted.", plugin:formatBulkDeleteMessage(0, 0, 0, 0))
     end)
 
     it("refreshes the active downloads hub in place when queue status changes", function()

@@ -35,21 +35,9 @@ msgctxt "source filter sort summary"
 msgid "%1 - Descending"
 msgstr ""
 
-msgid "%1 active download."
-msgid_plural "%1 active downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
 #. Translators: %1 active downloads, %2 queued downloads, %3 failed downloads.
 msgid "%1 active, %2 queued, %3 failed"
 msgstr ""
-
-msgid "%1 already downloaded or in the download queue."
-msgid_plural "%1 already downloaded or in the download queue."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
 
 msgid "%1 chapter"
 msgid_plural "%1 chapters"
@@ -57,8 +45,14 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
-msgid "%1 eligible chapter left outside this batch."
-msgid_plural "%1 eligible chapters left outside this batch."
+msgid "%1 download is busy. Delete it after it finishes."
+msgid_plural "%1 downloads are busy. Delete them after they finish."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "%1 download is busy. Mark it read again after it finishes."
+msgid_plural "%1 downloads are busy. Mark them read again after they finish."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
@@ -75,8 +69,9 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
-msgid "%1 missing download."
-msgid_plural "%1 missing downloads."
+msgid "%1 more chapter is available. Run this action again to download it."
+msgid_plural ""
+"%1 more chapters are available. Run this action again to download them."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
@@ -98,12 +93,6 @@ msgstr[2] ""
 
 msgid "%1 selected chapter"
 msgid_plural "%1 selected chapters"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
-msgid "1 download is still in progress."
-msgid_plural "%1 downloads are still in progress."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
@@ -154,12 +143,6 @@ msgstr ""
 msgid "Archive deletion pending: close reader"
 msgstr ""
 
-msgid "Archive removed; bookkeeping pending"
-msgstr ""
-
-msgid "Archive removed; metadata retained"
-msgstr ""
-
 msgid "Artist"
 msgstr ""
 
@@ -173,18 +156,12 @@ msgstr ""
 msgid "Automatic"
 msgstr ""
 
-msgid "Automatic chapter cleanup has %1 pending files."
-msgstr ""
-
 msgid ""
 "Automatic chapter cleanup is paused because its saved data uses an "
 "unsupported version."
 msgstr ""
 
 msgid "Automatic chapter cleanup paused for %1 unsafe files."
-msgstr ""
-
-msgid "Automatic chapter cleanup will retry %1 files."
 msgstr ""
 
 msgid "Available"
@@ -225,12 +202,6 @@ msgstr ""
 
 msgid "Cancel search"
 msgstr ""
-
-msgid "Canceled %1 queued download."
-msgid_plural "Canceled %1 queued downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
 
 msgid "Cannot cancel download: storage is ambiguous"
 msgstr ""
@@ -332,8 +303,33 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
+msgid ""
+"Could not confirm the read state was saved. No deletion was started. Reopen "
+"the chapter list and try again."
+msgstr ""
+
+msgid ""
+"Could not confirm the unread state was saved. Pending deletion may still "
+"run. Reopen the chapter list and try again."
+msgstr ""
+
 msgid "Could not connect to Suwayomi."
 msgstr ""
+
+msgid ""
+"Could not delete %1 download safely. Check its status in the chapter list."
+msgid_plural ""
+"Could not delete %1 downloads safely. Check their status in the chapter list."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Could not delete %1 download. Reopen the chapter list and try again."
+msgid_plural ""
+"Could not delete %1 downloads. Reopen the chapter list and try again."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Could not delete saved filter."
 msgstr ""
@@ -368,7 +364,7 @@ msgstr ""
 msgid "Could not queue download: %1"
 msgstr ""
 
-msgid "Could not queue downloads: %1"
+msgid "Could not queue downloads. Reopen the chapter list and try again."
 msgstr ""
 
 msgid "Could not redownload chapter."
@@ -467,18 +463,6 @@ msgstr ""
 msgid "Delete while reading: %1"
 msgstr ""
 
-msgid "Deleted %1 chapter from device."
-msgid_plural "Deleted %1 chapters from device."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
-msgid "Deleted %1 selected chapter from device."
-msgid_plural "Deleted %1 selected chapters from device."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
 msgid "Deletion not accepted: download busy; request again"
 msgstr ""
 
@@ -559,9 +543,6 @@ msgstr ""
 msgid "Download the chapter first."
 msgstr ""
 
-msgid "Download verified."
-msgstr ""
-
 msgid "Download-ahead buffer is already downloaded or queued."
 msgstr ""
 
@@ -581,11 +562,6 @@ msgid "Downloading %1/%2"
 msgstr ""
 
 msgid "Downloads"
-msgstr ""
-
-msgid ""
-"Downloads are busy and were not changed. Request deletion again after they "
-"finish."
 msgstr ""
 
 msgid "Downloads · %1 failed"
@@ -655,12 +631,6 @@ msgstr ""
 
 msgid "Failed"
 msgstr ""
-
-msgid "Failed to delete %1 download."
-msgid_plural "Failed to delete %1 downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
 
 msgid "Failed to queue %1 chapter download."
 msgid_plural "Failed to queue %1 chapter downloads."
@@ -813,11 +783,6 @@ msgstr ""
 msgid "Mark unread"
 msgstr ""
 
-msgid ""
-"Marked read: %1. Archives removed: %2. Pending: %3. Busy (not accepted): %4. "
-"Blocked: %5."
-msgstr ""
-
 msgid "Never ask"
 msgstr ""
 
@@ -879,13 +844,13 @@ msgstr ""
 msgid "No poster"
 msgstr ""
 
+msgid "No read downloads to delete."
+msgstr ""
+
 msgid "No results"
 msgstr ""
 
 msgid "No saved filters."
-msgstr ""
-
-msgid "No selected chapters were deleted."
 msgstr ""
 
 msgid "No unread chapters available to download."
@@ -912,15 +877,6 @@ msgid "On hiatus"
 msgstr ""
 
 msgid "Ongoing"
-msgstr ""
-
-msgid ""
-"Only chapter archives are removed. Reading metadata and backups are retained."
-msgstr ""
-
-msgid ""
-"Only this batch will be queued. If availability changes, fewer downloads may "
-"be added. Run another action for more."
 msgstr ""
 
 msgctxt "chapter action"
@@ -981,12 +937,6 @@ msgstr[2] ""
 msgid "Queued"
 msgstr ""
 
-msgid "Queued %1 chapter download."
-msgid_plural "Queued %1 chapter downloads."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
 msgid "Queued %1 selected chapter download."
 msgid_plural "Queued %1 selected chapter downloads."
 msgstr[0] ""
@@ -996,18 +946,10 @@ msgstr[2] ""
 msgid "Read"
 msgstr ""
 
-msgid ""
-"Read state could not be confirmed saved. No deletion was started by this "
-"action; reading metadata may already have changed."
-msgstr ""
-
 msgid "Read state is already synced."
 msgstr ""
 
 msgid "Read state sync is already running."
-msgstr ""
-
-msgid "Read state sync started."
 msgstr ""
 
 msgid "Redownload"
@@ -1035,6 +977,9 @@ msgid "Remove from library"
 msgstr ""
 
 msgid "Removing from library..."
+msgstr ""
+
+msgid "Reopen the chapter list and try again."
 msgstr ""
 
 msgid "Reset filters"
@@ -1147,24 +1092,6 @@ msgstr ""
 
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
-msgid "Skipped %1 chapter not downloaded."
-msgid_plural "Skipped %1 chapters not downloaded."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
-msgid "Skipped %1 chapter."
-msgid_plural "Skipped %1 chapters."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
-msgid "Skipped %1 download."
-msgid_plural "Skipped %1 downloads."
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
@@ -1322,17 +1249,7 @@ msgstr ""
 msgid "Unread"
 msgstr ""
 
-msgid ""
-"Unread state could not be confirmed saved. Deletion revocation was not "
-"confirmed; reading metadata may already have changed."
-msgstr ""
-
 msgid "Unsupported"
-msgstr ""
-
-msgid ""
-"Unverified archives are preserved. No replacement archive will be deleted by "
-"this request."
 msgstr ""
 
 msgctxt "extension action"

@@ -62,7 +62,8 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
         result_path = result_path,
     }
 
-    active = SubprocessJob.start({
+    local start_error
+    active, start_error = SubprocessJob.start({
         active = active,
         ffi_util = FFIUtil,
         ui_manager = UIManager,
@@ -83,7 +84,7 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
         end,
         on_error = function(err)
             self.pending_read_sync_active = nil
-            self:showMessage(I18n.f("Could not start read sync: %1", err or I18n.t("unknown error")))
+            SuwayomiDebug.log({ operation = "startPendingReadSyncWorker", event = "error", error = err })
         end,
         on_cleanup = function(cleaned_active)
             if self.pending_read_sync_active == cleaned_active then
@@ -93,7 +94,7 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
     })
     self.pending_read_sync_active = active and not active.cleaned and active or nil
     if not active then
-        return false, #batch
+        return false, #batch, start_error
     end
     return true, #batch
 end
@@ -264,10 +265,12 @@ function Methods:syncReadStateNow()
         return false
     end
 
-    local started = self:startPendingReadSyncWorker(credentials, self.read_sync_batch_size)
+    local started, attempted, err = self:startPendingReadSyncWorker(credentials, self.read_sync_batch_size)
     if started then
-        self:showMessage(I18n.t("Read state sync started."))
         return true
+    end
+    if err or (attempted or 0) > 0 then
+        self:showMessage(I18n.f("Could not start read sync: %1", err or I18n.t("unknown error")))
     end
     return false
 end

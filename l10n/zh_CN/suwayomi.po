@@ -34,25 +34,20 @@ msgctxt "source filter sort summary"
 msgid "%1 - Descending"
 msgstr "%1 - 降序"
 
-msgid "%1 active download."
-msgid_plural "%1 active downloads."
-msgstr[0] "%1 个下载正在进行。"
-
 #. Translators: %1 active downloads, %2 queued downloads, %3 failed downloads.
 msgid "%1 active, %2 queued, %3 failed"
 msgstr "%1 个进行中，%2 个排队中，%3 个失败"
-
-#, fuzzy
-msgid "%1 already downloaded or in the download queue."
-msgid_plural "%1 already downloaded or in the download queue."
-msgstr[0] "已跳过 %1 个已下载或已排队的项目。"
 
 msgid "%1 chapter"
 msgid_plural "%1 chapters"
 msgstr[0] "%1 章"
 
-msgid "%1 eligible chapter left outside this batch."
-msgid_plural "%1 eligible chapters left outside this batch."
+msgid "%1 download is busy. Delete it after it finishes."
+msgid_plural "%1 downloads are busy. Delete them after they finish."
+msgstr[0] ""
+
+msgid "%1 download is busy. Mark it read again after it finishes."
+msgid_plural "%1 downloads are busy. Mark them read again after they finish."
 msgstr[0] ""
 
 msgid "%1 failed for %2"
@@ -65,9 +60,11 @@ msgid "%1 manga"
 msgid_plural "%1 manga"
 msgstr[0] "%1 部漫画"
 
-msgid "%1 missing download."
-msgid_plural "%1 missing downloads."
-msgstr[0] "缺少 %1 个下载。"
+#, fuzzy
+msgid "%1 more chapter is available. Run this action again to download it."
+msgid_plural ""
+"%1 more chapters are available. Run this action again to download them."
+msgstr[0] "没有可下载的未读章节。"
 
 msgid "%1 result"
 msgid_plural "%1 results"
@@ -83,10 +80,6 @@ msgstr[0] "已选择 %1 项"
 msgid "%1 selected chapter"
 msgid_plural "%1 selected chapters"
 msgstr[0] "已选择 %1 章"
-
-msgid "1 download is still in progress."
-msgid_plural "%1 downloads are still in progress."
-msgstr[0] "还有 1 个下载正在进行。"
 
 msgid "1 selected"
 msgid_plural "%1 selected"
@@ -133,12 +126,6 @@ msgstr ""
 msgid "Archive deletion pending: close reader"
 msgstr ""
 
-msgid "Archive removed; bookkeeping pending"
-msgstr ""
-
-msgid "Archive removed; metadata retained"
-msgstr ""
-
 msgid "Artist"
 msgstr "画师"
 
@@ -152,18 +139,12 @@ msgstr "作者"
 msgid "Automatic"
 msgstr "自动"
 
-msgid "Automatic chapter cleanup has %1 pending files."
-msgstr ""
-
 msgid ""
 "Automatic chapter cleanup is paused because its saved data uses an "
 "unsupported version."
 msgstr ""
 
 msgid "Automatic chapter cleanup paused for %1 unsafe files."
-msgstr ""
-
-msgid "Automatic chapter cleanup will retry %1 files."
 msgstr ""
 
 msgid "Available"
@@ -204,10 +185,6 @@ msgstr "取消排队下载"
 
 msgid "Cancel search"
 msgstr "取消搜索"
-
-msgid "Canceled %1 queued download."
-msgid_plural "Canceled %1 queued downloads."
-msgstr[0] "已取消 %1 个排队下载。"
 
 msgid "Cannot cancel download: storage is ambiguous"
 msgstr ""
@@ -310,8 +287,29 @@ msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] "无法开始章节下载：%1"
 
+msgid ""
+"Could not confirm the read state was saved. No deletion was started. Reopen "
+"the chapter list and try again."
+msgstr ""
+
+msgid ""
+"Could not confirm the unread state was saved. Pending deletion may still "
+"run. Reopen the chapter list and try again."
+msgstr ""
+
 msgid "Could not connect to Suwayomi."
 msgstr "无法连接到 Suwayomi。"
+
+msgid ""
+"Could not delete %1 download safely. Check its status in the chapter list."
+msgid_plural ""
+"Could not delete %1 downloads safely. Check their status in the chapter list."
+msgstr[0] ""
+
+msgid "Could not delete %1 download. Reopen the chapter list and try again."
+msgid_plural ""
+"Could not delete %1 downloads. Reopen the chapter list and try again."
+msgstr[0] ""
 
 msgid "Could not delete saved filter."
 msgstr "无法删除已保存的筛选器。"
@@ -347,9 +345,8 @@ msgstr "无法加载源筛选器。"
 msgid "Could not queue download: %1"
 msgstr "无法开始章节下载：%1"
 
-#, fuzzy
-msgid "Could not queue downloads: %1"
-msgstr "无法开始章节下载：%1"
+msgid "Could not queue downloads. Reopen the chapter list and try again."
+msgstr ""
 
 #, fuzzy
 msgid "Could not redownload chapter."
@@ -446,14 +443,6 @@ msgstr "要删除已保存的筛选器“%1”吗？"
 msgid "Delete while reading: %1"
 msgstr "阅读时删除：%1"
 
-msgid "Deleted %1 chapter from device."
-msgid_plural "Deleted %1 chapters from device."
-msgstr[0] "已从设备删除 %1 章。"
-
-msgid "Deleted %1 selected chapter from device."
-msgid_plural "Deleted %1 selected chapters from device."
-msgstr[0] "已从设备删除 %1 个选中章节。"
-
 msgid "Deletion not accepted: download busy; request again"
 msgstr ""
 
@@ -539,10 +528,6 @@ msgstr "下载选中的"
 msgid "Download the chapter first."
 msgstr "请先下载此章节。"
 
-#, fuzzy
-msgid "Download verified."
-msgstr "已下载"
-
 msgid "Download-ahead buffer is already downloaded or queued."
 msgstr "提前下载缓冲中的章节已下载或已加入队列。"
 
@@ -563,11 +548,6 @@ msgstr "正在下载 %1/%2"
 
 msgid "Downloads"
 msgstr "下载"
-
-msgid ""
-"Downloads are busy and were not changed. Request deletion again after they "
-"finish."
-msgstr ""
 
 msgid "Downloads · %1 failed"
 msgid_plural "Downloads · %1 failed"
@@ -634,10 +614,6 @@ msgstr "扩展更新超时。"
 
 msgid "Failed"
 msgstr "失败"
-
-msgid "Failed to delete %1 download."
-msgid_plural "Failed to delete %1 downloads."
-msgstr[0] "删除 %1 个下载失败。"
 
 #, fuzzy
 msgid "Failed to queue %1 chapter download."
@@ -791,11 +767,6 @@ msgstr "标记已读"
 msgid "Mark unread"
 msgstr "标记未读"
 
-msgid ""
-"Marked read: %1. Archives removed: %2. Pending: %3. Busy (not accepted): %4. "
-"Blocked: %5."
-msgstr ""
-
 msgid "Never ask"
 msgstr "从不询问"
 
@@ -860,14 +831,15 @@ msgstr "没有新的下载排队。"
 msgid "No poster"
 msgstr "没有封面"
 
+#, fuzzy
+msgid "No read downloads to delete."
+msgstr "没有新的下载排队。"
+
 msgid "No results"
 msgstr "没有结果"
 
 msgid "No saved filters."
 msgstr "没有已保存的筛选器。"
-
-msgid "No selected chapters were deleted."
-msgstr "未删除选中的章节。"
 
 msgid "No unread chapters available to download."
 msgstr "没有可下载的未读章节。"
@@ -894,15 +866,6 @@ msgstr "暂停更新"
 
 msgid "Ongoing"
 msgstr "连载中"
-
-msgid ""
-"Only chapter archives are removed. Reading metadata and backups are retained."
-msgstr ""
-
-msgid ""
-"Only this batch will be queued. If availability changes, fewer downloads may "
-"be added. Run another action for more."
-msgstr ""
 
 msgctxt "chapter action"
 msgid "Open"
@@ -959,11 +922,6 @@ msgstr[0] "将 %1 个未读章节下载加入队列？"
 msgid "Queued"
 msgstr "排队中"
 
-#, fuzzy
-msgid "Queued %1 chapter download."
-msgid_plural "Queued %1 chapter downloads."
-msgstr[0] "已将 %1 个选中章节下载加入队列。"
-
 msgid "Queued %1 selected chapter download."
 msgid_plural "Queued %1 selected chapter downloads."
 msgstr[0] "已将 %1 个选中章节下载加入队列。"
@@ -971,19 +929,11 @@ msgstr[0] "已将 %1 个选中章节下载加入队列。"
 msgid "Read"
 msgstr "已读"
 
-msgid ""
-"Read state could not be confirmed saved. No deletion was started by this "
-"action; reading metadata may already have changed."
-msgstr ""
-
 msgid "Read state is already synced."
 msgstr "阅读状态已同步。"
 
 msgid "Read state sync is already running."
 msgstr "阅读状态同步已在运行。"
-
-msgid "Read state sync started."
-msgstr "阅读状态同步已开始。"
 
 #, fuzzy
 msgid "Redownload"
@@ -1012,6 +962,9 @@ msgstr "从书架移除"
 
 msgid "Removing from library..."
 msgstr "正在从书架移除..."
+
+msgid "Reopen the chapter list and try again."
+msgstr ""
 
 msgid "Reset filters"
 msgstr "重置筛选器"
@@ -1125,19 +1078,6 @@ msgstr "显示 NSFW 源：%1"
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
 msgstr[0] "已跳过 %1 个已下载或已排队的项目。"
-
-msgid "Skipped %1 chapter not downloaded."
-msgid_plural "Skipped %1 chapters not downloaded."
-msgstr[0] "已跳过 %1 个未下载章节。"
-
-#, fuzzy
-msgid "Skipped %1 chapter."
-msgid_plural "Skipped %1 chapters."
-msgstr[0] "已跳过 %1 个未下载章节。"
-
-msgid "Skipped %1 download."
-msgid_plural "Skipped %1 downloads."
-msgstr[0] "已跳过 %1 个下载。"
 
 msgid "Source"
 msgstr "源"
@@ -1294,18 +1234,8 @@ msgstr "未知错误"
 msgid "Unread"
 msgstr "未读"
 
-msgid ""
-"Unread state could not be confirmed saved. Deletion revocation was not "
-"confirmed; reading metadata may already have changed."
-msgstr ""
-
 msgid "Unsupported"
 msgstr "不支持"
-
-msgid ""
-"Unverified archives are preserved. No replacement archive will be deleted by "
-"this request."
-msgstr ""
 
 msgctxt "extension action"
 msgid "Update"
