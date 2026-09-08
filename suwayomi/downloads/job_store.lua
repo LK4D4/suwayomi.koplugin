@@ -179,6 +179,9 @@ function JobStore:copyMangaMetadata(manga)
     local copied = {
         id = manga.id,
         title = manga.title,
+        endpoint_scope = self.settings and self.settings.normalizeEndpointScope
+            and self.settings:normalizeEndpointScope(manga.endpoint_scope) or nil,
+        in_library = manga.in_library,
     }
     local source = self:copySourceMetadata(manga.source)
     if source then
@@ -287,47 +290,48 @@ function JobStore:upsertMany(new_jobs)
     return new_jobs
 end
 
+function JobStore:admitDocument(doc, new_jobs, provenance, manual_deletion)
+    if doc.download_queue ~= nil and type(doc.download_queue) ~= "table" then
+        error("unsupported_download_queue", 0)
+    end
+    local jobs = doc.download_queue or {}
+    local indexes, last_index = {}, 0
+    for index, existing in pairs(jobs) do
+        if type(index) == "number" and index > last_index and index == math.floor(index) then
+            last_index = index
+        end
+        if hasValidJobKey(existing) then
+            if indexes[existing.key] then error("duplicate_download_job", 0) end
+            indexes[existing.key] = index
+        end
+    end
+    for _, job in ipairs(new_jobs) do
+        local existing = indexes[job.key] and jobs[indexes[job.key]]
+        if existing and (provenance ~= "explicit" or existing.state ~= "failed" or existing.version ~= nil) then
+            error("download_job_owned_or_unsupported", 0)
+        end
+    end
+    if manual_deletion and #new_jobs > 0 then manual_deletion:admitDownloads(doc, new_jobs, provenance) end
+    for _, job in ipairs(new_jobs) do
+        job.provenance = provenance
+        local index = indexes[job.key]
+        if not index then
+            last_index = last_index + 1
+            index = last_index
+            indexes[job.key] = index
+        end
+        jobs[index] = job
+    end
+    doc.download_queue = jobs
+end
+
 function JobStore:admit(new_jobs, provenance, manual_deletion)
     if not self.settings or not self.settings.getStore then
         return nil, "checked_store_unavailable"
     end
     local call_ok, ok, err = pcall(function()
         return self.settings:getStore():saveDocument(function(doc)
-            if doc.download_queue ~= nil and type(doc.download_queue) ~= "table" then
-                error("unsupported_download_queue", 0)
-            end
-            local jobs = doc.download_queue or {}
-            local indexes, last_index = {}, 0
-            for index, existing in pairs(jobs) do
-                if type(index) == "number" and index > last_index and index == math.floor(index) then
-                    last_index = index
-                end
-                if hasValidJobKey(existing) then
-                    if indexes[existing.key] then error("duplicate_download_job", 0) end
-                    indexes[existing.key] = index
-                end
-            end
-            for _, job in ipairs(new_jobs) do
-                local index = indexes[job.key]
-                local existing = index and jobs[index]
-                if existing and (existing.state ~= "failed" or existing.version ~= nil) then
-                    error("download_job_owned_or_unsupported", 0)
-                end
-            end
-            if manual_deletion then
-                manual_deletion:admitDownloads(doc, new_jobs, provenance)
-            end
-            for _, job in ipairs(new_jobs) do
-                job.provenance = provenance
-                local index = indexes[job.key]
-                if not index then
-                    last_index = last_index + 1
-                    index = last_index
-                    indexes[job.key] = index
-                end
-                jobs[index] = job
-            end
-            doc.download_queue = jobs
+            self:admitDocument(doc, new_jobs, provenance, manual_deletion)
         end)
     end)
     if not call_ok then return nil, ok end

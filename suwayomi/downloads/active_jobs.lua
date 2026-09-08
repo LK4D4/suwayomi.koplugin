@@ -665,10 +665,10 @@ function ActiveJobs:poll()
     })
 end
 
-function ActiveJobs:shutdown()
+function ActiveJobs:shutdown(deadline, now)
     self.retry_wakeup_at, self.poll_scheduled = nil, false
-    local now = require("socket").gettime
-    local deadline = now() + 2
+    now = now or require("socket").gettime
+    deadline = deadline or now() + 2
     local workers = {}
     for _, job in pairs(self.jobs) do if job.pid then workers[job.pid] = job end end
     for pid, job in pairs(self.terminating_pids) do workers[pid] = job end

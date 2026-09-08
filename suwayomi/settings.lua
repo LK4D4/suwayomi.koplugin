@@ -374,6 +374,15 @@ function SuwayomiSettings:normalizeServerURL(server_url)
     return "http://" .. server_url
 end
 
+function SuwayomiSettings:normalizeEndpointScope(server_url)
+    if type(server_url) ~= "string" or server_url == "" then return nil end
+    local normalized = self:normalizeServerURL(server_url)
+    local authority = normalized:match("^https?://([^/]+)")
+    -- Authentication belongs in credentials, never in persisted origin associations.
+    if not authority or authority:find("@", 1, true) or normalized:find("[?#]") then return nil end
+    return normalized:gsub("/+$", "")
+end
+
 function SuwayomiSettings:load()
     return self:normalizeCredentials(self:getStore():readKey("credentials", copyTable(DEFAULT_CREDENTIALS)))
 end

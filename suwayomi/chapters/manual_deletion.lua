@@ -202,8 +202,15 @@ function ManualDeletion:capture(key, path, root)
     return result
 end
 
-local function mergeLedger(doc, ledger)
+local function mergeLedger(doc, ledger, replace_read_state)
     if type(doc.chapter_ledger) ~= "table" then doc.chapter_ledger = {} end
+    if replace_read_state then
+        for key, entry in pairs(doc.chapter_ledger) do
+            if ledger[key] == nil and type(entry) == "table" then
+                entry.read, entry.pending_read_sync, entry.pending_read_state = false, nil, nil
+            end
+        end
+    end
     for key, supplied in pairs(ledger or {}) do
         if type(supplied) == "table" then
             local current = doc.chapter_ledger[key]
@@ -219,10 +226,11 @@ local function mergeLedger(doc, ledger)
     end
 end
 
-function ManualDeletion:commitRead(ledger, captures, unread_keys)
+function ManualDeletion:commitRead(ledger, captures, unread_keys, mangas, replace_read_state)
     local outcomes = {}
     local ok, err = self:_save(function(doc)
-        mergeLedger(doc, ledger)
+        if self.queue.refill then self.queue.refill:enrollLedger(doc, ledger, mangas) end
+        mergeLedger(doc, ledger, replace_read_state)
         local state, state_error = collection(doc, #(captures or {}) > 0)
         if state then
             for key, request in pairs(state.requests) do
@@ -291,6 +299,7 @@ function ManualDeletion:commitRead(ledger, captures, unread_keys)
             captured.target = copy(outcomes[captured.key].target)
         end
     end
+    if self.queue.refill then self.queue.refill:wake(); self.queue.refill.onChanged() end
     return true, nil, outcomes
 end
 

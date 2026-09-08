@@ -115,6 +115,21 @@ function RequestWorker:run(credentials, request, result_path)
                 max_result_bytes = SubprocessJob.max_result_bytes,
             })
         end
+        if request.action == "fetch_refill_context" then
+            local chapters = SuwayomiAPI.fetchChaptersForManga(credentials, request.manga_id, {
+                max_result_bytes = SubprocessJob.max_result_bytes,
+            })
+            if not chapters.ok then return chapters end
+            local manga = request.manga
+            if type(manga) ~= "table" or not manga.title or manga.title == "" or type(manga.source) ~= "table"
+                or not (manga.source.name or manga.source.displayName or manga.source.display_name) then
+                local metadata = SuwayomiAPI.fetchMangaById(credentials, request.manga_id)
+                if not metadata.ok then return metadata end
+                manga = metadata.manga
+            end
+            chapters.manga = manga
+            return chapters
+        end
         if request.action == "fetch_reader_return_chapters_for_manga" then
             return fetchReaderReturnChapters(credentials, request.manga_id)
         end

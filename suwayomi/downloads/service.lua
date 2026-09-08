@@ -1,8 +1,9 @@
--- Boundary: process-owned downloads, durable manual deletion, completion, and disposable views.
+-- Boundary: process-owned downloads, durable refill/deletion, completion, and disposable views.
 -- Dependencies are process modules; no host owns workers or durable completion.
 
 local Queue = require("suwayomi/downloads/queue")
 local ManualDeletion = require("suwayomi/chapters/manual_deletion")
+local Refill = require("suwayomi/downloads/refill")
 local Settings = require("suwayomi/settings")
 local UIManager = require("ui/uimanager")
 local Debug = require("suwayomi/debug")
@@ -42,9 +43,17 @@ function Service:new(options)
         queue = service.queue,
         ui_manager = service.ui_manager,
         now = options.now,
-        onChanged = function() service:notify(nil, true) end,
+        onChanged = function()
+            if service.refill then service.refill:wake() end
+            service:notify(nil, true)
+        end,
     }
     service.queue.manual_deletion = service.manual_deletion
+    service.refill = Refill:new{
+        settings = service.settings, queue = service.queue, ui_manager = service.ui_manager,
+        now = options.now, onChanged = function() service:notify(nil, true) end,
+    }
+    service.queue.refill = service.refill
     service.cleanup = require("suwayomi/downloads/cleanup_adapter").new(service)
     return service
 end
@@ -66,6 +75,7 @@ function Service:start()
     self:installQuit()
     self.queue:recover()
     self.manual_deletion:start()
+    self.refill:start()
     self.cleanup:processFinishedChapterCleanup()
 end
 
@@ -119,6 +129,7 @@ function Service:statusChanged()
     if self.stopped then return end
     if self.cleanup then self.cleanup:scheduleFinishedChapterCleanup(0) end
     if self.manual_deletion then self.manual_deletion:wake() end
+    if self.refill then self.refill:wake() end
     self:notify()
 end
 
@@ -160,6 +171,9 @@ function Service:commitCompletion(job, path)
             entry.manga_id, entry.chapter_id = tostring(job.manga.id or ""), tostring(job.chapter.id or "")
             entry.manga_title, entry.chapter_name = job.manga.title, job.chapter.name
             entry.path = path
+            if not verification then
+                entry.endpoint_scope = self.settings:normalizeEndpointScope(job.manga.endpoint_scope)
+            end
             doc.chapter_ledger[key] = entry
             if type(doc.reader_return_contexts) ~= "table" then doc.reader_return_contexts = {} end
             local context = type(doc.reader_return_contexts[path]) == "table" and doc.reader_return_contexts[path] or {}
@@ -167,6 +181,7 @@ function Service:commitCompletion(job, path)
             context.manga_id, context.manga_title = entry.manga_id, entry.manga_title
             context.chapter_id, context.chapter_name = entry.chapter_id, entry.chapter_name
             context.in_library, context.source = job.manga.in_library, copy(job.manga.source)
+            context.endpoint_scope = entry.endpoint_scope
             doc.reader_return_contexts[path] = context
             -- Inspection observes an existing archive; it never publishes a
             -- new generation or supersedes an accepted archive-only request.
@@ -200,13 +215,17 @@ end
 
 function Service:shutdown()
     if self.stopped then return end
+    local now = require("socket").gettime
+    local deadline = now() + 2
     self.stopped, self.queue.stopped = true, true
     for subscription in pairs(self.subscribers) do subscription.callback = nil end
     self.subscribers = {}
     pcall(self.cleanup.cancelFinishedChapterCleanup, self.cleanup)
     pcall(self.manual_deletion.stop, self.manual_deletion)
-    self.queue:invalidateVerification()
-    self.queue.active_job_lifecycle:shutdown()
+    if now() < deadline then self.queue:invalidateVerification()
+    elseif self.queue.verification then self.queue.verification.canceled = true end
+    pcall(self.refill.shutdown, self.refill, deadline, now)
+    self.queue.active_job_lifecycle:shutdown(deadline, now)
 end
 
 return Service

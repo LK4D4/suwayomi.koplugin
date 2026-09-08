@@ -324,6 +324,7 @@ function DownloadQueue:getSnapshot()
         active = {},
         queued = {},
         failed = {},
+        refills = self.refill and self.refill:snapshot() or {},
         manual_deletion = {},
         manual_deletion_error = "unavailable",
     }
@@ -564,22 +565,53 @@ function DownloadQueue:commitChapterCompletion(active, path)
     return ok, err
 end
 
-function DownloadQueue:cancelJobRecord(job)
-    local progress = self:withArchiveEvidence(job, { state = "failed" })
-    if progress.archive_state then
-        progress.error = job.progress.error
-        local failed = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "failed", {
-            repair = job.repair, retry_count = job.retry_count, progress = progress,
-            archive_generation = job.archive_generation, provenance = job.provenance,
-        })
-        local ok, err = self:upsertPersistentJob(failed)
-        if ok then self.statuses[failed.key] = self:statusForJob(failed, "failed") end
-        return ok, err
+function DownloadQueue:cancelRecords(targets, retire_all)
+    if not self.settings or not self.settings.getStore then return nil, "checked_store_unavailable" end
+    local called, ok, err = pcall(function()
+        return self.settings:getStore():saveDocument(function(doc)
+            if doc.download_queue ~= nil and type(doc.download_queue) ~= "table" then
+                error("unsupported_download_queue", 0)
+            end
+            local jobs, remove_indexes, mangas = doc.download_queue or {}, {}, {}
+            for key, job in pairs(targets) do
+                if job.manga and job.manga.id then mangas[tostring(job.manga.id)] = true end
+                for index, stored in pairs(jobs) do
+                    if type(stored) == "table" and stored.key == key then
+                        if stored.version ~= nil or type(index) ~= "number" or index < 1 or index % 1 ~= 0
+                            or stored.archive_generation ~= job.archive_generation then
+                            error("download_job_replaced_or_unsupported", 0)
+                        end
+                        local progress = self:withArchiveEvidence(stored, { state = "failed" })
+                        if progress.archive_state then
+                            progress.error = stored.progress.error
+                            jobs[index] = self:buildPersistentJob(stored.manga, stored.chapter, stored.download_directory, "failed", {
+                                repair = stored.repair, retry_count = stored.retry_count, progress = progress,
+                                archive_generation = stored.archive_generation, provenance = stored.provenance,
+                            })
+                        else remove_indexes[#remove_indexes + 1] = index end
+                    end
+                end
+            end
+            table.sort(remove_indexes, function(a, b) return a > b end)
+            for _, index in ipairs(remove_indexes) do table.remove(jobs, index) end
+            doc.download_queue = jobs
+            if self.refill then self.refill:retire(doc, not retire_all and mangas or nil) end
+        end)
+    end)
+    if not called then return nil, ok end
+    if not ok then self:scheduleReconciliation(); return nil, err end
+    for key in pairs(targets) do
+        local job = self:findPersistentJob(key)
+        self.statuses[key] = job and self:statusForJob(job, job.state) or nil
+        self:invalidateVerification(key)
     end
+    if self.refill then self.refill:wake() end
+    return true
+end
+
+function DownloadQueue:cancelJobRecord(job)
     local key = job.key or self:getKey(job.manga, job.chapter)
-    local ok, err = self:removePersistentJob(key)
-    if ok then self.statuses[key] = nil end
-    return ok, err
+    return self:cancelRecords({ [key] = job })
 end
 
 function DownloadQueue:cancelPending(manga, chapter)
@@ -630,79 +662,49 @@ function DownloadQueue:cancelPending(manga, chapter)
     return false, nil
 end
 
-function DownloadQueue:cancelQueued()
+function DownloadQueue:cancelDownloads(include_active)
     if not self:checkStoreFence() then
         self:notifyDownloadFailure(I18n.t("Cannot cancel downloads: storage is ambiguous"))
         return 0, "store_blocked"
     end
-    local canceled_keys = {}
-    local remaining_items = {}
-
-    for _index, item in ipairs(self.items or {}) do
-        local key = item.key or self:getKey(item.manga or {}, item.chapter or {})
-        if key and key ~= "" then
-            canceled_keys[key] = true
-        else
-            table.insert(remaining_items, item)
+    local targets, count = {}, 0
+    for _, job in ipairs(self:loadPersistentJobs()) do
+        if job.version == nil and (job.state == "queued" or include_active and job.state == "downloading")
+            and (include_active or not self:getActiveJob(job.key)) then
+            targets[job.key] = job
         end
     end
-
-    local remaining_jobs = {}
-    for _index, job in ipairs(self:loadPersistentJobs()) do
-        local key = job.key or self:getKey(job.manga or {}, job.chapter or {})
-        if job.version == nil and job.state == "queued" and not self:getActiveJob(key) then
-            if key and key ~= "" then
-                canceled_keys[key] = true
-                local progress = self:withArchiveEvidence(job, { state = "failed" })
-                if progress.archive_state then
-                    progress.error = job.progress.error
-                    remaining_jobs[#remaining_jobs + 1] = self:buildPersistentJob(
-                        job.manga, job.chapter, job.download_directory, "failed",
-                        { repair = job.repair, retry_count = job.retry_count, progress = progress,
-                            archive_generation = job.archive_generation, provenance = job.provenance })
-                end
+    if include_active then
+        for key, active in pairs(self.active_job_lifecycle.jobs or {}) do targets[key] = active end
+    end
+    for _ in pairs(targets) do count = count + 1 end
+    if count == 0 and not include_active then return 0 end
+    local ok, err = self:cancelRecords(targets, include_active)
+    if not ok then return 0, err end
+    local remaining = {}
+    for _, item in ipairs(self.items) do
+        if not targets[item.key or self:getKey(item.manga, item.chapter)] then remaining[#remaining + 1] = item end
+    end
+    self.items = remaining
+    if include_active then
+        for key in pairs(targets) do
+            local active = self:getActiveJob(key)
+            if active then
+                self.active_job_lifecycle:terminateJob(active)
+                self.active_job_lifecycle:removeJob(active)
             end
-        else
-            table.insert(remaining_jobs, job)
         end
     end
+    self.onStatusChanged()
+    return count
+end
 
-    local canceled = 0
-    for _ in pairs(canceled_keys) do
-        canceled = canceled + 1
-    end
-
-    if canceled > 0 then
-        local saved, err = self:savePersistentJobs(remaining_jobs)
-        if not saved then
-            self:notifyDownloadFailure(err or "Failed to cancel downloads")
-            return 0, err or "save_failed"
-        end
-        self.items = remaining_items
-        for key in pairs(canceled_keys) do
-            self:invalidateVerification(key)
-            local job = self:findPersistentJob(key)
-            self.statuses[key] = job and self:statusForJob(job, job.state) or nil
-        end
-        self.onStatusChanged()
-    end
-    return canceled
+function DownloadQueue:cancelQueued()
+    return self:cancelDownloads(false)
 end
 
 function DownloadQueue:cancelAll()
-    if not self:checkStoreFence() then
-        self:notifyDownloadFailure(I18n.t("Cannot cancel downloads: storage is ambiguous"))
-        return 0, "store_blocked"
-    end
-    local queued, queued_err = self:cancelQueued()
-    local active = 0
-    local active_err = nil
-    if self.active_job_lifecycle.cancelAll then
-        active, active_err = self.active_job_lifecycle:cancelAll()
-    end
-    local total = (queued or 0) + (active or 0)
-    local err = active_err or queued_err
-    return total, err
+    return self:cancelDownloads(true)
 end
 
 function DownloadQueue:splitUtf8Chars(text)
