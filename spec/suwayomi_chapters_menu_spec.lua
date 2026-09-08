@@ -48,7 +48,7 @@ describe("suwayomi/chapters/menu", function()
         local captured_title_options
         local performed_action
         local performed_menu_context
-        local plugin = {}
+        local plugin = { getMangaRefillRequest = function() end }
         for name, method in pairs(ChapterMenu.methods) do
             plugin[name] = method
         end
@@ -142,6 +142,7 @@ describe("suwayomi/chapters/menu", function()
             return { x = 3, y = 4, w = 32, h = 32 }
         end
         local plugin = {
+            getMangaRefillRequest = function() end,
             current_chapter_context = {
                 chapters = {
                     { id = "c1", name = "Chapter 1" },
@@ -227,6 +228,7 @@ describe("suwayomi/chapters/menu", function()
         package.loaded["suwayomi/chapters/menu"] = nil
         local ChapterMenu = require("suwayomi/chapters/menu")
         local plugin = {
+            getMangaRefillRequest = function() end,
             current_chapter_context = {
                 chapters = {
                     { id = "c1", name = "Chapter 1", is_read = true },
@@ -407,6 +409,7 @@ describe("suwayomi/chapters/menu", function()
         package.loaded["suwayomi/chapters/menu"] = nil
         local ChapterMenu = require("suwayomi/chapters/menu")
         local plugin = {
+            getMangaRefillRequest = function() end,
             current_chapter_context = {
                 chapters = {
                     { id = "c1", name = "Chapter 1" },
@@ -443,6 +446,7 @@ describe("suwayomi/chapters/menu", function()
         package.loaded["suwayomi/chapters/menu"] = nil
         local ChapterMenu = require("suwayomi/chapters/menu")
         local plugin = {
+            getMangaRefillRequest = function() end,
             current_chapter_context = {
                 chapters = {
                     { id = "c1", name = "Chapter 1" },
@@ -539,6 +543,7 @@ describe("suwayomi/chapters/menu", function()
         package.loaded["suwayomi/ui"] = nil
         local ChapterMenu = require("suwayomi/chapters/menu")
         local plugin = {
+            getMangaRefillRequest = function() end,
             current_chapter_context = {
                 manga = { id = "m1", title = "Frieren" },
                 chapters = {

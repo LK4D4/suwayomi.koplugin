@@ -90,6 +90,7 @@ local function installController(options)
             load = function()
                 return { server_url = "https://suwayomi.example" }
             end,
+            normalizeEndpointScope = function(_, url) return url end,
             loadMangaKeepNextUnreadDownloads = function(_, target_manga)
                 return (options.keep_next_limits or {})[tostring(target_manga and target_manga.id)]
                     or 0
@@ -100,10 +101,6 @@ local function installController(options)
                     return normalized
                 end
                 return 0
-            end,
-            saveMangaKeepNextUnreadDownloads = function(_, target_manga, limit)
-                table.insert(state.keep_next_saves, { manga = target_manga, limit = limit })
-                return limit
             end,
         }
     end
@@ -284,10 +281,7 @@ local function installController(options)
         end
         return chapters
     end
-    function plugin:getUnreadDownloadBufferCandidates(_, limit)
-        return self:getNextUnreadChaptersForDownload(nil, limit)
-    end
-    function plugin:applyMangaKeepNextUnreadDownloadsPolicy(manga)
+    function plugin:requestMangaRefill(manga)
         table.insert(state.keep_policy_calls, manga)
         return 1
     end
@@ -655,144 +649,6 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("c2", plugin.opened_chapters[1].chapter.id)
     end)
 
-    it("queues the next missing unread chapter after KOReader-finished state is merged", function()
-        clearModules()
-        helper.stubControllerDependencies()
-        package.preload["suwayomi/settings"] = function()
-            return {
-                loadDownloadDirectory = function()
-                    return "/downloads"
-                end,
-                loadMangaKeepNextUnreadDownloads = function(_, target_manga)
-                    return target_manga and target_manga.id == "m1" and 5 or 0
-                end,
-            }
-        end
-        package.preload["suwayomi/ui"] = function()
-            return {
-                showChapterMenu = function(options)
-                    return { name = "chapter-menu", options = options }
-                end,
-            }
-        end
-        package.preload["suwayomi/downloads/downloader"] = function()
-            return {
-                getTargetPath = function(_, download_directory, _, chapter)
-                    return nil, download_directory .. "/Manga/" .. chapter.name .. ".cbz"
-                end,
-                chapterExists = function(_, path)
-                    return path ~= "/downloads/Manga/Ch. 6.cbz"
-                end,
-            }
-        end
-
-        local MangaController = require("suwayomi/manga/controller")
-        local ChapterContext = require("suwayomi/chapters/context")
-        local ChapterMenu = require("suwayomi/chapters/menu")
-        local DownloadsController = require("suwayomi/downloads/controller")
-        local ReadSyncLedger = require("suwayomi/readsync/ledger")
-        local queue = {
-            status = {},
-        }
-        function queue:getKey(target_manga, chapter)
-            return tostring(target_manga and target_manga.id or "") .. ":" .. tostring(chapter and chapter.id or "")
-        end
-        function queue:getStatus(target_manga, chapter)
-            return self.status[self:getKey(target_manga, chapter)]
-        end
-        function queue:getSnapshot()
-            return { active = {}, queued = {}, failed = {}, manual_deletion = {} }
-        end
-        function queue:formatChapterMenuStatus()
-            return nil
-        end
-        function queue:enqueueBatch(target_manga, chapters, download_directory)
-            self.enqueued = {
-                manga = target_manga,
-                chapters = chapters,
-                download_directory = download_directory,
-            }
-            for _, chapter in ipairs(chapters) do
-                self.status[self:getKey(target_manga, chapter)] = { state = "queued" }
-            end
-            return #chapters
-        end
-        local plugin = {
-            max_batch_queue_chapters = 50,
-            refreshed = false,
-        }
-        for _, method_table in ipairs({
-            MangaController.methods,
-            ChapterContext.methods,
-            ChapterMenu.methods,
-            DownloadsController.methods,
-            ReadSyncLedger.methods,
-        }) do
-            for name, method in pairs(method_table) do
-                plugin[name] = method
-            end
-        end
-        function plugin:getDownloadQueue()
-            return queue
-        end
-        function plugin:getVisibleChapters(chapters)
-            return chapters
-        end
-        function plugin:loadKoreaderHistoryPaths()
-            return {}
-        end
-        function plugin:isChapterPathFinishedInKoreader(path)
-            return path == "/downloads/Manga/Ch. 1.cbz"
-        end
-        function plugin:setKoreaderChapterReadState()
-            return true
-        end
-        function plugin:loadChapterLedger()
-            return {}
-        end
-        function plugin:saveChapterLedger() end
-        function plugin:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, updates)
-            local key = self:getChapterLedgerKey(manga, chapter)
-            ledger[key] = updates
-            return updates
-        end
-        function plugin:upsertChapterLedgerEntry() end
-        function plugin:getChapterDownloadStatus(target_manga, chapter)
-            return queue:getStatus(target_manga, chapter)
-        end
-        function plugin:isChapterDownloaded(_, chapter)
-            return chapter.id ~= "c6"
-        end
-        function plugin:isChapterSelected()
-            return false
-        end
-        function plugin:withChapterMenuRefreshSuppressed(callback)
-            return callback()
-        end
-        function plugin:refreshChapterMenu(options)
-            self.refreshed = options
-        end
-
-        local manga = { id = "m1", title = "Frieren" }
-        plugin:showChapterResultForManga(manga, {
-            ok = true,
-            chapters = {
-                { id = "c1", name = "Ch. 1", is_read = false, _suwayomi_is_read = false },
-                { id = "c2", name = "Ch. 2", is_read = false },
-                { id = "c3", name = "Ch. 3", is_read = false },
-                { id = "c4", name = "Ch. 4", is_read = false },
-                { id = "c5", name = "Ch. 5", is_read = false },
-                { id = "c6", name = "Ch. 6", is_read = false },
-            },
-        })
-
-        assert.is_true(plugin.current_chapter_context.chapters[1].is_read)
-        assert.is_table(queue.enqueued)
-        assert.are.equal("/downloads", queue.enqueued.download_directory)
-        assert.are.equal("c6", queue.enqueued.chapters[1].id)
-        assert.are.equal(1, #queue.enqueued.chapters)
-        assert.are.same({ quick = true }, plugin.refreshed)
-    end)
 
     it("does not warn about missing chapter context before loading first unread", function()
         local plugin, state = installController({
@@ -1047,29 +903,6 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal(2, state.chapter_menu_options.itemnumber)
     end)
 
-    it("saves per-manga keep-next policy and queues the current buffer", function()
-        local plugin, state = installController({
-            context_chapters = {
-                { id = "c1", name = "Ch. 1", is_read = false },
-                { id = "c2", name = "Ch. 2", is_read = false },
-            },
-        })
-        local manga = { id = "m1", title = "Frieren" }
-
-        assert.is_true(plugin:performMangaAction(manga, "keep_next_5_unread"))
-        assert.are.equal(2, #plugin.enqueued[1].chapters)
-        assert.are.same({ { manga = manga, limit = 5 } }, state.keep_next_saves)
-
-        assert.is_true(plugin:performMangaAction(manga, "keep_next_50_unread"))
-        assert.are.equal("Queue", state.bulk_confirmation.ok_text)
-        assert.is_nil(state.keep_next_saves[2])
-        state.bulk_confirmation.callback()
-        assert.are.equal(50, state.keep_next_saves[2].limit)
-        assert.are.equal(2, #plugin.enqueued[2].chapters)
-
-        assert.is_true(plugin:performMangaAction(manga, "delete_read_downloaded"))
-        assert.is_true(state.confirm_delete_read)
-    end)
 
     it("translates manga bulk download confirmations", function()
         Marker.install()
@@ -1102,40 +935,5 @@ describe("suwayomi/manga/controller", function()
         assert.are.equal("tx:Queue", state.bulk_confirmation.ok_text)
     end)
 
-    it("translates keep-next unread confirmation text with multiple placeholders", function()
-        Marker.install()
-        package.loaded["suwayomi/manga/controller"] = nil
-        package.loaded["suwayomi/manga/action_menu"] = nil
-        package.loaded["suwayomi/i18n"] = nil
 
-        local plugin, state = installController()
-        local manga = { id = "m1", title = "Frieren" }
-        plugin.current_chapter_context = {
-            manga = manga,
-            chapters = {
-                { id = "c1", name = "Ch. 1", is_read = false },
-                { id = "c2", name = "Ch. 2", is_read = false },
-            },
-        }
-
-        assert.is_true(plugin:confirmKeepNextUnreadChaptersDownloaded(5))
-        assert.are.equal(
-            "tx:Queue 2 missing downloads to keep the next 5 unread chapters available?",
-            state.bulk_confirmation.text
-        )
-        assert.are.equal("tx:Queue", state.bulk_confirmation.ok_text)
-    end)
-
-    it("clears a per-manga keep-next policy without loading chapters", function()
-        local plugin, state = installController()
-        local manga = { id = "m1", title = "Frieren" }
-        function plugin:ensureMangaChapterContext()
-            error("stop action should not load chapters")
-        end
-
-        assert.is_true(plugin:performMangaAction(manga, "keep_next_0_unread"))
-
-        assert.are.same({ { manga = manga, limit = 0 } }, state.keep_next_saves)
-        assert.are.same({}, state.messages)
-    end)
 end)

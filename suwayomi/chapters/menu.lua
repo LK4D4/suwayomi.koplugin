@@ -42,7 +42,7 @@ local function hasCancelableDownloads(self)
         return false
     end
     local snapshot = queue:getSnapshot() or {}
-    return #(snapshot.active or {}) > 0 or #(snapshot.queued or {}) > 0
+    return #(snapshot.active or {}) > 0 or #(snapshot.queued or {}) > 0 or #(snapshot.refills or {}) > 0
 end
 
 -- Controllers expose new(deps) for a consistent boundary; methods remain plugin-bound mixins so this refactor can move code without changing callback behavior.
@@ -56,9 +56,12 @@ end
 local Methods = {}
 
 local function guardChapterCallback(owner, callback)
+    local menu = owner.current_chapter_menu
     local is_current = owner.captureChapterActionGuard and owner:captureChapterActionGuard()
     return function(...)
         if owner.suwayomi_host_retired or (is_current and not is_current()) then return false end
+        if menu and owner.isSuwayomiScreenActive and not owner:isSuwayomiScreenActive(menu) then return false end
+        if menu and owner.suwayomi_navigation and not owner.suwayomi_navigation:isCurrent(menu) then return false end
         return callback(...)
     end
 end
@@ -77,14 +80,18 @@ function Methods:getChapterTitleBarMenuOptions(manga)
         -- Retained title options outlive failed reloads; capture request freshness on opening.
         captureActionGuard = function()
             local is_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
+            local menu = self.current_chapter_menu
             return function()
                 return not self.suwayomi_host_retired and self.current_chapter_context == context
+                    and self.current_chapter_menu == menu
+                    and (not self.suwayomi_navigation or self.suwayomi_navigation:isCurrent(menu))
                     and (not context or context.manga == manga)
                     and (not manga or tostring(manga.id or manga.title) == manga_id)
                     and (not is_current or is_current())
             end
         end,
         onSelect = function(action, _, menu_context)
+            if action.refill then return self:performRefillAction(action.refill_action, action.refill) end
             return self:performBulkChapterAction(action.id, menu_context)
         end,
     })
@@ -105,6 +112,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
     local snapshot = self:getDownloadQueue():getSnapshot()
     local manual_snapshot, manual_error = snapshot.manual_deletion, snapshot.manual_deletion_error
     local read_ledger = ledger or self:loadChapterLedger()
+    local ledger_changed = false
 
     for _index, chapter in ipairs(chapters or {}) do
         local item = {}
@@ -162,11 +170,8 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
                 read = item.is_read == true,
                 pending_read_sync = item.pending_read_sync == true or nil,
             }
-            if ledger then
-                self:upsertChapterLedgerEntryInLedger(ledger, manga, item, updates)
-            else
-                self:upsertChapterLedgerEntry(manga, item, updates)
-            end
+            self:upsertChapterLedgerEntryInLedger(read_ledger, manga, item, updates)
+            ledger_changed = true
             reader_return_entries[#reader_return_entries + 1] = {
                 chapter = item,
                 path = chapter_path,
@@ -195,6 +200,20 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         table.insert(items, item)
     end
 
+    if not ledger and ledger_changed then
+        local saved, err = self:saveChapterLedger(read_ledger)
+        if not saved then
+            self:showMessage(err or I18n.t("Failed to save settings."))
+            local committed = self:loadChapterLedger()
+            for _, chapter in ipairs(chapters or {}) do
+                local entry = committed[self:getChapterLedgerKey(manga, chapter)]
+                if entry then chapter.is_read = entry.read == true
+                else chapter.is_read = chapter._suwayomi_is_read == true end
+                chapter.pending_read_sync = entry and entry.pending_read_sync
+            end
+            return nil, err
+        end
+    end
     if not ledger and self.saveReaderReturnContextsForChapters then
         self:saveReaderReturnContextsForChapters(manga, reader_return_entries)
     end
@@ -217,10 +236,12 @@ end
 
 function Methods:buildChapterMenuOptions(manga, chapters, ledger)
     local visible_chapters = self:getVisibleChapters(chapters)
+    local items, err = self:buildChapterMenuItems(manga, visible_chapters, ledger)
+    if not items then return nil, err end
 
     return copyTitleBarOptions({
         title = self.formatChapterListScreenTitle and self:formatChapterListScreenTitle(manga) or I18n.t("Chapters"),
-        chapters = self:buildChapterMenuItems(manga, visible_chapters, ledger),
+        chapters = items,
     }, self:getChapterTitleBarMenuOptions(manga))
 end
 
@@ -345,6 +366,19 @@ end
 
 function Methods:getBulkChapterActions()
     local actions = {}
+    local context = self.current_chapter_context
+    local refill = context and self:getMangaRefillRequest(context.manga)
+    if refill and refill.manga_id ~= nil and refill.revision ~= nil then
+        table.insert(actions, {
+            id = "retry_refill", text = I18n.t("Retry download ahead") .. "\n" .. SuwayomiUI.formatRefillStatus(refill),
+            refill = refill, refill_action = "retry",
+        })
+        table.insert(actions, {
+            id = "stop_refill", text = I18n.t("Stop download ahead"), refill = refill, refill_action = "stop",
+        })
+    elseif refill then
+        table.insert(actions, { id = "refill_status", text = SuwayomiUI.formatRefillStatus(refill), enabled = false })
+    end
     local show_scanlator_filter = self.current_scanlator_filter ~= nil
         or #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0
 
@@ -485,8 +519,8 @@ function Methods:showBulkChapterActions(menu_context)
         actions = self:getBulkChapterActions(),
         anchor = menu_context and menu_context.anchor,
     }
-
     SuwayomiUI.showChapterActionsMenu(options, guardChapterCallback(self, function(action)
+        if action.refill then return self:performRefillAction(action.refill_action, action.refill) end
         self:performBulkChapterAction(action.id, menu_context)
     end))
 end
@@ -528,6 +562,7 @@ function Methods:refreshChapterMenu(options)
         self.current_chapter_context.chapters,
         options.ledger
     )
+    if not menu_options then return false end
     self.current_chapter_options = self.current_chapter_options or {}
     self.current_chapter_options.title = menu_options.title
     self.current_chapter_options.chapters = menu_options.chapters

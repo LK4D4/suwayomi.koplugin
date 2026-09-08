@@ -555,6 +555,7 @@ end
 
 
 function Methods:setScanlatorFilter(scanlator)
+    if self.suwayomi_host_retired or not self.current_chapter_context then return false end
     local saved_filter, err = self:saveMangaScanlatorFilter(
         self.current_chapter_context and self.current_chapter_context.manga,
         scanlator
@@ -565,8 +566,8 @@ function Methods:setScanlatorFilter(scanlator)
     end
     self.current_scanlator_filter = saved_filter
     self:clearChapterSelection(true)
-    self:refreshChapterMenu()
-    return true
+    self:refreshChapterMenu({ quick = true })
+    return self:requestMangaRefill(self.current_chapter_context.manga)
 end
 
 

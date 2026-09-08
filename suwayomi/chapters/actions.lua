@@ -77,11 +77,22 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
             return
         end
         if not is_current() then return end
+        local associated, association_err = self:getDownloadQueue().refill:associate(manga)
+        if not associated then
+            self:showMessage(association_err or I18n.t("Failed to save settings."))
+            return
+        end
         if self.saveReaderReturnContext then
             self:saveReaderReturnContext(manga, chapter, chapter_path)
         end
         if self.upsertChapterLedgerEntry then
-            self:upsertChapterLedgerEntry(manga, chapter, { path = chapter_path })
+            local saved, save_err = self:upsertChapterLedgerEntry(manga, chapter, {
+                path = chapter_path, endpoint_scope = manga.endpoint_scope,
+            })
+            if not saved then
+                self:showMessage(save_err or I18n.t("Failed to save settings."))
+                return
+            end
         end
         if ReaderUI.instance and ReaderUI.instance.switchDocument then
             ReaderUI.instance:switchDocument(chapter_path)
@@ -193,6 +204,7 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
         saved_filter = self:loadMangaScanlatorFilter(manga),
         is_current = self.captureChapterActionGuard and self:captureChapterActionGuard(),
     }
+    batch.manga.endpoint_scope = manga.endpoint_scope
     local current_ids
     local context_allowed = not self.suwayomi_host_retired
     if self.isChapterInCurrentContext and batch.context then
@@ -293,6 +305,14 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
         end
     end
     local queued, enqueue_err, outcome = 0, nil, { skipped = 0, failed = 0, unconfirmed = 0 }
+    if not stale and #candidates > 0 then
+        local associated
+        associated, enqueue_err = queue.refill:associate(batch.manga)
+        if not associated then
+            self:showMessage(enqueue_err or I18n.t("Failed to save settings."))
+            return 0, enqueue_err
+        end
+    end
     if not stale then
         self:withChapterMenuRefreshSuppressed(function()
             queued, enqueue_err, outcome = queue:enqueueBatch(batch.manga, candidates, batch.download_directory,
@@ -656,13 +676,7 @@ function Methods:performBulkChapterAction(action_id, menu_context)
     end
     local keep_unread_count = tostring(action_id or ""):match("^keep_next_(%d+)_unread$")
     if keep_unread_count then
-        local limit = tonumber(keep_unread_count)
-        if limit >= 50 then
-            self:confirmKeepNextUnreadChaptersDownloaded(limit)
-        else
-            self:keepNextUnreadChaptersDownloaded(limit)
-        end
-        return true
+        return self:keepNextUnreadChaptersDownloaded(tonumber(keep_unread_count))
     end
     if action_id == "delete_read_downloaded" then
         self:confirmDeleteReadChaptersFromDevice()
@@ -677,7 +691,8 @@ function Methods:performBulkChapterAction(action_id, menu_context)
         return true
     end
     if action_id == "cancel_all_downloads" then
-        self:getDownloadQueue():cancelAll()
+        local _, err = self:getDownloadQueue():cancelAll()
+        if err then self:showMessage(err) end
         self:refreshChapterMenu({ quick = true })
         return true
     end
@@ -710,6 +725,11 @@ function Methods:enqueueChapterDownload(manga, chapter)
         return
     end
 
+    local associated, association_err = self:getDownloadQueue().refill:associate(manga)
+    if not associated then
+        self:showMessage(association_err or I18n.t("Failed to save settings."))
+        return false, association_err
+    end
     local queued, state
     self:withChapterMenuRefreshSuppressed(function()
         queued, state = self:getDownloadQueue():enqueue(manga, chapter, download_directory, { provenance = "explicit" })

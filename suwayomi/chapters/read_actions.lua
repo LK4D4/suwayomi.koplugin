@@ -165,7 +165,7 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
         -- Include reconciliation of visible non-target chapters in the same save.
         self:refreshChapterMenu({ ledger = ledger })
     end
-    local ok, err, outcomes = core:commitRead(ledger, captures, {})
+    local ok, err, outcomes = core:commitRead(ledger, captures, {}, { manga })
     if not ok then
         refreshCommitted(self, options, options.ledger, previous)
         local result = { committed = false, error = err, marked_read = 0, removed = 0, pending = 0, busy = 0, blocked = #captures }
@@ -197,9 +197,6 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
     end
     if not options.skip_refresh then self:refreshChapterMenu() end
     if not options.skip_schedule then self:schedulePendingReadSync() end
-    if not options.skip_keep_policy and self.applyMangaKeepNextUnreadDownloadsPolicy then
-        self:applyMangaKeepNextUnreadDownloadsPolicy(manga)
-    end
     if options.ledger then
         local committed = self:loadChapterLedger()
         for key in pairs(options.ledger) do options.ledger[key] = nil end
@@ -241,7 +238,7 @@ local function markUnread(self, manga, chapters, options, batch, clear_selection
         ledger[keys[index]].pending_read_state = false
         updateContext(self, manga, chapter, false)
     end
-    local ok, err = core:commitRead(ledger, {}, keys)
+    local ok, err = core:commitRead(ledger, {}, keys, { manga })
     if not ok then
         refreshCommitted(self, options, options.ledger, previous)
         local result = { committed = false, marked_unread = 0, error = err }

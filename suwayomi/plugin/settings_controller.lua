@@ -112,6 +112,7 @@ function Methods:showLoginDialog(touchmenu_instance)
                 self:showMessage(err or I18n.t("Failed to save settings."))
                 return
             end
+            self:getDownloadQueue().refill:wake()
             self:refreshSettingsMenu(touchmenu_instance)
             UIManager:nextTick(function()
                 self:showMessage(I18n.t("Suwayomi login settings saved."))
@@ -319,7 +320,12 @@ function Methods:showOnboardingConnectionStep(options)
                 return false
             end
 
-            SuwayomiSettings:save(credentials)
+            local saved, err = SuwayomiSettings:save(credentials)
+            if not saved then
+                self:showMessage(err or I18n.t("Failed to save settings."))
+                return false
+            end
+            self:getDownloadQueue().refill:wake()
             local download_directory = SuwayomiSettings:loadDownloadDirectory()
             local should_choose_directory = options.first_run == false
                 or not download_directory

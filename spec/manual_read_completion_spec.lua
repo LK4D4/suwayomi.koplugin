@@ -84,6 +84,24 @@ describe("manual read completion integration", function()
         end
         error("missing chapter row")
     end
+    local function enableAhead(target, list)
+        target, list = target or manga, list or chapters
+        assert(settings:save({ server_url = "https://suwayomi.example" }))
+        local network = require("suwayomi/network/request_job")
+        local start = network.start
+        network.start = function(options)
+            assert.equals("https://suwayomi.example", options.credentials.server_url)
+            options.on_finish({ ok = true, chapters = list })
+            return {}
+        end
+        local ok = plugin:startFetchChaptersForManga(target)
+        network.start = start
+        assert(ok)
+        assert(plugin:performMangaAction(target, "keep_next_5_unread"))
+        assert.equals(5, settings:loadMangaKeepNextUnreadDownloads(target))
+        assert(service.queue:cancelAll())
+        assert.same({}, service.queue:getSnapshot().refills)
+    end
     before_each(function()
         clear()
         runtime = runtime_helper.install()
@@ -342,5 +360,114 @@ describe("manual read completion integration", function()
         plugin:processFinishedChapterCleanup()
         assert.equals("archive pages", read(path("A")))
         assert.equals("archive pages", read(path("B")))
+    end)
+
+    for _, action in ipairs({ "single", "selected", "previous" }) do
+        it("durably enrolls one refill with the public " .. action .. " read action", function()
+            enableAhead()
+            if action == "single" then
+                assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+            elseif action == "selected" then
+                plugin:toggleChapterSelection(manga, chapters[1])
+                plugin:toggleChapterSelection(manga, chapters[2])
+                assert.equals(2, plugin:markSelectedChaptersRead())
+            else
+                assert.equals(2, plugin:markChaptersBeforeRead(manga, chapters[3]))
+            end
+            local requests = service.queue:getSnapshot().refills
+            assert.equals(1, #requests)
+            assert.equals("m", requests[1].manga_id)
+            assert.is_true(settings:loadChapterLedger()["m:A"].pending_read_state)
+            assert.is_true(row("A").is_read)
+            assert.equals("archive pages", read(path("A")))
+            local saved = read(settings.store.path)
+            plugin:refreshChapterMenu({ quick = true })
+            assert.equals(saved, read(settings.store.path))
+        end)
+    end
+
+    it("enrolls unread with deletion revocation and preserves the live archive", function()
+        enableAhead()
+        configure(true, 0)
+        runtime.reader_ui.instance = { document = { file = path("A") } }
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        assert.equals("pending", service.manual_deletion:snapshot()["m:A"].state)
+        assert(service.queue:cancelAll())
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_unread"))
+        assert.equals(1, #service.queue:getSnapshot().refills)
+        assert.is_false(settings:loadChapterLedger()["m:A"].pending_read_state)
+        assert.is_false(row("A").is_read)
+        runtime.reader_ui.instance = nil
+        service.manual_deletion:process()
+        assert.equals("archive pages", read(path("A")))
+    end)
+
+    it("does not enroll refill or publish read success when the shared read save fails", function()
+        enableAhead()
+        local open = settings.store.io.open
+        settings.store.io.open = function() return nil, "injected storage failure" end
+        local ok, result = plugin:markChapterRead(manga, chapters[1])
+        settings.store.io.open = open
+        assert.is_false(ok)
+        assert.is_false(result.committed)
+        assert.same({}, service.queue:getSnapshot().refills)
+        assert.is_false(settings:loadChapterLedger()["m:A"].read)
+        assert.is_false(row("A").is_read)
+        assert.equals("archive pages", read(path("A")))
+    end)
+
+    it("enrolls reconciliation for a nonvisible manga without completion deletion", function()
+        local other = { id = "other", title = "Other", initialized = true, source = manga.source }
+        local other_chapter = { id = "E", name = "E" }
+        enableAhead(other, { other_chapter })
+        write(path("E"), "other archive")
+        assert(plugin:upsertChapterLedgerEntry(other, other_chapter, { path = path("E"), read = false }))
+        plugin:setCurrentMangaChapterContext(manga, chapters)
+        plugin:refreshChapterMenu()
+        assert(plugin:setKoreaderChapterReadState(path("E"), true))
+        assert.equals(1, plugin:reconcileDownloadedChapterLedger())
+        local requests = service.queue:getSnapshot().refills
+        assert.equals(1, #requests)
+        assert.equals("other", requests[1].manga_id)
+        assert.is_true(settings:loadChapterLedger()["other:E"].pending_read_state)
+        assert.same({}, recordIds())
+        assert.is_false(row("A").is_read)
+        assert.equals("other archive", read(path("E")))
+    end)
+
+    for _, route in ipairs({ "chapter", "manga" }) do
+        it("stops pending ahead from the " .. route .. " action without canceling chapter work", function()
+            enableAhead()
+            assert(plugin:performMangaAction(manga, "keep_next_5_unread"))
+            local missing = { id = "E", name = "E" }
+            chapters[#chapters + 1] = missing
+            assert(plugin:performChapterAction(manga, missing, "download"))
+            local before = assert(service.queue:findPersistentJob("m:E"))
+            if route == "chapter" then assert(plugin:performBulkChapterAction("keep_next_0_unread"))
+            else assert(plugin:performMangaAction(manga, "keep_next_0_unread")) end
+            assert.equals(0, settings:loadMangaKeepNextUnreadDownloads(manga))
+            assert.same({}, service.queue:getSnapshot().refills)
+            assert.equals(before.state, assert(service.queue:findPersistentJob("m:E")).state)
+            assert.equals("archive pages", read(path("A")))
+        end)
+    end
+
+    it("keeps policy and refill together across rejected enable and stop saves", function()
+        enableAhead()
+        assert(plugin:performMangaAction(manga, "keep_next_0_unread"))
+        local open = settings.store.io.open
+        settings.store.io.open = function() return nil, "injected storage failure" end
+        assert.is_false(plugin:performMangaAction(manga, "keep_next_5_unread"))
+        assert.equals(0, settings:loadMangaKeepNextUnreadDownloads(manga))
+        assert.same({}, service.queue:getSnapshot().refills)
+        settings.store.io.open = open
+        assert(plugin:performMangaAction(manga, "keep_next_5_unread"))
+        assert.equals(1, #service.queue:getSnapshot().refills)
+        settings.store.io.open = function() return nil, "injected storage failure" end
+        assert.is_false(plugin:performMangaAction(manga, "keep_next_0_unread"))
+        settings.store.io.open = open
+        assert.equals(5, settings:loadMangaKeepNextUnreadDownloads(manga))
+        assert.equals(1, #service.queue:getSnapshot().refills)
+        assert.equals("archive pages", read(path("A")))
     end)
 end)

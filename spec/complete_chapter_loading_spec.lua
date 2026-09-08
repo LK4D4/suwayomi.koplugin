@@ -22,6 +22,8 @@ describe("complete stored chapter loading", function()
         "suwayomi/downloads/job_store", "suwayomi/downloads/status_formatter",
         "suwayomi/downloads/downloader", "suwayomi/downloads/progress_file",
         "suwayomi/downloads/archive", "ffi/libarchive_h",
+        "suwayomi/downloads/service", "suwayomi/downloads/refill", "suwayomi/downloads/cleanup_adapter",
+        "suwayomi/chapters/manual_deletion", "suwayomi/chapters/archive_identity",
         "suwayomi/paths", "suwayomi/downloads/controller",
         "datastorage", "luasettings", "suwayomi/settings/store", "suwayomi/source_filters",
         "suwayomi/downloads/directory", "suwayomi/reader_return",
@@ -97,23 +99,28 @@ describe("complete stored chapter loading", function()
         settings = {
             load = function() return { server_url = "https://suwayomi.example" } end,
             getSettingsDir = function() return "." end,
-            loadChapterLedger = function() return json.decode(saved_ledger) end,
-            saveChapterLedger = function(_, value) saved_ledger = json.encode(value); return value end,
             loadDownloadDirectory = function() return download_directory end,
             saveDownloadDirectory = function(_, path) download_directory = path; return path end,
             normalizeMangaKeepNextUnreadDownloads = function(_, limit) return limit end,
             saveMangaKeepNextUnreadDownloads = function(_, _, limit) return limit end,
             loadMangaScanlatorFilter = function() return saved_filter end,
         }
+        package.preload.datastorage = function() return { getSettingsDir = function() return "." end } end
+        package.preload.luasettings = function() return { open = function() return { data = {} } end } end
+        local persisted = dofile("suwayomi/settings.lua")
         local checked = require("spec/support/checked_queue_settings")()
-        for _, name in ipairs({ "getStore", "isBlocked", "reconcile", "loadDownloadQueue", "saveDownloadQueue" }) do
-            settings[name] = checked[name]
+        for name, method in pairs(persisted) do
+            if settings[name] == nil then settings[name] = method end
         end
+        settings:setStore(checked:getStore())
         local store = settings:getStore()
         local saveDocument = store.saveDocument
         function store:saveDocument(mutator)
             local ok, err = saveDocument(self, mutator)
-            if ok then saved_jobs = json.encode(self:readKey("download_queue", {})) end
+            if ok then
+                saved_jobs = json.encode(self:readKey("download_queue", {}))
+                saved_ledger = json.encode(self:readKey("chapter_ledger", {}))
+            end
             return ok, err
         end
         package.preload["suwayomi/settings"] = function() return settings end
@@ -155,10 +162,10 @@ describe("complete stored chapter loading", function()
                 return 1, code or 200
             end }
         end
-        queue = require("suwayomi/downloads/queue"):new{
+        queue = require("suwayomi/downloads/service"):new{
             settings = settings, downloader = require("suwayomi/downloads/downloader"),
             ffi_util = host, ui_manager = ui,
-        }
+        }.queue
         plugin = { max_batch_queue_chapters = 50 }
         for _, module in ipairs({ "suwayomi/manga/controller", "suwayomi/chapters/context",
             "suwayomi/chapters/menu", "suwayomi/chapters/actions", "suwayomi/readsync/ledger",
@@ -267,8 +274,6 @@ describe("complete stored chapter loading", function()
             assert.are.equal("1", plugin.current_chapter_menu.chapters[1].id)
             assert.are.equal("999", plugin:getFirstUnreadChapterForManga(manga).id)
             assert.are.equal(200, #plugin:getChaptersBefore(plugin.current_chapter_context.chapters[201]))
-            assert.are.same({ "999", "1000", "203", "204", "205" },
-                chapterIds(plugin:getUnreadDownloadBufferCandidates(manga, 5)))
             plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
             assert.are.same({ "999", "1000", "203", "204", "205" }, admittedIds())
             assert.is_true(json.decode(saved_ledger)["17:200"].read)
@@ -297,7 +302,6 @@ describe("complete stored chapter loading", function()
                 finishRequest()
                 assert.are.equal(filter, plugin.current_scanlator_filter)
                 assert.are.same(expected, chapterIds(plugin.current_chapter_menu.chapters))
-                assert.are.same(expected, chapterIds(plugin:getUnreadDownloadBufferCandidates(manga, 5)))
                 assert.are.same(expected, chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
                 assert.is_true(json.decode(saved_ledger)["17:200"].read)
             end
@@ -435,8 +439,7 @@ describe("complete stored chapter loading", function()
                 archive_generation = { id = "generation-" .. id }, manual_intent = { revision = id } }
         end
         assert.is_table(real_settings:saveChapterLedger(entries))
-        settings.loadChapterLedger = function() return real_settings:loadChapterLedger() end
-        settings.saveChapterLedger = function(_, value) return real_settings:saveChapterLedger(value) end
+        settings:setStore(real_settings:getStore())
         respond = function(request)
             local chapters = nodes(1, 205)
             chapters[200].isRead = false -- Acknowledges pending local unread without dropping pathless extras.
@@ -512,7 +515,7 @@ describe("complete stored chapter loading", function()
     for _, origin in ipairs({ "chapter menu", "chapter error details" }) do
         for _, invalidation in ipairs({ "empty replacement", "another manga", "newer request", "cancellation", "retired host", "manga identity" }) do
             it("keeps failed jobs unchanged after " .. invalidation .. " invalidates " .. origin .. " Retry", function()
-                saved_ledger = json.encode({ ["17:200"] = { manga_id = "17", chapter_id = "200", read = true } })
+                assert(settings:saveChapterLedger({ ["17:200"] = { manga_id = "17", chapter_id = "200", read = true } }))
                 respond = function() return page(nodes(201, 201), 1, false) end
                 plugin:showChaptersForManga(manga)
                 finishRequest()

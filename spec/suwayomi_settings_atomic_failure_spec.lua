@@ -809,67 +809,6 @@ describe("suwayomi settings atomic failure handling", function()
         assert.are.equal("destination_committed_data", content)
     end)
 
-    it("reports failure and does not queue downloads when download-ahead preference save fails", function()
-        local DownloadsController = require("suwayomi/downloads/controller")
-        local manga = { id = "m1", title = "Manga 1" }
-        local queued_count = 0
-        local messages = {}
-        local controller = {
-            current_chapter_context = {
-                manga = manga,
-            },
-            getDownloadDirectoryOrChoose = function(_, _cb)
-                return "/sdcard/manga"
-            end,
-            enqueueSelectedChapterDownloads = function(_, _m, chs)
-                queued_count = #chs
-                return queued_count
-            end,
-            showMessage = function(_, msg)
-                table.insert(messages, msg)
-            end,
-        }
-        for k, v in pairs(DownloadsController.methods) do
-            controller[k] = v
-        end
-        controller.getUnreadDownloadBufferCandidates = function()
-            return { { id = "c1", name = "Chapter 1" } }
-        end
-
-        io_adapter.fail_write = true
-        local res = controller:keepNextUnreadChaptersDownloaded(5)
-        assert.are.equal(0, res)
-        assert.are.equal(0, queued_count)
-        assert.are.equal(1, #messages)
-
-        io_adapter.fail_write = false
-        local res2 = controller:keepNextUnreadChaptersDownloaded(5)
-        assert.are.equal(1, res2)
-        assert.are.equal(1, queued_count)
-    end)
-
-    it("MangaController reports failure when download-ahead preference save fails", function()
-        local MangaController = require("suwayomi/manga/controller")
-        local manga = { id = "m1", title = "Manga 1" }
-        local messages = {}
-        local controller = {
-            showMessage = function(_, msg)
-                table.insert(messages, msg)
-            end,
-        }
-        for k, v in pairs(MangaController.methods) do
-            controller[k] = v
-        end
-
-        io_adapter.fail_write = true
-        local ok = controller:performMangaAction(manga, "keep_next_0_unread")
-        assert.is_false(ok)
-        assert.are.equal(1, #messages)
-
-        io_adapter.fail_write = false
-        local ok2 = controller:performMangaAction(manga, "keep_next_0_unread")
-        assert.is_true(ok2)
-    end)
 
     it("reader-return context mutation does not leak into memory or later saves when save fails", function()
         local ReaderReturn = require("suwayomi/reader_return")

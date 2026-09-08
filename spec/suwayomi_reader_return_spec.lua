@@ -45,6 +45,7 @@ describe("suwayomi/reader_return", function()
                 load = function()
                     return { server_url = "https://suwayomi.example" }
                 end,
+                normalizeEndpointScope = function(_, url) return url end,
                 loadReaderReturnContexts = function()
                     return state.contexts
                 end,

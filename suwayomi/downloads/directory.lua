@@ -132,6 +132,7 @@ function Methods:chooseDownloadDirectory(callback, options)
             self:showMessage(err or I18n.t("Failed to save settings."))
             return
         end
+        self:getDownloadQueue().refill:wake()
         if not (options and options.suppress_saved_message) then
             self:showMessage(I18n.t("Suwayomi download directory saved."))
         end

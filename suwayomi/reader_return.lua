@@ -49,7 +49,7 @@ local function parentDirectory(path)
     return type(path) == "string" and path:match("^(.*)[/\\][^/\\]+$") or nil
 end
 
-local function buildContext(manga, chapter, chapter_path)
+local function buildContext(manga, chapter, chapter_path, endpoint_scope)
     if not chapter_path or chapter_path == "" or type(manga) ~= "table" or type(chapter) ~= "table" then
         return nil
     end
@@ -62,6 +62,7 @@ local function buildContext(manga, chapter, chapter_path)
         chapter_id = present(chapter.id),
         chapter_name = chapter.name,
         source = copyTable(manga.source),
+        endpoint_scope = endpoint_scope,
     }
 end
 
@@ -95,6 +96,7 @@ local function contextMatches(left, right)
         and left.in_library == right.in_library
         and left.chapter_id == right.chapter_id
         and left.chapter_name == right.chapter_name
+        and left.endpoint_scope == right.endpoint_scope
         and sourceMatches(left.source, right.source)
 end
 
@@ -109,6 +111,7 @@ local function candidateFromLedgerEntry(entry)
         in_library = entry.in_library,
         chapter_id = present(entry.chapter_id),
         chapter_name = entry.chapter_name,
+        endpoint_scope = entry.endpoint_scope,
     }
 end
 
@@ -202,7 +205,7 @@ local function normalizeContextStore(contexts)
 end
 
 function Methods:saveReaderReturnContext(manga, chapter, chapter_path)
-    local context = buildContext(manga, chapter, chapter_path)
+    local context = buildContext(manga, chapter, chapter_path, manga and manga.endpoint_scope)
     if not context then
         return nil
     end
@@ -225,7 +228,9 @@ function Methods:saveReaderReturnContextsForChapters(manga, entries)
     local saved = {}
     local changed = false
     for _, entry in ipairs(entries) do
-        local context = entry and buildContext(manga, entry.chapter, entry.path)
+        local previous = entry and contexts[entry.path]
+        local context = entry and buildContext(manga, entry.chapter, entry.path,
+            previous and previous.endpoint_scope)
         if context then
             saved[#saved + 1] = context
             if not contextMatches(contexts[context.path], context) then
@@ -312,6 +317,7 @@ function Methods:startReaderReturnChapterRequest(context)
     self.active_reader_return_request = request_token
 
     local credentials = SuwayomiSettings:load()
+    local endpoint_scope = SuwayomiSettings:normalizeEndpointScope(credentials.server_url)
     local active = NetworkRequestJob.start({
         owner = self,
         credentials = credentials,
@@ -350,10 +356,16 @@ function Methods:startReaderReturnChapterRequest(context)
                 self:showMessage(I18n.t("Could not load chapters."))
                 return
             end
+            if endpoint_scope ~= SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url) then
+                self.active_reader_return_request = nil
+                return
+            end
 
             local manga = buildReturnedManga(context, result.manga)
+            manga.endpoint_scope = endpoint_scope
             self:closeReaderToFileManager(function(destination)
                 if not destination or destination.suwayomi_host_retired then return end
+                if endpoint_scope ~= SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url) then return end
                 if destination.cancelMangaNetworkRequests then destination:cancelMangaNetworkRequests() end
                 destination:showChapterResultForManga(manga, result, {
                     return_context = context,

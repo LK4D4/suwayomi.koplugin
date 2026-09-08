@@ -41,10 +41,7 @@ end
 
 
 function Methods:saveChapterLedger(ledger)
-    if not SuwayomiSettings.saveChapterLedger then
-        return ledger or {}
-    end
-    return SuwayomiSettings:saveChapterLedger(ledger or {})
+    return self:getDownloadQueue().refill:commitLedger(ledger or {})
 end
 
 
@@ -74,7 +71,8 @@ end
 function Methods:upsertChapterLedgerEntry(manga, chapter, updates)
     local ledger = self:loadChapterLedger()
     local entry = self:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, updates)
-    self:saveChapterLedger(ledger)
+    local saved, err = self:saveChapterLedger(ledger)
+    if not saved then return nil, err end
     return entry
 end
 
@@ -147,7 +145,8 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters)
     end
 
     if changed then
-        self:saveChapterLedger(ledger)
+        local saved, err = self:saveChapterLedger(ledger)
+        if not saved then return nil, err end
     end
 
     return merged
@@ -192,8 +191,9 @@ function Methods:markLedgerEntryRead(entry)
     ledger_entry.read = true
     ledger_entry.pending_read_sync = true
     ledger_entry.pending_read_state = true
+    local saved_ledger, err = self:saveChapterLedger(ledger)
+    if not saved_ledger then return false, nil, err end
     self:markCurrentContextChapterReadFromLedger(ledger_entry)
-    local saved_ledger = self:saveChapterLedger(ledger)
 
     self:schedulePendingReadSync()
     return true, saved_ledger[key] or ledger_entry

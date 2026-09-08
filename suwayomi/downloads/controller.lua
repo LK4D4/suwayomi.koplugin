@@ -1,6 +1,6 @@
 -- Boundary: DownloadsController.
 --
--- Responsibility: Owns the Downloads hub UI, error-details/retry/cancel actions, download-ahead refills, and downloaded-read reconciliation.
+-- Responsibility: Owns Downloads controls, durable refill commands, and downloaded-read reconciliation.
 -- Owned state: Uses the device-local queue only; it must not call Suwayomi server download mutations.
 -- Dependencies: KOReader UI helpers and Suwayomi runtime modules, including the plugin i18n facade.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -65,7 +65,7 @@ end
 function Methods:getDownloadsTitleActions(snapshot)
     snapshot = snapshot or {}
     local actions = {}
-    if #(snapshot.active or {}) > 0 or #(snapshot.queued or {}) > 0 then
+    if #(snapshot.active or {}) > 0 or #(snapshot.queued or {}) > 0 or #(snapshot.refills or {}) > 0 then
         table.insert(actions, { id = "cancel_all", text = I18n.t("Cancel all downloads"), destructive = true })
     end
     if #(snapshot.failed or {}) > 0 then
@@ -266,8 +266,29 @@ function Methods:showChapterDownloadError(manga, chapter)
     end)
 end
 
-function Methods:getDownloadsMenuCallbacks()
+function Methods:getDownloadsMenuCallbacks(view)
+    view = view or self.current_downloads_menu
+    local function live()
+        local menu = type(view) == "function" and view() or view
+        return not self.suwayomi_host_retired and menu ~= nil and self.current_downloads_menu == menu
+            and (not self.isSuwayomiScreenActive or self:isSuwayomiScreenActive(menu))
+            and (not self.suwayomi_navigation or self.suwayomi_navigation:isCurrent(menu))
+    end
+    local function refill_is_current(request)
+        if not live() or not request or request.manga_id == nil or request.revision == nil then return false end
+        local current = self:getMangaRefillRequest({ id = request.manga_id })
+        return current ~= nil and current.revision == request.revision
+    end
     return {
+        refill_is_current = refill_is_current,
+        retry_refill = function(request)
+            if not refill_is_current(request) then return false end
+            return self:performRefillAction("retry", request)
+        end,
+        stop_refill = function(request)
+            if not refill_is_current(request) then return false end
+            return self:performRefillAction("stop", request)
+        end,
         onSelectActive = function(job, menu)
             self:showActiveDownloadActions(job, menu)
         end,
@@ -388,7 +409,9 @@ function Methods:showDownloads()
     local snapshot = queue:getSnapshot()
     local options, trackMenu = self:withDownloadsMenuTracking(self:getDownloadsMenuOptions(snapshot))
 
-    local menu = SuwayomiUI.showDownloadsMenu(snapshot, self:getDownloadsMenuCallbacks(), options)
+    local menu
+    local callbacks = self:getDownloadsMenuCallbacks(function() return menu end)
+    menu = SuwayomiUI.showDownloadsMenu(snapshot, callbacks, options)
     trackMenu(menu)
     if self.trackSuwayomiScreen then
         self:trackSuwayomiScreen("downloads", menu)
@@ -401,31 +424,27 @@ function Methods:reconcileDownloadedChapterLedger(ledger)
     ledger = ledger or self:loadChapterLedger()
     local history_paths = self:loadKoreaderHistoryPaths()
     local changed = false
-    local current_context_changed = false
     local read_count = 0
 
     for _index, entry in pairs(ledger or {}) do
         if type(entry) == "table" and type(entry.path) == "string" and entry.path ~= "" then
             local metadata_finished = self:isChapterPathFinishedInKoreader(entry.path)
             local history_read = history_paths[entry.path] == true
-            if (metadata_finished or history_read) and entry.read ~= true then
+            local explicit_unread = entry.pending_read_sync == true and entry.pending_read_state == false
+            if (metadata_finished or history_read) and entry.read ~= true and not explicit_unread then
                 entry.read = true
                 entry.pending_read_sync = true
                 entry.pending_read_state = true
                 changed = true
                 read_count = read_count + 1
-                if self:markCurrentContextChapterReadFromLedger(entry) then
-                    current_context_changed = true
-                end
             end
         end
     end
 
     if changed then
-        self:saveChapterLedger(ledger)
-    end
-    if current_context_changed then
-        self:applyMangaKeepNextUnreadDownloadsPolicy()
+        local saved, err = self:saveChapterLedger(ledger)
+        if not saved then return 0, err end
+        for _, entry in pairs(saved) do self:markCurrentContextChapterReadFromLedger(entry) end
     end
 
     return read_count
@@ -434,154 +453,48 @@ end
 
 
 
-function Methods:getUnreadDownloadBufferCandidates(manga, limit)
-    local missing = {}
-    local unread_count = 0
-
-    for _index, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
-        if chapter.is_read ~= true then
-            unread_count = unread_count + 1
-            if not self:isChapterDownloadAvailable(manga, chapter) then
-                table.insert(missing, chapter)
-            end
-            if unread_count >= limit then
-                break
-            end
-        end
+function Methods:performRefillAction(action, request)
+    if self.suwayomi_host_retired or not request or request.manga_id == nil or request.revision == nil then return false end
+    local refill = self:getDownloadQueue().refill
+    local ok, err
+    if action == "retry" then
+        ok, err = refill:retry(request.manga_id, request.revision)
+    elseif action == "stop" then
+        ok, err = refill:stop(request.manga_id, request.revision)
     end
-
-    return missing, unread_count
+    if not ok and err then self:showMessage(I18n.f("Could not update download ahead: %1", err)) end
+    self:refreshDownloadsMenu()
+    if self.refreshChapterMenu then self:refreshChapterMenu({ quick = true }) end
+    return ok, err
 end
 
-
-function Methods:getMangaKeepNextUnreadDownloadsLimit(manga)
-    if not SuwayomiSettings.loadMangaKeepNextUnreadDownloads then
-        return 0
+function Methods:getMangaRefillRequest(manga)
+    for _, request in ipairs(self:getDownloadQueue().refill:snapshot()) do
+        if request.manga_id == nil or tostring(request.manga_id) == tostring(manga and manga.id) then return request end
     end
-    return tonumber(SuwayomiSettings:loadMangaKeepNextUnreadDownloads(manga)) or 0
 end
 
-
-function Methods:saveMangaKeepNextUnreadDownloadsLimit(manga, limit)
-    if not SuwayomiSettings.saveMangaKeepNextUnreadDownloads then
-        return tonumber(limit) or 0
-    end
-    return SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, limit)
+function Methods:requestMangaRefill(manga)
+    if self.suwayomi_host_retired then return false end
+    local ok, err = self:getDownloadQueue().refill:request(manga)
+    if not ok and err then self:showMessage(I18n.f("Could not update download ahead: %1", err)) end
+    return ok, err
 end
 
-
-function Methods:normalizeMangaKeepNextUnreadDownloadsLimit(limit)
-    if SuwayomiSettings.normalizeMangaKeepNextUnreadDownloads then
-        return SuwayomiSettings:normalizeMangaKeepNextUnreadDownloads(limit)
+function Methods:setMangaDownloadAhead(manga, limit)
+    if self.suwayomi_host_retired then return false end
+    local ok, err = self:getDownloadQueue().refill:setPolicy(manga, limit)
+    if not ok then
+        self:showMessage(err or I18n.t("Failed to save settings."))
+        return false, err
     end
-    return tonumber(limit) or 0
+    if self.refreshChapterMenu then self:refreshChapterMenu({ quick = true }) end
+    return ok
 end
-
-
-function Methods:getQueueableKeepNextUnreadDownloads(manga, chapters)
-    local queueable = {}
-    local max_chapters = tonumber(self.max_batch_queue_chapters) or 50
-    for _index, chapter in ipairs(chapters or {}) do
-        local status = self:getDownloadQueue():getStatus(manga, chapter)
-        local downloaded = self:isChapterDownloaded(manga, chapter)
-        if not downloaded and not (status and (
-            status.state == "queued"
-                or status.state == "downloading"
-                or status.state == "downloaded"
-                or status.state == "skipped"
-                or status.archive_state == "damaged"
-                or status.archive_state == "unverified"
-        )) then
-            if #queueable >= max_chapters then
-                break
-            end
-            table.insert(queueable, chapter)
-        end
-    end
-    return queueable
-end
-
-
-function Methods:enqueueKeepNextUnreadDownloads(manga, chapters, download_directory)
-    local queueable = self:getQueueableKeepNextUnreadDownloads(manga, chapters)
-    if #queueable == 0 then
-        return 0
-    end
-
-    local queued = 0
-    self:withChapterMenuRefreshSuppressed(function()
-        queued = self:getDownloadQueue():enqueueBatch(manga, queueable, download_directory,
-            { quiet_duplicate = true, provenance = "automatic" })
-    end)
-    if queued > 0 then
-        self:refreshChapterMenu({ quick = true })
-    end
-    return queued
-end
-
-
-function Methods:applyMangaKeepNextUnreadDownloadsPolicy(manga)
-    if not self.current_chapter_context then
-        return 0
-    end
-
-    manga = manga or self.current_chapter_context.manga
-    if not manga then
-        return 0
-    end
-    if self.isCurrentChapterContextForManga and not self:isCurrentChapterContextForManga(manga) then
-        return 0
-    end
-
-    local limit = self:getMangaKeepNextUnreadDownloadsLimit(manga)
-    if limit <= 0 then
-        return 0
-    end
-
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    if not download_directory or download_directory == "" then
-        return 0
-    end
-
-    local chapters = self:getUnreadDownloadBufferCandidates(manga, limit)
-    if #chapters == 0 then
-        return 0
-    end
-
-    return self:enqueueKeepNextUnreadDownloads(manga, chapters, download_directory)
-end
-
 
 function Methods:keepNextUnreadChaptersDownloaded(limit)
-    if not self.current_chapter_context then
-        return 0
-    end
-
-    local manga = self.current_chapter_context.manga
-    local requested_limit = self:normalizeMangaKeepNextUnreadDownloadsLimit(limit)
-    if requested_limit <= 0 then
-        return 0
-    end
-
-    local download_directory = self:getDownloadDirectoryOrChoose(function()
-            self:keepNextUnreadChaptersDownloaded(requested_limit)
-    end)
-    if not download_directory then
-        return 0
-    end
-
-    local saved, err = self:saveMangaKeepNextUnreadDownloadsLimit(manga, requested_limit)
-    if not saved and err then
-        self:showMessage(err or I18n.t("Failed to save settings."))
-        return 0
-    end
-    local chapters = self:getUnreadDownloadBufferCandidates(manga, requested_limit)
-    if #chapters == 0 then
-        self:showMessage(I18n.t("Download-ahead buffer is already downloaded or queued."))
-        return 0
-    end
-
-    return self:enqueueSelectedChapterDownloads(manga, chapters, download_directory)
+    if not self.current_chapter_context then return false end
+    return self:keepNextUnreadChaptersForManga(self.current_chapter_context.manga, limit)
 end
 
 

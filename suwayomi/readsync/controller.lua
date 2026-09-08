@@ -170,7 +170,8 @@ function Methods:applyPendingReadSyncResult(active, result)
     end
 
     if changed then
-        self:saveChapterLedger(ledger)
+        local saved = self:saveChapterLedger(ledger)
+        if not saved then synced = 0 end
     end
 
     return synced, tonumber(result.attempted) or #(active.batch or {})
@@ -284,14 +285,23 @@ function Methods:onCloseDocument()
 
     local ledger = self:loadChapterLedger()
     for _, entry in pairs(ledger) do
-        if entry.path == document_path then
-            local already_read = entry.read == true
-            local marked, saved_entry = self:markLedgerEntryRead(entry)
-            local finished_entry = saved_entry or entry
+        if type(entry) == "table" and entry.path == document_path
+            and validId(entry.manga_id) and validId(entry.chapter_id) then
+            if entry.read ~= true then
+                entry.read = true
+                entry.pending_read_sync = true
+                entry.pending_read_state = true
+            end
+            local saved = self:getDownloadQueue().refill:commitLedger(ledger, {
+                { id = entry.manga_id, title = entry.manga_title, endpoint_scope = entry.endpoint_scope, require_origin = true },
+            })
+            if not saved then return end
+            local finished_entry = saved[tostring(entry.manga_id) .. ":" .. tostring(entry.chapter_id)] or entry
+            self:markCurrentContextChapterReadFromLedger(finished_entry)
+            self:schedulePendingReadSync()
             local settings = SuwayomiSettings:loadDeleteChaptersSettings()
             local cleanup_enabled = tonumber(settings and settings.delete_finished_while_reading) or 0
-            if (marked or already_read) and cleanup_enabled > 0
-                and validId(finished_entry.manga_id) and validId(finished_entry.chapter_id)
+            if cleanup_enabled > 0
                 and type(finished_entry.path) == "string" and finished_entry.path ~= ""
                 and self.recordFinishedChapter
             then

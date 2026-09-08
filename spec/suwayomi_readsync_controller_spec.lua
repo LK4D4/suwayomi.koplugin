@@ -82,17 +82,6 @@ local function buildPlugin(controller, options)
         end
         return batch
     end
-    function plugin:markLedgerEntryRead(entry)
-        if entry.read == true then
-            return false
-        end
-        entry.read = true
-        entry.pending_read_sync = true
-        entry.pending_read_state = true
-        self:saveChapterLedger(ledger)
-        self:schedulePendingReadSync()
-        return true
-    end
     function plugin:reconcileDownloadedChapterLedger()
         self.reconcile_count = (self.reconcile_count or 0) + 1
     end
@@ -521,118 +510,6 @@ describe("suwayomi/readsync/controller", function()
         assert.are.equal("https://new.example", plugin.pending_read_sync_active.credentials.server_url)
     end)
 
-    it("marks the matching ledger entry read when KOReader closes a finished document", function()
-        local controller, state = installController()
-        local plugin = buildPlugin(controller, {
-            current_document_path = "/books/Frieren/Ch. 1.cbz",
-            current_document_finished = true,
-            ledger = {
-                ["m1:c1"] = {
-                    chapter_id = "c1",
-                    path = "/books/Frieren/Ch. 1.cbz",
-                    read = false,
-                },
-            },
-        })
-
-        plugin:onCloseDocument()
-
-        assert.is_true(plugin:loadChapterLedger()["m1:c1"].read)
-        assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
-        assert.are.equal(1, #plugin.saved_ledgers)
-        assert.are.equal(1, #state.scheduled)
-    end)
-
-    it("records finished cleanup from a fresh reader instance without chapter context", function()
-        local controller = installController()
-        local plugin = buildPlugin(controller, {
-            current_document_path = "/downloads/source/manga/c2.cbz",
-            current_document_finished = true,
-            ledger = {
-                ["m1:c2"] = {
-                    manga_id = "m1",
-                    chapter_id = "c2",
-                    path = "/downloads/source/manga/c2.cbz",
-                    read = false,
-                },
-            },
-        })
-        plugin.current_chapter_context = nil
-
-        plugin:onCloseDocument()
-
-        assert.are.equal("c2", plugin.recorded_finished[1].chapter_id)
-        assert.is_true(plugin:loadChapterLedger()["m1:c2"].pending_read_sync)
-        assert.are.equal(1, plugin.finished_journal_flushes)
-        assert.are.equal(0, #plugin.delete_calls)
-    end)
-
-    it("records already-read finished documents without rewriting the ledger", function()
-        local controller = installController()
-        local plugin = buildPlugin(controller, {
-            current_document_path = "/downloads/source/manga/c3.cbz",
-            current_document_finished = true,
-            ledger = {
-                ["m1:c3"] = {
-                    manga_id = "m1",
-                    chapter_id = "c3",
-                    path = "/downloads/source/manga/c3.cbz",
-                    read = true,
-                },
-            },
-        })
-
-        plugin:onCloseDocument()
-
-        assert.are.equal("c3", plugin.recorded_finished[1].chapter_id)
-        assert.are.equal(0, #plugin.saved_ledgers)
-        assert.are.equal(0, #plugin.delete_calls)
-    end)
-
-    it("keeps read sync scheduling when finished cleanup is disabled", function()
-        local controller, state = installController({ delete_finished_while_reading = 0 })
-        local plugin = buildPlugin(controller, {
-            current_document_path = "/downloads/source/manga/c4.cbz",
-            current_document_finished = true,
-            ledger = {
-                ["m1:c4"] = {
-                    manga_id = "m1",
-                    chapter_id = "c4",
-                    path = "/downloads/source/manga/c4.cbz",
-                    read = false,
-                },
-            },
-        })
-
-        plugin:onCloseDocument()
-
-        assert.is_true(plugin:loadChapterLedger()["m1:c4"].pending_read_sync)
-        assert.are.equal(1, #state.scheduled)
-        assert.are.equal(0, #plugin.recorded_finished)
-        assert.are.equal(0, #plugin.delete_calls)
-    end)
-
-    it("records native open-next close events without chapter context", function()
-        local controller = installController()
-        local plugin = buildPlugin(controller, {
-            current_document_path = "/downloads/source/manga/c5.cbz",
-            current_document_finished = true,
-            ledger = {
-                ["m1:c5"] = {
-                    manga_id = "m1",
-                    chapter_id = "c5",
-                    path = "/downloads/source/manga/c5.cbz",
-                    read = false,
-                },
-            },
-        })
-        plugin.current_chapter_context = nil
-
-        plugin:onCloseDocument()
-
-        assert.are.equal("c5", plugin.recorded_finished[1].chapter_id)
-        assert.are.equal(0, #plugin.delete_calls)
-    end)
 
     it("does not record unfinished, unmatched, or invalid ledger entries", function()
         local controller = installController()

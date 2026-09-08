@@ -10,7 +10,7 @@ describe("suwayomi/chapters/actions", function()
     local downloader
     local debug_events
 
-    local manga = { id = "m1", title = "Manga" }
+    local manga = { id = "m1", title = "Manga", endpoint_scope = "https://suwayomi.example" }
     local chapter = { id = "c1", name = "Chapter 1" }
 
     local function reset_modules()
@@ -27,6 +27,7 @@ describe("suwayomi/chapters/actions", function()
             "suwayomi/i18n",
             "suwayomi/settings",
             "suwayomi/downloads/downloader",
+            "suwayomi/downloads/refill",
             "suwayomi/ui",
             "suwayomi/debug",
             "suwayomi/api",
@@ -78,6 +79,11 @@ describe("suwayomi/chapters/actions", function()
         settings.getStore = checked.getStore
         settings.isBlocked = checked.isBlocked
         settings.reconcile = checked.reconcile
+        local persisted = dofile("suwayomi/settings.lua")
+        for name, method in pairs(persisted) do
+            if settings[name] == nil then settings[name] = method end
+        end
+        assert(settings:save({ server_url = "https://suwayomi.example" }))
         downloader = {
             existing = options.existing or {},
             getTargetPath = function(_, download_directory, target_manga, target_chapter)
@@ -205,9 +211,10 @@ describe("suwayomi/chapters/actions", function()
                 for update_key, value in pairs(updates or {}) do
                     target_ledger[key][update_key] = value
                 end
+                return target_ledger[key]
             end,
             upsertChapterLedgerEntry = function(self, target_manga, target_chapter, updates)
-                self:upsertChapterLedgerEntryInLedger(self.ledger, target_manga, target_chapter, updates)
+                return self:upsertChapterLedgerEntryInLedger(self.ledger, target_manga, target_chapter, updates)
             end,
             setKoreaderChapterReadState = function(self, chapter_path, read_state)
                 table.insert(self.metadata_updates, { path = chapter_path, read = read_state })
@@ -249,10 +256,6 @@ describe("suwayomi/chapters/actions", function()
                     chapter_id = chapter_id,
                 })
             end,
-            applyMangaKeepNextUnreadDownloadsPolicy = function(self, target_manga)
-                self.keep_next_policy_manga = target_manga
-                return options.keep_next_queued or 0
-            end,
             saveReaderReturnContext = function(self, target_manga, target_chapter, chapter_path)
                 table.insert(self.reader_return_contexts, {
                     manga = target_manga,
@@ -279,6 +282,10 @@ describe("suwayomi/chapters/actions", function()
             settings = settings, queue = queue,
             ui_manager = { scheduleIn = function() end, unschedule = function() end },
         }
+        queue.refill = require("suwayomi/downloads/refill"):new{
+            settings = settings, queue = queue,
+            ui_manager = { scheduleIn = function() end, unschedule = function() end },
+        }
 
         local Actions = require("suwayomi/chapters/actions")
         for name, method in pairs(Actions.methods) do
@@ -290,6 +297,14 @@ describe("suwayomi/chapters/actions", function()
     local function install_bulk_admission(plugin)
         plugin.max_batch_queue_chapters = 50
         plugin.queue = require("suwayomi/downloads/queue"):new{ downloader = downloader }
+        plugin.queue.manual_deletion = require("suwayomi/chapters/manual_deletion"):new{
+            settings = settings, queue = plugin.queue,
+            ui_manager = { scheduleIn = function() end, unschedule = function() end },
+        }
+        plugin.queue.refill = require("suwayomi/downloads/refill"):new{
+            settings = settings, queue = plugin.queue,
+            ui_manager = { scheduleIn = function() end, unschedule = function() end },
+        }
         local context = require("suwayomi/chapters/context").methods
         for _, name in ipairs({ "loadMangaScanlatorFilter", "getChapterScanlator" }) do
             plugin[name] = context[name]
