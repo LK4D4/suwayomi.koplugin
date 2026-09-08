@@ -19,3 +19,15 @@ _Avoid_: Next N additional downloads, chapters after the current reader page.
 **Refill request**:
 Outstanding work to reevaluate a manga's Download-ahead buffer using current reading and download choices. Repeated triggers can refer to the same outstanding evaluation; they do not reserve additional chapters.
 _Avoid_: Download job, reserved batch.
+
+**Download job**:
+An accepted request to obtain a chapter archive on the KOReader device. A job may require multiple download attempts before completion.
+_Avoid_: Download attempt when referring to the continuing request.
+
+**Download attempt**:
+One execution of a download job that tries to produce a complete local chapter archive. Attempts for the same chapter can overlap without being the same attempt.
+_Avoid_: Download job, archive generation.
+
+**Damaged download**:
+A local chapter archive that fails an integrity check, such as archive structure, entry checksums, or a known expected page count. Passing those checks does not establish that its content is correct.
+_Avoid_: Reader error when no archive damage has been established.
