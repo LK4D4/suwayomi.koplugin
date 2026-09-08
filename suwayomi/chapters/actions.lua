@@ -40,48 +40,86 @@ mergeMethods(
     ChapterReadActions.methods
 )
 
-function Methods:openChapter(manga, chapter)
+function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
+    if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
+    local request = {}
+    local completed = false
+    self.chapter_archive_request = request
+    local context_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
     if not downloaded or not chapter_path then
         self:showMessage(I18n.t("Download the chapter first."))
         return false
     end
-
-    local ok, ReaderUI = pcall(require, "apps/reader/readerui")
-    if not ok or not ReaderUI then
-        self:showMessage(I18n.t("KOReader could not open this chapter right now."))
-        return false
+    local function is_current()
+        return not self.suwayomi_host_retired
+            and self.chapter_archive_request == request
+            and (not context_current or context_current())
+            and (not self.isChapterInCurrentContext or self:isChapterInCurrentContext(manga, chapter))
+            and self:getChapterPath(manga, chapter) == chapter_path
     end
-
-    if self.saveReaderReturnContext then
-        self:saveReaderReturnContext(manga, chapter, chapter_path)
+    local accepted, err = self:getDownloadQueue():verifyArchive(manga, chapter, chapter_path, function(result)
+        if completed or not is_current() then return end
+        completed = true
+        if self.refreshChapterMenu then self:refreshChapterMenu() end
+        if result.state ~= "valid" then
+            self:showChapterDownloadError(manga, chapter)
+            return
+        end
+        if not open_when_valid then
+            self:showMessage(I18n.t("Download verified."))
+            return
+        end
+        local ok, ReaderUI = pcall(require, "apps/reader/readerui")
+        if not ok or not ReaderUI
+            or not ((ReaderUI.instance and ReaderUI.instance.switchDocument) or ReaderUI.showReader)
+        then
+            self:showMessage(I18n.t("KOReader could not open this chapter right now."))
+            return
+        end
+        if not is_current() then return end
+        if self.saveReaderReturnContext then
+            self:saveReaderReturnContext(manga, chapter, chapter_path)
+        end
+        if self.upsertChapterLedgerEntry then
+            self:upsertChapterLedgerEntry(manga, chapter, { path = chapter_path })
+        end
+        if ReaderUI.instance and ReaderUI.instance.switchDocument then
+            ReaderUI.instance:switchDocument(chapter_path)
+        else
+            ReaderUI:showReader(chapter_path)
+        end
+    end, { is_current = is_current })
+    if not accepted then
+        self:showMessage(err == "verification_busy" and I18n.t("Another download is being verified.")
+            or I18n.t("Could not verify download"))
     end
-    if self.upsertChapterLedgerEntry then
-        self:upsertChapterLedgerEntry(manga, chapter, {
-            path = chapter_path,
-        })
-    end
+    return accepted, err
+end
 
-    if ReaderUI.instance and ReaderUI.instance.switchDocument then
-        ReaderUI.instance:switchDocument(chapter_path)
-    elseif ReaderUI.showReader then
-        ReaderUI:showReader(chapter_path)
-    else
-        self:showMessage(I18n.t("KOReader could not open this chapter right now."))
-        return false
-    end
-
-    return true
+function Methods:openChapter(manga, chapter)
+    return self:verifyChapterDownload(manga, chapter, true)
 end
 
 
 function Methods:performChapterAction(manga, chapter, action_id)
     if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
+    self.chapter_archive_request = nil
     if action_id == "open" then
         return self:openChapter(manga, chapter)
     end
     if action_id == "download" then
         return self:enqueueChapterDownload(manga, chapter)
+    end
+    if action_id == "verify_download" then
+        return self:verifyChapterDownload(manga, chapter)
+    end
+    if action_id == "redownload" then
+        return self:redownloadDownloadJob({
+            key = self:getDownloadQueue():getKey(manga, chapter),
+            manga = manga,
+            chapter = chapter,
+        })
     end
     if action_id == "retry_download" then
         return self:retryDownloadJob({ key = self:getDownloadQueue():getKey(manga, chapter) })

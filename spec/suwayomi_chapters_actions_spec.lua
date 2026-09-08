@@ -457,8 +457,9 @@ describe("suwayomi/chapters/actions", function()
         assert.are.same({ "This chapter is not downloaded." }, plugin.messages)
     end)
 
-    it("saves reader return context before opening a downloaded chapter", function()
+    it("opens only after verification and preserves existing reading metadata", function()
         local opened_paths = {}
+        local complete
         package.preload["apps/reader/readerui"] = function()
             return {
                 showReader = function(_, path)
@@ -467,12 +468,22 @@ describe("suwayomi/chapters/actions", function()
             }
         end
         local plugin = build_plugin({
+            queue = {
+                verifyArchive = function(_, _, _, _, callback)
+                    complete = callback
+                    return true
+                end,
+            },
+            ledger = { ["m1:c1"] = { read = true, last_page = 7 } },
             existing = {
                 ["/downloads/Manga/Chapter 1.cbz"] = true,
             },
         })
 
         assert.is_true(plugin:openChapter(manga, chapter))
+        assert.are.same({}, opened_paths)
+        assert.are.same({}, plugin.reader_return_contexts)
+        complete({ state = "valid" })
 
         assert.are.same({ "/downloads/Manga/Chapter 1.cbz" }, opened_paths)
         assert.are.equal(1, #plugin.reader_return_contexts)
@@ -480,8 +491,58 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal(chapter, plugin.reader_return_contexts[1].chapter)
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.reader_return_contexts[1].path)
         assert.are.equal("/downloads/Manga/Chapter 1.cbz", plugin.ledger["m1:c1"].path)
+        assert.is_true(plugin.ledger["m1:c1"].read)
+        assert.are.equal(7, plugin.ledger["m1:c1"].last_page)
         package.preload["apps/reader/readerui"] = nil
         package.loaded["apps/reader/readerui"] = nil
+    end)
+
+    it("never opens or writes reader metadata for an inconclusive or damaged inspection", function()
+        local complete
+        local plugin = build_plugin({
+            existing = { ["/downloads/Manga/Chapter 1.cbz"] = true },
+            queue = { verifyArchive = function(_, _, _, _, callback)
+                complete = callback
+                return true
+            end },
+        })
+        local failures = 0
+        plugin.showChapterDownloadError = function() failures = failures + 1 end
+        for _, state in ipairs({ "unverified", "damaged" }) do
+            assert.is_true(plugin:openChapter(manga, chapter))
+            complete({ state = state })
+        end
+        assert.are.equal(2, failures)
+        assert.are.same({}, plugin.reader_return_contexts)
+        assert.are.same({}, plugin.ledger)
+        assert.are.same({}, plugin.metadata_updates)
+    end)
+
+    it("drops verification after a newer open request, context change, path change, or host retirement", function()
+        local callbacks = {}
+        local plugin = build_plugin({
+            existing = { ["/downloads/Manga/Chapter 1.cbz"] = true },
+            queue = { verifyArchive = function(_, _, _, _, callback)
+                callbacks[#callbacks + 1] = callback
+                return true
+            end },
+        })
+        local Context = require("suwayomi/chapters/context")
+        plugin.captureChapterActionGuard = Context.methods.captureChapterActionGuard
+        assert.is_true(plugin:openChapter(manga, chapter))
+        assert.is_true(plugin:openChapter(manga, chapter))
+        callbacks[1]({ state = "valid" })
+        plugin.current_chapter_context = { manga = manga, chapters = { chapter } }
+        callbacks[2]({ state = "valid" })
+        assert.is_true(plugin:openChapter(manga, chapter))
+        settings.download_directory = "/other"
+        callbacks[3]({ state = "valid" })
+        settings.download_directory = "/downloads"
+        assert.is_true(plugin:openChapter(manga, chapter))
+        plugin.suwayomi_host_retired = true
+        callbacks[4]({ state = "valid" })
+        assert.are.same({}, plugin.reader_return_contexts)
+        assert.are.same({}, plugin.ledger)
     end)
 
     it("translates chapter action refusal and confirmation messages", function()

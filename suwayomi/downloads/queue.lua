@@ -14,6 +14,8 @@ local ActiveJobs = require("suwayomi/downloads/active_jobs")
 local JobStore = require("suwayomi/downloads/job_store")
 local ProgressFile = require("suwayomi/downloads/progress_file")
 local StatusFormatter = require("suwayomi/downloads/status_formatter")
+local Archive = require("suwayomi/downloads/archive")
+local SubprocessJob = require("suwayomi/subprocess/job")
 
 local DownloadQueue = {}
 DownloadQueue.__index = DownloadQueue
@@ -103,8 +105,8 @@ function DownloadQueue:getKey(manga, chapter)
     return tostring(manga.id or manga.title or "") .. ":" .. tostring(chapter.id or chapter.name or "")
 end
 
-function DownloadQueue:buildProgressPath(manga, chapter, download_directory)
-    return ProgressFile.buildPath(self:getKey(manga, chapter), download_directory)
+function DownloadQueue:buildProgressPath(manga, chapter, download_directory, attempt_id)
+    return ProgressFile.buildPath(self:getKey(manga, chapter), download_directory, attempt_id)
 end
 
 function DownloadQueue:loadPersistentJobs()
@@ -255,6 +257,7 @@ function DownloadQueue:reconcile()
             item.retry_count = job.retry_count
             item.retry_at = job.retry_at
             item.progress = job.progress
+            item.repair = job.repair == true or nil
             item.previous_pid = previous_pids[key] or item.previous_pid
             table.insert(remaining_items, item)
             seen[key] = true
@@ -264,21 +267,11 @@ function DownloadQueue:reconcile()
 
     local new_statuses = {}
     for key, pjob in pairs(persistent_map) do
-        new_statuses[key] = {
-            state = pjob.state,
-            retry_count = pjob.retry_count,
-            retry_at = pjob.retry_at,
-            current = pjob.progress and pjob.progress.current or 0,
-            total = pjob.progress and pjob.progress.total or 0,
-        }
+        new_statuses[key] = self:statusForJob(pjob, pjob.state)
     end
     if self.active_job_lifecycle and self.active_job_lifecycle.jobs then
         for key, active in pairs(self.active_job_lifecycle.jobs) do
-            new_statuses[key] = {
-                state = "downloading",
-                current = active.last_progress_current or 0,
-                total = active.last_progress_total or 0,
-            }
+            new_statuses[key] = self:statusForJob(active, "downloading")
         end
     end
     self.statuses = new_statuses
@@ -298,7 +291,16 @@ function DownloadQueue:checkStoreFence()
 end
 
 function DownloadQueue:copySnapshotJob(job, state)
-    return self.job_store:copySnapshotJob(job, state)
+    local snapshot = self.job_store:copySnapshotJob(job, state)
+    if snapshot.progress and snapshot.progress.archive_state then
+        self:withArchiveEvidence(job, snapshot.progress)
+    end
+    if self.verification and self.verification.key == snapshot.key
+        and not self.verification.canceled and not self.verification.delivered then
+        snapshot.progress = snapshot.progress or {}
+        snapshot.progress.verifying = true
+    end
+    return snapshot
 end
 
 function DownloadQueue:getSnapshot()
@@ -346,6 +348,7 @@ function DownloadQueue:retryFailed(key)
     if self:isChapterBusy(key) or (status and status.state ~= "failed") then
         return false, "missing"
     end
+    if job.repair == true then return self:redownload(job.manga, job.chapter, job.download_directory) end
     return self:enqueue(job.manga, job.chapter, job.download_directory)
 end
 
@@ -354,7 +357,7 @@ function DownloadQueue:clearFailed()
     local remaining = {}
     local cleared = 0
     for _index, job in ipairs(self:loadPersistentJobs()) do
-        if job.state == "failed" then
+        if job.state == "failed" and not (job.progress and job.progress.archive_state) then
             cleared = cleared + 1
             if job.manga and job.chapter then
                 self.statuses[self:getKey(job.manga, job.chapter)] = nil
@@ -374,7 +377,7 @@ function DownloadQueue:clearFailed()
                 if job.state == "failed" then
                     local key = job.key or (job.manga and job.chapter and self:getKey(job.manga, job.chapter))
                     if key then
-                        self.statuses[key] = { state = "failed" }
+                        self.statuses[key] = self:statusForJob(job, "failed")
                     end
                 end
             end
@@ -387,7 +390,58 @@ function DownloadQueue:clearFailed()
 end
 
 function DownloadQueue:getStatus(manga, chapter)
-    return self.statuses[self:getKey(manga, chapter)]
+    local key = self:getKey(manga, chapter)
+    local status = self.statuses[key]
+    if status and status.archive_state then
+        local current = {}
+        for field, value in pairs(status) do current[field] = value end
+        status = self:withArchiveEvidence({ progress = status }, current)
+    end
+    if self.verification and self.verification.key == key
+        and not self.verification.canceled and not self.verification.delivered then
+        local result = {}
+        for field, value in pairs(status or {}) do result[field] = value end
+        result.verifying = true
+        return result
+    end
+    return status
+end
+
+function DownloadQueue:statusForJob(job, state)
+    local progress = job.progress or {}
+    local evidence = progress.archive_state and self:withArchiveEvidence(job, {})
+    return {
+        state = state or job.state,
+        repair = job.repair,
+        retry_count = job.retry_count,
+        retry_at = job.retry_at,
+        current = progress.current or job.last_progress_current or 0,
+        total = progress.total or job.last_progress_total or 0,
+        archive_state = evidence and evidence.archive_state,
+        identity = progress.identity,
+        path = progress.path,
+        error = progress.error,
+    }
+end
+
+-- Only retain evidence while it still describes the inspected archive. This is
+-- an observation, not a deletion-generation proof or a pathname lock.
+function DownloadQueue:withArchiveEvidence(job, progress)
+    local previous = job.progress or {}
+    if job.repair and not progress.path then progress.path = previous.path end
+    local evidence = progress.archive_state and progress or previous
+    if evidence.archive_state then
+        local identity = evidence.path and Archive.identity(evidence.path)
+        if not evidence.identity or identity == evidence.identity then
+            progress.archive_state = evidence.archive_state
+            progress.identity = evidence.identity
+            progress.path = evidence.path
+            if progress.error == nil then progress.error = evidence.error end
+        else
+            progress.archive_state, progress.identity = nil, nil
+        end
+    end
+    return progress
 end
 
 function DownloadQueue:setStatus(manga, chapter, status)
@@ -406,7 +460,8 @@ function DownloadQueue:notifyDownloadFailure(message)
 end
 
 function DownloadQueue:getTargetChapterPath(job)
-    if not job or not job.download_directory or not job.manga or not job.chapter or not self.downloader.getTargetPath then
+    if not job or not job.download_directory or not job.manga or not job.chapter
+        or not self.downloader or not self.downloader.getTargetPath then
         return nil
     end
     local chapter_path = select(2, self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter))
@@ -464,6 +519,7 @@ function DownloadQueue:clearStatus(manga, chapter, options)
     end
     options = options or {}
     local key = self:getKey(manga, chapter)
+    self:invalidateVerification(key)
     local ok, err = self:removePersistentJob(key)
     if not ok then
         return false, err
@@ -487,8 +543,21 @@ function DownloadQueue:commitChapterCompletion(active, path)
     return ok, err
 end
 
-function DownloadQueue:jobArchiveExists(job, progress)
-    return self:getExistingArchivePath(job, progress) ~= nil
+function DownloadQueue:cancelJobRecord(job)
+    local progress = self:withArchiveEvidence(job, { state = "failed" })
+    if progress.archive_state then
+        progress.error = job.progress.error
+        local failed = self:buildPersistentJob(job.manga, job.chapter, job.download_directory, "failed", {
+            repair = job.repair, retry_count = job.retry_count, progress = progress,
+        })
+        local ok, err = self:upsertPersistentJob(failed)
+        if ok then self.statuses[failed.key] = self:statusForJob(failed, "failed") end
+        return ok, err
+    end
+    local key = job.key or self:getKey(job.manga, job.chapter)
+    local ok, err = self:removePersistentJob(key)
+    if ok then self.statuses[key] = nil end
+    return ok, err
 end
 
 function DownloadQueue:cancelPending(manga, chapter)
@@ -497,6 +566,7 @@ function DownloadQueue:cancelPending(manga, chapter)
         return false, "store_blocked"
     end
     local key = self:getKey(manga, chapter)
+    self:invalidateVerification(key)
     local active = self:getActiveJob(key)
     if active then
         local ok, err = self.active_job_lifecycle:finishWithCancel(active)
@@ -519,13 +589,13 @@ function DownloadQueue:cancelPending(manga, chapter)
     end
 
     if removed then
-        local ok, err = self:removePersistentJob(key)
+        local job = self:findPersistentJob(key) or { key = key, manga = manga, chapter = chapter }
+        local ok, err = self:cancelJobRecord(job)
         if not ok then
             self:notifyDownloadFailure(err or "Failed to remove download job")
             return false, err or "save_failed"
         end
         self.items = remaining
-        self.statuses[key] = nil
         self.onStatusChanged()
         return true, "queued"
     end
@@ -561,6 +631,13 @@ function DownloadQueue:cancelQueued()
         if job.state == "queued" and not self:getActiveJob(key) then
             if key and key ~= "" then
                 canceled_keys[key] = true
+                local progress = self:withArchiveEvidence(job, { state = "failed" })
+                if progress.archive_state then
+                    progress.error = job.progress.error
+                    remaining_jobs[#remaining_jobs + 1] = self:buildPersistentJob(
+                        job.manga, job.chapter, job.download_directory, "failed",
+                        { repair = job.repair, retry_count = job.retry_count, progress = progress })
+                end
             end
         else
             table.insert(remaining_jobs, job)
@@ -580,7 +657,9 @@ function DownloadQueue:cancelQueued()
         end
         self.items = remaining_items
         for key in pairs(canceled_keys) do
-            self.statuses[key] = nil
+            self:invalidateVerification(key)
+            local job = self:findPersistentJob(key)
+            self.statuses[key] = job and self:statusForJob(job, job.state) or nil
         end
         self.onStatusChanged()
     end
@@ -639,99 +718,185 @@ function DownloadQueue:formatFailureMessage(manga, chapter, detail)
     return StatusFormatter.formatFailureMessage(manga, chapter, detail, self:getKey(manga or {}, chapter or {}))
 end
 
-function DownloadQueue:cleanupInterruptedDownload(job)
-    if not job or not job.download_directory or not job.manga or not job.chapter or not self.downloader then
-        return false
+function DownloadQueue:cleanupAttempt(job)
+    if not job or not job.attempt_id or not job.worker_done then return end
+    local paths = self.downloader and self.downloader.getChapterPathCandidates
+        and self.downloader:getChapterPathCandidates(job.download_directory, job.manga, job.chapter)
+        or { self:getTargetChapterPath(job) }
+    for _, path in ipairs(paths) do
+        if self.downloader.getPartialPath then os.remove(self.downloader:getPartialPath(path, job.attempt_id)) end
+        if self.downloader.getDirectPartialPath then os.remove(self.downloader:getDirectPartialPath(path, job.attempt_id)) end
     end
-    local chapter_path = select(2, self.downloader:getTargetPath(job.download_directory, job.manga, job.chapter))
-    local partial_path = self.downloader.getPartialPath and self.downloader:getPartialPath(chapter_path) or (chapter_path .. ".part")
-    os.remove(partial_path)
-    if self.downloader.getDirectPartialPath then
-        os.remove(self.downloader:getDirectPartialPath(chapter_path))
+    if job.progress_path then
+        os.remove(job.progress_path)
+        os.remove(job.progress_path .. ".tmp")
     end
-    return true
 end
 
-function DownloadQueue:cleanupInterruptedProgress(job)
-    if not job or not job.download_directory or not job.manga or not job.chapter then
-        return false
+function DownloadQueue:invalidateVerification(key)
+    local active = self.verification
+    if active and (not key or active.key == key) then
+        active.canceled = true
+        if active.pid and not active.worker_done then
+            pcall(self.ffi_util.terminateSubProcess, active.pid)
+        end
     end
-    local key = self:getKey(job.manga, job.chapter)
-    os.remove(ProgressFile.buildPath(key, job.download_directory))
-    os.remove(ProgressFile.buildLegacyPath(key, job.download_directory))
-    return true
 end
 
-function DownloadQueue:prepareFailedRetry(job)
-    if self:isChapterBusy(self:getKey(job.manga, job.chapter)) then return false end
-    local partial_cleanup_attempted = self:cleanupInterruptedDownload(job)
-    local progress_cleanup_attempted = self:cleanupInterruptedProgress(job)
-    self:logDebug({
-        operation = "downloadQueue.retry",
-        event = "failed",
-        key = job and job.manga and job.chapter and self:getKey(job.manga, job.chapter) or nil,
-        chapter_id = job and job.chapter and job.chapter.id,
-        cleanup_attempted = partial_cleanup_attempted or progress_cleanup_attempted,
-    })
+function DownloadQueue:verificationIsCurrent(active)
+    if self.stopped or active.canceled or self.verification ~= active then return false end
+    if active.is_current then
+        local ok, current = pcall(active.is_current)
+        if not ok or not current then return false end
+    end
+    local identity = Archive.identity(active.path)
+    local inspected = active.result and active.result.identity or active.identity
+    return identity == inspected
+end
+
+function DownloadQueue:pollVerification()
+    local active = self.verification
+    if not active then return end
+    if self.stopped then
+        self:invalidateVerification()
+        return -- Unknown worker files are intentionally retained on shutdown.
+    end
+    if not active.worker_done then
+        local ok, done = pcall(self.ffi_util.isSubProcessDone, active.pid)
+        active.worker_done = ok and done == true
+    end
+    if not self:verificationIsCurrent(active) then active.canceled = true end
+    if active.canceled and not active.worker_done and not active.terminating then
+        active.terminating = true
+        pcall(self.ffi_util.terminateSubProcess, active.pid)
+    end
+    if not active.result and not active.canceled then
+        if active.worker_done then
+            active.result = SubprocessJob.readResult(active.result_path)
+            if type(active.result) ~= "table"
+                or (active.result.state ~= "valid" and active.result.state ~= "damaged"
+                    and active.result.state ~= "unverified") then
+                active.result = { state = "unverified", identity = active.identity,
+                    error = I18n.t("Could not verify download") }
+            end
+        elseif self.now() - active.started_at > self.WATCHDOG_TIMEOUT_SECONDS then
+            active.result = { state = "unverified", identity = active.identity,
+                error = I18n.t("Could not verify download") }
+            active.terminating = true
+            pcall(self.ffi_util.terminateSubProcess, active.pid)
+        end
+    end
+    if active.result and not active.delivered and not active.canceled then
+        if not self:verificationIsCurrent(active) then
+            active.canceled = true
+        elseif self:checkStoreFence() then
+            local result = active.result
+            result.path = active.path
+            local ok
+            if result.state == "valid" then
+                ok = self:commitChapterCompletion(active, active.path)
+            else
+                local failed = self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
+                    repair = active.repair,
+                    progress = { state = "failed", archive_state = result.state, identity = result.identity,
+                        path = active.path, error = result.error },
+                })
+                ok = self:upsertPersistentJob(failed)
+            end
+            if ok then
+                active.delivered = true
+                self.statuses[active.key] = result.state == "valid"
+                    and { state = "downloaded", path = active.path }
+                    or { state = "failed", archive_state = result.state, identity = result.identity,
+                        path = active.path, error = result.error }
+                self.onStatusChanged()
+                local current = self:verificationIsCurrent(active)
+                if active.worker_done then
+                    if not active.retain_files then SubprocessJob.cleanup(active) end
+                    self.verification = nil
+                end
+                if current and active.callback then pcall(active.callback, result) end
+            end
+        end
+    end
+    if active.worker_done and (active.canceled or active.delivered) then
+        if not active.retain_files then SubprocessJob.cleanup(active) end
+        if self.verification == active then self.verification = nil end
+        if active.canceled then self.onStatusChanged() end
+    elseif self.verification == active then
+        self.ui_manager:scheduleIn(self.POLL_INTERVAL_SECONDS, function() self:pollVerification() end)
+    end
+end
+
+function DownloadQueue:verifyArchive(manga, chapter, path, callback, options)
+    if not self:checkStoreFence() then return false, "store_blocked" end
+    if self.verification then return false, "verification_busy" end
+    local key = self:getKey(manga, chapter)
+    local status = self.statuses[key]
+    if self:isChapterBusy(key) or status and (status.state == "queued" or status.state == "downloading") then
+        return false, "downloading"
+    end
+    local attempt_id, err = Archive.newAttemptId()
+    if not attempt_id then return false, err end
+    local stored = self:findPersistentJob(key)
+    local directory = stored and stored.download_directory
+        or self.settings and self.settings.loadDownloadDirectory and self.settings:loadDownloadDirectory()
+    local active = {
+        key = key, manga = manga, chapter = chapter, path = path,
+        download_directory = directory, repair = stored and stored.repair,
+        identity = Archive.identity(path), callback = callback,
+        is_current = options and options.is_current, started_at = self.now(),
+        result_path = SubprocessJob.buildResultPath("verify_" .. attempt_id),
+    }
+    self.verification = active
+    local ok, pid, launch_error = pcall(self.ffi_util.runInSubProcess, function()
+        local valid, result = pcall(Archive.validate, path)
+        if not valid then result = { state = "unverified", identity = active.identity, error = tostring(result) } end
+        SubprocessJob.writeResult(active.result_path, result)
+    end)
+    if ok and pid then
+        active.pid = pid
+    else
+        active.worker_done = true
+        -- An exception supplies no PID/exit proof; never unlink files a
+        -- possibly launched child could still be writing.
+        active.retain_files = not ok
+        active.result = { state = "unverified", identity = active.identity, error = tostring(ok and launch_error or pid) }
+    end
+    self.onStatusChanged()
+    self.ui_manager:scheduleIn(0, function() self:pollVerification() end)
+    return true
 end
 
 function DownloadQueue:recover()
     if self.recovered then return true end
     self.recovery_pending = true
-    self.recovery_completions = self.recovery_completions or {}
-    local function retry(err)
+    if self:isBlocked() then
         self:scheduleReconciliation()
-        return false, err
+        return false, "store_blocked"
     end
-    if self:isBlocked() then return retry("store_blocked") end
     local jobs = self:loadPersistentJobs()
+    local normalized, changed = {}, false
     for _, job in ipairs(jobs) do
-        if job.manga and job.chapter and job.download_directory
-            and (job.state == "queued" or job.state == "downloading") then
-            local path = self:getExistingArchivePath(job)
-            if path then
-                local key = self:getKey(job.manga, job.chapter)
-                self.recovery_completions[key] = { job = job, path = path }
-            end
-        end
-    end
-    -- Retain these observations across an ambiguous save that removed the job.
-    for _, completion in pairs(self.recovery_completions) do
-        if not completion.saved then
-            local ok, err = self:commitChapterCompletion(completion.job, completion.path)
-            if not ok then return retry(err) end
-            completion.saved = true
-        end
-    end
-    jobs = self:loadPersistentJobs()
-    local statuses, normalized, changed = {}, {}, false
-    for _, job in ipairs(jobs) do
-        if job.manga and job.chapter and job.download_directory
-            and (job.state == "queued" or job.state == "downloading") then
-            local failed = {}
-            for key, value in pairs(job) do failed[key] = value end
-            failed.state, failed.retry_at = "failed", nil
-            failed.progress = self:normalizeProgress(job.progress) or {}
-            failed.progress.state = "failed"
-            failed.progress.retryable = nil
-            failed.progress.error = I18n.t("Interrupted; retry download")
-            job, changed = failed, true
+        if job.manga and job.chapter and job.download_directory and job.state == "downloading" then
+            local queued = {}
+            for key, value in pairs(job) do queued[key] = value end
+            queued.state = "queued"
+            job, changed = queued, true
         end
         normalized[#normalized + 1] = job
-        if job.manga and job.chapter and job.state == "failed" then
-            statuses[self:getKey(job.manga, job.chapter)] = { state = "failed" }
-        end
     end
     if changed then
         local ok, err = self:savePersistentJobs(normalized)
-        if not ok then return retry(err) end
+        if not ok then
+            self:scheduleReconciliation()
+            return false, err
+        end
     end
-    for key in pairs(self.recovery_completions) do statuses[key] = { state = "downloaded" } end
-    self.statuses = statuses
-    self.recovery_completions = nil
     self.recovery_pending, self.recovered = nil, true
-    self.onStatusChanged()
-    return true
+    local ok, err = self:reconcile()
+    if ok and #self.items > 0 then self.ui_manager:scheduleIn(0, function() self:process() end) end
+    return ok, err
 end
 
 function DownloadQueue:canEnqueue(manga, chapter, download_directory)
@@ -743,6 +908,10 @@ function DownloadQueue:canEnqueue(manga, chapter, download_directory)
         or status.state == "running" or status.state == "stopping" or status.state == "finalizing") then
         return false, status.state
     end
+    local persisted = self:findPersistentJob(self:getKey(manga, chapter))
+    local archive_state = status and status.archive_state
+        or persisted and self:withArchiveEvidence(persisted, {}).archive_state
+    if archive_state then return false, archive_state end
     -- Terminal status can outlive its archive or configured download directory.
     if self:getExistingArchivePath({ manga = manga, chapter = chapter, download_directory = download_directory }) then
         return false, "downloaded"
@@ -751,12 +920,22 @@ function DownloadQueue:canEnqueue(manga, chapter, download_directory)
 end
 
 function DownloadQueue:enqueue(manga, chapter, download_directory, options)
+    return self:admit(manga, chapter, download_directory, options, false)
+end
+
+function DownloadQueue:redownload(manga, chapter, download_directory)
+    local job = self:findPersistentJob(self:getKey(manga, chapter))
+    return self:admit(manga, chapter, job and job.download_directory or download_directory, nil, true)
+end
+
+function DownloadQueue:admit(manga, chapter, download_directory, options, repair)
     if not self:checkStoreFence() then
         self:notifyDownloadFailure(I18n.t("Cannot enqueue download: storage is ambiguous"))
         return false, "store_blocked"
     end
     options = options or {}
     local eligible, state = self:canEnqueue(manga, chapter, download_directory)
+    if repair and (state == "downloaded" or state == "damaged" or state == "unverified") then eligible = true end
     if not eligible then
         if not options.quiet_duplicate then
             self.onMessage(I18n.t("Chapter download is already in progress."))
@@ -769,13 +948,18 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
         enqueue_state = "retry"
     end
 
-    local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued")
+    local previous = self:findPersistentJob(self:getKey(manga, chapter))
+    local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued", {
+        repair = repair,
+        progress = previous and previous.progress and (previous.progress.archive_state or repair)
+            and self:withArchiveEvidence(previous, { state = "queued" }) or nil,
+    })
     local ok, err = self:upsertPersistentJob(persistent_job)
     if not ok then
         self:notifyDownloadFailure(err or "Failed to persist queued download")
         return false, err or "save_failed"
     end
-    if enqueue_state == "retry" then self:prepareFailedRetry(persistent_job) end
+    self:invalidateVerification(persistent_job.key)
 
     table.insert(self.items, {
         key = persistent_job.key,
@@ -783,8 +967,10 @@ function DownloadQueue:enqueue(manga, chapter, download_directory, options)
         manga = manga,
         chapter = chapter,
         downloader = self.downloader,
+        repair = persistent_job.repair,
+        progress = persistent_job.progress,
     })
-    self:setStatus(manga, chapter, { state = "queued" })
+    self:setStatus(manga, chapter, self:statusForJob(persistent_job, "queued"))
 
     self.ui_manager:scheduleIn(0, function()
         self:process()
@@ -819,7 +1005,6 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
 
     for _index, chapter in ipairs(chapters or {}) do
         local key = self:getKey(manga, chapter)
-        local status = self:getStatus(manga, chapter)
         if seen[key] or not self:canEnqueue(manga, chapter, download_directory) then
             if not options.quiet_duplicate then
                 self.onMessage(I18n.t("Chapter download is already in progress."))
@@ -830,7 +1015,6 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
             table.insert(persistent_jobs, persistent_job)
             table.insert(candidates, {
                 persistent_job = persistent_job,
-                retry = status and status.state == "failed",
                 item = {
                     key = persistent_job.key,
                     download_directory = download_directory,
@@ -855,7 +1039,7 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
     end
 
     for _, candidate in ipairs(candidates) do
-        if candidate.retry then self:prepareFailedRetry(candidate.persistent_job) end
+        self:invalidateVerification(candidate.persistent_job.key)
         self.statuses[candidate.persistent_job.key] = { state = "queued" }
         table.insert(self.items, candidate.item)
     end

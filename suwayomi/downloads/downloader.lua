@@ -8,9 +8,9 @@
 -- are validated before final CBZ rename.
 
 local lfs = require("suwayomi/fs")
-local Archiver = require("ffi/archiver")
 local SuwayomiAPI = require("suwayomi/api")
 local ProgressFile = require("suwayomi/downloads/progress_file")
+local Archive = require("suwayomi/downloads/archive")
 local SuwayomiPaths = require("suwayomi/paths")
 
 local Downloader = {}
@@ -88,12 +88,14 @@ function Downloader:findExistingChapterPath(download_directory, manga, chapter)
     return self:findExistingPathInCandidates(self:getChapterPathCandidates(download_directory, manga, chapter))
 end
 
-function Downloader:getPartialPath(chapter_path)
-    return tostring(chapter_path or "") .. ".part"
+function Downloader:getPartialPath(chapter_path, attempt_id)
+    assert(type(attempt_id) == "string" and #attempt_id == 32 and attempt_id:match("^[0-9a-f]+$"), "Invalid download attempt ID")
+    return tostring(chapter_path or "") .. "." .. attempt_id .. ".part"
 end
 
-function Downloader:getDirectPartialPath(chapter_path)
-    return tostring(chapter_path or "") .. ".direct.part"
+function Downloader:getDirectPartialPath(chapter_path, attempt_id)
+    assert(type(attempt_id) == "string" and #attempt_id == 32 and attempt_id:match("^[0-9a-f]+$"), "Invalid download attempt ID")
+    return tostring(chapter_path or "") .. "." .. attempt_id .. ".direct.part"
 end
 
 function Downloader:chapterExists(chapter_path)
@@ -174,7 +176,7 @@ function Downloader:closeArchiveWriter(writer)
     if not ok then
         return false, "Could not close chapter archive. " .. tostring(closed)
     end
-    if closed == false or close_error ~= nil then
+    if closed == false or close_error ~= nil or writer.err ~= nil then
         return false, "Could not close chapter archive. " .. tostring(close_error or writer.err or "unknown error")
     end
     return true
@@ -187,299 +189,104 @@ function Downloader:isArchiveContentType(content_type)
         or content_type:match("zip") ~= nil
 end
 
-function Downloader:isZipHeader(header_bytes)
-    header_bytes = tostring(header_bytes or "")
-    return header_bytes:sub(1, 4) == "PK\003\004"
-        or header_bytes:sub(1, 4) == "PK\005\006"
-        or header_bytes:sub(1, 4) == "PK\007\008"
-end
-
-local function readUInt16LE(bytes, index)
-    local first = bytes:byte(index)
-    local second = bytes:byte(index + 1)
-    if not first or not second then
-        return nil
+local function beginAttempt(self, download_directory, manga, chapter, options)
+    if not download_directory or download_directory == "" then
+        return nil, { ok = false, error = "Set up a download directory first." }
     end
-    return first + (second * 256)
-end
-
-local function readUInt32LE(bytes, index)
-    local low = readUInt16LE(bytes, index)
-    local high = readUInt16LE(bytes, index + 2)
-    if not low or not high then
-        return nil
+    options = options or {}
+    local attempt_id, entropy_error = options.attempt_id
+    if attempt_id == nil then attempt_id, entropy_error = Archive.newAttemptId() end
+    if type(attempt_id) ~= "string" or #attempt_id ~= 32 or not attempt_id:match("^[0-9a-f]+$") then
+        return nil, { ok = false, error = entropy_error or "Invalid download attempt ID." }
     end
-    return low + (high * 65536)
-end
-
-local function hasFlag(value, flag)
-    return value and value % (flag * 2) >= flag
-end
-
-local function parseCentralDirectoryEntry(bytes, index, limit)
-    if index + 45 > limit or bytes:sub(index, index + 3) ~= "PK\001\002" then
-        return nil
+    local manga_dir, chapter_path = self:getTargetPath(download_directory, manga, chapter)
+    local attempt = { attempt_id = attempt_id, force = options.force == true,
+        manga_dir = manga_dir, chapter_path = chapter_path }
+    local candidates = self:getChapterPathCandidates(download_directory, manga, chapter)
+    if attempt.force and options.repair_path ~= nil then
+        local supported = false
+        for _, path in ipairs(candidates) do
+            if path == options.repair_path then supported = true; break end
+        end
+        if not supported then
+            return nil, { ok = false, error = "Unsupported chapter repair path.", retryable = false }
+        end
+        attempt.chapter_path = options.repair_path
+        attempt.manga_dir = options.repair_path:match("^(.*)/[^/]+$")
+        candidates = { options.repair_path }
     end
-
-    local name_length = readUInt16LE(bytes, index + 28)
-    local extra_length = readUInt16LE(bytes, index + 30)
-    local comment_length = readUInt16LE(bytes, index + 32)
-    local compressed_size = readUInt32LE(bytes, index + 20)
-    local local_header_offset = readUInt32LE(bytes, index + 42)
-    local flags = readUInt16LE(bytes, index + 8)
-    if not name_length
-        or name_length == 0
-        or not extra_length
-        or not comment_length
-        or not compressed_size
-        or not local_header_offset
-        or not flags
-    then
-        return nil
-    end
-
-    local length = 46 + name_length + extra_length + comment_length
-    if index + length - 1 > limit then
-        return nil
-    end
-
-    return {
-        length = length,
-        name_length = name_length,
-        compressed_size = compressed_size,
-        local_header_offset = local_header_offset,
-        flags = flags,
-    }
-end
-
-local function readArchiveBytes(archive_result, archive_path, offset, length)
-    local head_bytes = tostring(archive_result.head_bytes or archive_result.header_bytes or "")
-    if offset >= 0 and offset + length <= #head_bytes then
-        return head_bytes:sub(offset + 1, offset + length)
-    end
-
-    local tail_bytes = tostring(archive_result.tail_bytes or "")
-    local tail_offset = (archive_result.bytes or 0) - #tail_bytes
-    if offset >= tail_offset and offset + length <= tail_offset + #tail_bytes then
-        local start_index = offset - tail_offset + 1
-        return tail_bytes:sub(start_index, start_index + length - 1)
-    end
-
-    if not archive_path or archive_path == "" then
-        return nil
-    end
-    local handle = io.open(archive_path, "rb")
-    if not handle then
-        return nil
-    end
-    local seek_ok = handle:seek("set", offset)
-    local bytes
-    if seek_ok then
-        bytes = handle:read(length)
-    end
-    handle:close()
-    if type(bytes) ~= "string" or #bytes ~= length then
-        return nil
-    end
-    return bytes
-end
-
-local function parseLocalHeader(archive_result, archive_path, offset)
-    local header = readArchiveBytes(archive_result, archive_path, offset, 30)
-    if not header or header:sub(1, 4) ~= "PK\003\004" then
-        return nil
-    end
-
-    local flags = readUInt16LE(header, 7)
-    local compressed_size = readUInt32LE(header, 19)
-    local name_length = readUInt16LE(header, 27)
-    local extra_length = readUInt16LE(header, 29)
-    if not flags or not compressed_size or not name_length or not extra_length or name_length == 0 then
-        return nil
-    end
-
-    return {
-        flags = flags,
-        compressed_size = compressed_size,
-        name_length = name_length,
-        header_length = 30 + name_length + extra_length,
-    }
-end
-
-local function isAllowedDescriptorGap(uses_data_descriptor, gap)
-    if uses_data_descriptor then
-        return gap == 12 or gap == 16
-    end
-    return gap == 0
-end
-
-function Downloader:isZipArchiveResult(archive_result, archive_path)
-    if not archive_result or (archive_result.bytes or 0) < 22 then
-        return false
-    end
-    local header_signature = tostring(archive_result.header_bytes or ""):sub(1, 4)
-    if not self:isZipHeader(header_signature) then
-        return false
-    end
-
-    local tail_bytes = tostring(archive_result.tail_bytes or "")
-    local eocd_start
-    for index = math.max(#tail_bytes - 21, 1), 1, -1 do
-        if tail_bytes:sub(index, index + 3) == "PK\005\006" then
-            eocd_start = index
-            break
+    for _, path in ipairs(candidates) do
+        local exists, inspection_error = self:chapterExists(path)
+        if exists then
+            if attempt.force then
+                attempt.chapter_path = path
+                attempt.manga_dir = path:match("^(.*)/[^/]+$")
+                attempt.preserve_metadata = true
+                break
+            end
+            local result = Archive.validate(path)
+            return nil, {
+                ok = result.state == "valid",
+                skipped = result.state == "valid" or nil,
+                archive_state = result.state ~= "valid" and result.state or nil,
+                identity = result.identity,
+                path = path,
+                error = result.error,
+                retryable = false,
+            }
+        elseif inspection_error then
+            return nil, { ok = false, archive_state = "unverified", path = path,
+                error = "Could not inspect existing chapter archive.", retryable = false }
         end
     end
-    if not eocd_start or #tail_bytes - eocd_start + 1 < 22 then
-        return false
-    end
-
-    local comment_length = readUInt16LE(tail_bytes, eocd_start + 20)
-    if not comment_length or eocd_start + 21 + comment_length ~= #tail_bytes then
-        return false
-    end
-
-    local entry_count = readUInt16LE(tail_bytes, eocd_start + 10)
-    local central_dir_size = readUInt32LE(tail_bytes, eocd_start + 12)
-    local central_dir_offset = readUInt32LE(tail_bytes, eocd_start + 16)
-    if not entry_count or not central_dir_size or not central_dir_offset then
-        return false
-    end
-
-    local eocd_offset = archive_result.bytes - (#tail_bytes - eocd_start + 1)
-    if eocd_offset < 0 or central_dir_offset + central_dir_size ~= eocd_offset then
-        return false
-    end
-    if entry_count == 0 and central_dir_size == 0 then
-        return false
-    end
-    if header_signature ~= "PK\003\004" or entry_count == 0 or central_dir_size == 0 or central_dir_offset <= 0 then
-        return false
-    end
-
-    if central_dir_size < 46 then
-        return false
-    end
-    local central_dir_bytes = readArchiveBytes(archive_result, archive_path, central_dir_offset, central_dir_size)
-    if not central_dir_bytes then
-        return false
-    end
-
-    local central_dir_end = central_dir_size
-    local central_index = 1
-    local entries = {}
-    for _ = 1, entry_count do
-        local entry = parseCentralDirectoryEntry(central_dir_bytes, central_index, central_dir_end)
-        if not entry then
-            return false
-        end
-        local local_header = parseLocalHeader(archive_result, archive_path, entry.local_header_offset)
-        if not local_header then
-            return false
-        end
-        local uses_data_descriptor = hasFlag(local_header.flags, 8)
-        if uses_data_descriptor ~= hasFlag(entry.flags, 8)
-            or entry.local_header_offset >= central_dir_offset
-            or local_header.name_length ~= entry.name_length
-            or entry.local_header_offset + local_header.header_length + entry.compressed_size > central_dir_offset
-        then
-            return false
-        end
-        if not uses_data_descriptor and local_header.compressed_size ~= entry.compressed_size then
-            return false
-        end
-        table.insert(entries, {
-            local_header_offset = entry.local_header_offset,
-            payload_end = entry.local_header_offset + local_header.header_length + entry.compressed_size,
-            uses_data_descriptor = uses_data_descriptor,
-        })
-        central_index = central_index + entry.length
-    end
-    if central_index ~= central_dir_end + 1 or #entries == 0 then
-        return false
-    end
-    table.sort(entries, function(left, right)
-        return left.local_header_offset < right.local_header_offset
-    end)
-
-    local previous_payload_end = 0
-    local previous_uses_data_descriptor = false
-    for _, entry in ipairs(entries) do
-        local gap = entry.local_header_offset - previous_payload_end
-        if not isAllowedDescriptorGap(previous_uses_data_descriptor, gap) then
-            return false
-        end
-        previous_payload_end = entry.payload_end
-        previous_uses_data_descriptor = entry.uses_data_descriptor
-    end
-    if not isAllowedDescriptorGap(previous_uses_data_descriptor, central_dir_offset - previous_payload_end) then
-        return false
-    end
-
-    return true
+    return attempt
 end
 
-function Downloader:finalizePartialArchive(partial_path, chapter_path, existing_path)
-    if existing_path then
-        self:cleanupPartialFile(partial_path)
-        return {
-            ok = true,
-            skipped = true,
-            path = existing_path,
-        }
+function Downloader:finalizePartialArchive(partial_path, chapter_path, attempt_id, expected_pages, preserve_metadata)
+    local stamped, stamp_error = Archive.stamp(partial_path, attempt_id, expected_pages)
+    if not stamped then
+        local result = self:failAndCleanup(stamp_error, partial_path)
+        result.path = chapter_path
+        return result, "validation"
     end
-
+    local inspection = Archive.validate(partial_path)
+    if inspection.state ~= "valid" then
+        local result = self:failAndCleanup(inspection.error or "Could not verify chapter archive.", partial_path)
+        result.path = chapter_path
+        return result, "validation"
+    end
+    if preserve_metadata then
+        local resolved, preserved, preservation_error = pcall(function()
+            return require("suwayomi/readsync/koreader_metadata").preserveForReplacement(chapter_path, attempt_id)
+        end)
+        if not resolved or not preserved then
+            local result = self:failAndCleanup("Could not preserve KOReader reading metadata. "
+                .. tostring(resolved and preservation_error or preserved), partial_path)
+            result.path = chapter_path
+            return result
+        end
+    end
+    -- The final is shared. Never delete it or adopt it after a failed rename.
     local renamed, rename_error = os.rename(partial_path, chapter_path)
-    if renamed then
-        return {
-            ok = true,
-            path = chapter_path,
-        }
+    if not renamed then
+        local result = self:failAndCleanup("Could not finalize chapter archive. " .. tostring(rename_error or ""), partial_path)
+        result.path = chapter_path
+        return result
     end
-
-    if self:chapterExists(chapter_path) then
-        self:cleanupPartialFile(partial_path)
-        return {
-            ok = true,
-            skipped = true,
-            path = chapter_path,
-        }
-    end
-
-    self:cleanupPartialFile(partial_path)
-    local error_message = "Could not finalize chapter archive."
-    if rename_error and tostring(rename_error) ~= "" then
-        error_message = error_message .. " " .. tostring(rename_error)
-    end
-    return {
-        ok = false,
-        error = error_message,
-        path = chapter_path,
-    }
+    return { ok = true, path = chapter_path, identity = Archive.identity(chapter_path) }
 end
 
-function Downloader:downloadDirectChapterArchive(credentials, download_directory, manga, chapter)
+local function downloadDirect(self, credentials, chapter, attempt)
     if not SuwayomiAPI.downloadChapterArchive or not chapter or chapter.id == nil then
         return nil
     end
-
-    if not download_directory or download_directory == "" then
-        return { ok = false, error = "Set up a download directory first." }
-    end
-
-    local manga_dir, chapter_path = self:getTargetPath(download_directory, manga, chapter)
-    local existing_path = self:findExistingChapterPath(download_directory, manga, chapter)
-    if existing_path then
-        return { ok = true, skipped = true, path = existing_path }
-    end
-
+    local manga_dir, chapter_path = attempt.manga_dir, attempt.chapter_path
     local directory_ok, directory_error = self:ensureDirectory(manga_dir)
     if not directory_ok then
-        return { ok = false, error = directory_error }
+        return { ok = false, error = directory_error, path = chapter_path }
     end
 
-    local partial_path = self.getDirectPartialPath and self:getDirectPartialPath(chapter_path) or self:getPartialPath(chapter_path)
-    self:cleanupPartialFile(partial_path)
+    local partial_path = self:getDirectPartialPath(chapter_path, attempt.attempt_id)
 
     local archive_result = callWithTransientRetry(function()
         return SuwayomiAPI.downloadChapterArchive(credentials, chapter.id, partial_path)
@@ -491,58 +298,35 @@ function Downloader:downloadDirectChapterArchive(credentials, download_directory
             or archive_result.error == "Chapter archive not found." then
             return nil
         end
+        archive_result.path = chapter_path
         return archive_result
     end
-    if (archive_result.bytes or 0) <= 0
-        or not self:isArchiveContentType(archive_result.content_type)
-        or not self:isZipArchiveResult(archive_result, partial_path)
-    then
+    if (archive_result.bytes or 0) <= 0 or not self:isArchiveContentType(archive_result.content_type) then
         self:cleanupPartialFile(partial_path)
         return nil
     end
-
-    return self:finalizePartialArchive(partial_path, chapter_path, self:findExistingChapterPath(download_directory, manga, chapter))
+    -- Only a count captured by this transfer is trustworthy; never fetch current
+    -- chapter metadata merely to validate an offline/exported archive.
+    local result, failure = self:finalizePartialArchive(partial_path, chapter_path, attempt.attempt_id,
+        archive_result.expected_pages, attempt.preserve_metadata)
+    if failure == "validation" then return nil end
+    return result
 end
 
-function Downloader:writeProgress(progress_path, state, current, total, path, error_message, retryable)
-    if not progress_path or progress_path == "" then
-        return
-    end
-
-    local tmp_path = tostring(progress_path) .. ".tmp"
-    local handle = io.open(tmp_path, "w")
-    if not handle then
-        return
-    end
-
-    handle:write("state=", ProgressFile.lineSafe(state), "\n")
-    handle:write("current=", ProgressFile.lineSafe(current or 0), "\n")
-    handle:write("total=", ProgressFile.lineSafe(total or 0), "\n")
-    handle:write("path=", ProgressFile.lineSafe(path), "\n")
-    if error_message then
-        handle:write("error=", ProgressFile.lineSafe(error_message), "\n")
-    end
-    if retryable ~= nil then
-        handle:write("retryable=", retryable == true and "true" or "false", "\n")
-    end
-    handle:close()
-    if not os.rename(tmp_path, progress_path) then
-        os.remove(tmp_path)
-    end
+function Downloader:downloadDirectChapterArchive(credentials, download_directory, manga, chapter, options)
+    local attempt, result = beginAttempt(self, download_directory, manga, chapter, options)
+    if not attempt then return result end
+    return downloadDirect(self, credentials, chapter, attempt)
 end
 
-function Downloader:startChapterDownload(credentials, download_directory, manga, chapter)
-    if not download_directory or download_directory == "" then
-        return { ok = false, error = "Set up a download directory first." }
-    end
+function Downloader:writeProgress(progress_path, state, current, total, path, error_message, retryable, details)
+    if not progress_path or progress_path == "" then return end
+    ProgressFile.writeFallback(progress_path, state, current, total, path, error_message, retryable, details)
+end
 
-    local manga_dir, chapter_path = self:getTargetPath(download_directory, manga, chapter)
-    local existing_path = self:findExistingChapterPath(download_directory, manga, chapter)
-    if existing_path then
-        return { ok = true, skipped = true, path = existing_path }
-    end
-    local chapter_path_candidates = self:getChapterPathCandidates(download_directory, manga, chapter)
-    local partial_path = self:getPartialPath(chapter_path)
+local function startDownload(self, credentials, chapter, attempt)
+    local manga_dir, chapter_path = attempt.manga_dir, attempt.chapter_path
+    local partial_path = self:getPartialPath(chapter_path, attempt.attempt_id)
 
     local page_result = callWithTransientRetry(function()
         return SuwayomiAPI.fetchChapterPages(credentials, chapter.id)
@@ -551,22 +335,28 @@ function Downloader:startChapterDownload(credentials, download_directory, manga,
         return {
             ok = false,
             error = page_result.error,
+            path = chapter_path,
             retryable = isRetryableResult(page_result),
         }
     end
     if #page_result.pages == 0 then
-        return { ok = false, error = "Suwayomi server did not return chapter pages." }
+        return { ok = false, error = "Suwayomi server did not return chapter pages.", path = chapter_path }
     end
 
     local directory_ok, directory_error = self:ensureDirectory(manga_dir)
     if not directory_ok then
-        return { ok = false, error = directory_error }
+        return { ok = false, error = directory_error, path = chapter_path }
     end
 
-    self:cleanupPartialFile(partial_path)
+    local available, Archiver = pcall(require, "ffi/archiver")
+    if not available or type(Archiver) ~= "table" or not Archiver.Writer then
+        return { ok = false, error = "Chapter archive writer is unavailable.", path = chapter_path, retryable = false }
+    end
     local writer = Archiver.Writer:new()
     if not writer:open(partial_path, "zip") then
-        return { ok = false, error = writer.err or "Could not create chapter archive." }
+        local result = self:failAndCleanup(writer.err or "Could not create chapter archive.", partial_path, writer)
+        result.path = chapter_path
+        return result
     end
 
     return {
@@ -578,12 +368,19 @@ function Downloader:startChapterDownload(credentials, download_directory, manga,
             pages = page_result.pages,
             writer = writer,
             chapter_path = chapter_path,
-            chapter_path_candidates = chapter_path_candidates,
+            attempt_id = attempt.attempt_id,
+            preserve_metadata = attempt.preserve_metadata,
             partial_path = partial_path,
             current = 0,
             written = 0,
         },
     }
+end
+
+function Downloader:startChapterDownload(credentials, download_directory, manga, chapter, options)
+    local attempt, result = beginAttempt(self, download_directory, manga, chapter, options)
+    if not attempt then return result end
+    return startDownload(self, credentials, chapter, attempt)
 end
 
 function Downloader:validatePage(binary)
@@ -616,53 +413,12 @@ function Downloader:finalizeChapterArchive(job)
         }
     end
 
-    local existing_path = self:findExistingPathInCandidates(job.chapter_path_candidates)
-    if existing_path then
-        self:cleanupPartialFile(job.partial_path)
-        return {
-            ok = true,
-            done = true,
-            skipped = true,
-            current = job.current,
-            total = #job.pages,
-            path = existing_path,
-        }
-    end
-
-    local renamed, rename_error = os.rename(job.partial_path, job.chapter_path)
-    if not renamed then
-        if self:chapterExists(job.chapter_path) then
-            self:cleanupPartialFile(job.partial_path)
-            return {
-                ok = true,
-                done = true,
-                skipped = true,
-                current = job.current,
-                total = #job.pages,
-                path = job.chapter_path,
-            }
-        end
-        self:cleanupPartialFile(job.partial_path)
-        local error_message = "Could not finalize chapter archive."
-        if rename_error and tostring(rename_error) ~= "" then
-            error_message = error_message .. " " .. tostring(rename_error)
-        end
-        return {
-            ok = false,
-            error = error_message,
-            current = job.current,
-            total = #job.pages,
-            path = job.chapter_path,
-        }
-    end
-
-    return {
-        ok = true,
-        done = true,
-        current = job.current,
-        total = #job.pages,
-        path = job.chapter_path,
-    }
+    local result = self:finalizePartialArchive(job.partial_path, job.chapter_path, job.attempt_id,
+        #job.pages, job.preserve_metadata)
+    result.done = result.ok
+    result.current = job.current
+    result.total = #job.pages
+    return result
 end
 
 function Downloader:downloadNextPage(job)
@@ -727,82 +483,38 @@ function Downloader:downloadNextPage(job)
     }
 end
 
-function Downloader:downloadChapter(credentials, download_directory, manga, chapter)
-    local direct_result = self:downloadDirectChapterArchive(credentials, download_directory, manga, chapter)
-    if direct_result then
-        return direct_result
+local function downloadChapter(self, credentials, download_directory, manga, chapter, progress_path, options)
+    local function report(result, current, total)
+        self:writeProgress(progress_path,
+            result.skipped and "skipped" or (result.ok and "downloaded" or "failed"),
+            result.current or current or 0, result.total or total or 0,
+            result.path, result.error, result.retryable, result)
+        return result
     end
-
-    local start_result = self:startChapterDownload(credentials, download_directory, manga, chapter)
-    if not start_result.ok or start_result.skipped then
-        return start_result
-    end
-
-    local result
+    local attempt, result = beginAttempt(self, download_directory, manga, chapter, options)
+    if not attempt then return report(result) end
+    local direct_result = downloadDirect(self, credentials, chapter, attempt)
+    if direct_result then return report(direct_result, direct_result.ok and 1 or 0, direct_result.ok and 1 or 0) end
+    -- Share this attempt through optional-export fallback without inspecting a
+    -- final that another worker may have published while the export ran.
+    local start_result = startDownload(self, credentials, chapter, attempt)
+    if not start_result.ok then return report(start_result) end
     repeat
         result = self:downloadNextPage(start_result.job)
-        if not result.ok then
-            return result
+        if not result.ok or result.done then
+            result.path = result.path or start_result.path
+            return report(result, start_result.job.current, start_result.total)
         end
+        self:writeProgress(progress_path, "downloading", result.current, result.total, result.path)
     until result.done
-
-    return { ok = true, skipped = result and result.skipped, path = (result and result.path) or start_result.path }
 end
 
-function Downloader:downloadChapterWithProgress(credentials, download_directory, manga, chapter, progress_path)
-    local direct_result = self:downloadDirectChapterArchive(credentials, download_directory, manga, chapter)
-    if direct_result then
-        self:writeProgress(
-            progress_path,
-            direct_result.skipped and "skipped" or (direct_result.ok and "downloaded" or "failed"),
-            direct_result.ok and 1 or 0,
-            direct_result.ok and 1 or 0,
-            direct_result.path,
-            direct_result.error,
-            direct_result.retryable
-        )
-        return direct_result
-    end
+function Downloader:downloadChapter(credentials, download_directory, manga, chapter, options)
+    return downloadChapter(self, credentials, download_directory, manga, chapter, nil, options)
+end
 
-    local start_result = self:startChapterDownload(credentials, download_directory, manga, chapter)
-    if not start_result.ok or start_result.skipped then
-        self:writeProgress(
-            progress_path,
-            start_result.skipped and "skipped" or (start_result.ok and "downloaded" or "failed"),
-            start_result.ok and 1 or 0,
-            start_result.ok and 1 or 0,
-            start_result.path,
-            start_result.error,
-            start_result.retryable
-        )
-        return start_result
-    end
-
-    local result
-    repeat
-        result = self:downloadNextPage(start_result.job)
-        if not result.ok then
-            self:writeProgress(
-                progress_path,
-                "failed",
-                result.current or (start_result.job and start_result.job.current) or 0,
-                result.total or start_result.total,
-                result.path or start_result.path,
-                result.error,
-                result.retryable
-            )
-            return result
-        end
-        self:writeProgress(
-            progress_path,
-            result.skipped and "skipped" or (result.done and "downloaded" or "downloading"),
-            result.current,
-            result.total,
-            result.path
-        )
-    until result.done
-
-    return { ok = true, skipped = result and result.skipped, path = (result and result.path) or start_result.path }
+function Downloader:downloadChapterWithProgress(credentials, download_directory, manga, chapter, progress_path, options)
+    return downloadChapter(self, credentials, download_directory, manga, chapter, progress_path, options)
 end
 
 return Downloader

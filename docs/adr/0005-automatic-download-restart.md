@@ -5,7 +5,7 @@ date: 2026-09-08
 
 # Restart unfinished downloads with isolated attempts
 
-The maintainer confirmed this design on 2026-09-08; implementation remains pending. It supersedes the startup interruption policy and shared temporary-file handling in [ADR-0002](0002-navigation-safe-download-ownership.md); process-owned navigation-safe downloads remain unchanged. [ARCHITECTURE.md](../ARCHITECTURE.md#download-ownership) continues to describe the implemented behavior.
+The maintainer confirmed this design on 2026-09-08. The runtime implementation follows this decision; physical-device acceptance remains separate. It supersedes the startup interruption policy and shared temporary-file handling in [ADR-0002](0002-navigation-safe-download-ownership.md); process-owned navigation-safe downloads remain unchanged. [ARCHITECTURE.md](../ARCHITECTURE.md#download-ownership) describes the implemented boundaries.
 
 ## Agreed direction
 
@@ -54,4 +54,4 @@ Keep the change within existing queue/downloader ownership and prefer the smalle
 
 ## Confirmation
 
-Shared understanding is confirmed. Implement the agreed scope without expanding the recovery protocol. Validator API and supported-device atomic-replacement behavior still need implementation-time verification. Acceptance of this decision does not mean the runtime has changed.
+Shared understanding is confirmed. The implementation keeps the agreed scope without expanding the recovery protocol. Linux/LuaJIT smoke scenarios exercised the unmodified KOReader archive writer/reader APIs, full-entry CRC detection, interleaved and real-process competing publication, preserved files on failed repair/rename, and composed queue/UI recovery. Physical-device UI, storage timing, and abrupt-power-loss behavior have not been verified.

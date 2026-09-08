@@ -8,7 +8,7 @@ revised: 2026-09-07
 
 ## Follow-on decision (2026-09-08)
 
-[ADR-0005](0005-automatic-download-restart.md) supersedes this record's startup interruption policy and shared temporary-file handling with automatic restart, isolated attempts, validated publication, and best-effort cleanup. That implementation is pending; the process-owned navigation and bounded-quit decisions here remain in force. The superseded startup behavior below is retained as history and still describes the current runtime.
+[ADR-0005](0005-automatic-download-restart.md) supersedes this record's startup interruption policy and shared temporary-file handling with automatic restart, isolated attempts, validated publication, and best-effort cleanup. The process-owned navigation and bounded-quit decisions here remain in force. The superseded startup behavior below is retained as history; [ARCHITECTURE.md](../ARCHITECTURE.md#download-ownership) describes the current runtime.
 
 ## Problem
 

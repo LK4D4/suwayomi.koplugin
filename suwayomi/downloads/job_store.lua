@@ -122,6 +122,10 @@ function JobStore:normalizeProgress(progress)
     if progress.error ~= nil then
         normalized.error = tostring(progress.error)
     end
+    if progress.archive_state == "damaged" or progress.archive_state == "unverified" then
+        normalized.archive_state = progress.archive_state
+    end
+    if type(progress.identity) == "string" then normalized.identity = progress.identity end
     if progress.retryable ~= nil then
         normalized.retryable = progress.retryable == true or progress.retryable == "true"
     end
@@ -207,6 +211,7 @@ function JobStore:buildJob(manga, chapter, download_directory, state, details)
         manga = self:copyMangaMetadata(manga),
         chapter = self:copyChapterMetadata(chapter),
     }
+    if details.repair == true then job.repair = true end
     if details.started_at ~= nil then
         job.started_at = tonumber(details.started_at) or details.started_at
     end
@@ -303,6 +308,7 @@ function JobStore:copySnapshotJob(job, state)
         chapter = copyMetadata(job.chapter),
         retry_count = job.retry_count,
         retry_at = job.retry_at,
+        repair = job.repair,
     }
     local progress = self:normalizeProgress(job.progress)
     if progress then

@@ -1,6 +1,6 @@
 -- Boundary: KoreaderMetadata.
 --
--- Responsibility: Resolves KOReader sidecar locations and owns bounded metadata/history helpers.
+-- Responsibility: Resolves KOReader sidecars, preserves hash metadata before archive replacement, and owns bounded metadata/history helpers.
 -- Owned state: Accepts filesystem paths from downloaded chapters/current documents and validates table/file state before trusting it.
 -- Dependencies: Suwayomi settings, KOReader DocSettings location APIs, and the filesystem adapter.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -71,6 +71,7 @@ function Methods:getKoreaderMetadataPathForDocument(document_path)
     if hash_enabled then
         locations[#locations + 1] = "hash"
     end
+    local hash_path
     for _, location in ipairs(locations) do
         local directory = DocSettings:getSidecarDir(document_path, location)
         -- Hashing failure silently falls back to document storage in KOReader.
@@ -79,6 +80,7 @@ function Methods:getKoreaderMetadataPathForDocument(document_path)
             error("cannot resolve KOReader hash metadata", 0)
         end
         paths[#paths + 1] = directory .. "/" .. filename
+        if location == "hash" then hash_path = directory .. "/" .. filename end
     end
     if DocSettings.getHistoryPath then
         paths[#paths + 1] = DocSettings:getHistoryPath(document_path)
@@ -99,7 +101,7 @@ function Methods:getKoreaderMetadataPathForDocument(document_path)
             end
         end
     end
-    return metadata_path or existing_path or preferred_path, cleanup_paths
+    return metadata_path or existing_path or preferred_path, cleanup_paths, hash_path
 end
 
 
@@ -123,6 +125,87 @@ function Methods:ensureDirectory(path)
     end
 
     return lfs.mkdir(path) or lfs.attributes(path, "mode") == "directory"
+end
+
+-- Repairs keep the document path but change its content hash. Copy raw hash
+-- sidecars to document storage before replacing bytes; never open/flush native
+-- DocSettings, whose candidate validation and purge can delete the originals.
+function KoreaderMetadata.preserveForReplacement(document_path, attempt_id)
+    local temporary_path, temporary_owned
+    local input, output
+    local ok, failure = pcall(function()
+        assert(type(attempt_id) == "string" and #attempt_id == 32
+            and attempt_id:match("^[0-9a-f]+$"), "Invalid download attempt ID.")
+        local DocSettings = require("docsettings")
+        local fs = require("suwayomi/fs")
+        local _, paths, hash_path = Methods.getKoreaderMetadataPathForDocument(Methods, document_path)
+        if not hash_path then return end
+
+        local function mode(path)
+            local value, message, code = fs.symlinkattributes(path, "mode")
+            if not value and (message or code) and code ~= 2 and code ~= 20 then
+                error("Could not inspect metadata: " .. path .. ": " .. tostring(message), 0)
+            end
+            return value
+        end
+        local function readRaw(path)
+            local kind = mode(path)
+            if not kind then return nil end
+            assert(kind == "file", "Unsupported metadata file: " .. path)
+            input = assert(io.open(path, "rb"))
+            local content = assert(input:read("*a"))
+            local closed, close_error = input:close()
+            input = nil
+            assert(closed, close_error)
+            return content
+        end
+
+        local source = { readRaw(hash_path), readRaw(hash_path .. ".old") }
+        if source[1] == nil and source[2] == nil then return end
+        local directory = DocSettings:getSidecarDir(document_path, "doc")
+        local destination = directory .. "/" .. DocSettings.getSidecarFilename(document_path)
+        -- These legacy candidates are read by open(), but not findSidecarFile().
+        paths[#paths + 1] = directory .. "/" .. document_path:match("[^/]+$") .. ".lua"
+        paths[#paths + 1] = document_path .. ".kpdfview.lua"
+        for _, path in ipairs(paths) do
+            if path ~= hash_path then
+                for index, suffix in ipairs({ "", ".old" }) do
+                    local existing = readRaw(path .. suffix)
+                    assert(existing == nil or existing == source[index],
+                        "Conflicting KOReader metadata: " .. path .. suffix)
+                end
+            end
+        end
+        assert(Methods.ensureDirectory(Methods, directory), "Could not create document metadata folder.")
+        for index, suffix in ipairs({ "", ".old" }) do
+            local content = source[index]
+            local final_path = destination .. suffix
+            if content ~= nil and readRaw(final_path) == nil then
+                temporary_path = final_path .. "." .. attempt_id .. ".part"
+                assert(mode(temporary_path) == nil, "Metadata temporary path already exists: " .. temporary_path)
+                output = assert(io.open(temporary_path, "wb"))
+                temporary_owned = true
+                assert(output:write(content))
+                local closed, close_error = output:close()
+                output = nil
+                assert(closed, close_error)
+                -- A competing sidecar is not ours to replace.
+                assert(mode(final_path) == nil, "Metadata destination appeared during repair: " .. final_path)
+                assert(os.rename(temporary_path, final_path))
+                temporary_owned = false
+            end
+        end
+    end)
+    if input then pcall(input.close, input) end
+    if output then pcall(output.close, output) end
+    if not ok then
+        if temporary_owned then
+            local removed, remove_error = os.remove(temporary_path)
+            if not removed then failure = tostring(failure) .. " Could not remove metadata temporary file: " .. tostring(remove_error) end
+        end
+        return false, tostring(failure)
+    end
+    return true
 end
 
 

@@ -252,7 +252,7 @@ describe("suwayomi settings atomic failure handling", function()
         local manga, chapter = { id = "m1" }, { id = "c1" }
         assert.is_true(queue:enqueue(manga, chapter, "."))
         queue:process()
-        local path = queue:buildProgressPath(manga, chapter, ".")
+        local path = queue:getActiveJob(queue:getKey(manga, chapter)).progress_path
         local ProgressFile = require("suwayomi/downloads/progress_file")
         ProgressFile.writeFallback(path, "failed", 2, 10, nil, "network failure", true)
         local write = io_adapter.write
@@ -348,7 +348,7 @@ describe("suwayomi settings atomic failure handling", function()
         local manga, chapter = { id = "m1" }, { id = "c1" }
         assert.is_true(queue:enqueue(manga, chapter, "."))
         queue:process()
-        local path = queue:buildProgressPath(manga, chapter, ".")
+        local path = queue:getActiveJob(queue:getKey(manga, chapter)).progress_path
         require("suwayomi/downloads/progress_file").writeFallback(path, "failed", 2, 10, nil, "network failure", true)
         io_adapter.fail_sync_dir = true
         queue:poll()
@@ -399,7 +399,7 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_truthy(SuwayomiSettings:saveDownloadQueue({
             queue:buildPersistentJob(manga, chapter, ".", "downloading"),
         }))
-        local path = queue:buildProgressPath(manga, chapter, ".")
+        local path = os.tmpname()
         local ProgressFile = require("suwayomi/downloads/progress_file")
         ProgressFile.writeFallback(path, "downloading", 2, 10)
         io_adapter.fail_write = true
@@ -412,8 +412,9 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_false(ok)
         assert.are.equal("downloading", progress and progress.state)
         assert.are.equal(0, #snapshot.queued)
-        assert.are.equal(1, #queue:getSnapshot().failed)
-        assert.are.equal("failed", SuwayomiSettings:loadDownloadQueue()[1].state)
+        assert.are.equal(0, #queue:getSnapshot().failed)
+        assert.are.equal(1, #queue:getSnapshot().queued)
+        assert.are.equal("queued", SuwayomiSettings:loadDownloadQueue()[1].state)
     end)
 
     it("reports rejected single and capped batch download actions without claiming queued work", function()

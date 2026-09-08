@@ -155,6 +155,7 @@ function Service:shutdown()
     for subscription in pairs(self.subscribers) do subscription.callback = nil end
     self.subscribers = {}
     pcall(self.cleanup.cancelFinishedChapterCleanup, self.cleanup)
+    self.queue:invalidateVerification()
     self.queue.active_job_lifecycle:shutdown()
 end
 

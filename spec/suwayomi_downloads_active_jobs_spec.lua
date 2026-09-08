@@ -49,6 +49,7 @@ describe("suwayomi/downloads/active_jobs", function()
                         end,
                         close = function()
                             progress_files[path] = table.concat(chunks)
+                            return true
                         end,
                     }
                 end
@@ -113,11 +114,11 @@ describe("suwayomi/downloads/active_jobs", function()
                 return download_directory .. "/" .. manga.title,
                     download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
             end,
-            getPartialPath = function(_, chapter_path)
-                return chapter_path .. ".part"
+            getPartialPath = function(_, chapter_path, attempt_id)
+                return chapter_path .. "." .. attempt_id .. ".part"
             end,
-            getDirectPartialPath = function(_, chapter_path)
-                return chapter_path .. ".direct.part"
+            getDirectPartialPath = function(_, chapter_path, attempt_id)
+                return chapter_path .. "." .. attempt_id .. ".direct.part"
             end,
             writeProgress = function(_, progress_path, state, current, total, path, error_message)
                 local handle = assert(io.open(progress_path, "w"))
@@ -230,7 +231,7 @@ describe("suwayomi/downloads/active_jobs", function()
                 return context.queue:getActiveJob(context.queue:getKey(manga, chapter))
             end,
             write_progress = function(manga, chapter, state, current, total, path, error_message, retryable)
-                local progress_path = context.queue:buildProgressPath(manga, chapter, "/books")
+                local progress_path = context.active_job(manga, chapter).progress_path
                 local handle = assert(io.open(progress_path, "w"))
                 handle:write("state=", tostring(state or ""), "\n")
                 handle:write("current=", tostring(current or 0), "\n")
@@ -377,21 +378,6 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.equal(0, #context.queue.items)
     end)
 
-    it("uses atomic progress writes so polling sees complete updates", function()
-        local context = build_queue()
-        local progress_path = context.queue:buildProgressPath(
-            { id = "m1", title = "Sousou no Frieren" },
-            { id = "398", name = "Official_Vol. 1 Ch. 1" },
-            "/books"
-        )
-
-        context.queue.active_job_lifecycle:writeProgressFallback(progress_path, "failed", 0, 1, "", "network timeout")
-
-        assert.are.equal(progress_path .. ".tmp", context.renamed_paths[#context.renamed_paths].from)
-        assert.are.equal(progress_path, context.renamed_paths[#context.renamed_paths].to)
-        assert.are.equal("state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n", context.progress_files[progress_path])
-        assert.is_nil(context.progress_files[progress_path .. ".tmp"])
-    end)
 
     it("persists initial progress without runtime-only fields when a queued job becomes active", function()
         local context = build_queue({
@@ -661,7 +647,7 @@ describe("suwayomi/downloads/active_jobs", function()
                     return download_directory .. "/" .. manga.title,
                         target_path
                 end,
-                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                getPartialPath = function(_, chapter_path, attempt_id) return chapter_path .. "." .. attempt_id .. ".part" end,
                 startChapterDownload = function()
                     return {
                         ok = true,
@@ -708,7 +694,7 @@ describe("suwayomi/downloads/active_jobs", function()
                     return download_directory .. "/" .. manga.title,
                         download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
                 end,
-                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                getPartialPath = function(_, chapter_path, attempt_id) return chapter_path .. "." .. attempt_id .. ".part" end,
                 startChapterDownload = function(_, _, download_directory, manga, chapter)
                     return {
                         ok = true,
@@ -766,7 +752,7 @@ describe("suwayomi/downloads/active_jobs", function()
                     return download_directory .. "/" .. target_manga.title,
                         download_directory .. "/" .. target_manga.title .. "/" .. target_chapter.name .. (target_chapter.id and (" [id-" .. target_chapter.id .. "]") or "") .. ".cbz"
                 end,
-                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                getPartialPath = function(_, chapter_path, attempt_id) return chapter_path .. "." .. attempt_id .. ".part" end,
                 writeProgress = function(_, progress_path)
                     local handle = assert(io.open(progress_path, "w"))
                     handle:write("state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n")
@@ -796,7 +782,7 @@ describe("suwayomi/downloads/active_jobs", function()
                     return download_directory .. "/" .. manga.title,
                         download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
                 end,
-                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                getPartialPath = function(_, chapter_path, attempt_id) return chapter_path .. "." .. attempt_id .. ".part" end,
                 writeProgress = function(_, progress_path)
                     local handle = assert(io.open(progress_path, "w"))
                     handle:write("state=failed\ncurrent=0\ntotal=1\npath=\nerror=network timeout\n")
@@ -836,16 +822,20 @@ describe("suwayomi/downloads/active_jobs", function()
 
         context.queue:enqueue(manga, chapter, "/books")
         table.remove(context.scheduled, 1).callback()
-        local progress_path = context.queue:buildProgressPath(manga, chapter, "/books")
+        local active = context.active_job(manga, chapter)
+        local progress_path = active.progress_path
+        local partial = context.queue.downloader:getPartialPath(chapter_path, active.attempt_id)
+        local direct = context.queue.downloader:getDirectPartialPath(chapter_path, active.attempt_id)
 
         local cancelled = context.queue:cancelPending(manga, chapter)
 
         assert.is_true(cancelled)
-        assert.is_false(path_was_removed(chapter_path .. ".part"))
+        assert.is_false(path_was_removed(partial))
         context.set_subprocess_done(1234, true)
         context.queue:process()
-        assert.is_true(path_was_removed(chapter_path .. ".part"))
-        assert.is_true(path_was_removed(chapter_path .. ".direct.part"))
+        assert.is_true(path_was_removed(partial))
+        assert.is_true(path_was_removed(direct))
+        assert.is_false(path_was_removed(chapter_path .. ".part"))
         assert.is_true(path_was_removed(progress_path))
     end)
 
@@ -891,6 +881,9 @@ describe("suwayomi/downloads/active_jobs", function()
 
         context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
         table.remove(context.scheduled, 1).callback()
+        local active = context.queue:getActiveJob("m1:398")
+        local partial = context.queue.downloader:getPartialPath(chapter_path, active.attempt_id)
+        local direct = context.queue.downloader:getDirectPartialPath(chapter_path, active.attempt_id)
 
         context.advance(context.queue.WATCHDOG_TIMEOUT_SECONDS + 1)
         table.remove(context.scheduled, 1).callback()
@@ -910,11 +903,12 @@ describe("suwayomi/downloads/active_jobs", function()
             updated_at = watchdog_time,
         }, context.saved_queue()[1].progress)
         assert.are.same({}, context.messages)
-        assert.is_false(path_was_removed(chapter_path .. ".part"))
+        assert.is_false(path_was_removed(partial))
         context.set_subprocess_done(1234, true)
         context.queue:process()
-        assert.is_true(path_was_removed(chapter_path .. ".part"))
-        assert.is_true(path_was_removed(chapter_path .. ".direct.part"))
+        assert.is_true(path_was_removed(partial))
+        assert.is_true(path_was_removed(direct))
+        assert.is_false(path_was_removed(chapter_path .. ".part"))
     end)
 
     it("translates the queued watchdog retry detail", function()
@@ -962,7 +956,7 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.same({}, context.messages)
     end)
 
-    it("treats failed progress as downloaded when the archive exists locally", function()
+    it("does not turn failed publication into success merely because a final exists", function()
         local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
         local archive_exists = false
         local context = build_queue({
@@ -973,7 +967,7 @@ describe("suwayomi/downloads/active_jobs", function()
                     return download_directory .. "/" .. manga.title,
                         download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
                 end,
-                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                getPartialPath = function(_, chapter_path, attempt_id) return chapter_path .. "." .. attempt_id .. ".part" end,
                 chapterExists = function(_, chapter_path)
                     return archive_exists and chapter_path == target_path
                 end,
@@ -988,12 +982,12 @@ describe("suwayomi/downloads/active_jobs", function()
         context.write_progress(manga, chapter, "failed", 2, 2, target_path, "Could not finalize chapter archive.")
         table.remove(context.scheduled, 1).callback()
 
-        assert.are.same({}, context.saved_queue())
-        assert.are.equal("downloaded", context.queue:getStatus(manga, chapter).state)
+        assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.are.equal("failed", context.queue:getStatus(manga, chapter).state)
         assert.are.same({}, context.messages)
     end)
 
-    it("treats a finished subprocess as downloaded when progress is missing but the archive exists locally", function()
+    it("does not adopt an unknown final when a worker exits without progress", function()
         local target_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
         local archive_exists = false
         local context = build_queue({
@@ -1004,7 +998,7 @@ describe("suwayomi/downloads/active_jobs", function()
                     return download_directory .. "/" .. manga.title,
                         download_directory .. "/" .. manga.title .. "/" .. chapter.name .. (chapter.id and (" [id-" .. chapter.id .. "]") or "") .. ".cbz"
                 end,
-                getPartialPath = function(_, chapter_path) return chapter_path .. ".part" end,
+                getPartialPath = function(_, chapter_path, attempt_id) return chapter_path .. "." .. attempt_id .. ".part" end,
                 chapterExists = function(_, chapter_path)
                     return archive_exists and chapter_path == target_path
                 end,
@@ -1018,8 +1012,8 @@ describe("suwayomi/downloads/active_jobs", function()
         archive_exists = true
         table.remove(context.scheduled, 1).callback()
 
-        assert.are.same({}, context.saved_queue())
-        assert.are.equal("downloaded", context.queue:getStatus(manga, chapter).state)
+        assert.are.equal("failed", context.saved_queue()[1].state)
+        assert.are.equal("failed", context.queue:getStatus(manga, chapter).state)
         assert.are.same({}, context.messages)
     end)
 end)

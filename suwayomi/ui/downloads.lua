@@ -30,31 +30,39 @@ function DownloadsUI.showDownloadErrorDetails(job, options)
     if job and job.state == "queued" and job.retry_at then
         text = text .. "\n\n" .. I18n.t("Retry scheduled") .. "\n" .. StatusFormatter.formatRetryTime(job.retry_at)
     end
+    local archive_status = StatusFormatter.formatArchiveStatus(job and job.progress)
+    if archive_status then text = text .. "\n\n" .. archive_status end
     if text ~= "" then
         text = text .. "\n\n"
     end
     local viewer
+    local buttons = {}
+    local function addAction(id, label, callback, include_disabled)
+        if not callback and not include_disabled then return end
+        buttons[#buttons + 1] = {
+            id = id,
+            text = label,
+            enabled = callback ~= nil,
+            callback = function()
+                if callback then
+                    viewer:onClose()
+                    callback()
+                end
+            end,
+        }
+    end
+    addAction("retry", I18n.t("Retry"), options.onRetry, not archive_status)
+    addAction("verify_download", I18n.t("Verify download"), options.onVerify)
+    addAction("redownload", I18n.t("Redownload"), options.onRedownload)
+    buttons[#buttons + 1] = {
+        id = "close",
+        text = I18n.t("Close"),
+        callback = function() viewer:onClose() end,
+    }
     viewer = TextViewer:new{
         title = I18n.t("Error details"),
         text = text .. getErrorText(job),
-        buttons_table = {{
-            {
-                id = "retry",
-                text = I18n.t("Retry"),
-                enabled = options.onRetry ~= nil,
-                callback = function()
-                    if options.onRetry then
-                        viewer:onClose()
-                        options.onRetry()
-                    end
-                end,
-            },
-            {
-                id = "close",
-                text = I18n.t("Close"),
-                callback = function() viewer:onClose() end,
-            },
-        }},
+        buttons_table = { buttons },
     }
     UIManager:show(viewer)
     return viewer
@@ -161,6 +169,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
             -- Job actions open overlays; native selection must not run the
             -- hub's close callback and detach its live status updates.
             keep_menu_open = true,
+            subtitle = StatusFormatter.formatArchiveStatus(job.progress),
             mandatory = prefix,
             callback = callbacks.onSelectActive and function(menu)
                 callbacks.onSelectActive(job, menu)
@@ -174,7 +183,8 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
             text = formatDownloadJobLabel(job),
             keep_menu_open = true,
             mandatory = job.retry_at and I18n.t("Retry scheduled") or queued_label,
-            subtitle = job.retry_at and StatusFormatter.formatRetryTime(job.retry_at) or nil,
+            subtitle = StatusFormatter.formatArchiveStatus(job.progress)
+                or (job.retry_at and StatusFormatter.formatRetryTime(job.retry_at) or nil),
             callback = function(menu)
                 if callbacks.onSelectQueued then
                     callbacks.onSelectQueued(job, menu)
@@ -189,7 +199,7 @@ function DownloadsUI.buildDownloadsMenuTable(snapshot, callbacks, options)
             text = formatDownloadJobLabel(job),
             keep_menu_open = true,
             subtitle = formatFailedDownloadText(job),
-            mandatory = failed_label,
+            mandatory = StatusFormatter.formatArchiveStatus(job.progress) or failed_label,
             callback = function(menu)
                 if callbacks.onSelectFailed then
                     callbacks.onSelectFailed(job, menu)

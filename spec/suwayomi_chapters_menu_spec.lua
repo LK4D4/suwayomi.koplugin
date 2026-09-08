@@ -285,6 +285,37 @@ describe("suwayomi/chapters/menu", function()
         assert.is_nil(action_ids.mark_through_read)
     end)
 
+    it("keeps damaged and unverified local archives visible with distinct recovery actions", function()
+        helper.stubControllerDependencies()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local status = { state = "failed", archive_state = "damaged" }
+        local plugin = {
+            isChapterDownloaded = function() return true end,
+            getChapterDownloadStatus = function() return status end,
+        }
+        local function actionSet()
+            local result = {}
+            for _, action in ipairs(ChapterMenu.methods.getChapterActions(plugin, {}, { is_read = true })) do
+                result[action.id] = true
+            end
+            return result
+        end
+        local damaged = actionSet()
+        assert.is_true(damaged.redownload)
+        assert.is_true(damaged.verify_download)
+        assert.is_true(damaged.delete)
+        assert.is_true(damaged.mark_unread)
+        assert.is_nil(damaged.open)
+        assert.is_nil(damaged.retry_download)
+        status.archive_state = "unverified"
+        local unverified = actionSet()
+        assert.is_true(unverified.verify_download)
+        assert.is_nil(unverified.redownload)
+        assert.is_nil(unverified.open)
+        assert.is_nil(unverified.retry_download)
+    end)
+
     it("offers cancel download for queued and active chapter rows", function()
         helper.stubControllerDependencies()
         package.loaded["suwayomi/chapters/menu"] = nil

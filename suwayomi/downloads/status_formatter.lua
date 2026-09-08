@@ -85,6 +85,14 @@ function StatusFormatter.formatChapterStatusSymbols(chapter, symbols, max_title_
     return title .. "  " .. suffix
 end
 
+function StatusFormatter.formatArchiveStatus(status)
+    if status and status.archive_state == "damaged" then
+        return I18n.t("Download damaged; redownload")
+    elseif status and status.archive_state == "unverified" then
+        return I18n.t("Could not verify download")
+    end
+end
+
 function StatusFormatter.buildChapterStatusSymbols(chapter, status)
     local symbols = {}
     if chapter and chapter.is_read == true then
@@ -94,6 +102,15 @@ function StatusFormatter.buildChapterStatusSymbols(chapter, status)
     if not status then
         return symbols
     end
+    if status.verifying then
+        table.insert(symbols, I18n.t("Verifying download"))
+    end
+    local archive_status = StatusFormatter.formatArchiveStatus(status)
+    if archive_status then
+        table.insert(symbols, archive_status)
+        if status.state ~= "queued" and status.state ~= "downloading" then return symbols end
+    end
+    if status.verifying then return symbols end
     if status.state == "queued" then
         table.insert(symbols, status.retry_at and I18n.t("Retry scheduled") or I18n.t("Queued"))
         return symbols

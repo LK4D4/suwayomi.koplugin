@@ -28,6 +28,7 @@ describe("suwayomi/downloads/progress_file", function()
                     end,
                     close = function()
                         files[path] = table.concat(chunks)
+                        return true
                     end,
                 }
             end
@@ -81,23 +82,17 @@ describe("suwayomi/downloads/progress_file", function()
         package.loaded["suwayomi/downloads/progress_file"] = nil
     end)
 
-    it("builds hidden progress filenames from encoded full keys", function()
-        assert.are.equal(
-            "/books/.suwayomi_progress_6d313a333938.txt",
-            progress_file.buildPath("m1:398", "/books/")
-        )
-        assert.are.equal(
-            "/books/.suwayomi_progress_6d3153333938.txt",
-            progress_file.buildPath("m1S398", "/books/")
+    it("isolates different keys and attempts without shared fallback names", function()
+        local first, second = string.rep("1", 32), string.rep("2", 32)
+        assert.are_not.equal(
+            progress_file.buildPath("m1:398", "/books/", first),
+            progress_file.buildPath("m1/398", "/books/", first)
         )
         assert.are_not.equal(
-            progress_file.buildPath("m1:398", "/books/"),
-            progress_file.buildPath("m1/398", "/books/")
+            progress_file.buildPath("m1:398", "/books/", first),
+            progress_file.buildPath("m1:398", "/books/", second)
         )
-        assert.are.equal(
-            "/books/.suwayomi_progress_m1_398.txt",
-            progress_file.buildLegacyPath("m1:398", "/books/")
-        )
+        assert.has_error(function() progress_file.buildPath("m1:398", "/books/") end)
     end)
 
     it("writes fallback progress through a temporary file before renaming", function()
@@ -137,6 +132,17 @@ describe("suwayomi/downloads/progress_file", function()
             path = "/books/Manga state=failed path=x/chapter.cbz",
             error = "first line state=failed path=x",
         }, progress_file.read("/books/.suwayomi_progress_m1_398.txt"))
+    end)
+
+    it("keeps independent workers from replacing each other's progress", function()
+        local first = progress_file.buildPath("chapter", "/books", string.rep("1", 32))
+        local second = progress_file.buildPath("chapter", "/books", string.rep("2", 32))
+        progress_file.writeFallback(first, "downloading", 1, 5, "/books/chapter.cbz")
+        progress_file.writeFallback(second, "failed", 2, 5, "/books/chapter.cbz", "damaged", false,
+            { archive_state = "damaged", identity = "1:2:3:attempt" })
+        assert.are.equal("downloading", progress_file.read(first).state)
+        assert.are.equal("damaged", progress_file.read(second).archive_state)
+        assert.are.equal("1:2:3:attempt", progress_file.read(second).identity)
     end)
 
     it("returns nil when no progress file exists", function()

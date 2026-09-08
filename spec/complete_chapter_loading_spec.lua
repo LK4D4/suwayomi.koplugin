@@ -8,6 +8,7 @@ describe("complete stored chapter loading", function()
     local saved_ledger, saved_jobs, respond, settings, saved_filter, ledger_path, confirmation
     local subprocess_done, loading, fake_time, original_time
     local directory_callback, download_directory, chapter_action_callback, error_details
+    local archive_directory, archive_path, restore_native
     local modules = {
         "gettext", "ffi/util", "ffi/archiver", "ui/uimanager", "ssl.https",
         "socket.http", "suwayomi/api", "suwayomi/api/queries", "suwayomi/api/parsers",
@@ -20,6 +21,7 @@ describe("complete stored chapter loading", function()
         "suwayomi/downloads/queue", "suwayomi/downloads/active_jobs",
         "suwayomi/downloads/job_store", "suwayomi/downloads/status_formatter",
         "suwayomi/downloads/downloader", "suwayomi/downloads/progress_file",
+        "suwayomi/downloads/archive", "ffi/libarchive_h",
         "suwayomi/paths", "suwayomi/downloads/controller",
         "datastorage", "luasettings", "suwayomi/settings/store", "suwayomi/source_filters",
         "suwayomi/downloads/directory", "suwayomi/reader_return",
@@ -163,6 +165,7 @@ describe("complete stored chapter loading", function()
         plugin.showLoadingMessage = require("suwayomi/plugin/home").methods.showLoadingMessage
         plugin.closeLoadingMessage = require("suwayomi/plugin/home").methods.closeLoadingMessage
         function plugin:loadKoreaderHistoryPaths() return {} end
+        function plugin:isChapterPathFinishedInKoreader() return false end
         function plugin:withChapterMenuRefreshSuppressed(callback) return callback() end
     end)
 
@@ -170,6 +173,15 @@ describe("complete stored chapter loading", function()
         if plugin then plugin:cancelMangaNetworkRequests() end
         os.time = original_time
         if ledger_path then os.remove(ledger_path); ledger_path = nil end
+        if archive_path then os.remove(archive_path); archive_path = nil end
+        if archive_directory then
+            local lfs = require("lfs")
+            lfs.rmdir(archive_directory .. "/Unknown source/Example manga")
+            lfs.rmdir(archive_directory .. "/Unknown source")
+            lfs.rmdir(archive_directory)
+            archive_directory = nil
+        end
+        if restore_native then restore_native(); restore_native = nil end
         os.remove("./suwayomi_manga_request_1.json")
         os.remove("./suwayomi_manga_request_1.json.tmp")
         clearModules()
@@ -580,14 +592,25 @@ describe("complete stored chapter loading", function()
                         return page(chapters, 2, false)
                     end
                 end
+                archive_directory = os.tmpname()
+                os.remove(archive_directory)
+                assert(require("lfs").mkdir(archive_directory))
+                download_directory = archive_directory
                 plugin:showChaptersForManga(manga)
                 finishRequest()
                 local chapter = plugin.current_chapter_context.chapters[1]
                 local chapter_path = plugin:getChapterPath(manga, chapter)
+                archive_path = chapter_path
+                local Native = require("spec/support/native_archiver")
+                restore_native = Native.install()
+                assert(queue.downloader:ensureDirectory(chapter_path:match("^(.*)/[^/]+$")))
+                local writer = Native.Writer:new()
+                assert(writer:open(chapter_path, "zip"))
+                assert(writer:addFileFromMemory("001.jpg", "fixture image"))
+                assert(writer:close())
                 local downloaded_paths = { [chapter_path] = true }
                 if invalidation == "filter change" then
                     downloaded_paths[plugin:getChapterPath(manga, plugin.current_chapter_context.chapters[2])] = true
-                    function plugin:isChapterPathFinishedInKoreader() return false end
                 end
                 require("suwayomi/downloads/downloader").chapterExists = function(_, path) return downloaded_paths[path] == true end
                 if origin == "chapter title" then plugin:refreshChapterMenu({ quick = true }) end
@@ -602,6 +625,15 @@ describe("complete stored chapter loading", function()
                 package.preload["apps/reader/readerui"] = function()
                     return { instance = { switchDocument = function(_, path) reader_opens[#reader_opens + 1] = path end },
                         showReader = function(_, path) reader_opens[#reader_opens + 1] = path end }
+                end
+                local function finishVerification()
+                    assert.are.same({}, reader_opens)
+                    local run = table.remove(workers)
+                    assert.is_function(run)
+                    run()
+                    local poll = table.remove(scheduled)
+                    assert.is_function(poll)
+                    poll()
                 end
                 local dispatch = function() return plugin:performMangaAction(manga, "open_first_unread") end
                 local open_action_menu
@@ -662,6 +694,7 @@ describe("complete stored chapter loading", function()
                 local message_count = #messages
                 dispatch()
                 if invalidation == "current" then
+                    finishVerification()
                     assert.are.same({ chapter_path }, reader_opens)
                     assert.are.equal(chapter_path, json.decode(saved_ledger)["17:201"].path)
                     assert.are.equal("201", json.decode(return_contexts)[chapter_path].chapter_id)
@@ -676,18 +709,17 @@ describe("complete stored chapter loading", function()
                 assert.are.equal(jobs, saved_jobs)
                 assert.are.same({}, queue:getSnapshot().queued)
                 assert.are.equal(context, plugin.current_chapter_context)
-                assert.are.equal(menu, plugin.current_chapter_menu)
                 assert.are.same(visible, chapterIds(plugin.current_chapter_menu.chapters))
                 assert.are.equal(worker_count, #workers)
                 if invalidation == "failed reload" then
                     local fresh_dispatch = open_action_menu()
                     fresh_dispatch()
+                    finishVerification()
                     assert.are.same({ chapter_path }, reader_opens)
                     assert.are.equal(chapter_path, json.decode(saved_ledger)["17:201"].path)
                     assert.are.equal("201", json.decode(return_contexts)[chapter_path].chapter_id)
                     assert.are.equal(1, return_writes)
                     assert.are.equal(jobs, saved_jobs)
-                    assert.are.equal(menu, plugin.current_chapter_menu)
                     assert.are.same(visible, chapterIds(menu.chapters))
                     assert.are.equal(worker_count, #workers)
                 end
