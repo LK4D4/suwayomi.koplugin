@@ -3,9 +3,9 @@ package.path = "?.lua;" .. package.path
 -- Public actions compose real selection, confirmations, queue admission, and the
 -- checked settings store. Only host widgets, workers, and filesystem IO are fake.
 describe("bounded bulk download actions", function()
-    local plugin, queue, settings, stack, messages, files, failure, archives
+    local plugin, service, queue, settings, stack, messages, files, failure, archives, manga
     local settings_path = "/bulk-test/suwayomi.lua"
-    local manga = { id = "m1", title = "Example manga" }
+    local server_url = "http://bulk.example.invalid"
     local saved_modules = {}
     local original_remove
     local marker_installed = false
@@ -21,6 +21,13 @@ describe("bounded bulk download actions", function()
         "suwayomi/manga/controller", "suwayomi/manga/action_menu", "suwayomi/downloads/queue",
         "suwayomi/downloads/downloader",
         "suwayomi/downloads/active_jobs", "suwayomi/downloads/job_store", "suwayomi/downloads/status_formatter",
+        "suwayomi/downloads/service", "suwayomi/downloads/refill", "suwayomi/downloads/cleanup_adapter",
+        "suwayomi/downloads/controller", "suwayomi/downloads/directory", "suwayomi/downloads/archive",
+        "suwayomi/downloads/progress_file", "suwayomi/chapters/manual_deletion", "suwayomi/chapters/archive_identity",
+        "suwayomi/chapters/finished_cleanup", "suwayomi/readsync/ledger", "suwayomi/readsync/koreader_metadata",
+        "suwayomi/reader_return", "suwayomi/network/request_job", "suwayomi/network/request_worker",
+        "suwayomi/subprocess/job", "suwayomi/api", "suwayomi/client", "suwayomi/fs", "lfs",
+        "suwayomi/debug", "suwayomi/settings/retention_labels",
     }
 
     local function chapters(count)
@@ -47,9 +54,11 @@ describe("bounded bulk download actions", function()
             package.loaded[name], package.preload[name] = nil, nil
         end
         stack, messages, files, archives, failure = {}, {}, {}, {}, nil
+        manga = { id = "m1", title = "Example manga", endpoint_scope = server_url }
         original_remove = os.remove
         os.remove = function(path) files[path] = nil; return true end
-        files[settings_path] = 'return { download_directory = "/books", download_queue = {} }'
+        files[settings_path] = 'return { server_url = "' .. server_url
+            .. '", download_directory = "/books", download_queue = {} }'
         package.preload.datastorage = function() return { getSettingsDir = function() return "/bulk-test" end } end
         package.preload.luasettings = function()
             return { open = function()
@@ -58,6 +67,14 @@ describe("bounded bulk download actions", function()
             end }
         end
         require("spec/support/controller_module_spec_helper").stubControllerDependencies()
+        local workers = {}
+        local ffi_util = require("ffi/util")
+        ffi_util.runInSubProcess = function()
+            workers[#workers + 1] = { done = false }
+            return #workers
+        end
+        ffi_util.isSubProcessDone = function(pid) return workers[pid].done end
+        ffi_util.terminateSubProcess = function(pid) workers[pid].done = true end
         local ui = {
             show = function(_, widget) stack[#stack + 1] = widget end,
             close = function(_, widget)
@@ -66,6 +83,7 @@ describe("bounded bulk download actions", function()
                 end
             end,
             scheduleIn = function() end,
+            unschedule = function() end,
         }
         package.preload["ui/uimanager"] = function() return ui end
         settings = require("suwayomi/settings")
@@ -92,30 +110,31 @@ describe("bounded bulk download actions", function()
                 dir_exists = function() return true end,
             },
         })
-        queue = require("suwayomi/downloads/queue"):new{
-            settings = settings, ui_manager = ui,
-            downloader = {
-                getTargetPath = function(_, directory, target_manga, chapter)
-                    return directory, directory .. "/" .. target_manga.id .. "-" .. chapter.id .. ".cbz"
-                end,
-                chapterExists = function(_, path) return archives[path] == true end,
-            },
-            ffi_util = { runInSubProcess = function() return 123 end, isSubProcessDone = function() return false end },
+        local downloader = {
+            getTargetPath = function(_, directory, target_manga, chapter)
+                return directory, directory .. "/" .. target_manga.id .. "-" .. chapter.id .. ".cbz"
+            end,
+            chapterExists = function(_, path) return archives[path] == true end,
         }
-        package.preload["suwayomi/downloads/downloader"] = function() return queue.downloader end
+        package.preload["suwayomi/downloads/downloader"] = function() return downloader end
+        service = require("suwayomi/downloads/service"):new{
+            settings = settings, ui_manager = ui, downloader = downloader, ffi_util = ffi_util,
+        }
+        queue = service:getQueue()
         plugin = { max_batch_queue_chapters = 50 }
         for _, module in ipairs({ "suwayomi/chapters/context", "suwayomi/chapters/actions",
-            "suwayomi/chapters/menu", "suwayomi/manga/controller" }) do
+            "suwayomi/chapters/menu", "suwayomi/manga/controller", "suwayomi/downloads/controller",
+            "suwayomi/downloads/directory" }) do
             for name, method in pairs(require(module).methods) do plugin[name] = method end
         end
-        function plugin:getDownloadQueue() return queue end
-        function plugin:getDownloadDirectoryOrChoose() return settings:loadDownloadDirectory() end
+        function plugin:getDownloadQueue() return service:getQueue() end
         function plugin:showMessage(text) messages[#messages + 1] = text end
         function plugin:refreshChapterMenu() end
         function plugin:withChapterMenuRefreshSuppressed(callback) return callback() end
     end)
 
     after_each(function()
+        if service then service:shutdown() end
         if marker_installed then
             require("spec/support/i18n_marker").uninstall()
             marker_installed = false
@@ -292,7 +311,7 @@ describe("bounded bulk download actions", function()
     it("keeps failed retry artifacts when bulk admission is rejected", function()
         local items = openChapters(chapters(1))
         assert.is_truthy(queue:savePersistentJobs({ queue:buildPersistentJob(manga, items[1], "/books", "failed") }))
-        assert.is_true(queue:recover())
+        assert.is_true(queue:reconcile())
         local progress_path = "/books/unknown-attempt.progress"
         files[progress_path], files["/books/m1-c1.cbz.part"] = "old progress", "old partial"
         plugin:performMangaAction(manga, "download_all_chapters")
@@ -491,7 +510,7 @@ describe("bounded bulk download actions", function()
     it("keeps unconfirmed retry artifacts and reports a later store-fenced command as rejected", function()
         local items = openChapters(chapters(1))
         assert.is_truthy(queue:savePersistentJobs({ queue:buildPersistentJob(manga, items[1], "/books", "failed") }))
-        assert.is_true(queue:recover())
+        assert.is_true(queue:reconcile())
         local progress_path = "/books/unknown-attempt.progress"
         files[progress_path] = "old progress"
         plugin:performMangaAction(manga, "download_all_chapters")
@@ -577,16 +596,19 @@ describe("bounded bulk download actions", function()
 
         it("preserves artifacts and admission state for a rejected single retry with " .. storage_failure, function()
             local items = openChapters(chapters(1))
-            queue:savePersistentJobs({ queue:buildPersistentJob(manga, items[1], "/books", "failed") })
-            queue:recover()
+            assert.is_truthy(queue:savePersistentJobs({ queue:buildPersistentJob(manga, items[1], "/books", "failed") }))
+            assert.is_true(queue:reconcile())
             local progress_path = "/books/unknown-attempt.progress"
             files[progress_path] = "old progress"
             failure = storage_failure
-            local accepted, state = queue:enqueue(manga, items[1], "/books")
+            local accepted, state = queue:retryFailed("m1:c1")
             assert.is_false(accepted)
             assert.is_truthy(state:match(storage_failure == "write" and "write_failed" or "ambiguous_post_replacement"))
             assert.are.equal("old progress", files[progress_path])
             assert.are.equal(0, #queue:getSnapshot().queued)
+            assert.are.equal("failed", queue:getSnapshot().failed[1].state)
+            assert.are.equal(storage_failure == "write" and "failed" or "queued", storedJobs()[1].state)
+            assert.are.equal(storage_failure == "sync_dir", settings:isBlocked())
         end)
     end
 
