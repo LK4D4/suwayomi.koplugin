@@ -6,9 +6,9 @@ describe("complete stored chapter loading", function()
     local json = require("dkjson")
     local plugin, manga, queue, messages, scheduled, workers, requests
     local saved_ledger, saved_jobs, respond, settings, saved_filter, ledger_path, confirmation
-    local subprocess_done, loading, fake_time, original_time
+    local subprocess_done, loading, fake_time, original_time, worker_ids, poll_ids, pending_pid, next_pid
     local directory_callback, download_directory, chapter_action_callback, error_details
-    local archive_directory, archive_path, restore_native
+    local archive_directory, archive_path, restore_native, refill_directory
     local modules = {
         "gettext", "ffi/util", "ffi/archiver", "ui/uimanager", "ssl.https",
         "socket.http", "suwayomi/api", "suwayomi/api/queries", "suwayomi/api/parsers",
@@ -32,6 +32,7 @@ describe("complete stored chapter loading", function()
         "ui/widget/buttondialog", "ui/widget/confirmbox", "ui/widget/menu", "ui/widget/multiinputdialog",
         "suwayomi/ui/menu_utils", "suwayomi/ui/browse", "suwayomi/ui/choice_dialogs", "suwayomi/ui/directory",
         "suwayomi/ui/downloads", "suwayomi/ui/list_rows", "suwayomi/ui/manga_info",
+        "suwayomi/settings/retention_labels",
     }
 
     local function clearModules()
@@ -65,28 +66,58 @@ describe("complete stored chapter loading", function()
 
     local function admittedIds()
         local ids = {}
-        for _, job in ipairs(json.decode(saved_jobs)) do ids[#ids + 1] = job.chapter.id end
+        for _, job in ipairs(settings:loadDownloadQueue()) do ids[#ids + 1] = job.chapter.id end
         return ids
     end
 
-
-    local function finishRequest(index, token)
-        index = index or 1
-        local run = table.remove(workers, index)
+    local function finishJob(active)
+        assert.is_table(active)
+        -- Queue/refill callbacks can precede the requested load's poll.
+        -- Complete only this subprocess, including canceled older requests.
+        local run, poll
+        for index, callback in ipairs(workers) do
+            if worker_ids[callback] == active.pid then run = table.remove(workers, index); break end
+        end
         assert.is_function(run)
         run()
-        local active = token or plugin.active_manga_network_requests.chapter_context
-            or plugin.active_manga_network_requests.chapter_menu
-        local result = require("suwayomi/network/request_worker"):readResult(active.active.result_path)
-        local poll = table.remove(scheduled, index)
+        local result = require("suwayomi/network/request_worker"):readResult(active.result_path)
+        for index, callback in ipairs(scheduled) do
+            if poll_ids[callback] == active.pid then poll = table.remove(scheduled, index); break end
+        end
         assert.is_function(poll)
         poll()
         return result
     end
 
+    local function finishRequest(token)
+        local active = token or plugin.active_manga_network_requests.chapter_context
+            or plugin.active_manga_network_requests.chapter_menu
+        return finishJob(active.active)
+    end
+
+    local function prepareRefill()
+        refill_directory = os.tmpname()
+        os.remove(refill_directory)
+        assert(require("lfs").mkdir(refill_directory))
+        download_directory = refill_directory
+        manga.source = { id = "fixture-source", name = "Fixture source" }
+        queue.refill:start()
+    end
+
+    local function finishRefill()
+        local callback = queue.refill.scheduled
+        assert.is_function(callback)
+        for index, scheduled_callback in ipairs(scheduled) do
+            if scheduled_callback == callback then table.remove(scheduled, index); break end
+        end
+        callback()
+        return finishJob(queue.refill.active)
+    end
+
     before_each(function()
         clearModules()
         messages, scheduled, workers, requests = {}, {}, {}, {}
+        worker_ids, poll_ids, pending_pid, next_pid = {}, {}, nil, 0
         saved_ledger, saved_jobs = "{}", "[]"
         saved_filter = nil
         confirmation = nil
@@ -101,8 +132,6 @@ describe("complete stored chapter loading", function()
             getSettingsDir = function() return "." end,
             loadDownloadDirectory = function() return download_directory end,
             saveDownloadDirectory = function(_, path) download_directory = path; return path end,
-            normalizeMangaKeepNextUnreadDownloads = function(_, limit) return limit end,
-            saveMangaKeepNextUnreadDownloads = function(_, _, limit) return limit end,
             loadMangaScanlatorFilter = function() return saved_filter end,
         }
         package.preload.datastorage = function() return { getSettingsDir = function() return "." end } end
@@ -132,11 +161,24 @@ describe("complete stored chapter loading", function()
                 return (text:gsub("%%(%d+)", function(index) return tostring(values[tonumber(index)]) end))
             end,
             joinPath = function(...) return table.concat({ ... }, "/") end,
-            runInSubProcess = function(run) workers[#workers + 1] = run; return #workers end,
+            runInSubProcess = function(run)
+                next_pid = next_pid + 1
+                pending_pid, worker_ids[run] = next_pid, next_pid
+                workers[#workers + 1] = run
+                return next_pid
+            end,
             isSubProcessDone = function() return subprocess_done end,
             terminateSubProcess = function() end,
         }
-        local ui = { scheduleIn = function(_, _, callback) scheduled[#scheduled + 1] = callback end,
+        local ui = { scheduleIn = function(_, _, callback)
+                scheduled[#scheduled + 1] = callback
+                poll_ids[callback], pending_pid = pending_pid, nil
+            end,
+            unschedule = function(_, callback)
+                for index, scheduled_callback in ipairs(scheduled) do
+                    if scheduled_callback == callback then table.remove(scheduled, index); break end
+                end
+            end,
             nextTick = function(_, callback) scheduled[#scheduled + 1] = callback end,
             show = function(_, widget) loading = widget end,
             close = function(_, widget) if widget.dismiss_callback then widget.dismiss_callback() end end }
@@ -144,7 +186,8 @@ describe("complete stored chapter loading", function()
         package.preload["ui/uimanager"] = function() return ui end
         package.preload["ui/widget/infomessage"] = function() return { new = function(_, options) return options end } end
         package.preload["suwayomi/ui"] = function()
-            return { showChapterMenu = function(options) return options end,
+            return { formatRefillStatus = require("suwayomi/ui/downloads").formatRefillStatus,
+                showChapterMenu = function(options) return options end,
                 showConfirm = function(options) confirmation = options.ok_callback; return true end,
                 showChapterActionsMenu = function(_, callback) chapter_action_callback = callback end,
                 showDownloadErrorDetails = function(_, options) error_details = options; return true end,
@@ -183,6 +226,8 @@ describe("complete stored chapter loading", function()
 
     after_each(function()
         if plugin then plugin:cancelMangaNetworkRequests() end
+        if queue then queue.refill:shutdown(fake_time + 1, os.time) end
+        if refill_directory then require("lfs").rmdir(refill_directory); refill_directory = nil end
         os.time = original_time
         if ledger_path then os.remove(ledger_path); ledger_path = nil end
         if archive_path then os.remove(archive_path); archive_path = nil end
@@ -284,6 +329,7 @@ describe("complete stored chapter loading", function()
     for _, filter in ipairs({ "Late group", "Absent group" }) do
         it("keeps exact saved " .. filter .. " across complete reopen and refresh", function()
             saved_filter = filter
+            prepareRefill()
             respond = function(request)
                 local chapters = nodes(1, 205)
                 for index, chapter in ipairs(chapters) do
@@ -309,6 +355,8 @@ describe("complete stored chapter loading", function()
                 assert.matches("No chapters match the saved scanlator filter", messages[#messages])
             end
             plugin:keepNextUnreadChaptersForManga(manga, 5)
+            assert.are.same({}, admittedIds())
+            finishRefill()
             assert.are.same(expected, admittedIds())
         end)
     end
@@ -356,7 +404,7 @@ describe("complete stored chapter loading", function()
                 assert.are.equal(0, filter_writes)
                 assert.are.same({}, admittedIds())
                 assert.are.same({}, queue:getSnapshot().queued)
-                assert.are.equal("{}", saved_ledger)
+                assert.are.same({}, json.decode(saved_ledger))
                 if dataset ~= "labeled chapters" then
                     assert.are.same({}, plugin:getChapterScanlatorChoices(plugin.current_chapter_context.chapters))
                     if restricted then assert.matches("No chapters match the saved scanlator filter", messages[1])
@@ -411,14 +459,14 @@ describe("complete stored chapter loading", function()
                 assert.are.same(expected_ids, chapterIds(menu.chapters))
                 assert.are.same(expected_ids, chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
                 assert.are.same({}, admittedIds())
-                assert.are.equal("{}", saved_ledger)
+                assert.are.same({}, json.decode(saved_ledger))
                 open_action_menu()
                 if dataset ~= "labeled chapters" then assert.is_nil(find_action("scanlator_filter"))
                 else assert.is_table(find_action("scanlator_filter")) end
                 select_action("bulk_downloads")
                 select_action("download_next_5_unread")
                 assert.are.same(expected_ids, admittedIds())
-                assert.are.equal("{}", saved_ledger)
+                assert.are.same({}, json.decode(saved_ledger))
                 assert.are.equal(0, #workers)
             end)
         end
@@ -507,7 +555,7 @@ describe("complete stored chapter loading", function()
             assert.are.equal(0, plugin:getSelectedChapterCount())
             plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
             assert.are.same({}, admittedIds())
-            assert.are.equal("{}", saved_ledger)
+            assert.are.same({}, json.decode(saved_ledger))
             assert.are.equal(0, #workers)
         end)
     end
@@ -636,12 +684,7 @@ describe("complete stored chapter loading", function()
                 end
                 local function finishVerification()
                     assert.are.same({}, reader_opens)
-                    local run = table.remove(workers)
-                    assert.is_function(run)
-                    run()
-                    local poll = table.remove(scheduled)
-                    assert.is_function(poll)
-                    poll()
+                    finishJob(queue.verification)
                 end
                 local dispatch = function() return plugin:performMangaAction(manga, "open_first_unread") end
                 local open_action_menu
@@ -897,10 +940,10 @@ describe("complete stored chapter loading", function()
             local target = different_manga and { id = "18", title = "Other manga" } or manga
             plugin:showChaptersForManga(target)
             respond = function() return page(nodes(301, 301), 1, false) end
-            finishRequest(2)
+            finishRequest()
             local context, menu, ledger = plugin.current_chapter_context, plugin.current_chapter_menu, saved_ledger
             respond = function() return page(nodes(201, 205), 5, false) end
-            finishRequest(1, older)
+            finishRequest(older)
             assert.are.equal(context, plugin.current_chapter_context)
             assert.are.equal(menu, plugin.current_chapter_menu)
             assert.are.same({ "301" }, chapterIds(plugin.current_chapter_menu.chapters))
@@ -925,12 +968,18 @@ describe("complete stored chapter loading", function()
                 loading.dismiss_callback()
             elseif invalidation == "timeout" then
                 subprocess_done, fake_time = false, 200
-                table.remove(scheduled, 1)()
+                for index, callback in ipairs(scheduled) do
+                    if poll_ids[callback] == token.active.pid then
+                        pending_pid = token.active.pid
+                        table.remove(scheduled, index)()
+                        break
+                    end
+                end
                 subprocess_done = true
             elseif invalidation == "manga identity" then manga.id = "18"
             else plugin:retireChapterHost() end
             respond = function() return page(nodes(201, 205), 5, false) end
-            finishRequest(1, token)
+            finishRequest(token)
             assert.are.equal(context, plugin.current_chapter_context)
             assert.are.equal(menu, plugin.current_chapter_menu)
             assert.are.equal(ledger, saved_ledger)
@@ -959,7 +1008,7 @@ describe("complete stored chapter loading", function()
         assert.are.same({ "Suwayomi download directory saved." }, messages)
         assert.are.same({}, plugin.current_chapter_menu.chapters)
         assert.are.same({}, admittedIds())
-        assert.are.equal("{}", saved_ledger)
+        assert.are.same({}, json.decode(saved_ledger))
         assert.are.equal(0, #workers)
     end)
 
@@ -975,7 +1024,7 @@ describe("complete stored chapter loading", function()
         finishRequest()
         assert.are.same({ "301" }, chapterIds(plugin.current_chapter_menu.chapters))
         assert.are.same({}, admittedIds())
-        assert.are.equal("{}", saved_ledger)
+        assert.are.same({}, json.decode(saved_ledger))
         assert.are.same({}, messages)
     end)
 
@@ -988,7 +1037,7 @@ describe("complete stored chapter loading", function()
         assert.matches("No chapters match the saved scanlator filter", messages[#messages])
         assert.are.equal(1, #messages)
         assert.are.same({}, admittedIds())
-        assert.are.equal("{}", saved_ledger)
+        assert.are.same({}, json.decode(saved_ledger))
     end)
 
     for _, total in ipairs({ 0, 205 }) do
@@ -1018,14 +1067,14 @@ describe("complete stored chapter loading", function()
             end
             plugin:returnToSuwayomiChapters(reader_context)
             local token = plugin.active_reader_return_request
-            finishRequest(1, token)
+            finishRequest(token)
             assert.is_nil(plugin.current_chapter_context)
             assert.is_function(scheduled[1])
             table.remove(scheduled, 1)()
             assert.is_true(plugin.suwayomi_host_retired)
             assert.is_nil(plugin.current_chapter_context)
             assert.are.equal(total, #destination.current_chapter_menu.chapters)
-            destination:downloadNextUnreadChaptersForManga(manga, 5, false)
+            destination:downloadNextUnreadChaptersForManga(destination.current_chapter_context.manga, 5, false)
             assert.are.same(total == 0 and {} or { "201", "202", "203", "204", "205" }, admittedIds())
             assert.are.equal(total > 0, json.decode(saved_ledger)["17:200"] ~= nil)
         end)
@@ -1044,7 +1093,7 @@ describe("complete stored chapter loading", function()
         assert.is_nil(manga.author)
         plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
         assert.are.same({ "201" }, admittedIds())
-        assert.are.equal("{}", saved_ledger)
+        assert.are.same({}, json.decode(saved_ledger))
         assert.are.same({}, messages)
     end)
 
@@ -1240,7 +1289,7 @@ describe("complete stored chapter loading", function()
         assert.are.same({}, plugin:getChapterScanlatorChoices(plugin.current_chapter_context.chapters))
         plugin:downloadNextUnreadChaptersForManga(manga, 5, false)
         assert.are.same({ "201" }, admittedIds())
-        assert.are.equal("{}", saved_ledger)
+        assert.are.same({}, json.decode(saved_ledger))
         assert.are.same({}, messages)
     end)
 
@@ -1267,6 +1316,7 @@ describe("complete stored chapter loading", function()
     end)
 
     it("admits the complete next-unread buffer after verified empty stored source fallback", function()
+        prepareRefill()
         respond = function(request)
             if request.query:find("GET_MANGA_CHAPTERS_FETCH", 1, true) then
                 return { data = { fetchChapters = { chapters = nodes(201, 205) } } }
@@ -1276,13 +1326,17 @@ describe("complete stored chapter loading", function()
         plugin:keepNextUnreadChaptersForManga(manga, 5)
         finishRequest()
         assert.are.equal(5, #plugin.current_chapter_context.chapters)
-        assert.are.same({ "201", "202", "203", "204", "205" }, admittedIds())
-        assert.are.equal("{}", saved_ledger)
+        assert.are.same({}, admittedIds())
         assert.are.equal(2, #requests)
+        finishRefill()
+        assert.are.same({ "201", "202", "203", "204", "205" }, admittedIds())
+        assert.are.same({}, json.decode(saved_ledger))
+        assert.are.equal(4, #requests)
         assert.are.same({}, messages)
     end)
 
     it("loads all stored pages before admitting a fresh Download ahead action", function()
+        prepareRefill()
         respond = function(request)
             local offset = request.variables.offset
             return page(nodes(offset + 1, math.min(offset + 200, 205)), 205, offset + 200 < 205)
@@ -1293,8 +1347,12 @@ describe("complete stored chapter loading", function()
         assert.are.equal(205, result.total_count)
         assert.is_false(result.has_next_page)
         assert.are.equal(205, #plugin.current_chapter_context.chapters)
+        assert.are.same({}, admittedIds())
+        assert.are.equal(2, #requests)
+        finishRefill()
         assert.are.same({ "201", "202", "203", "204", "205" }, admittedIds())
         assert.is_true(json.decode(saved_ledger)["17:200"].read)
+        assert.are.equal(4, #requests)
         assert.are.same({}, messages)
     end)
 
@@ -1323,7 +1381,7 @@ describe("complete stored chapter loading", function()
             assert.are.equal("too_large", result.error_kind)
             assert.is_nil(plugin.current_chapter_context)
             assert.is_nil(plugin.current_chapter_menu)
-            assert.are.equal("{}", saved_ledger)
+            assert.are.same({}, json.decode(saved_ledger))
             assert.are.same({}, admittedIds())
             assert.matches("too large", messages[#messages])
         end)
