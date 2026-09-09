@@ -1,7 +1,7 @@
 -- Boundary: FinishedChapterCleanup.
 --
 -- Responsibility: Persist finished-chapter order, process retention-based local cleanup, and refresh changed download views per batch.
--- Owned state: Processing, scheduling, retry, and notification state on a process-owned receiver in production.
+-- Owned state: Captured pending enrollments, processing, scheduling, retry, and notification state on a process-owned receiver.
 -- Dependencies: Receiver ledger/delete methods, settings, UIManager, filesystem path resolution, debug, and i18n.
 -- External data: Journal, ledger, queue, and filesystem paths are revalidated before deletion.
 
@@ -178,6 +178,55 @@ local function notifyCompatibility(self, error_code)
     ))
 end
 
+local function copyTarget(target)
+    if type(target) ~= "table" then return target end
+    local copy = {}
+    for key, value in pairs(target) do copy[key] = copyTarget(value) end
+    return copy
+end
+
+local function removePendingCompletion(self, manga_id, chapter_id)
+    for index, entry in ipairs(self.finished_cleanup_pending or {}) do
+        if entry.manga_id == manga_id and entry.chapter_id == chapter_id then
+            table.remove(self.finished_cleanup_pending, index)
+            return true
+        end
+    end
+    return false
+end
+
+local function flushPendingCompletions(self, journal)
+    local pending = self.finished_cleanup_pending
+    if not pending or #pending == 0 then return journal end
+    for _, entry in ipairs(pending) do
+        removeRecord(journal, entry.manga_id, entry.chapter_id)
+        local manga = journal.mangas[entry.manga_id] or { records = {} }
+        journal.mangas[entry.manga_id] = manga
+        manga.records[#manga.records + 1] = {
+            chapter_id = entry.chapter_id,
+            path = entry.path,
+            archive_target = entry.archive_target,
+            archive_retired = entry.archive_retired,
+            sequence = journal.next_sequence,
+            retry_count = 0,
+            retry_after = 0,
+        }
+        journal.next_sequence = journal.next_sequence + 1
+    end
+    local saved, err = SuwayomiSettings:saveFinishedChapterCleanupJournal(journal)
+    if not saved or err then
+        self.finished_cleanup_enrollment_retry_count = (self.finished_cleanup_enrollment_retry_count or 0) + 1
+        self:scheduleFinishedChapterCleanup(retryDelay(self.finished_cleanup_enrollment_retry_count))
+        return nil, err
+    end
+    self.finished_cleanup_pending = nil
+    self.finished_cleanup_enrollment_retry_count = nil
+    self.finished_cleanup_cursor = nil
+    self.finished_cleanup_traversal_retry_at = nil
+    self.finished_cleanup_traversal_reasons = nil
+    return saved
+end
+
 function Methods:recordFinishedChapter(entry)
     if cleanupSetting() <= 0 then
         return false, "disabled"
@@ -204,22 +253,17 @@ function Methods:recordFinishedChapter(entry)
         local current = removal and removal:getTarget(manga_id .. ":" .. chapter_id, entry.path)
         if current and current.generation == entry.archive_generation then archive_target = current end
     end
-    removeRecord(journal, manga_id, chapter_id)
-    journal.mangas[manga_id] = journal.mangas[manga_id] or { records = {} }
-    table.insert(journal.mangas[manga_id].records, {
+    removePendingCompletion(self, manga_id, chapter_id)
+    self.finished_cleanup_pending = self.finished_cleanup_pending or {}
+    table.insert(self.finished_cleanup_pending, {
+        manga_id = manga_id,
         chapter_id = chapter_id,
         path = entry.path,
-        archive_target = archive_target,
+        archive_target = copyTarget(archive_target),
         archive_retired = entry.archive_retired,
-        sequence = journal.next_sequence,
-        retry_count = 0,
-        retry_after = 0,
     })
-    journal.next_sequence = journal.next_sequence + 1
-    SuwayomiSettings:saveFinishedChapterCleanupJournal(journal)
-    self.finished_cleanup_cursor = nil
-    self.finished_cleanup_traversal_retry_at = nil
-    self.finished_cleanup_traversal_reasons = nil
+    local saved, err = flushPendingCompletions(self, journal)
+    if not saved then return false, err end
     self:scheduleFinishedChapterCleanup(0)
     return true
 end
@@ -228,15 +272,17 @@ function Methods:cancelFinishedChapter(manga_id, chapter_id)
     if manga_id == nil or chapter_id == nil then
         return false
     end
+    manga_id, chapter_id = tostring(manga_id), tostring(chapter_id)
+    local pending_removed = removePendingCompletion(self, manga_id, chapter_id)
     local journal, error_code = SuwayomiSettings:loadFinishedChapterCleanupJournal()
     if error_code then
-        return false
+        return pending_removed
     end
-    local removed = removeRecord(journal, tostring(manga_id), tostring(chapter_id))
+    local removed = removeRecord(journal, manga_id, chapter_id)
     if removed then
         SuwayomiSettings:saveFinishedChapterCleanupJournal(journal)
     end
-    return removed
+    return removed or pending_removed
 end
 
 local function scheduleFinishedChapterCleanup(self, delay_seconds)
@@ -288,6 +334,8 @@ function Methods:onFinishedCleanupSettingChanged(previous_value, current_value)
     previous_value = tonumber(previous_value) or 0
     current_value = tonumber(current_value) or 0
     if current_value <= 0 then
+        self.finished_cleanup_pending = nil
+        self.finished_cleanup_enrollment_retry_count = nil
         self:cancelFinishedChapterCleanup()
         self.finished_cleanup_cursor = nil
         self.finished_cleanup_traversal_retry_at = nil
@@ -432,12 +480,24 @@ local function processFinishedChapterCleanup(self, summary)
 
     local setting = cleanupSetting()
     if setting <= 0 then
+        self.finished_cleanup_pending = nil
+        self.finished_cleanup_enrollment_retry_count = nil
         SuwayomiSettings:clearFinishedChapterCleanupJournal()
         self.finished_cleanup_cursor = nil
         self.finished_cleanup_traversal_retry_at = nil
         self.finished_cleanup_traversal_reasons = nil
         return summary
     end
+
+    -- No cleanup may use the old order while a newer captured completion is
+    -- waiting for storage. Retry snapshots, never recapture current archives.
+    local committed, enrollment_error = flushPendingCompletions(self, journal)
+    if not committed then
+        summary.storage_error = enrollment_error
+        summary.retrying = #(self.finished_cleanup_pending or {})
+        return summary
+    end
+    journal = committed
 
     local ledger = self:loadChapterLedger()
     pruneUnreadRecords(self, journal, ledger, summary)
