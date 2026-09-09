@@ -1,6 +1,6 @@
 -- Boundary: BrowseController.
 --
--- Responsibility: Composes source catalog methods, owns source fetch worker polling, and coordinates Browse entry flow.
+-- Responsibility: Composes source catalog methods and owns source request/UI identity; the shared job helper owns cancellation, polling, and cleanup.
 -- Owned state: Accepts source data from Suwayomi API and worker result files, so boundary code validates table shapes before rendering.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -53,13 +53,21 @@ local function credentialsMatch(left, right)
         and credentialField(left, "password") == credentialField(right, "password")
 end
 
+local function closeSourceFetchLoading(owner, active)
+    local loading_message = active and active.loading_message
+    if not loading_message then return end
+    active.loading_message = nil
+    loading_message.dismiss_callback = nil
+    owner:closeLoadingMessage(loading_message)
+end
+
 function Methods:getSourceFetchResultPath()
     return SubprocessJob.buildResultPath("source_fetch")
 end
 
 
 function Methods:scheduleSourceCacheRefresh(credentials)
-    if self.source_cache_refresh_scheduled or self.source_fetch_active then
+    if self.suwayomi_host_retired or self.source_cache_refresh_scheduled or self.source_fetch_active then
         return
     end
 
@@ -85,7 +93,7 @@ end
 function Methods:startSourceFetchWorker(credentials, options)
     options = options or {}
     options.credentials = options.credentials or credentials
-    if self.source_fetch_active then
+    if self.suwayomi_host_retired or self.source_fetch_active then
         return false
     end
 
@@ -94,10 +102,14 @@ function Methods:startSourceFetchWorker(credentials, options)
         credentials = credentials,
         options = options,
         result_path = result_path,
-        loading_message = not options.silent
-            and self:showLoadingMessage(options.loading_message or I18n.t("Loading sources..."))
-            or nil,
     }
+    if not options.silent then
+        active.loading_message = self:showLoadingMessage(
+            options.loading_message or I18n.t("Loading sources..."),
+            function()
+                if self.source_fetch_active == active then self:cancelSourceFetchWorker() end
+            end)
+    end
 
     active = SubprocessJob.start({
         active = active,
@@ -115,13 +127,18 @@ function Methods:startSourceFetchWorker(credentials, options)
             self:finishSourceFetch(finished_active, result)
         end,
         on_timeout = function(timed_out_active)
-            if self.source_fetch_active == timed_out_active then
-                self.source_fetch_active = nil
-            end
-            self:closeLoadingMessage(timed_out_active and timed_out_active.loading_message)
-            if not options.silent then
+            if self.source_fetch_active ~= timed_out_active then return end
+            self.source_fetch_active = nil
+            closeSourceFetchLoading(self, timed_out_active)
+            if not self.suwayomi_host_retired and not options.silent then
                 self:showMessage(I18n.t("Source loading timed out."))
             end
+        end,
+        on_cancel = function(canceled_active)
+            if self.source_fetch_active == canceled_active then
+                self.source_fetch_active = nil
+            end
+            closeSourceFetchLoading(self, canceled_active)
         end,
         on_cleanup = function(cleaned_active)
             if self.source_fetch_active == cleaned_active then
@@ -130,8 +147,8 @@ function Methods:startSourceFetchWorker(credentials, options)
         end,
         on_error = function(err)
             self.source_fetch_active = nil
-            self:closeLoadingMessage(active.loading_message)
-            if not options.silent then
+            closeSourceFetchLoading(self, active)
+            if not self.suwayomi_host_retired and not options.silent then
                 local message = trim(err)
                 if message ~= "" then
                     self:showMessage(I18n.f("Could not start source loading: %1", message))
@@ -150,23 +167,18 @@ function Methods:cancelSourceFetchWorker()
     if not active then
         return false
     end
-    active.canceled = true
-    self.source_fetch_active = nil
-    self:closeLoadingMessage(active.loading_message)
-    if SubprocessJob.cancel then
-        SubprocessJob.cancel(active)
-    end
+    SubprocessJob.cancel(active)
     return true
 end
 
 
 function Methods:finishSourceFetch(active, result)
-    if active and active.canceled then
+    if not active or active.canceled or self.source_fetch_active ~= active then
         return false
     end
     self.source_fetch_active = nil
-    self:closeLoadingMessage(active and active.loading_message)
-    if not credentialsMatch(active and active.credentials, SuwayomiSettings:load()) then
+    closeSourceFetchLoading(self, active)
+    if self.suwayomi_host_retired or not credentialsMatch(active.credentials, SuwayomiSettings:load()) then
         return false
     end
     self:showFetchedSources(result, active and active.options or {})

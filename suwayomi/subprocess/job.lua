@@ -1,8 +1,8 @@
 -- Boundary: Shared subprocess job helper.
 --
--- Responsibility: launch one-shot subprocess workers, poll for completion, and
--- move bounded JSON result files across the process boundary.
--- Owned state: a module-local result path counter and caller-owned active jobs.
+-- Responsibility: launch one-shot subprocess workers, own cancellation and polling,
+-- and clean bounded JSON result files only after confirmed worker exit.
+-- Owned state: a module-local result path counter and active jobs retained by poll callbacks.
 -- Dependencies: dkjson, settings path lookup, KOReader ui_manager/ffi_util collaborators.
 -- External data: result files and subprocess state are normalized before callbacks run.
 
@@ -100,7 +100,7 @@ function SubprocessJob.cleanup(active)
 end
 
 function SubprocessJob.schedulePoll(active)
-    if not active or active.poll_scheduled then
+    if not active or active.cleaned or active.poll_scheduled then
         return false
     end
     if active.canceled and not active.terminating then
@@ -118,7 +118,7 @@ function SubprocessJob.schedulePoll(active)
 end
 
 function SubprocessJob.terminate(active)
-    if not active or active.terminating then
+    if not active or active.cleaned or active.terminating then
         return
     end
     active.terminating = true
@@ -128,6 +128,7 @@ function SubprocessJob.terminate(active)
 end
 
 function SubprocessJob.finish(active)
+    if not active or active.cleaned then return end
     if active.terminating or active.canceled then
         SubprocessJob.cleanup(active)
         return
@@ -145,7 +146,7 @@ function SubprocessJob.finish(active)
 end
 
 function SubprocessJob.poll(active)
-    if not active then
+    if not active or active.cleaned then
         return
     end
     if active.canceled and not active.terminating then
@@ -211,7 +212,7 @@ function SubprocessJob.start(options)
 end
 
 function SubprocessJob.cancel(active)
-    if not active or active.canceled then
+    if not active or active.cleaned or active.canceled then
         return
     end
     active.canceled = true
@@ -219,8 +220,10 @@ function SubprocessJob.cancel(active)
     if active.on_cancel then
         active.on_cancel(active)
     end
-    if not active.pid or (not active.poll_scheduled and not SubprocessJob.schedulePoll(active)) then
+    if not active.pid then
         SubprocessJob.cleanup(active)
+    else
+        SubprocessJob.schedulePoll(active)
     end
 end
 

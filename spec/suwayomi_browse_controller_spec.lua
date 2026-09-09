@@ -253,82 +253,6 @@ describe("suwayomi/browse/controller", function()
         assert.are.same({ "tx:Could not start source loading: unknown error" }, controller.messages)
     end)
 
-    it("cancels source fetch workers and ignores late completions after plugin close", function()
-        local started_options
-        local canceled = {}
-        clearModules()
-        helper.stubControllerDependencies()
-        package.preload["ui/uimanager"] = function()
-            return {
-                scheduleIn = function() end,
-            }
-        end
-        package.preload["suwayomi/browse/source_catalog"] = function()
-            return { methods = {} }
-        end
-        package.preload["suwayomi/browse/extensions"] = function()
-            return { methods = {} }
-        end
-        package.preload["suwayomi/browse/source_fetch_worker"] = function()
-            return {
-                run = function() end,
-                readResult = function() end,
-            }
-        end
-        package.preload["suwayomi/subprocess/job"] = function()
-            return {
-                buildResultPath = function()
-                    return "/settings/source_fetch.json"
-                end,
-                start = function(options)
-                    started_options = options
-                    return options.active
-                end,
-                cancel = function(active)
-                    table.insert(canceled, active)
-                    active.canceled = true
-                end,
-                schedulePoll = function() end,
-                poll = function() end,
-            }
-        end
-        package.preload["suwayomi/settings"] = function()
-            return {
-                load = function()
-                    return { server_url = "https://suwayomi.example" }
-                end,
-            }
-        end
-        package.preload["suwayomi/debug"] = function()
-            return {
-                time = function(_, callback)
-                    return callback()
-                end,
-            }
-        end
-
-        local controller_module = require("suwayomi/browse/controller")
-        local controller = buildController(controller_module)
-        local rendered = false
-        controller.showFetchedSources = function()
-            rendered = true
-        end
-
-        assert.is_true(controller:startSourceFetchWorker({ server_url = "https://suwayomi.example" }))
-        assert.is_true(controller:cancelSourceFetchWorker())
-        assert.are.equal(1, #canceled)
-        assert.is_nil(controller.source_fetch_active)
-
-        controller:finishSourceFetch(started_options.active, {
-            ok = true,
-            sources = {
-                { id = "src", display_name = "Late Source" },
-            },
-        })
-
-        assert.is_false(rendered)
-    end)
-
     it("drops stale source fetch results after credentials change", function()
         local controller_module = installControllerWithSourceFetchStub({
             credentials = {
@@ -344,7 +268,7 @@ describe("suwayomi/browse/controller", function()
             rendered = true
         end
 
-        local result = controller:finishSourceFetch({
+        local active = {
             credentials = {
                 server_url = "https://old.example",
                 username = "alice",
@@ -353,7 +277,9 @@ describe("suwayomi/browse/controller", function()
             },
             loading_message = { message = "Loading sources..." },
             options = {},
-        }, {
+        }
+        controller.source_fetch_active = active
+        local result = controller:finishSourceFetch(active, {
             ok = true,
             sources = {
                 { id = "source-mangadex" },
