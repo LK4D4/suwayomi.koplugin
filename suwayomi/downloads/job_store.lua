@@ -1,7 +1,7 @@
 -- Boundary: persisted download queue schema.
 --
 -- Responsibility: load/save settings-backed jobs, normalize saved data, and
--- build the exact persisted job shape used by the download queue.
+-- build persisted jobs and check their runnable shape without rewriting inert records.
 -- Owned state: settings adapter and queue-key callback.
 -- Injected dependencies: settings.loadDownloadQueue/saveDownloadQueue and a
 -- getKey function supplied by the public queue facade.
@@ -20,6 +20,13 @@ end
 
 local function hasValidJobKey(job)
     return type(job) == "table" and type(job.key) == "string" and job.key ~= ""
+end
+
+local function hasValidIdentity(metadata)
+    if type(metadata) ~= "table" then return false end
+    local id = metadata.id
+    if type(id) == "string" then return id:match("%S") ~= nil end
+    return type(id) == "number" and id == id and math.abs(id) < math.huge
 end
 
 local function normalizeJobList(jobs)
@@ -62,6 +69,13 @@ function JobStore:new(options)
             return tostring(manga.id or manga.title or "") .. ":" .. tostring(chapter.id or chapter.name or "")
         end,
     }, self)
+end
+
+function JobStore:isRunnable(job)
+    return hasValidJobKey(job) and job.version == nil
+        and (job.state == "queued" or job.state == "downloading")
+        and hasValidIdentity(job.manga) and hasValidIdentity(job.chapter)
+        and type(job.download_directory) == "string" and job.download_directory ~= ""
 end
 
 function JobStore:isBlocked()

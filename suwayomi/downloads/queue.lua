@@ -221,7 +221,7 @@ function DownloadQueue:reconcile()
         local key = job.key or (job.manga and job.chapter and self:getKey(job.manga, job.chapter))
         if key and key ~= "" then
             -- A launch intent can commit before the parent creates its worker.
-            if job.version == nil and job.state == "downloading" and not self:getActiveJob(key) then
+            if self.job_store:isRunnable(job) and job.state == "downloading" and not self:getActiveJob(key) then
                 local staged_job = {}
                 for field, value in pairs(job) do staged_job[field] = value end
                 staged_job.state = "queued"
@@ -260,7 +260,7 @@ function DownloadQueue:reconcile()
     local seen = {}
     for _, job in ipairs(persistent_jobs) do
         local key = job.key or (job.manga and job.chapter and self:getKey(job.manga, job.chapter))
-        if key and job.version == nil and job.state == "queued" and not seen[key] then
+        if self.job_store:isRunnable(job) and job.state == "queued" and not seen[key] then
             local item = existing_items[key] or {}
             item.key = key
             item.download_directory = job.download_directory
@@ -907,7 +907,7 @@ function DownloadQueue:recover()
     local jobs = self:loadPersistentJobs()
     local normalized, changed = {}, false
     for _, job in ipairs(jobs) do
-        if job.version == nil and job.manga and job.chapter and job.download_directory and job.state == "downloading" then
+        if self.job_store:isRunnable(job) and job.state == "downloading" then
             local queued = {}
             for key, value in pairs(job) do queued[key] = value end
             queued.state = "queued"
