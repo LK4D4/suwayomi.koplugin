@@ -1,6 +1,6 @@
 # UI Login
 
-Status: the maintainer confirmed Q1–Q6 and authorized implementation, laptop verification, independent review, and a commit on the task branch on 2026-09-09. No push or merge to master is authorized.
+Status: implemented and laptop-verified. The maintainer confirmed Q1–Q6 on 2026-09-09.
 
 ## Scope
 
