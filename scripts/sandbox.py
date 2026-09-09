@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import secrets
 import shutil
 import signal
@@ -62,7 +63,7 @@ def configuration(root):
     if value.get("format") != 1:
         raise RuntimeError("Not a supported sandbox root")
     value.setdefault("auth_mode", "basic_auth")
-    if value["auth_mode"] not in ("basic_auth", "simple_login"):
+    if value["auth_mode"] not in ("basic_auth", "simple_login", "ui_login"):
         raise RuntimeError("Unsupported sandbox authentication mode")
     return value
 
@@ -274,6 +275,8 @@ class ServerClient:
             urllib.request.HTTPCookieProcessor(self.cookies))
         self.plain_http = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
         self.logged_in = False
+        self.access_token = None
+        self.refresh_token = None
 
     def login(self):
         self.cookies.clear()
@@ -296,6 +299,76 @@ class ServerClient:
                 error.close()
         self.logged_in = True
 
+    def _jwt_tokens(self, refresh=False):
+        operation = "refreshToken" if refresh else "login"
+        input_type = "RefreshTokenInput" if refresh else "LoginInput"
+        fields = "accessToken" if refresh else "accessToken refreshToken"
+        values = {"refreshToken": self.refresh_token} if refresh else self.credentials
+        body = json.dumps({
+            "query": f"mutation ($input: {input_type}!) {{ {operation}(input: $input) {{ {fields} }} }}",
+            "variables": {"input": values},
+        }).encode("utf-8")
+        # Login must have no access token; refresh also bypasses access validation.
+        request = urllib.request.Request(self.url + "/api/graphql", data=body, headers={
+            "Content-Type": "application/json",
+        })
+        with self.plain_http.open(request, timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError("UI Login returned an unexpected HTTP status")
+            try:
+                result = json.loads(response.read())
+            except ValueError:
+                raise RuntimeError("UI Login returned an invalid response") from None
+        if not isinstance(result, dict):
+            raise RuntimeError("UI Login returned an invalid response")
+        data = result.get("data")
+        errors = result.get("errors")
+        if errors:
+            # The pinned server includes exception types in GraphQL errors.
+            # Only a rejected, non-executed refresh permits saved-password login.
+            error = errors[0] if isinstance(errors, list) and len(errors) == 1 else None
+            message = error.get("message") if isinstance(error, dict) else None
+            if (refresh and (data is None or data == {"refreshToken": None})
+                    and isinstance(error, dict) and error.get("path") == ["refreshToken"]
+                    and isinstance(message, str)):
+                heading, _, trace = message.partition("\r\n\r\n")
+                token_rejected = re.match(
+                    r"com\.auth0\.jwt\.exceptions\."
+                    r"(?:TokenExpired|SignatureVerification|AlgorithmMismatch|JWTDecode|IncorrectClaim)Exception:",
+                    trace)
+                wrong_claim = trace.startswith("java.lang.IllegalArgumentException: ") and (
+                    heading == "Exception while fetching data (/refreshToken) : Cannot use access token to refresh"
+                    or heading.startswith(
+                        "Exception while fetching data (/refreshToken) : Token intended for different audience ["))
+                if (heading.startswith("Exception while fetching data (/refreshToken) : ")
+                        and (token_rejected or wrong_claim)
+                        and "\tat suwayomi.tachidesk.global.impl.util.Jwt.refreshJwt(" in trace
+                        and "\tat suwayomi.tachidesk.graphql.mutations.UserMutation.refreshToken(" in trace):
+                    return None
+            raise RuntimeError("UI Login refresh failed" if refresh else "UI Login failed")
+        tokens = data.get(operation) if isinstance(data, dict) else None
+        required = ("accessToken",) if refresh else ("accessToken", "refreshToken")
+        if not isinstance(tokens, dict) or not all(
+                isinstance(tokens.get(name), str) and tokens[name]
+                and re.fullmatch(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", tokens[name])
+                for name in required):
+            raise RuntimeError("UI Login returned invalid tokens")
+        return tokens
+
+    def _login_ui(self):
+        self.access_token = self.refresh_token = None
+        tokens = self._jwt_tokens()
+        self.access_token = tokens["accessToken"]
+        self.refresh_token = tokens["refreshToken"]
+
+    def _refresh_ui(self):
+        tokens = self._jwt_tokens(refresh=True)
+        if tokens is None:
+            self._login_ui()
+        else:
+            # Refresh returns accessToken only; its refresh token never rotates.
+            self.access_token = tokens["accessToken"]
+
     def request(self, path, authorized=True):
         if not path.startswith("/api/") or "\\" in path or "#" in path:
             raise RuntimeError("Invalid sandbox API path")
@@ -304,14 +377,29 @@ class ServerClient:
             if self.mode == "simple_login":
                 if not self.logged_in:
                     self.login()
+            elif self.mode == "ui_login":
+                if self.access_token is None:
+                    self._login_ui()
+                headers["Authorization"] = "Bearer " + self.access_token
             else:
                 headers["Authorization"] = "Basic " + base64.b64encode(
                     (self.credentials["username"] + ":" + self.credentials["password"]).encode()).decode()
         request = urllib.request.Request(self.url + path, headers=headers)
         client = self.http if authorized and self.mode == "simple_login" else self.plain_http
-        with client.open(request, timeout=5) as response:
-            body = response.read()
-            return json.loads(body) if body else None
+        try:
+            with client.open(request, timeout=5) as response:
+                body = response.read()
+        except urllib.error.HTTPError as error:
+            if not (authorized and self.mode == "ui_login" and error.code == 401):
+                raise
+            error.close()
+            self._refresh_ui()
+            request.add_header("Authorization", "Bearer " + self.access_token)
+            # REST 401 rejects before execution. Never replay network failures,
+            # redirects, other HTTP errors, or a second rejection.
+            with client.open(request, timeout=5) as response:
+                body = response.read()
+        return json.loads(body) if body else None
 
 
 def seed_library(client):
@@ -451,7 +539,7 @@ def main():
     setup_args = commands.add_parser("setup", help="Download pinned releases into an empty root")
     setup_args.add_argument("--server-port", type=int, default=4569)
     setup_args.add_argument("--inspector-port", type=int, default=8083)
-    setup_args.add_argument("--auth-mode", choices=("basic_auth", "simple_login"), default="basic_auth")
+    setup_args.add_argument("--auth-mode", choices=("basic_auth", "simple_login", "ui_login"), default="basic_auth")
     deploy_args = commands.add_parser("deploy", help="Copy and hash the runtime payload with reader stopped")
     deploy_args.add_argument("--source", required=True, type=Path)
     deploy_args.add_argument("--revision", required=True, help="Candidate revision label; exact bytes are recorded separately")

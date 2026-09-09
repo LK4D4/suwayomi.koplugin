@@ -116,7 +116,7 @@ class Inspector:
             raise SandboxUIError("Missing or invalid sandbox inspector configuration") from None
         _require(type(port) is int and 1024 <= port <= 65535, "Invalid inspector port")
         _require(re.fullmatch(r"[0-9a-fA-F]{64}", self.token), "Invalid inspector token")
-        _require(self.auth_mode in ("basic_auth", "simple_login"), "Invalid sandbox authentication mode")
+        _require(self.auth_mode in ("basic_auth", "simple_login", "ui_login"), "Invalid sandbox authentication mode")
         self.url = f"http://127.0.0.1:{port}"
         self._private = [self.token, str(self.root)] + [
             value for value in secrets.values() if isinstance(value, str) and value
@@ -263,13 +263,13 @@ class Inspector:
         self.wait("Suwayomi setup: connection (not tested)")
         for field, name in (("Server URL", "server_url"), ("Username", "username"), ("Password", "password")):
             self.fill(field, self.credential(name))
-        desired = "Simple Login" if self.auth_mode == "simple_login" else "Basic Auth"
-        other = "Basic Auth" if self.auth_mode == "simple_login" else "Simple Login"
-        # Exercise selection even when setup prefilled the desired method.
-        for choice in (other, desired):
+        labels = {"basic_auth": "Basic Auth", "simple_login": "Simple Login", "ui_login": "UI Login"}
+        desired = labels[self.auth_mode]
+        # Exercise all choices, then restore the configured method for testing.
+        for choice in [label for label in labels.values() if label != desired] + [desired]:
             state = self._observe()
             controls = [item for item in state["controls"]
-                        if item.get("label") in ("Authentication: Basic Auth", "Authentication: Simple Login")]
+                        if item.get("label") in ("Authentication: " + label for label in labels.values())]
             _require(len(controls) == 1, "Expected the setup authentication selector")
             self._tap(controls[0]["label"])
             self.wait("Authentication method")
