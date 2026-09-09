@@ -10,6 +10,7 @@ local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiDebug = require("suwayomi/debug")
 local I18n = require("suwayomi/i18n")
 local FFIUtil = require("ffi/util")
+local Identity = require("suwayomi/chapters/archive_identity")
 
 local FinishedChapterCleanup = {}
 FinishedChapterCleanup.__index = FinishedChapterCleanup
@@ -266,6 +267,17 @@ function Methods:recordFinishedChapter(entry)
     if not saved then return false, err end
     self:scheduleFinishedChapterCleanup(0)
     return true
+end
+
+function Methods:refreshPendingFinishedChapterEvidence(target, evidence)
+    for _, entry in ipairs(self.finished_cleanup_pending or {}) do
+        local captured = entry.archive_target
+        if captured and captured.key == target.key and captured.generation == target.generation
+            and captured.path == target.path and captured.root == target.root
+            and Identity.same(captured.evidence, target.evidence) then
+            captured.evidence = copyTarget(evidence)
+        end
+    end
 end
 
 function Methods:cancelFinishedChapter(manga_id, chapter_id)

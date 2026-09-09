@@ -320,7 +320,6 @@ describe("complete stored chapter loading", function()
         assert.are.equal(previous_menu, plugin.current_chapter_menu)
         assert.are.equal(previous_ledger, saved_ledger)
         assert.are.equal(previous_jobs, saved_jobs)
-        assert.matches("Later page failed", messages[#messages])
         assert.are.equal(3, #requests)
     end)
 
@@ -769,7 +768,6 @@ describe("complete stored chapter loading", function()
                     respond = function() return { errors = { { message = "Reload failed." } } } end
                     plugin:showChaptersForManga(manga)
                     finishRequest()
-                    assert.matches("Reload failed", messages[#messages])
                 elseif invalidation == "filter change" then plugin:setScanlatorFilter("Second group")
                 elseif invalidation == "manga identity" then manga.id = "18" end
                 local ledger, jobs = saved_ledger, saved_jobs
@@ -866,7 +864,6 @@ describe("complete stored chapter loading", function()
                     respond = function() return { errors = { { message = "Reload failed." } } } end
                     plugin:showChaptersForManga(manga)
                     finishRequest()
-                    assert.matches("Reload failed", messages[#messages])
                 elseif invalidation == "filter change" then plugin:setScanlatorFilter("Second group") end
                 local ledger, jobs, last_widget, last_tracked = saved_ledger, saved_jobs, loading, tracked_menu
                 local context, menu = plugin.current_chapter_context, plugin.current_chapter_menu

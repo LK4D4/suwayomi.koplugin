@@ -96,7 +96,7 @@ Ordinary Delete and finish retention retain their separate metadata-removal boun
 
 `finished_cleanup.lua` retains ordered completion snapshots in process memory when journal enrollment fails. It reports failed enrollment and retries through its existing timer before allowing cleanup against the old order. Later completions merge after pending snapshots without recapturing archive authority. A process exit cannot preserve an enrollment that storage rejected.
 
-KOReader's history touch can change archive timestamps without replacing it. `ReadSettings` captures strictly verified pre-touch evidence; `ReaderReady` completes a bounded ctime-only refresh. The checked update touches only matching archive, manual-request, and retention targets. Generation, path, completion order, and deletion authority do not change.
+KOReader's history touch can change archive timestamps without replacing it. `ReadSettings` captures strictly verified pre-touch evidence; `ReaderReady` completes a bounded ctime-only refresh. The checked update touches only matching archive, manual-request, and retention targets; after success, matching pending completion snapshots receive the same evidence. Generation, path, completion order, and deletion authority do not change.
 
 ## Chapter loading and actions
 

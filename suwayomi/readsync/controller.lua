@@ -295,7 +295,8 @@ function Methods:onReaderReady()
     local target = self.reader_access_target
     self.reader_access_target = nil
     if not target or target.path ~= self:getCurrentDocumentPath() then return end
-    local saved, reason = self:getDownloadQueue().manual_deletion:finishReaderAccess(target)
+    local saved, reason, evidence = self:getDownloadQueue().manual_deletion:finishReaderAccess(target)
+    if saved and evidence then self:refreshPendingFinishedChapterEvidence(target, evidence) end
     if not saved and reason == "persistence_failed" then
         self:showMessage(I18n.t("Failed to save settings."))
     end

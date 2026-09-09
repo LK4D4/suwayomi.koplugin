@@ -429,7 +429,7 @@ function ManualDeletion:finishReaderAccess(target)
         end
     end)
     if not saved then return nil, "persistence_failed" end
-    return true
+    return true, nil, evidence
 end
 
 

@@ -252,6 +252,29 @@ describe("completion enrollment storage recovery (#40)", function()
         assert.equals("archive pages", read(path("C")))
     end)
 
+    it("preserves pending archive authority across a verified reader history touch", function()
+        reject_enrollment = true
+        assert(plugin:markChapterRead(manga, chapters[1]))
+        plugin.ui.document = { file = path("A") }
+        runtime.reader_ui.instance = { document = plugin.ui.document }
+        plugin:onReadSettings()
+        local lfs = require("lfs")
+        local before = assert(lfs.attributes(path("A")))
+        require("socket").sleep(1.1) -- Native ctime evidence has whole-second precision.
+        assert(lfs.touch(path("A"), before.access + 1, before.modification))
+        assert.is_true(lfs.attributes(path("A"), "change") > before.change)
+        plugin:onReaderReady()
+        plugin.ui.document = nil
+        runtime.reader_ui.instance = nil
+        reject_enrollment = false
+        assert(plugin:markChapterListRead(manga, { chapters[2], chapters[3] }))
+        advance(5)
+        assert.is_nil(read(path("A")))
+        assert.equals("archive pages", read(path("B")))
+        assert.equals("archive pages", read(path("C")))
+        assert.same({ "B", "C" }, recordIds())
+    end)
+
     it("does not resurrect a pending completion after explicit unread", function()
         reject_enrollment = true
         assert(plugin:markChapterRead(manga, chapters[1]))
