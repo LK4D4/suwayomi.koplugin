@@ -26,7 +26,7 @@ The shipped launcher supports **Linux x86_64**: native Linux, Windows with [WSLg
 Provide these prerequisites in that Linux environment:
 
 - [Python 3.9+](https://www.python.org/downloads/). The Python tooling uses only the standard library; no pip packages are required.
-- A working graphical session and SDL2 runtime libraries for [KOReader desktop Linux](https://github.com/koreader/koreader/wiki/Installation-on-desktop-Linux). A shell alone is not a display. Use the distribution's documented dependencies when provisioning the environment.
+- A working graphical session and the system dependencies needed by the pinned [KOReader desktop Linux](https://github.com/koreader/koreader/wiki/Installation-on-desktop-Linux) release. KOReader v2026.07.1 uses SDL3 and bundles its SDL3 shared library; the sandbox does not require a separate SDL2 installation. A shell alone is not a display. Use the distribution's documented dependencies when provisioning the environment, and inspect the sandbox's private `logs/reader.log` for missing libraries or display initialization failures.
 - HTTPS access for setup to fetch the pinned [KOReader releases](https://github.com/koreader/koreader/releases) and [Suwayomi releases](https://github.com/Suwayomi/Suwayomi-Server/releases). See [Suwayomi installation guidance](https://github.com/Suwayomi/Suwayomi-Server#downloading-and-running-the-app) for upstream requirements.
 
 [scripts/sandbox.py](../../scripts/sandbox.py) owns the release pins and download selection; `sandbox.json` records the installed versions. The scripts download application releases but do not install OS packages or change firewall, routing, DNS, or other network configuration. Provision missing prerequisites separately.

@@ -2,7 +2,6 @@
 """Run an isolated, opt-in Suwayomi/KOReader sandbox on Linux x86_64."""
 import argparse
 import base64
-import ctypes.util
 import hashlib
 import http.cookiejar
 import json
@@ -459,8 +458,6 @@ def launch(root, service):
     else:
         if not (environment.get("DISPLAY") or environment.get("WAYLAND_DISPLAY")):
             raise RuntimeError("KOReader needs a desktop display (Linux, WSLg, or a Linux VM)")
-        if not ctypes.util.find_library("SDL2-2.0"):
-            raise RuntimeError("Install the SDL2 runtime using your OS package manager before running KOReader")
         verify_deployment(root)
         runtime = unique_path(root / "runtime/koreader", "**/koreader.sh").parent
         environment.update(KO_HOME=str(root / "profile"), EMULATE_READER_W="600", EMULATE_READER_H="800")
