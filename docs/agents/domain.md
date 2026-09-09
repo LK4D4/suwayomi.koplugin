@@ -1,25 +1,14 @@
 # Domain docs
 
-This repository uses a single-context layout:
-- CONTEXT.md at the repository root is a glossary of domain terminology.
-- docs/adr/ holds architectural decision records.
-- docs/ARCHITECTURE.md holds the existing module map and boundary guidance.
+Consult only the references relevant to the change:
 
-## When to consult
+- [CONTEXT.md](../../CONTEXT.md): domain vocabulary for code, issues, and tests. Keep it a glossary, not an implementation plan.
+- [ARCHITECTURE.md](../ARCHITECTURE.md): current module ownership and runtime boundaries; check source/specs when behavior matters.
+- [ADRs](../adr/): accepted decisions and their rationale. Read the governing record and its amendments for ownership, persistence, or lifecycle changes.
+- GitHub Issues: requested scope, current work status, maintainer clarifications, and acceptance evidence. Read comments as well as the original body.
 
-Consult relevant sections of CONTEXT.md and docs/ARCHITECTURE.md when the task
-involves their terminology, ownership, persistence, lifecycle, or module boundaries.
-Read relevant ADRs when their decisions govern the change. Small unrelated fixes
-do not require reading every domain document.
+An accepted ADR records a decision, not proof of implementation or device acceptance. Explicit later amendments supersede the affected older clauses, not unrelated safeguards. If source and the current contract disagree, report the discrepancy rather than rewriting the contract to bless existing behavior.
 
-If CONTEXT.md or docs/adr/ is absent, proceed silently.
-Ordinary fixes do not require new domain documentation. Use domain-modeling when
-the task calls for resolving terminology or recording architectural decisions.
+`docs/superpowers/` retains historical plans, audits, and some linked feature specs. Consult them only when relevant to the task; old checkboxes, branch instructions, and mirrored issue statuses are not current authority. Reconcile them with later decisions and issue comments before acting.
 
-## Vocabulary and decisions
-
-Use the terminology defined in CONTEXT.md in issues, proposals, and tests.
-Identify genuine glossary gaps for domain-modeling.
-
-If a proposal contradicts an ADR, cite the ADR and explain why the decision
-should be reconsidered.
+Ordinary fixes need no new domain document. Update a glossary term or ADR only when terminology or an architectural decision actually changes; explain any proposed departure from an accepted decision.

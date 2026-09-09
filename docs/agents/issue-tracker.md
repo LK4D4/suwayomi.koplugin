@@ -1,23 +1,14 @@
 # Issue tracker: GitHub
 
-Track issues and specs in GitHub Issues for LK4D4/suwayomi.koplugin.
-Use the gh CLI from the repository checkout.
+Track requested work and specs in GitHub Issues for `LK4D4/suwayomi.koplugin`, not PRs or local ticket maps. PRs may carry implementation review. Use `gh` from the repository checkout.
 
-## Operations
-
+- Read: `gh issue view <number> --json number,title,state,body,labels,comments`
+- List open work: `gh issue list --state open --json number,title,body,labels`
 - Create: `gh issue create --title "..." --body-file <path>`
-- Read: `gh issue view <number> --json number,title,body,labels,comments`
-- List: `gh issue list --state open --json number,title,body,labels`
 - Comment: `gh issue comment <number> --body-file <path>`
 - Label: `gh issue edit <number> --add-label "..." --remove-label "..."`
 - Close: `gh issue close <number>`
 
-For multiline text, write the exact content to a temporary file and pass
---body-file. Apply the label vocabulary in docs/agents/triage-labels.md.
+For multiline bodies, pass exact text through a temporary file with `--body-file`. Use the labels in [triage-labels.md](triage-labels.md).
 
-When a skill says "publish to the issue tracker", create a GitHub issue.
-When a skill says "fetch the relevant ticket", read the issue and its comments.
-
-## Pull requests as a triage surface
-
-**PRs as a request surface: no.**
+Read the current state and comments before acting; they may amend an older body or checklist. When a skill requests ticket publication or retrieval, use these operations rather than creating another local mirror.

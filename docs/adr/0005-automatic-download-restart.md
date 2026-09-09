@@ -50,7 +50,7 @@ Do not intercept generic reader failures or patch KOReader's reader error handli
 
 ## Complexity limit
 
-Keep the change within existing queue/downloader ownership and prefer the smallest coherent implementation. Do not add an ownership service, recovery journal, cross-process locking protocol, boot tracking, cleanup registry, reader patch, or library-wide validation scan. The future exact-generation deletion contract in [ADR-0003](0003-durable-manual-delete-intent.md) remains separate: this change does not implement it or supply proof that a pathname still denotes a captured generation. Preserve that contract's blocked outcome when proof is unavailable rather than expanding this work.
+Keep changes within the existing queue/downloader boundaries. Do not add another ownership service, recovery journal, cross-process locking protocol, boot tracker, cleanup registry, reader patch, or library-wide validation scan. Archive validation does not supply [ADR-0003](0003-durable-manual-delete-intent.md)'s exact-generation deletion proof. Preserve blocked deletion outcomes when proof is unavailable rather than treating a valid archive or matching pathname as removal authority.
 
 ## Confirmation
 

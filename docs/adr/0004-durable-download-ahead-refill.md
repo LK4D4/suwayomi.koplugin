@@ -7,7 +7,7 @@ date: 2026-09-06
 
 A completed chapter must request Download-ahead evaluation even when the reader never returns to a plugin chapter screen. Persist one coalesced refill request per manga in the existing checked shared store, owned by the process-wide service from [ADR-0002](0002-navigation-safe-download-ownership.md). Evaluate current policy after teardown using complete chapter data; do not persist a candidate list or keep the retiring reader alive.
 
-This decision covers [section 3 of the investigation](../superpowers/audits/2026-09-06-issue-2-investigation.md#3-finishing-a-document-does-not-itself-refill-download-ahead). The user authorized autonomous decisions, favoring simplicity. The runtime implementation and automated/real-process evidence are described in [the architecture map](../ARCHITECTURE.md#download-ownership); physical-device acceptance remains separate.
+Implemented in `suwayomi/downloads/refill.lua`; [the architecture map](../ARCHITECTURE.md#download-ahead) describes current ownership and safeguards. [#22](https://github.com/LK4D4/suwayomi.koplugin/issues/22) records the contract and [#31](https://github.com/LK4D4/suwayomi.koplugin/issues/31) records combined workflow evidence. Implementation and evidence of each device case remain distinct.
 
 ## Durable boundary
 
@@ -19,7 +19,7 @@ A changed endpoint cannot silently retarget outstanding work to reused manga IDs
 
 ## Lifecycle and policy
 
-Keep one read-only context helper across the service, with bounded fair work between manga. Reuse existing API/subprocess result allocation, request tokens, and known-child completion checks; defer cleanup while the known helper runs and reject stale results. Helpers do not write shared settings. Revised #5 supplies the service and one total two-second best-effort quit integration, not a durable launch, inherited-lock, or orphan-isolation protocol. Recover durable refill requests with a fresh fetch after restart without sweeping untracked helper files. Chapter jobs retain [ADR-0005](0005-automatic-download-restart.md)'s automatic restart policy, which supersedes revised #3's interruption policy. Refill never resets terminal chapter failures.
+Keep one read-only context helper across the service, with bounded fair work between manga. Reuse existing subprocess result allocation, request tokens, and known-child exit checks; defer cleanup while the helper runs and reject stale results. Helpers do not write shared settings. Reuse the service's total two-second quit budget, not another ownership protocol. Recover refill requests with a fresh fetch after restart without sweeping untracked helper files. Chapter-job restart follows [ADR-0005](0005-automatic-download-restart.md); refill must not reset terminal failures.
 
 Use complete ordinary chapter retrieval, current ledger read precedence, source-order/ID ordering, and exact saved scanlator restriction. Missing scanlator matches never broaden to All. Keep existing 5/10/50 earliest-unread-position semantics. Existing owned downloads and terminal failures occupy positions; automatic evaluation cannot reset terminal failures, extend beyond N to compensate, or revoke manual-delete intent. Explicit chapter Download/Retry retains the authority already specified by ADR-0003.
 
@@ -33,4 +33,4 @@ A durable dirty revision is less state than persisting proposed chapter lists, w
 
 Event-driven reevaluation avoids a new always-on scheduler and cancellation-suppression policy. Automatic refill does not retry terminal failures implicitly. These two boundaries deliberately trade immediate self-healing of every missing slot for predictable explicit controls and existing queue retry behavior.
 
-[The refill specification](../superpowers/specs/2026-09-06-durable-download-ahead-refill.md) defines the full command, settings, state, and acceptance contract. Require composed public lifecycle/actions, real filesystem/process helper checks, and the device next-file versus plugin-return control. Existing ownership and manual-delete tickets remain prerequisites. This ADR does not authorize runtime edits, deployment, branch switching, merging, or pushing.
+[The refill specification](../superpowers/specs/2026-09-06-durable-download-ahead-refill.md) records the detailed contract; reconcile it with later decisions and issue comments before implementation. Preserve composed public-action checks, real filesystem/process evidence, and the device next-file versus plugin-return control. Issue records own current dependencies and acceptance status; this ADR grants no execution or publication authority.

@@ -50,13 +50,13 @@ The current README names these missing areas:
 Goal: make the existing plugin hard to wedge before adding larger parity work.
 
 Status: Implemented. Next implementors should treat Priority 1 as complete
-unless device QA or regressions reopen a specific item. See the reusable
-checklist in `docs/qa/stability-recovery-golden-flow.md` and the coverage map
-in `docs/superpowers/audits/2026-05-23-stability-recovery.md`.
+unless device QA or regressions reopen a specific item. The original coverage
+map is retained in `docs/superpowers/audits/2026-05-23-stability-recovery.md`;
+the standalone QA checklist has been retired.
 
 Completed work:
 
-- Add a manual golden-flow QA checklist for:
+- Added a manual golden-flow QA checklist (since retired) for:
   - setup and connection test
   - Library load, category switch, manga open, chapter refresh
   - Browse source list refresh, extension install/update/uninstall, source cache

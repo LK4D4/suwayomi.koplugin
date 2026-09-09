@@ -6,55 +6,28 @@ revised: 2026-09-07
 
 # Keep one download queue through reader navigation
 
-## Follow-on decision (2026-09-08)
-
-[ADR-0005](0005-automatic-download-restart.md) supersedes this record's startup interruption policy and shared temporary-file handling with automatic restart, isolated attempts, validated publication, and best-effort cleanup. The process-owned navigation and bounded-quit decisions here remain in force. The superseded startup behavior below is retained as history; [ARCHITECTURE.md](../ARCHITECTURE.md#download-ownership) describes the current runtime.
+Implemented: this record owns process-level navigation and bounded quit. [ADR-0005](0005-automatic-download-restart.md) supersedes the original terminal-interruption startup policy and shared temporary files with automatic restart and isolated, validated attempts. Use [ARCHITECTURE.md](../ARCHITECTURE.md#download-ownership) for the current runtime map.
 
 ## Problem
 
-The maintainer reproduced downloads resetting or requeueing during FileManager–ReaderUI navigation. On master at `01ed3e3`, `main.lua:getDownloadQueue()` caches a queue on each plugin instance and `init()` calls its recovery. A new host can therefore recover persisted work while an earlier host's workers still run. The [investigation](../superpowers/audits/2026-09-06-issue-2-investigation.md#1-download-queues-compete-across-reader-instances) preserves the original evidence; it does not establish an application-crash cause.
+At `01ed3e3`, each plugin instance cached and recovered its own queue. FileManager–ReaderUI navigation could recover persisted work while another host's workers still ran. The [original investigation](../superpowers/audits/2026-09-06-issue-2-investigation.md#1-download-queues-compete-across-reader-instances) records the maintainer's download-reset observation; it does not establish an application-crash cause.
 
-This revision supersedes the earlier reboot/ownership-recovery protocol in ADR-0002 and spec #3. The maintainer rejects mandatory reboot, storage relocation, and automatic crash salvage. The revised design is accepted; runtime implementation and device acceptance remain pending.
+## Decision
 
-## Revised decision
+- One small process-owned service wraps the existing queue, scheduler, downloader, and KOReader `ffi/util` helper. FileManager and ReaderUI attach disposable view subscriptions. Navigation, screen/document close, and sleep/wake neither create nor recover another queue.
+- Downloads and completion bookkeeping continue with zero plugin views while the main loop runs. Commit queue completion, ledger path, and reader-return context through the checked shared store before notifying views. Retry a failed completion save in-session without another transfer. Detached views receive no callbacks; reopened views read current state.
+- Retain known stopping workers and their chapter/file associations until the helper confirms exit. They still count toward concurrency. A queue failure/removal does not prove child termination; defer temporary cleanup and replacement launch, preserving final CBZs.
+- Use one idempotent `UIManager.quit` wrapper that preserves the previous method. Stop admission/timers and attempt to stop known children within one total two-second budget, with no final save or required future tick. Closing a screen is not quitting KOReader.
+- Preserve retry classification/counts/deadlines, directory captured at admission, current credentials at each attempt, source-scoped local downloads, and the checked store's ambiguity fence/reconciliation. Navigation or wake spends no retry. Lowering concurrency lets current workers finish before replacement.
 
-Use one small process-owned service around the existing download queue. FileManager and ReaderUI instances share that queue and attach disposable view subscriptions. Navigation, document/screen closure, and sleep/wake neither construct nor recover another queue. Downloads and necessary completion bookkeeping continue while KOReader's main loop runs, even with no Suwayomi screen open.
+## Limits and superseded alternatives
 
-Keep the existing queue, active-job scheduler, downloader, and KOReader `ffi/util` subprocess helper. Move archive completion bookkeeping and existing queue-triggered cleanup wakeups out of UI callbacks. Commit the ledger path, reader-return context, and queue completion through the checked shared store before notifying views. Retry a failed completion save during the current session without another transfer; this needs no publication journal. Detached views receive no callbacks, and reopened views read current state.
+This is current-process coordination, not cross-process exclusion. Abrupt death may leave an untracked child; a PID, queue state, or missing progress cannot establish its lifetime. Keep unknown files. Hot reload and simultaneous writable KOReader processes are unsupported. ADR-0005 owns the resulting late-publication and legacy-worker limits.
 
-On genuine process startup, normalize unfinished persisted `queued` and `downloading` work to `failed` with “Interrupted; retry download”. This includes queued delayed retries. Preserve completed archives and their metadata, and preserve existing permanent-failure diagnostics. The [authoritative specification](../superpowers/specs/2026-09-06-navigation-safe-download-ownership.md), mirrored verbatim in [#3](https://github.com/LK4D4/suwayomi.koplugin/issues/3), defines the existing-archive case and focused acceptance.
+The earlier mandatory-reboot, storage-relocation, inherited-lock, and publication-journal approach was rejected. The old startup rule requiring explicit retry is also superseded; do not restore it from the [historical spec](../superpowers/specs/2026-09-06-navigation-safe-download-ownership.md). Manual-delete identity and refill have their own decisions, not implied guarantees supplied by this service.
 
-Normal quit stops admission and timers, then makes a bounded best-effort stop of known workers through existing helpers. Use one idempotent `UIManager.quit` integration, preserving the prior method, with at most two seconds of added work across all workers. Do not require a final save or future UI tick. Closing a screen is not quitting KOReader.
+## Evidence and history
 
-Failing or removing a queue entry does not terminate its child. During the running session, retain known terminating workers and their file associations until the existing helper reports completion. Defer their temporary-file cleanup and replacement launch; preserve the existing final CBZ. This is a narrow extension of the current scheduler's terminating-worker tracking, not a new process framework.
+[#5](https://github.com/LK4D4/suwayomi.koplugin/issues/5) records implementation; [#11](https://github.com/LK4D4/suwayomi.koplugin/issues/11) records device acceptance. Read their comments and later acceptance records rather than treating this ADR as a checklist of unimplemented work. Superseded #6–#10 were not completed implementations.
 
-## Preserved behavior
-
-- Enforce one chapter-download concurrency limit, including known workers still stopping. Lowering the limit lets current workers finish before replacements start.
-- Preserve ordinary transient retry classification, counts, deadlines, and quiet full-error inspection during the session. Navigation and wake alone do not spend retries.
-- Keep the source-scoped archive layout, download directory captured at enqueue, current connection settings at each attempt, settings semantics, and device-local downloading.
-- Keep #4's implemented atomic settings protections, ambiguous-save fence and reconciliation, unrelated metadata, live-reader protection, and existing cleanup policy.
-- Do not broaden chapter retrieval, Download ahead, read-sync, manual deletion, or retention.
-
-## Accepted limitations and scope
-
-Interrupted transfers may fail and require explicit retry, including after normal quit. No automatic transfer salvage, receipt/content-hash protocol, parent-only publication pipeline, multi-phase journal, boot identity, inherited attempt lock, custom fork/waitpid wrapper, global legacy-worker proof gate, or coordination between simultaneously writable KOReader processes is required.
-
-Abrupt death may bypass shutdown and leave a child running. A fresh process cannot establish the lifetime of an untracked old child from failed queue state, a PID, or missing progress. A surviving legacy worker can still write shared temporary or final paths; this revision does not guarantee isolation from it. Startup does not sweep those files or demand reboot. Explicit retry uses existing file handling and may fail or repeat a transfer; deferred temporary cleanup is acceptable. No final archive is removed as retry cleanup. Hot reload and simultaneous writable KOReader processes are unsupported.
-
-Implement through one focused coding session plus device acceptance: [#5](https://github.com/LK4D4/suwayomi.koplugin/issues/5) owns the complete runtime change; [#11](https://github.com/LK4D4/suwayomi.koplugin/issues/11) owns device evidence. #6–#10 are superseded/not planned, not completed implementation. #4 remains complete and unchanged. Future manual-delete identity or refill requirements belong to their own tickets and must not expand #5.
-
-## Acceptance checklist
-
-- [ ] First launch/upgrade works without reboot, storage relocation, or a legacy proof gate.
-- [ ] FileManager–ReaderUI and reader-to-reader navigation retain one queue, workers, progress, retry timing, and bounded concurrency; sleep/wake does not reinitialize it.
-- [ ] Completion with all screens closed commits metadata and queue state; returned chapter, Downloads, and home views agree. Detached callbacks do nothing.
-- [ ] Cancellation/retry waits for known stopping workers before temporary cleanup or replacement, preserves final archives, and keeps errors quiet.
-- [ ] Normal quit is bounded; fresh launch fails unfinished queued/downloading work, preserves completed work and prior failure diagnostics, and explicit retry succeeds.
-- [ ] Focused composed public-action tests assert persistence, filesystem effects, worker counts, and rendered state together. Reuse existing fixtures and run normal repository checks for implementation; no exhaustive crash-boundary matrix is required.
-
-## Historical evidence and implementation references
-
-The original investigation and this ADR's prior version in git remain historical evidence. The host analysis used KOReader `825b9bced0eb666b45af4208e1c0095b88d38b0d` and base `7a46ea3812539083ee25b06f0c81ac58b1356ee0`: separate plugin instances, close ordering, quit clearing scheduled callbacks, and a subprocess helper without parent-death termination motivated the ownership discussion. Earlier lock/publication analysis is not a requirement of this revision.
-
-The preserved branch `codex/ownership-5-10` is a rejected implementation reference. Read `0c86149` and follow-ups `d3029d9`, `5f87f3d`, and `94498ab` for navigation, completion-save retry, and cleanup/view integration lessons. They predate current master changes and must not be cherry-picked unchanged. The branch's later locking, recovery, and publication machinery is outside this decision. [ARCHITECTURE.md](../ARCHITECTURE.md) describes implemented master behavior separately from this proposal.
+The rejected `codex/ownership-5-10` implementation and original host/helper analysis remain historical references in Git and the investigation. They are not ready-to-apply patches or current lock/recovery requirements. Automated composition tests and device observations remain distinct evidence.
