@@ -1538,6 +1538,104 @@ describe("process-owned download navigation", function()
         assert.are.same({}, settings:loadDownloadQueue())
     end)
 
+    it("removes the oldest completed archive after reader closes across restart", function()
+        local plugin, files_owner = manualHost(3)
+        assert(settings:saveDeleteChaptersSettings({
+            delete_after_mark_read = false, delete_finished_while_reading = 3,
+        }))
+        local ledger = {}
+        for index = 1, 3 do
+            local chapter = chapters[index]
+            local path = directory .. "/" .. chapter.id .. ".cbz"
+            write(path, "archive " .. index)
+            ledger["m1:" .. chapter.id] = {
+                manga_id = "m1", chapter_id = chapter.id, path = path, read = false,
+            }
+        end
+        assert(settings:saveChapterLedger(ledger))
+        for index = 1, 3 do
+            local key = "m1:" .. chapters[index].id
+            assert(plugin:getDownloadQueue().manual_deletion:prepareRemoval(key, ledger[key].path, directory))
+        end
+        files_owner:close()
+        require("socket").sleep(1.1) -- lfs reports ctime in whole seconds.
+        for index = 1, 3 do
+            local path = directory .. "/" .. chapters[index].id .. ".cbz"
+            local _, owner = host("reader", path)
+            owner:handleEvent("ReadSettings")
+            -- ReadHistory:addItem updates access time between plugin init and ReaderReady.
+            assert(require("lfs").touch(path, original_time(), require("lfs").attributes(path, "modification")))
+            owner:handleEvent("ReaderReady")
+            owner.doc_settings = { readSetting = function(_, key)
+                if key == "summary" then return { status = "complete" } end
+            end }
+            owner:close()
+            advance(0)
+            if index == 2 then
+                assert.are.equal("archive 1", read(directory .. "/c1.cbz"))
+                ui:quit()
+                timers = {}
+                settings.store = require("suwayomi/settings/store"):new{ path = settings.store.path }
+                package.loaded["suwayomi/downloads/service"] = nil
+                package.loaded.main = nil
+                shell = require("main")
+            end
+        end
+        assert.is_nil(read(directory .. "/c1.cbz"))
+        assert.are.equal("archive 2", read(directory .. "/c2.cbz"))
+        assert.are.equal("archive 3", read(directory .. "/c3.cbz"))
+        assert.is_true(settings:loadChapterLedger()["m1:c1"].read)
+        assert.is_nil(settings:loadChapterLedger()["m1:c1"].path)
+    end)
+
+    for _, replaced_before_capture in ipairs({ true, false }) do
+        it("preserves a replacement around reader access capture " .. tostring(replaced_before_capture), function()
+            local plugin, files_owner = manualHost(1)
+            assert(settings:saveDeleteChaptersSettings({ delete_finished_while_reading = 1 }))
+            local path = directory .. "/c1.cbz"
+            write(path, "same contents")
+            assert(settings:saveChapterLedger({ ["m1:c1"] = {
+                manga_id = "m1", chapter_id = "c1", path = path, read = false,
+            } }))
+            assert(plugin:getDownloadQueue().manual_deletion:prepareRemoval("m1:c1", path, directory))
+            files_owner:close()
+            local _, owner = host("reader", path)
+            if not replaced_before_capture then owner:handleEvent("ReadSettings") end
+            write(path .. ".replacement", "same contents")
+            assert(os.rename(path .. ".replacement", path))
+            if replaced_before_capture then owner:handleEvent("ReadSettings") end
+            owner:handleEvent("ReaderReady")
+            owner.doc_settings = { readSetting = function(_, key)
+                if key == "summary" then return { status = "complete" } end
+            end }
+            owner:close()
+            advance(300)
+            assert.are.equal("same contents", read(path))
+            assert.are.equal(path, settings:loadChapterLedger()["m1:c1"].path)
+            assert.is_not_nil(settings:loadFinishedChapterCleanupJournal().mangas.m1.records[1].blocked_reason)
+        end)
+    end
+
+    it("keeps pending manual removal bound through a reader access-time update", function()
+        local plugin, owner = manualHost(0, true)
+        local path = directory .. "/c1.cbz"
+        write(path, "pending archive")
+        assert(require("lfs").mkdir(path .. ".sdr"))
+        write(path .. ".sdr/metadata.lua", "return { custom = 'preserve' }")
+        write(path .. ".sdr/metadata.lua.old", "preserve backup")
+        assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
+        owner:handleEvent("ReadSettings")
+        require("socket").sleep(1.1)
+        assert(require("lfs").touch(path, original_time(), require("lfs").attributes(path, "modification")))
+        owner:handleEvent("ReaderReady")
+        assert.are.equal("pending archive", read(path))
+        owner:close()
+        advance(5)
+        assert.is_nil(read(path))
+        assert.is_not_nil(read(path .. ".sdr/metadata.lua"))
+        assert.are.equal("preserve backup", read(path .. ".sdr/metadata.lua.old"))
+    end)
+
     for _, already_read in ipairs({ false, true }) do
     it("records completed close for retention with ahead Off and prior read " .. tostring(already_read), function()
         local path = directory .. "/c1.cbz"

@@ -388,6 +388,50 @@ function ManualDeletion:getTarget(key, path)
     if not validTarget(target) or target.retired or target.path ~= path then return nil, "unproved_target" end
     return copy(target)
 end
+-- ReaderReady follows KOReader's access-time touch. Capture before that window;
+-- only its ctime change may refresh an already proved archive generation.
+function ManualDeletion:beginReaderAccess(key, path)
+    local target, reason = self:getTarget(key, path)
+    if not target then return nil, reason end
+    if self:_busy(key, self:_document()) then return nil, "busy" end
+    local evidence, err = Identity.inspect(path, target.root, target.evidence)
+    if not evidence then return nil, err end
+    return target
+end
+
+function ManualDeletion:finishReaderAccess(target)
+    if self:_blocked() then return nil, "persistence_failed" end
+    if not validTarget(target) then return nil, "unsupported_identity" end
+    local evidence, reason = Identity.inspect(target.path, target.root)
+    if not evidence then return nil, reason end
+    local ctime = evidence.ctime
+    evidence.ctime = target.evidence.ctime
+    local unchanged = Identity.same(target.evidence, evidence)
+    evidence.ctime = ctime
+    if not unchanged then return nil, "identity_changed" end
+    if ctime == target.evidence.ctime then return true end
+    local saved = self:_save(function(doc)
+        local state = collection(doc)
+        local archive = state and state.archives[target.key]
+        if not sameTarget(archive, target) or archive.retired or self:_busy(target.key, doc) then
+            error("generation_changed")
+        end
+        if not Identity.inspect(target.path, target.root, evidence) then error("identity_changed") end
+        archive.evidence = copy(evidence)
+        local request = state.requests[target.key]
+        if request and sameTarget(request.target, target) then request.target.evidence = copy(evidence) end
+        local entry = type(doc.chapter_ledger) == "table" and doc.chapter_ledger[target.key]
+        local journal = doc.finished_chapter_cleanup
+        local manga = entry and type(journal) == "table" and journal.version == 1
+            and type(journal.mangas) == "table" and journal.mangas[tostring(entry.manga_id)]
+        for _, record in ipairs(manga and manga.records or {}) do
+            if sameTarget(record.archive_target, target) then record.archive_target.evidence = copy(evidence) end
+        end
+    end)
+    if not saved then return nil, "persistence_failed" end
+    return true
+end
+
 
 function ManualDeletion:validateTarget(target, allow_missing)
     if self:_blocked() then return false, "persistence_failed" end

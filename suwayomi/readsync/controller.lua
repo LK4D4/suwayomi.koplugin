@@ -1,7 +1,7 @@
 -- Boundary: ReadSyncController.
 --
--- Responsibility: Owns read-sync worker scheduling, result application, manual sync, and document-close sync.
--- Owned state: Coordinates ledger, KOReader metadata, and subprocess result files.
+-- Responsibility: Owns read-sync scheduling, document-close sync, and reader-open archive evidence refresh.
+-- Owned state: Coordinates ledger, KOReader metadata, subprocess files, and a pre-history-touch archive snapshot.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and plugin i18n facade.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
@@ -274,6 +274,31 @@ function Methods:syncReadStateNow()
         self:showMessage(I18n.f("Could not start read sync: %1", err or I18n.t("unknown error")))
     end
     return false
+end
+
+
+function Methods:onReadSettings()
+    self.reader_access_target = nil
+    local path = self:getCurrentDocumentPath()
+    if not path then return end
+    local removal = self:getDownloadQueue().manual_deletion
+    if not removal then return end
+    for key, entry in pairs(self:loadChapterLedger()) do
+        if entry.path == path then
+            self.reader_access_target = removal:beginReaderAccess(key, path)
+            return
+        end
+    end
+end
+
+function Methods:onReaderReady()
+    local target = self.reader_access_target
+    self.reader_access_target = nil
+    if not target or target.path ~= self:getCurrentDocumentPath() then return end
+    local saved, reason = self:getDownloadQueue().manual_deletion:finishReaderAccess(target)
+    if not saved and reason == "persistence_failed" then
+        self:showMessage(I18n.t("Failed to save settings."))
+    end
 end
 
 
