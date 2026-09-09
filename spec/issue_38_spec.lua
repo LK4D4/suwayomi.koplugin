@@ -80,7 +80,7 @@ describe("remote unread revokes deferred manual deletion (#38)", function()
         return request
     end
     local function acknowledge()
-        local batch = plugin:buildPendingReadSyncBatch(plugin:loadChapterLedger())
+        local batch = plugin:buildPendingReadSyncBatch(plugin:loadChapterLedger(), 1)
         assert.equals(1, #batch)
         local synced = plugin:applyPendingReadSyncResult({ batch = batch }, { successes = batch, attempted = #batch })
         assert.equals(1, synced)
