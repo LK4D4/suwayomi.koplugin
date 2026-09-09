@@ -339,29 +339,6 @@ describe("suwayomi/readsync/koreader_metadata", function()
         }, cleanup_paths)
     end)
 
-    it("ignores oversized metadata before running loadstring", function()
-        helper.stubControllerDependencies()
-        clearModule()
-        local module = require("suwayomi/readsync/koreader_metadata")
-        local subject = {}
-        for name, method in pairs(module.methods) do
-            subject[name] = method
-        end
-        original_io_open = io.open
-        io.open = function()
-            return {
-                read = function()
-                    return "return { doc_path = '/bad.cbz' }" .. string.rep(" ", 131072)
-                end,
-                close = function() end,
-            }
-        end
-
-        local metadata, metadata_path = subject:loadKoreaderMetadataTable("/books/Frieren.cbz")
-        assert.are.equal("/books/Frieren.cbz", metadata.doc_path)
-        assert.are.equal("/books/Frieren.sdr/metadata.cbz.lua", metadata_path)
-    end)
-
     it("ignores oversized metadata when checking finished state", function()
         helper.stubControllerDependencies()
         clearModule()

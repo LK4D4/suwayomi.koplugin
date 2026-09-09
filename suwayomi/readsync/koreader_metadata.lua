@@ -1,6 +1,6 @@
 -- Boundary: KoreaderMetadata.
 --
--- Responsibility: Resolves KOReader sidecars, preserves hash metadata before archive replacement, and owns bounded metadata helpers.
+-- Responsibility: Separates readable KOReader candidates from cleanup paths, preserves metadata during read updates/replacement, and owns bounded metadata helpers.
 -- Owned state: Accepts filesystem paths from downloaded chapters/current documents and validates table/file state before trusting it.
 -- Dependencies: KOReader DocSettings location APIs and the filesystem adapter.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -25,9 +25,9 @@ local function readBoundedLuaFile(path)
         return nil
     end
 
-    local content = handle:read(MAX_KOREADER_LUA_BYTES + 1) or ""
-    handle:close()
-    if #content > MAX_KOREADER_LUA_BYTES then
+    local content = handle:read(MAX_KOREADER_LUA_BYTES + 1)
+    local closed, close_error = handle:close()
+    if not content or (not closed and close_error) or #content > MAX_KOREADER_LUA_BYTES then
         return nil
     end
     return content
@@ -53,8 +53,8 @@ function Methods:getKoreaderMetadataPathForDocument(document_path)
         end
         return mode
     end
-    -- findSidecarFile ignores backups. Return their primary path so cleanup can
-    -- remove both files without opening DocSettings (which can delete bad data).
+    -- Cleanup needs primary paths even for backup-only metadata. These paths
+    -- are not the ordered candidates that native DocSettings will read.
     local paths = { preferred_path }
     local locations = { "doc", "dir" }
     local hash_enabled = DocSettings.isHashLocationEnabled()
@@ -207,32 +207,73 @@ function KoreaderMetadata.preserveForReplacement(document_path, attempt_id)
 end
 
 
+-- DocSettings:open sorts native candidates by mtime, not findSidecarFile's
+-- preferred location. Do not call open(): it removes invalid candidates.
+local function getReadableCandidate(chapter_path, hash_path)
+    local DocSettings = require("docsettings")
+    local fs = require("suwayomi/fs")
+    local candidates, seen = {}, {}
+    local function add(path, primary)
+        if not path or seen[path] then return end
+        seen[path] = true
+        local mode, message, code = fs.attributes(path, "mode")
+        if not mode then
+            if (message or code) and code ~= 2 and code ~= 20 then
+                error("cannot inspect KOReader metadata", 0)
+            end
+            return
+        end
+        assert(mode == "file", "unsupported KOReader metadata file")
+        local mtime = fs.attributes(path, "modification")
+        assert(type(mtime) == "number", "cannot inspect KOReader metadata timestamp")
+        local candidate = { path = path, primary = primary or path, mtime = mtime, priority = #candidates + 1 }
+        local previous = candidates[#candidates]
+        if primary and previous and previous.path == primary then
+            previous.mtime = math.max(previous.mtime, mtime)
+        end
+        candidates[#candidates + 1] = candidate
+    end
+    local function addPair(path)
+        if not path then return end
+        add(path)
+        add(path .. ".old", path)
+    end
+    local filename = DocSettings.getSidecarFilename(chapter_path)
+    local doc_directory = DocSettings:getSidecarDir(chapter_path, "doc")
+    addPair(doc_directory .. "/" .. filename)
+    add(doc_directory .. "/" .. chapter_path:match("[^/]+$") .. ".lua")
+    addPair(DocSettings:getSidecarDir(chapter_path, "dir") .. "/" .. filename)
+    addPair(hash_path)
+    if DocSettings.getHistoryPath then addPair(DocSettings:getHistoryPath(chapter_path)) end
+    add(chapter_path .. ".kpdfview.lua")
+    table.sort(candidates, function(left, right)
+        if left.mtime == right.mtime then return left.priority < right.priority end
+        return left.mtime > right.mtime
+    end)
+    return candidates[1]
+end
+
 function Methods:loadKoreaderMetadataTable(chapter_path)
     local metadata = {
         doc_path = chapter_path,
     }
-    local resolved, metadata_path = pcall(self.getKoreaderMetadataPathForDocument, self, chapter_path)
-    if not resolved then
-        return metadata, nil
-    end
+    local ok, parsed, metadata_path = pcall(function()
+        local preferred_path, _, hash_path = self:getKoreaderMetadataPathForDocument(chapter_path)
+        local candidate = getReadableCandidate(chapter_path, hash_path)
+        if not candidate then return metadata, preferred_path end
 
-    local content = readBoundedLuaFile(metadata_path)
-    if not content then
-        return metadata, metadata_path
-    end
-    local loader = loadstring(content)
-    if not loader then
-        return metadata, metadata_path
-    end
-
-    setfenv(loader, {})
-    local ok, parsed = pcall(loader)
-    if ok and type(parsed) == "table" then
-        parsed.doc_path = parsed.doc_path or chapter_path
-        return parsed, metadata_path
-    end
-
-    return metadata, metadata_path
+        -- An existing but unreadable/invalid candidate is not absent metadata.
+        -- Refuse the update without opening, purging, or overwriting its files.
+        local content = assert(readBoundedLuaFile(candidate.path), "cannot read KOReader metadata")
+        local loader = assert(loadstring(content))
+        setfenv(loader, {})
+        local stored = loader()
+        assert(type(stored) == "table" and next(stored) ~= nil, "invalid KOReader metadata")
+        stored.doc_path = stored.doc_path or chapter_path
+        return stored, candidate.primary
+    end)
+    if ok then return parsed, metadata_path end
+    return metadata, nil
 end
 
 local function sortLuaKeys(left, right)
