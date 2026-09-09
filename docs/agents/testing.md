@@ -119,7 +119,7 @@ Choose a fresh root with `setup --auth-mode simple_login`, deploy the candidate,
 python3 scripts/sandbox.py --root "$ROOT" auth-smoke
 ```
 
-This English-profile scenario opens **Settings > Setup wizard**, fills all three visible inputs from the sandbox's private configuration, selects the other authentication method and then the configured method, invokes **Test connection**, waits for the real worker's success message, and dismisses it through the ordinary message gesture. It requires the tested setup title before **Continue**, selects the existing sandbox download directory with **Use this folder > Choose**, and runs the single-chapter smoke above. It saves credentials through the real setup callback, not by editing plugin settings. Run it once per fresh comparison root; like `smoke`, it needs an unused fixture chapter.
+This English-profile scenario opens **Settings > Setup wizard**, fills all three visible inputs from the sandbox's private configuration, and selects the other authentication method followed by the configured method. It tests a deliberately wrong password, requires the failed setup title and disabled **Continue**, restores the correct password, and requires the real worker's success message and tested title with **Continue** enabled. It dismisses result messages through ordinary widget handlers, continues setup, selects the existing sandbox download directory with **Use this folder > Choose**, and runs the single-chapter smoke above. It saves credentials through the real setup callback, not by editing plugin settings. Run it once per fresh comparison root; like `smoke`, it needs an unused fixture chapter.
 
 For deliberate failed credentials or individual controls, use the observed field hint or its 1-based index:
 

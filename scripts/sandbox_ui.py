@@ -274,14 +274,22 @@ class Inspector:
             self._tap(controls[0]["label"])
             self.wait("Authentication method")
             self._tap(choice)
-        self._tap("Test connection")
-        result = self._wait(lambda state: bool(state.get("message"))
-                            and state.get("message") != "Testing Suwayomi connection...",
-                            "connection test result", 40)
-        _require(result.get("message", "").startswith("Connection test passed"),
-                 "Setup connection test failed")
-        self._tap("Dismiss message")
-        self.wait("Suwayomi setup: connection (tested)")
+        for invalid in (True, False):
+            self.fill("Password", self.credential("password", invalid=invalid))
+            self._tap("Test connection")
+            result = self._wait(lambda state: bool(state.get("message"))
+                                and state.get("message") != "Testing Suwayomi connection...",
+                                "connection test result", 40)
+            passed = result.get("message", "").startswith("Connection test passed")
+            _require(passed != invalid, "Wrong password was accepted" if invalid else "Corrected credentials failed")
+            dismiss = [item["label"] for item in result["controls"]
+                       if item.get("label") in ("Dismiss message", "Close") and item.get("enabled")]
+            _require(len(dismiss) == 1, "Expected one connection result dismiss action")
+            self._tap(dismiss[0])
+            state = self.wait("Suwayomi setup: connection (" + ("failed" if invalid else "tested") + ")")
+            proceed = [item for item in state["controls"] if item.get("label") == "Continue"]
+            _require(len(proceed) == 1 and proceed[0].get("enabled") == (not invalid),
+                     "Setup Continue does not match the connection result")
         self._tap("Continue")
         directory = self._wait(lambda state: state.get("directory_path") is not None,
                                "download directory chooser")
@@ -293,6 +301,8 @@ class Inspector:
         result = self.smoke()
         return {"auth_mode": self.auth_mode, "setup_fields_filled": True,
                 "method_selected_via_ui": True, "setup_connection_test_passed": True,
+                "wrong_password_rejected": True, "continue_blocked_after_rejection": True,
+                "corrected_credentials_passed": True,
                 "credentials_saved_via_continue": True, "chapter_smoke": result}
 
     def home(self):
