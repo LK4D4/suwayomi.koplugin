@@ -165,7 +165,7 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
         -- Include reconciliation of visible non-target chapters in the same save.
         self:refreshChapterMenu({ ledger = ledger })
     end
-    local ok, err, outcomes = core:commitRead(ledger, captures, {}, { manga })
+    local ok, err, outcomes = core:commitRead(ledger, captures, {}, { manga }, nil, options)
     if not ok then
         refreshCommitted(self, options, options.ledger, previous)
         local result = { committed = false, error = err, marked_read = 0, removed = 0, pending = 0, busy = 0, blocked = #captures }

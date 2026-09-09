@@ -154,7 +154,8 @@ function Refill:request(manga, options)
     if ok then self:wake(); self.onChanged() end
     return ok, err
 end
-function Refill:enrollLedger(doc, ledger, mangas)
+function Refill:enrollLedger(doc, ledger, mangas, options)
+    if options and options.skip_keep_policy then return false end
     local affected = {}
     local enrolled = false
     for _, manga in pairs(mangas or {}) do

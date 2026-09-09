@@ -227,11 +227,11 @@ local function mergeLedger(doc, ledger, replace_read_state)
     end
 end
 
-function ManualDeletion:commitRead(ledger, captures, unread_keys, mangas, replace_read_state)
+function ManualDeletion:commitRead(ledger, captures, unread_keys, mangas, replace_read_state, options)
     local outcomes = {}
     local enrolled = false
     local ok, err = self:_save(function(doc)
-        if self.queue.refill then enrolled = self.queue.refill:enrollLedger(doc, ledger, mangas) end
+        if self.queue.refill then enrolled = self.queue.refill:enrollLedger(doc, ledger, mangas, options) end
         mergeLedger(doc, ledger, replace_read_state)
         local state, state_error = collection(doc, #(captures or {}) > 0)
         if state then
