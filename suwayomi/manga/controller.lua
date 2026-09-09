@@ -647,7 +647,7 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
     end
     local menu = SuwayomiUI.showMangaActionsMenu({
         title = I18n.t("Download ahead"),
-        actions = MangaActionMenu.buildKeepDownloadedActions(),
+        actions = MangaActionMenu.buildKeepDownloadedActions(self, manga),
         on_back = guardMangaCallback(self, manga, function()
             self:showMangaActions(manga, options)
         end),

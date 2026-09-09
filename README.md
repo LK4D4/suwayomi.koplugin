@@ -41,6 +41,8 @@ You can repeat setup from **Suwayomi > Settings > Setup wizard**.
 
 Choose a manga, open its chapters, then tap a chapter to download or read it. Use **Download next** for a batch, or **Download ahead** to keep a small reading buffer. Each download action adds at most 50 new chapters.
 
+The **Download ahead** menu shows **Off** or the saved buffer size for that manga. A checkmark identifies the current choice.
+
 Downloads continue while you read. Network failures retry in the background, and unfinished downloads resume after a KOReader restart. Files are organized by source and manga in your chosen download folder.
 
 ## Need help?

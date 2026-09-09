@@ -192,7 +192,7 @@ function SuwayomiUI.updateHomeDownloadsLabel(dialog, text)
 end
 
 local function formatActionButtonText(action)
-    local text = action and action.text or ""
+    local text = action and (action.text_func and action.text_func() or action.text) or ""
     if action and action.submenu == true then
         return tostring(text) .. " >"
     end
@@ -204,6 +204,8 @@ local function buildActionMenuButton(action, dialogProvider, UIManager, onSelect
         id = action.id,
         text = formatActionButtonText(action),
         destructive = action.destructive == true or nil,
+        checked_func = action.checked ~= nil and function() return action.checked end or nil,
+        no_refresh_checkmark = action.checked ~= nil or nil,
         callback = function()
             local function selectAction()
                 if onSelectCallback then
