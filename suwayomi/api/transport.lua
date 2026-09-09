@@ -2,7 +2,7 @@
 --
 -- Responsibility: build request headers/URLs, choose the right HTTP client, map
 -- transport failures to plugin errors, and stream downloaded bytes to files.
--- Owned state: one credential-scoped Simple Login cookie in this process only.
+-- Owned state: one credential-scoped cookie or UI Login token pair in memory.
 -- Dependencies: socket/http, ssl.https, ltn12, and Lua file IO at call time.
 -- External data: credentials, URLs, HTTP status codes, and downloaded bytes are
 -- normalized here before the API facade parses or returns them.
@@ -12,7 +12,7 @@ local session
 
 local function sessionMatches(credentials)
     return session and credentials
-        and credentials.auth_method == "simple_login"
+        and session.auth_method == credentials.auth_method
         and session.server_url == credentials.server_url
         and session.username == credentials.username
         and session.password == credentials.password
@@ -203,7 +203,11 @@ function Transport.buildRequestHeaders(credentials)
     if credentials and credentials.auth_method == "basic_auth" then
         headers.Authorization = Transport.buildBasicAuthHeader(credentials.username, credentials.password)
     elseif sessionMatches(credentials) then
-        headers.Cookie = session.cookie
+        if credentials.auth_method == "ui_login" then
+            headers.Authorization = "Bearer " .. session.access_token
+        else
+            headers.Cookie = session.cookie
+        end
     end
 
     return headers
@@ -266,6 +270,7 @@ local function login(credentials, timeout_seconds)
             retryable = isRetryableHttpStatus(code), status_code = code }
     end
     session = {
+        auth_method = credentials.auth_method,
         server_url = credentials.server_url,
         username = credentials.username,
         password = credentials.password,
@@ -274,31 +279,144 @@ local function login(credentials, timeout_seconds)
     return { ok = true }
 end
 
+local function validToken(token)
+    -- Accept compact JWT bytes only; do not interpret claims or predict expiry.
+    return type(token) == "string" and #token <= 8192
+        and token:match("^[%w_-]+%.[%w_-]+%.[%w_-]+$") ~= nil
+end
+
+local function refreshRejected(response, json)
+    if type(response.errors) ~= "table" or #response.errors ~= 1 then return false end
+    if response.data ~= nil and response.data ~= json.null then
+        if type(response.data) ~= "table" then return false end
+        for field, value in pairs(response.data) do
+            if field ~= "refreshToken" or value ~= json.null then return false end
+        end
+    end
+    local err = response.errors[1]
+    if type(err) ~= "table" or type(err.path) ~= "table" or #err.path ~= 1
+        or err.path[1] ~= "refreshToken" or type(err.message) ~= "string"
+    then return false end
+    -- v2.3.2243 wraps the thrown exception and stack in this exact field error.
+    -- HTTP status alone, generic errors, and nested causes are not token rejection.
+    local message = err.message
+    if not message:match("^Exception while fetching data %(/refreshToken%) : [^\r\n]+[\r\n]")
+        or not message:find("\tat suwayomi.tachidesk.global.impl.util.Jwt.refreshJwt(", 1, true)
+        or not message:find("\tat suwayomi.tachidesk.graphql.mutations.UserMutation.refreshToken(", 1, true)
+    then return false end
+    local exception = message:match("^[^\r\n]+[\r\n]+([^\r\n]+)")
+    local class = exception and exception:match("^com%.auth0%.jwt%.exceptions%.(%w+):")
+    if class == "TokenExpiredException" or class == "SignatureVerificationException"
+        or class == "AlgorithmMismatchException" or class == "JWTDecodeException"
+        or class == "IncorrectClaimException"
+    then return true end
+    return exception == "java.lang.IllegalArgumentException: Cannot use access token to refresh"
+        or (exception ~= nil and exception:match(
+            "^java%.lang%.IllegalArgumentException: Token intended for different audience %[.*%]$") ~= nil)
+end
+
+local function uiAuthenticate(credentials, timeout_seconds, refresh)
+    local server_url = credentials.server_url
+    if type(server_url) ~= "string" or server_url == "" then
+        return { ok = false, error = "Missing Suwayomi server URL.", retryable = false }
+    end
+    local json = require("dkjson")
+    local field = refresh and "refreshToken" or "login"
+    local input = refresh and { refreshToken = session.refresh_token }
+        or { username = credentials.username or "", password = credentials.password or "" }
+    local query = refresh
+        and "mutation ($input: RefreshTokenInput!) { refreshToken(input: $input) { accessToken } }"
+        or "mutation ($input: LoginInput!) { login(input: $input) { accessToken refreshToken } }"
+    local body = json.encode({ query = query, variables = { input = input } })
+    local client = server_url:match("^https://") and require("ssl.https") or require("socket.http")
+    local chunks = {}
+    -- Login requires Visitor identity. Never attach old access credentials here.
+    local ok, code = client.request{
+        url = Transport.buildGraphQLEndpoint(server_url),
+        method = "POST",
+        redirect = false,
+        headers = { ["Content-Type"] = "application/json", ["Content-Length"] = tostring(#body) },
+        source = require("ltn12").source.string(body),
+        sink = buildGuardedTableSink(chunks, { max_bytes = 64 * 1024 }),
+        timeout = timeout_seconds or REQUEST_TIMEOUT_SECONDS,
+    }
+    local failure = {
+        ok = false,
+        error = refresh and "UI Login session refresh failed."
+            or "UI Login failed. Check authentication method, username, and password.",
+        retryable = isRetryableTransportCode(code) or isRetryableHttpStatus(code),
+        status_code = type(code) == "number" and code or nil,
+    }
+    -- Keep auth response bodies and transport diagnostics out of results and logs.
+    if not ok or code ~= 200 then return failure end
+    local response_body = table.concat(chunks)
+    local response, position, decode_error = json.decode(response_body, 1, json.null)
+    if decode_error or type(response) ~= "table" or response_body:sub(position):find("%S") then
+        return failure
+    end
+    if response.errors ~= nil then
+        return failure, refresh and refreshRejected(response, json)
+    end
+    local payload = type(response.data) == "table" and response.data[field]
+    if type(payload) ~= "table" or not validToken(payload.accessToken)
+        or (not refresh and not validToken(payload.refreshToken))
+    then return failure end
+    if refresh then
+        -- The server returns only accessToken; the existing refresh token survives.
+        session.access_token = payload.accessToken
+    else
+        session = {
+            server_url = credentials.server_url,
+            username = credentials.username,
+            password = credentials.password,
+            auth_method = credentials.auth_method,
+            access_token = payload.accessToken,
+            refresh_token = payload.refreshToken,
+        }
+    end
+    return { ok = true }
+end
+
 local function withSession(credentials, timeout_seconds, request, ...)
-    if not credentials or credentials.auth_method ~= "simple_login" then
+    local ui_login = credentials and credentials.auth_method == "ui_login"
+    if not credentials or (credentials.auth_method ~= "simple_login" and not ui_login) then
         session = nil
         return request(credentials, ...)
     end
     if not sessionMatches(credentials) then
-        local authenticated = login(credentials, timeout_seconds)
+        session = nil
+        local authenticated = ui_login and uiAuthenticate(credentials, timeout_seconds)
+            or login(credentials, timeout_seconds)
         if not authenticated.ok then return authenticated end
     end
     local result = request(credentials, ...)
-    if result.status_code ~= 401 and result.status_code ~= 403 then return result end
-    local authenticated = login(credentials, timeout_seconds)
+    if result.status_code ~= 401 and (ui_login or result.status_code ~= 403) then return result end
+    local authenticated
+    if ui_login then
+        local rejected
+        authenticated, rejected = uiAuthenticate(credentials, timeout_seconds, true)
+        if rejected then
+            session = nil
+            authenticated = uiAuthenticate(credentials, timeout_seconds)
+        end
+    else
+        authenticated = login(credentials, timeout_seconds)
+    end
     if not authenticated.ok then return authenticated end
     result = request(credentials, ...)
-    if result.status_code == 401 or result.status_code == 403 then session = nil end
+    if result.status_code == 401 or (not ui_login and result.status_code == 403) then session = nil end
     return result
 end
 
 local function graphQLAuthRejected(request_body, response_body)
     if not response_body:find("Unauthorized", 1, true) then return false end
     local json = require("dkjson")
-    local response = json.decode(response_body, 1, json.null)
-    local request = json.decode(request_body)
-    if type(response) ~= "table" or type(response.errors) ~= "table"
+    local response, response_end, response_error = json.decode(response_body, 1, json.null)
+    local request, request_end, request_error = json.decode(request_body)
+    if response_error or request_error
+        or type(response) ~= "table" or type(response.errors) ~= "table"
         or type(request) ~= "table" or type(request.query) ~= "string"
+        or response_body:sub(response_end):find("%S") or request_body:sub(request_end):find("%S")
     then return false end
     -- Prove that every root emitted by our builders failed before execution.
     -- Missing errors or partial data can hide effects from a multi-root mutation.
@@ -365,7 +483,7 @@ local function performGraphQLRequest(credentials, request_body, operation_name, 
         url = Transport.buildGraphQLEndpoint(server_url),
         method = "POST",
         headers = headers,
-        redirect = not (credentials and credentials.auth_method == "simple_login"),
+        redirect = not (credentials and (credentials.auth_method == "simple_login" or credentials.auth_method == "ui_login")),
         source = ltn12.source.string(request_body),
         sink = buildGuardedTableSink(response_chunks, {
             max_bytes = MAX_GRAPHQL_RESPONSE_BYTES,
@@ -390,7 +508,16 @@ local function performGraphQLRequest(credentials, request_body, operation_name, 
     then
         return { ok = false, error = "Authentication failed.", retryable = false, status_code = 401 }
     end
-    if code == 200 then
+    if ok and code == 200 and credentials and credentials.auth_method == "ui_login" then
+        local json = require("dkjson")
+        local response, position, decode_error = json.decode(response_body, 1, json.null)
+        if decode_error or type(response) ~= "table" or response_body:sub(position):find("%S")
+            or response.errors ~= nil
+        then
+            return { ok = false, error = "Suwayomi GraphQL request failed.", retryable = false }
+        end
+    end
+    if ok and code == 200 then
         return {
             ok = true,
             response_body = response_body,
@@ -460,7 +587,7 @@ local function downloadBinary(credentials, page_url, log_debug_event, request_op
         url = request_url,
         method = "GET",
         headers = headers,
-        redirect = not (credentials and credentials.auth_method == "simple_login"),
+        redirect = not (credentials and (credentials.auth_method == "simple_login" or credentials.auth_method == "ui_login")),
         sink = buildGuardedTableSink(response_chunks, {
             max_bytes = request_options.max_bytes or MAX_BINARY_RESPONSE_BYTES,
             total_timeout_seconds = request_options.total_timeout_seconds,
@@ -570,7 +697,7 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
         url = request_url,
         method = "GET",
         headers = headers,
-        redirect = not (credentials and credentials.auth_method == "simple_login"),
+        redirect = not (credentials and (credentials.auth_method == "simple_login" or credentials.auth_method == "ui_login")),
         sink = function(chunk)
             if chunk then
                 if now() - started_at > total_timeout_seconds then
@@ -698,7 +825,7 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
 end
 
 function Transport.downloadBinary(credentials, page_url, log_debug_event, request_options)
-    -- External images must neither receive our cookie nor trigger a server login.
+    -- External images must neither receive our credentials nor trigger a server login.
     if type(page_url) ~= "string" or page_url == ""
         or (page_url:match("^https?://") and not isSameOrigin(credentials and credentials.server_url, page_url))
     then

@@ -335,6 +335,267 @@ describe("suwayomi/api/transport", function()
         assert.are.equal(2, logins)
     end)
 
+    local function ui_refresh_error(message)
+        return require("dkjson").encode({ data = require("dkjson").null, errors = { {
+            path = { "refreshToken" },
+            message = "Exception while fetching data (/refreshToken) : " .. message .. "\r\n\r\n"
+                .. "com.auth0.jwt.exceptions.TokenExpiredException: " .. message .. "\n"
+                .. "\tat suwayomi.tachidesk.global.impl.util.Jwt.refreshJwt(Jwt.kt:81)\n"
+                .. "\tat suwayomi.tachidesk.graphql.mutations.UserMutation.refreshToken(UserMutation.kt:62)",
+        } } })
+    end
+
+    it("refreshes UI Login across GraphQL, pages, and archives without rotating the refresh token", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "ui_login"
+        local json = require("dkjson")
+        local logins, refreshes, requests = 0, 0, 0
+        local path = os.tmpname()
+        local events = {}
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                assert.is_false(options.redirect)
+                assert.is_nil(options.headers.Cookie)
+                local body = options.source and json.decode(options.source)
+                if body and body.query:find("LoginInput", 1, true) then
+                    assert.is_nil(options.headers.Authorization)
+                    logins = logins + 1
+                    options.sink(json.encode({ data = { login = {
+                        accessToken = "access." .. logins .. ".signature",
+                        refreshToken = "refresh." .. logins .. ".signature",
+                    } } }))
+                elseif body and body.query:find("RefreshTokenInput", 1, true) then
+                    assert.is_nil(options.headers.Authorization)
+                    assert.are.equal("refresh." .. logins .. ".signature", body.variables.input.refreshToken)
+                    refreshes = refreshes + 1
+                    if refreshes == 2 then
+                        options.sink(ui_refresh_error("The Token has expired on 2026-09-01T00:00:00Z."))
+                    else
+                        options.sink(json.encode({ data = { refreshToken = {
+                            accessToken = "renewed." .. refreshes .. ".signature",
+                        } } }))
+                    end
+                else
+                    requests = requests + 1
+                    if requests % 2 == 1 then
+                        if body then
+                            options.sink([[{"data":null,"errors":[{"path":["updateChapter"],"message":"Exception while fetching data (/updateChapter) : Unauthorized\r\n\r\nsuwayomi.tachidesk.server.user.UnauthorizedException: Unauthorized\n\tat suwayomi.tachidesk.server.user.UserTypeKt.requireUser(UserType.kt:27)\n\tat suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring.onField(RequireAuthDirectiveWiring.kt:35)"}]}]])
+                            return 1, 200
+                        end
+                        options.sink("Unauthorized")
+                        return 1, 401
+                    end
+                    local expected = requests == 2 and "renewed.1.signature"
+                        or requests == 4 and "access.2.signature" or "renewed.3.signature"
+                    assert.are.equal("Bearer " .. expected, options.headers.Authorization)
+                    options.sink(body and [[{"data":{"updateChapter":{"isRead":true}}}]]
+                        or requests == 4 and "PNG" or "PK\003\004archive")
+                end
+                return 1, 200
+            end }
+        end
+        local result = transport.performGraphQLRequest(credentials,
+            [[{"query":"mutation { updateChapter(input: {id: 1}) { isRead } }"}]], "markRead",
+            function(event) events[#events + 1] = event end)
+        assert.is_true(result.ok)
+        assert.are.equal([[{"data":{"updateChapter":{"isRead":true}}}]], result.response_body)
+        assert.are.equal("PNG", transport.downloadBinary(credentials, "/page.png").body)
+        result = transport.downloadChapterArchive(credentials, 1, path)
+        local file = assert(io.open(path, "rb"))
+        local bytes = file:read("*a")
+        file:close()
+        os.remove(path)
+        assert.is_true(result.ok)
+        assert.are.equal("PK\003\004archive", bytes)
+        assert.are.equal(2, logins)
+        assert.are.equal(3, refreshes)
+        assert.are.equal(6, requests)
+        assert.is_nil(json.encode(events):find("signature", 1, true))
+        assert.is_nil(credentials.access_token)
+        assert.is_nil(credentials.refresh_token)
+    end)
+
+    it("never substitutes login for an uncertain UI Login refresh failure", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "ui_login"
+        local cases = {
+            { code = "timeout" },
+            { code = 500, body = ui_refresh_error("The Token has expired on 2026-09-01T00:00:00Z.") },
+            { code = 401 },
+            { code = 200, body = [[{"data":{"refreshToken":{}}}]] },
+            { code = 200, body = [[{"errors":[{"path":["refreshToken"],"message":"secret refresh.1.signature"}]}]] },
+            { code = 200, body = ui_refresh_error("Expired") .. "trailing" },
+        }
+        for _, failure in ipairs(cases) do
+            package.loaded["suwayomi/api/transport"] = nil
+            transport = require("suwayomi/api/transport")
+            package.loaded["ssl.https"] = nil
+            local logins, requests, refreshes = 0, 0, 0
+            package.preload["ssl.https"] = function()
+                return { request = function(options)
+                    local body = options.source and require("dkjson").decode(options.source)
+                    if body and body.query:find("LoginInput", 1, true) then
+                        logins = logins + 1
+                        options.sink([[{"data":{"login":{"accessToken":"access.1.signature","refreshToken":"refresh.1.signature"}}}]])
+                        return 1, 200
+                    elseif body then
+                        refreshes = refreshes + 1
+                        if failure.body then options.sink(failure.body) end
+                        return type(failure.code) == "number" and 1 or nil, failure.code
+                    end
+                    requests = requests + 1
+                    return 1, 401
+                end }
+            end
+            local result = transport.downloadBinary(credentials, "/page.png")
+            assert.is_false(result.ok)
+            assert.are.equal(1, logins)
+            assert.are.equal(1, refreshes)
+            assert.are.equal(1, requests)
+            assert.is_nil(result.response_body)
+            assert.is_nil(result.error:find("signature", 1, true))
+        end
+    end)
+
+    it("stops UI Login after one replay and does not renew arbitrary HTTP rejections", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "ui_login"
+        local status, logins, refreshes, requests = 401, 0, 0, 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                local body = options.source and require("dkjson").decode(options.source)
+                if body and body.query:find("LoginInput", 1, true) then
+                    logins = logins + 1
+                    options.sink([[{"data":{"login":{"accessToken":"access.1.signature","refreshToken":"refresh.1.signature"}}}]])
+                elseif body then
+                    refreshes = refreshes + 1
+                    options.sink([[{"data":{"refreshToken":{"accessToken":"renewed.1.signature"}}}]])
+                else
+                    requests = requests + 1
+                    return 1, status
+                end
+                return 1, 200
+            end }
+        end
+        assert.is_false(transport.downloadBinary(credentials, "/page.png").ok)
+        assert.are.equal(1, logins)
+        assert.are.equal(1, refreshes)
+        assert.are.equal(2, requests)
+        status = 403
+        assert.is_false(transport.downloadBinary(credentials, "/page.png").ok)
+        assert.are.equal(2, logins)
+        assert.are.equal(1, refreshes)
+        assert.are.equal(3, requests)
+        status = 400
+        assert.is_false(transport.downloadBinary(credentials, "/page.png").ok)
+        assert.are.equal(2, logins)
+        assert.are.equal(1, refreshes)
+        assert.are.equal(4, requests)
+    end)
+
+    it("rejects unsafe UI Login tokens before any protected request or secret result", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "ui_login"
+        local calls = 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                calls = calls + 1
+                assert.truthy(options.source:find("LoginInput", 1, true))
+                options.sink([[{"data":{"login":{"accessToken":"secret\r\nInjected: value","refreshToken":"refresh.1.signature"}}}]])
+                return 1, 200
+            end }
+        end
+        local result = transport.downloadBinary(credentials, "/page.png")
+        assert.is_false(result.ok)
+        assert.are.equal(1, calls)
+        assert.is_nil(result.response_body)
+        assert.is_nil(result.error:find("secret", 1, true))
+    end)
+
+    it("isolates UI Login identities, module restarts, and external images", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "ui_login"
+        local logins = 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                if options.url == "https://cdn.example/page.png" then
+                    assert.is_nil(options.headers.Authorization)
+                    assert.is_nil(options.headers.Cookie)
+                    return 1, 401
+                end
+                if options.source then
+                    logins = logins + 1
+                    assert.is_nil(options.headers.Authorization)
+                    options.sink(require("dkjson").encode({ data = { login = {
+                        accessToken = "access." .. logins .. ".signature",
+                        refreshToken = "refresh." .. logins .. ".signature",
+                    } } }))
+                else
+                    assert.are.equal("Bearer access." .. logins .. ".signature", options.headers.Authorization)
+                    options.sink("PNG")
+                end
+                return 1, 200
+            end }
+        end
+        assert.is_false(transport.downloadBinary(credentials, "https://cdn.example/page.png").ok)
+        assert.are.equal(0, logins)
+        assert.are.equal("PNG", transport.downloadBinary(credentials, "/page.png").body)
+        credentials.username = "bob"
+        assert.are.equal("PNG", transport.downloadBinary(credentials, "/page.png").body)
+        credentials.password = "changed"
+        assert.are.equal("PNG", transport.downloadBinary(credentials, "/page.png").body)
+        credentials.server_url = "https://other.example"
+        assert.are.equal("PNG", transport.downloadBinary(credentials, "/page.png").body)
+        package.loaded["suwayomi/api/transport"] = nil
+        transport = require("suwayomi/api/transport")
+        assert.are.equal("PNG", transport.downloadBinary(credentials, "/page.png").body)
+        assert.is_false(transport.downloadBinary(credentials, "https://cdn.example/page.png").ok)
+        assert.are.equal(5, logins)
+    end)
+
+    it("never recovers UI Login after partial mutation execution or ambiguous failures", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "ui_login"
+        local response
+        local logins, mutations = 0, 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                if options.source:find("LoginInput", 1, true) then
+                    logins = logins + 1
+                    options.sink([[{"data":{"login":{"accessToken":"access.1.signature","refreshToken":"refresh.1.signature"}}}]])
+                    return 1, 200
+                end
+                assert.is_nil(options.source:find("RefreshTokenInput", 1, true))
+                mutations = mutations + 1
+                if response then
+                    options.sink(response)
+                    return 1, 200
+                end
+                return nil, "closed"
+            end }
+        end
+        local query = [[{"query":"mutation { updateChapter(input: {id: 1}) { id } updateManga(input: {id: 2}) { id } }"}]]
+        local result = transport.performGraphQLRequest(credentials, query, "update")
+        assert.is_false(result.ok)
+        response = [[{"data":{"updateChapter":null,"updateManga":{"id":2}},"errors":[{"path":["updateChapter"],"message":"Exception while fetching data (/updateChapter) : Unauthorized\r\nsuwayomi.tachidesk.server.user.UserTypeKt.requireUser\nsuwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring"}]}]]
+        result = transport.performGraphQLRequest(credentials, query, "update")
+        assert.is_false(result.ok)
+        assert.is_nil(result.response_body)
+        response = [[{"data":null,"errors":[{"path":["updateChapter"],"message":"access.1.signature"}]}]]
+        result = transport.performGraphQLRequest(credentials, query, "update")
+        assert.is_false(result.ok)
+        assert.is_nil(result.error:find("signature", 1, true))
+        assert.is_nil(result.response_body)
+        assert.are.equal(1, logins)
+        assert.are.equal(3, mutations)
+    end)
+
     it("performs GraphQL requests with auth headers and debug metadata", function()
         install_ltn12()
         local request = {}
