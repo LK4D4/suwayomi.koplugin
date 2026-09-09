@@ -1704,6 +1704,48 @@ describe("suwayomi/ui", function()
         assert.is_true(selected.submenu)
     end)
 
+    it("shows fresh per-manga download-ahead state when retained menus reopen", function()
+        local ui = require("suwayomi/ui")
+        package.loaded["suwayomi/manga/action_menu"] = nil
+        local actions = require("suwayomi/manga/action_menu")
+        local limits = { m1 = 5, m2 = 10 }
+        local owner = {
+            getMangaKeepNextUnreadDownloadsLimit = function(_, manga)
+                return limits[manga.id] or 0
+            end,
+        }
+        local manga = { id = "m1" }
+        local retained = actions.buildMainActions(owner, manga)
+        local function parentLabel()
+            ui.showChapterActionsMenu({ actions = retained })
+            for _, row in ipairs(shown_dialog.buttons) do
+                if row[1] and row[1].id == "keep_downloaded" then return row[1].text end
+            end
+        end
+        local function selectedChoice(target)
+            ui.showMangaActionsMenu({ actions = actions.buildKeepDownloadedActions(owner, target) })
+            local selected = {}
+            for _, row in ipairs(shown_dialog.buttons) do
+                local button = row[1]
+                if button and button.checked_func and button.checked_func() then
+                    selected[#selected + 1] = button.id
+                end
+            end
+            return selected
+        end
+
+        assert.are.equal("Download ahead: 5 >", parentLabel())
+        assert.are.same({ "keep_next_5_unread" }, selectedChoice(manga))
+        assert.are.same({ "keep_next_10_unread" }, selectedChoice({ id = "m2" }))
+        limits.m1 = 50
+        assert.are.equal("Download ahead: 50 >", parentLabel())
+        assert.are.same({ "keep_next_50_unread" }, selectedChoice(manga))
+        limits.m1 = 0
+        assert.are.equal("Download ahead: Off >", parentLabel())
+        assert.are.same({ "keep_next_0_unread" }, selectedChoice(manga))
+        package.loaded["suwayomi/manga/action_menu"] = nil
+    end)
+
     it("adds a shared back action for nested action menus", function()
         local ui = require("suwayomi/ui")
         local selected

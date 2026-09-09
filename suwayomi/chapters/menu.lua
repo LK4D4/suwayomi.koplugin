@@ -458,7 +458,7 @@ function Methods:showKeepDownloadedActions(menu_context)
 
     SuwayomiUI.showChapterActionsMenu({
         title = I18n.t("Download ahead"),
-        actions = MangaActionMenu.buildKeepDownloadedActions(),
+        actions = MangaActionMenu.buildKeepDownloadedActions(self, self.current_chapter_context and self.current_chapter_context.manga),
         anchor = menu_context and menu_context.anchor,
         on_back = guardChapterCallback(self, function()
             self:showBulkChapterActions(menu_context)

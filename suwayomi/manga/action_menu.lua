@@ -60,6 +60,11 @@ local function hasVisibleChapters(owner)
     return #context.chapters > 0
 end
 
+local function getDownloadAheadLimit(owner, manga)
+    return owner and owner.getMangaKeepNextUnreadDownloadsLimit
+        and owner:getMangaKeepNextUnreadDownloadsLimit(manga) or 0
+end
+
 function MangaActionMenu.buildMainActions(owner, manga, options)
     options = options or {}
     local actions = {}
@@ -85,7 +90,15 @@ function MangaActionMenu.buildMainActions(owner, manga, options)
         end
     end
     table.insert(actions, { id = "bulk_downloads", text = I18n.t("Bulk downloads"), submenu = true })
-    table.insert(actions, { id = "keep_downloaded", text = I18n.t("Download ahead"), submenu = true })
+    table.insert(actions, {
+        id = "keep_downloaded",
+        submenu = true,
+        -- Chapter title menus retain actions; read the saved policy when opened.
+        text_func = function()
+            local limit = getDownloadAheadLimit(owner, manga)
+            return limit > 0 and I18n.f("Download ahead: %1", limit) or I18n.t("Download ahead: Off")
+        end,
+    })
     table.insert(actions, { id = "delete_read_downloaded", text = I18n.t("Delete read downloads"), destructive = true })
     if destructive_library_action then
         table.insert(actions, destructive_library_action)
@@ -105,12 +118,13 @@ function MangaActionMenu.buildBulkDownloadActions()
     }
 end
 
-function MangaActionMenu.buildKeepDownloadedActions()
+function MangaActionMenu.buildKeepDownloadedActions(owner, manga)
+    local limit = getDownloadAheadLimit(owner, manga)
     return {
-        { id = "keep_next_5_unread", text = I18n.t("Keep next 5 downloaded") },
-        { id = "keep_next_10_unread", text = I18n.t("Keep next 10 downloaded") },
-        { id = "keep_next_50_unread", text = I18n.t("Keep next 50 downloaded") },
-        { id = "keep_next_0_unread", text = I18n.t("Stop download ahead") },
+        { id = "keep_next_5_unread", text = I18n.t("Keep next 5 downloaded"), checked = limit == 5 },
+        { id = "keep_next_10_unread", text = I18n.t("Keep next 10 downloaded"), checked = limit == 10 },
+        { id = "keep_next_50_unread", text = I18n.t("Keep next 50 downloaded"), checked = limit == 50 },
+        { id = "keep_next_0_unread", text = I18n.t("Stop download ahead"), checked = limit == 0 },
     }
 end
 

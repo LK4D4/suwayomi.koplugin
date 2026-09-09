@@ -495,6 +495,14 @@ msgid "Download ahead"
 msgstr "Завантажувати наперед"
 
 #, fuzzy
+msgid "Download ahead: %1"
+msgstr "Завантажувати наперед"
+
+#, fuzzy
+msgid "Download ahead: Off"
+msgstr "Завантажувати наперед"
+
+#, fuzzy
 msgid "Download all chapters (up to 50 new)"
 msgstr "Завантажити всі розділи"
 

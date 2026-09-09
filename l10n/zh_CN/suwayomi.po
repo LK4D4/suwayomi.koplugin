@@ -467,6 +467,14 @@ msgid "Download ahead"
 msgstr "提前下载"
 
 #, fuzzy
+msgid "Download ahead: %1"
+msgstr "提前下载"
+
+#, fuzzy
+msgid "Download ahead: Off"
+msgstr "提前下载"
+
+#, fuzzy
 msgid "Download all chapters (up to 50 new)"
 msgstr "下载全部章节"
 

@@ -457,6 +457,12 @@ msgstr ""
 msgid "Download ahead"
 msgstr ""
 
+msgid "Download ahead: %1"
+msgstr ""
+
+msgid "Download ahead: Off"
+msgstr ""
+
 msgid "Download all chapters (up to 50 new)"
 msgstr ""
 

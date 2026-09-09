@@ -496,6 +496,14 @@ msgid "Download ahead"
 msgstr "Скачать заранее"
 
 #, fuzzy
+msgid "Download ahead: %1"
+msgstr "Скачать заранее"
+
+#, fuzzy
+msgid "Download ahead: Off"
+msgstr "Скачать заранее"
+
+#, fuzzy
 msgid "Download all chapters (up to 50 new)"
 msgstr "Скачать все главы"
 
