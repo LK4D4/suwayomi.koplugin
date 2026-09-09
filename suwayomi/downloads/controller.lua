@@ -422,16 +422,14 @@ end
 
 function Methods:reconcileDownloadedChapterLedger(ledger)
     ledger = ledger or self:loadChapterLedger()
-    local history_paths = self:loadKoreaderHistoryPaths()
     local changed = false
     local read_count = 0
 
     for _index, entry in pairs(ledger or {}) do
         if type(entry) == "table" and type(entry.path) == "string" and entry.path ~= "" then
             local metadata_finished = self:isChapterPathFinishedInKoreader(entry.path)
-            local history_read = history_paths[entry.path] == true
             local explicit_unread = entry.pending_read_sync == true and entry.pending_read_state == false
-            if (metadata_finished or history_read) and entry.read ~= true and not explicit_unread then
+            if metadata_finished and entry.read ~= true and not explicit_unread then
                 entry.read = true
                 entry.pending_read_sync = true
                 entry.pending_read_state = true

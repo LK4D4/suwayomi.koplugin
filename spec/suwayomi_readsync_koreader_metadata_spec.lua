@@ -339,16 +339,7 @@ describe("suwayomi/readsync/koreader_metadata", function()
         }, cleanup_paths)
     end)
 
-    it("exports KOReader sidecar and history helpers", function()
-        helper.assertControllerModule("suwayomi/readsync/koreader_metadata", {
-            "getKoreaderMetadataPathForDocument",
-            "loadKoreaderMetadataTable",
-            "setKoreaderChapterReadState",
-            "loadKoreaderHistoryPaths",
-        })
-    end)
-
-    it("ignores oversized metadata and history files before running loadstring", function()
+    it("ignores oversized metadata before running loadstring", function()
         helper.stubControllerDependencies()
         clearModule()
         local module = require("suwayomi/readsync/koreader_metadata")
@@ -356,17 +347,10 @@ describe("suwayomi/readsync/koreader_metadata", function()
         for name, method in pairs(module.methods) do
             subject[name] = method
         end
-        subject.getKoreaderHistoryPath = function()
-            return "/settings/history.lua"
-        end
-
         original_io_open = io.open
-        io.open = function(path)
+        io.open = function()
             return {
                 read = function()
-                    if path == "/settings/history.lua" then
-                        return "return { { file = '/bad.cbz' } }" .. string.rep(" ", 131072)
-                    end
                     return "return { doc_path = '/bad.cbz' }" .. string.rep(" ", 131072)
                 end,
                 close = function() end,
@@ -376,8 +360,6 @@ describe("suwayomi/readsync/koreader_metadata", function()
         local metadata, metadata_path = subject:loadKoreaderMetadataTable("/books/Frieren.cbz")
         assert.are.equal("/books/Frieren.cbz", metadata.doc_path)
         assert.are.equal("/books/Frieren.sdr/metadata.cbz.lua", metadata_path)
-
-        assert.are.same({}, subject:loadKoreaderHistoryPaths())
     end)
 
     it("ignores oversized metadata when checking finished state", function()

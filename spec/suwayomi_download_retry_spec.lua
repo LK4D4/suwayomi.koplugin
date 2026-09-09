@@ -191,7 +191,6 @@ describe("download retry across live menus", function()
         plugin.getVisibleChapters = function(_, chapters) return chapters end
         plugin.getSelectedChapterCount = function() return 0 end
         plugin.isChapterDownloaded = function() return false end
-        plugin.loadKoreaderHistoryPaths = function() return {} end
         queue = plugin:getDownloadQueue()
         queue:upsertPersistentJob(failure())
         queue:setStatus(manga, chapter, { state = 'failed' })

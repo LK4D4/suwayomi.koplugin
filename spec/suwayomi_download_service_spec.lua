@@ -1636,6 +1636,34 @@ describe("process-owned download navigation", function()
         assert.are.equal("preserve backup", read(path .. ".sdr/metadata.lua.old"))
     end)
 
+    for _, route in ipairs({ "chapter list", "downloaded ledger" }) do
+        it("preserves synchronized unread state despite reader history through " .. route, function()
+            local plugin = manualHost(0)
+            local chapter = { id = "c1", name = "Chapter 1", is_read = false }
+            local path = directory .. "/c1.cbz"
+            write(path, "unfinished archive")
+            assert(require("lfs").mkdir(path .. ".sdr"))
+            write(path .. ".sdr/metadata.lua", 'return { ["summary"] = { ["status"] = "reading" }, ["percent_finished"] = 0.2 }')
+            write(directory .. "/history.lua", "return { { file = " .. string.format("%q", path) .. " } }")
+            plugin:setCurrentMangaChapterContext(manga, { chapter })
+            assert(plugin:performChapterAction(manga, chapter, "mark_unread"))
+            local batch = plugin:buildPendingReadSyncBatch(plugin:loadChapterLedger(), 50)
+            assert.are.equal(1, plugin:applyPendingReadSyncResult({ batch = batch }, { successes = batch }))
+            plugin:setCurrentMangaChapterContext(manga, {
+                { id = "c1", name = "Chapter 1", is_read = false },
+            })
+            if route == "chapter list" then plugin:refreshChapterMenu()
+            else plugin:reconcileDownloadedChapterLedger() end
+            local entry = settings:loadChapterLedger()["m1:c1"]
+            assert.is_false(entry.read)
+            assert.is_nil(entry.pending_read_sync)
+            local metadata = assert(loadfile(path .. ".sdr/metadata.lua"))()
+            assert.is_nil(metadata.summary.status)
+            assert.are.equal(0, metadata.percent_finished)
+            assert.are.equal("unfinished archive", read(path))
+        end)
+    end
+
     for _, already_read in ipairs({ false, true }) do
     it("records completed close for retention with ahead Off and prior read " .. tostring(already_read), function()
         local path = directory .. "/c1.cbz"

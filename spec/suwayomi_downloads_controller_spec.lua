@@ -206,9 +206,6 @@ local function installController(options)
     function plugin:loadChapterLedger()
         return options.ledger or {}
     end
-    function plugin:loadKoreaderHistoryPaths()
-        return options.history_paths or {}
-    end
     function plugin:isChapterPathFinishedInKoreader(path)
         return options.finished_paths and options.finished_paths[path] == true
     end

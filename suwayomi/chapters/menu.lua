@@ -101,11 +101,9 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
     local started_at = SuwayomiDebug.now()
     local SuwayomiDownloader = require("suwayomi/downloads/downloader")
     local download_directory = SuwayomiSettings:loadDownloadDirectory()
-    local history_paths = self:loadKoreaderHistoryPaths()
     local items = {}
     local downloaded_count = 0
     local metadata_finished_count = 0
-    local history_read_count = 0
     local metadata_write_count = 0
     local ledger_upsert_count = 0
     local reader_return_entries = {}
@@ -125,7 +123,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         local explicit_unread = type(read_entry) == "table"
             and read_entry.pending_read_sync == true and read_entry.pending_read_state == false
         if explicit_unread then
-            -- Older history/sidecar evidence cannot undo a pending explicit unread.
+            -- Older sidecar evidence cannot undo a pending explicit unread.
             item.is_read, chapter.is_read = false, false
         end
 
@@ -138,17 +136,13 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
             end
             chapter_exists = SuwayomiDownloader:chapterExists(chapter_path)
             local metadata_finished = chapter_exists and self:isChapterPathFinishedInKoreader(chapter_path)
-            local history_read = chapter_exists and history_paths[chapter_path] == true
             if chapter_exists then
                 downloaded_count = downloaded_count + 1
             end
             if metadata_finished then
                 metadata_finished_count = metadata_finished_count + 1
             end
-            if history_read then
-                history_read_count = history_read_count + 1
-            end
-            if (metadata_finished or history_read) and not explicit_unread then
+            if metadata_finished and not explicit_unread then
                 item.is_read = true
                 if chapter.is_read ~= true then
                     chapter.is_read = true
@@ -225,7 +219,6 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         chapter_count = #(chapters or {}),
         downloaded_count = downloaded_count,
         metadata_finished_count = metadata_finished_count,
-        history_read_count = history_read_count,
         metadata_write_count = metadata_write_count,
         ledger_upsert_count = ledger_upsert_count,
         elapsed_ms = SuwayomiDebug.elapsedMs(started_at),

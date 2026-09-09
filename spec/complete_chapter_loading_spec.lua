@@ -224,7 +224,6 @@ describe("complete stored chapter loading", function()
         function plugin:showMessage(message) messages[#messages + 1] = message end
         plugin.showLoadingMessage = require("suwayomi/plugin/home").methods.showLoadingMessage
         plugin.closeLoadingMessage = require("suwayomi/plugin/home").methods.closeLoadingMessage
-        function plugin:loadKoreaderHistoryPaths() return {} end
         function plugin:isChapterPathFinishedInKoreader() return false end
         function plugin:withChapterMenuRefreshSuppressed(callback) return callback() end
     end)

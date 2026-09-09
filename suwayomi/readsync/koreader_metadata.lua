@@ -1,11 +1,9 @@
 -- Boundary: KoreaderMetadata.
 --
--- Responsibility: Resolves KOReader sidecars, preserves hash metadata before archive replacement, and owns bounded metadata/history helpers.
+-- Responsibility: Resolves KOReader sidecars, preserves hash metadata before archive replacement, and owns bounded metadata helpers.
 -- Owned state: Accepts filesystem paths from downloaded chapters/current documents and validates table/file state before trusting it.
--- Dependencies: Suwayomi settings, KOReader DocSettings location APIs, and the filesystem adapter.
+-- Dependencies: KOReader DocSettings location APIs and the filesystem adapter.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
-
-local SuwayomiSettings = require("suwayomi/settings")
 
 local KoreaderMetadata = {}
 KoreaderMetadata.__index = KoreaderMetadata
@@ -349,45 +347,6 @@ function Methods:isChapterPathFinishedInKoreader(chapter_path)
 end
 
 
-function Methods:getKoreaderHistoryPath()
-    if not SuwayomiSettings.getSettingsDir then
-        return nil
-    end
-
-    local settings_dir = SuwayomiSettings:getSettingsDir()
-    if not settings_dir or settings_dir == "" then
-        return nil
-    end
-
-    return settings_dir .. "/history.lua"
-end
-
-
-function Methods:loadKoreaderHistoryPaths()
-    local history_path = self:getKoreaderHistoryPath()
-    local content = readBoundedLuaFile(history_path)
-    if not content then
-        return {}
-    end
-    local loader = loadstring(content)
-    if not loader then
-        return {}
-    end
-
-    setfenv(loader, {})
-    local ok, history = pcall(loader)
-    if not ok or type(history) ~= "table" then
-        return {}
-    end
-
-    local paths = {}
-    for _, entry in pairs(history) do
-        if type(entry) == "table" and type(entry.file) == "string" and entry.file ~= "" then
-            paths[entry.file] = true
-        end
-    end
-    return paths
-end
 
 
 function Methods:getCurrentDocumentPath()

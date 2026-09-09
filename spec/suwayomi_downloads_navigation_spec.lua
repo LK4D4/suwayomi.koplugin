@@ -106,7 +106,6 @@ describe("Downloads chapter navigation", function()
         plugin.getVisibleChapters = function(_, chapters) return chapters end
         plugin.getSelectedChapterCount = function() return 0 end
         plugin.isChapterDownloaded = function() return false end
-        plugin.loadKoreaderHistoryPaths = function() return {} end
         plugin.showMessage = function(_, text) table.insert(messages, text) end
         queue = plugin:getDownloadQueue()
     end)
