@@ -9,6 +9,6 @@ Consult only the references relevant to the change:
 
 An accepted ADR records a decision, not proof of implementation or device acceptance. Explicit later amendments supersede the affected older clauses, not unrelated safeguards. If source and the current contract disagree, report the discrepancy rather than rewriting the contract to bless existing behavior.
 
-`docs/superpowers/` retains historical plans, audits, and some linked feature specs. Consult them only when relevant to the task; old checkboxes, branch instructions, and mirrored issue statuses are not current authority. Reconcile them with later decisions and issue comments before acting.
+Retired plans, audits, and feature specs remain in Git history. Consult them only for relevant historical context; old checkboxes, branch instructions, and mirrored issue statuses are not current authority. Reconcile them with later decisions and issue comments before acting.
 
 Ordinary fixes need no new domain document. Update a glossary term or ADR only when terminology or an architectural decision actually changes; explain any proposed departure from an accepted decision.

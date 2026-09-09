@@ -33,4 +33,4 @@ A durable dirty revision is less state than persisting proposed chapter lists, w
 
 Event-driven reevaluation avoids a new always-on scheduler and cancellation-suppression policy. Automatic refill does not retry terminal failures implicitly. These two boundaries deliberately trade immediate self-healing of every missing slot for predictable explicit controls and existing queue retry behavior.
 
-[The refill specification](../superpowers/specs/2026-09-06-durable-download-ahead-refill.md) records the detailed contract; reconcile it with later decisions and issue comments before implementation. Preserve composed public-action checks, real filesystem/process evidence, and the device next-file versus plugin-return control. Issue records own current dependencies and acceptance status; this ADR grants no execution or publication authority.
+Preserve composed public-action checks, real filesystem/process evidence, and the device next-file versus plugin-return control. Linked issue records retain scope, maintainer clarifications, and acceptance evidence; retired planning documents remain in Git history. This ADR grants no execution or publication authority.

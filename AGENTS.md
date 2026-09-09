@@ -4,7 +4,7 @@
 
 - LuaJIT/Lua 5.1 KOReader plugin for Suwayomi. `main.lua` owns lifecycle/composition; feature code belongs in slash-style modules under `suwayomi/`, such as `require("suwayomi/api")`.
 - For module ownership and runtime invariants, read the relevant sections of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Update them when ownership, facades, packaging boundaries, or test strategy change.
-- For terminology, persistence, lifecycle, or architectural decisions, follow [docs/agents/domain.md](docs/agents/domain.md). Retained `docs/superpowers/` files are planning/history, not default execution instructions; check their amendments and linked issues before reuse.
+- For terminology, persistence, lifecycle, or architectural decisions, follow [docs/agents/domain.md](docs/agents/domain.md).
 - Before ticket operations, read [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md); before triage, read [docs/agents/triage-labels.md](docs/agents/triage-labels.md).
 - For translation work, read [docs/TRANSLATING.md](docs/TRANSLATING.md).
 - Before planning verification, running integration/UI/device checks, or handing off manual QA, read [docs/agents/testing.md](docs/agents/testing.md).

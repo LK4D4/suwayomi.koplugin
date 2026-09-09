@@ -10,7 +10,7 @@ Implemented: this record owns process-level navigation and bounded quit. [ADR-00
 
 ## Problem
 
-At `01ed3e3`, each plugin instance cached and recovered its own queue. FileManager–ReaderUI navigation could recover persisted work while another host's workers still ran. The [original investigation](../superpowers/audits/2026-09-06-issue-2-investigation.md#1-download-queues-compete-across-reader-instances) records the maintainer's download-reset observation; it does not establish an application-crash cause.
+At `01ed3e3`, each plugin instance cached and recovered its own queue. FileManager–ReaderUI navigation could recover persisted work while another host's workers still ran. The original investigation for [#2](https://github.com/LK4D4/suwayomi.koplugin/issues/2), preserved in Git history, records the maintainer's download-reset observation; it does not establish an application-crash cause.
 
 ## Decision
 
@@ -24,7 +24,7 @@ At `01ed3e3`, each plugin instance cached and recovered its own queue. FileManag
 
 This is current-process coordination, not cross-process exclusion. Abrupt death may leave an untracked child; a PID, queue state, or missing progress cannot establish its lifetime. Keep unknown files. Hot reload and simultaneous writable KOReader processes are unsupported. ADR-0005 owns the resulting late-publication and legacy-worker limits.
 
-The earlier mandatory-reboot, storage-relocation, inherited-lock, and publication-journal approach was rejected. The old startup rule requiring explicit retry is also superseded; do not restore it from the [historical spec](../superpowers/specs/2026-09-06-navigation-safe-download-ownership.md). Manual-delete identity and refill have their own decisions, not implied guarantees supplied by this service.
+The earlier mandatory-reboot, storage-relocation, inherited-lock, and publication-journal approach was rejected. The old startup rule requiring explicit retry is also superseded; do not restore it from historical plans. Manual-delete identity and refill have their own decisions, not implied guarantees supplied by this service.
 
 ## Evidence and history
 

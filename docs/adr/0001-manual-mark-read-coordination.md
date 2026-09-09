@@ -17,8 +17,8 @@ Keep `markChapterRead`, `markChapterListRead`, `markSelectedChaptersRead`, and `
 
 1. Capture archive targets before metadata changes or menu refresh can change the observed context. Build independent completion snapshots from those captured observations.
 2. Update read state in the operation's ledger. For selected batches, clear selection before rebuilding the menu. Reconcile visible non-target chapters during the batch refresh before committing the shared ledger.
-3. Commit read state and accepted manual-delete requests through the checked shared store before archive removal. Busy download work prevents deletion acceptance without preventing mark-read or canceling that work.
-4. Publish captured completions in input order after the commit, then run manual processing, read-sync scheduling, and keep-next-unread policy. A caller-owned completion buffer defers manual processing until the caller can publish it.
+3. Commit read state, accepted manual-delete requests, and [refill enrollment](0004-durable-download-ahead-refill.md) through the checked shared store before archive removal. Busy download work prevents deletion acceptance without preventing mark-read or canceling that work.
+4. Publish captured completions in input order after the commit, then run manual processing and read-sync scheduling. Refill runs later through the process service. A caller-owned completion buffer defers manual processing until the caller can publish it.
 
 Singles commit and publish before refresh; batches need pre-commit refresh to preserve non-target reconciliation. Do not flatten this distinction into one ordering. A failed or uncertain save makes no durable-success claim and starts no removal; KOReader metadata writes and server synchronization are not part of the shared-settings transaction.
 
