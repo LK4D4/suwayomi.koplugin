@@ -21,6 +21,10 @@ class SandboxUIError(RuntimeError):
     """A public diagnostic which contains no response body or private path."""
 
 
+class InspectorConnectionError(SandboxUIError):
+    """A refused or reset read-only inspector connection, safe to retry."""
+
+
 def _require(condition, message):
     if not condition:
         raise SandboxUIError(message)
@@ -125,7 +129,7 @@ class Inspector:
         self._http = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
         self._transition_until = time.monotonic() + 15
 
-    def _request(self, path, data=None):
+    def _request(self, path, data=None, *, deadline=None):
         _require(path.startswith("/koreader/") and "?" not in path and "#" not in path,
                  "Invalid inspector control")
         headers = {"Authorization": "Bearer " + self.token}
@@ -136,9 +140,14 @@ class Inspector:
             _require(len(body) <= 8192, "Inspector input is too large")
         request = urllib.request.Request(self.url + path, headers=headers, data=body)
         observation = path in ("/koreader/ui/httpinspector/observe/", "/koreader/device/screen/bb")
+        # Startup owns retries so it can check its child and total deadline.
+        transition_until = self._transition_until if deadline is None else 0
         while True:
+            timeout = 10 if deadline is None else min(10, deadline - time.monotonic())
+            if timeout <= 0:
+                raise InspectorConnectionError("Inspector readiness deadline expired")
             try:
-                with self._http.open(request, timeout=10) as response:
+                with self._http.open(request, timeout=timeout) as response:
                     _require(response.status == 200, "Unexpected inspector response")
                     return response.read()
             except urllib.error.HTTPError as error:
@@ -147,23 +156,26 @@ class Inspector:
                 refused = isinstance(error.reason, ConnectionRefusedError) or (
                     isinstance(error.reason, OSError) and error.reason.errno == errno.ECONNREFUSED)
                 reset = observation and isinstance(error.reason, ConnectionResetError)
-                if (refused or reset) and time.monotonic() < self._transition_until:
-                    time.sleep(max(0, min(0.2, self._transition_until - time.monotonic())))
+                if (refused or reset) and time.monotonic() < transition_until:
+                    time.sleep(max(0, min(0.2, transition_until - time.monotonic())))
                     continue
-                raise SandboxUIError("Inspector connection refused" if refused else "Inspector transport failed") from None
-            except ConnectionResetError:
-                # A listener can close after connect but before accepting this
-                # observation. Never replay a possibly executed control action.
-                if observation and time.monotonic() < self._transition_until:
-                    time.sleep(0.2)
+                error_type = InspectorConnectionError if observation and (refused or reset) else SandboxUIError
+                raise error_type("Inspector connection refused" if refused else "Inspector transport failed") from None
+            except (ConnectionRefusedError, ConnectionResetError) as error:
+                # A reset may follow an executed control action. Only read-only
+                # observations can be replayed after an ambiguous connection.
+                refused = isinstance(error, ConnectionRefusedError)
+                if (refused or observation) and time.monotonic() < transition_until:
+                    time.sleep(max(0, min(0.2, transition_until - time.monotonic())))
                     continue
-                raise SandboxUIError("Inspector connection reset") from None
+                error_type = InspectorConnectionError if observation else SandboxUIError
+                raise error_type("Inspector connection refused" if refused else "Inspector connection reset") from None
             except (OSError, ValueError) as error:
                 raise SandboxUIError("Inspector transport failed: " + type(error).__name__) from None
 
-    def _observe(self):
+    def _observe(self, *, deadline=None):
         try:
-            response = json.loads(self._request("/koreader/ui/httpinspector/observe/"))
+            response = json.loads(self._request("/koreader/ui/httpinspector/observe/", deadline=deadline))
             _require(isinstance(response, list) and len(response) == 1 and isinstance(response[0], dict),
                      "Invalid inspector observation")
             state = response[0]
@@ -190,8 +202,9 @@ class Inspector:
             return re.sub(r"(?<![\w])(?:[A-Za-z]:[\\/]|/[A-Za-z_.])[^\n]*", "[path]", value)
         return value
 
-    def observe(self):
-        return self._public(self._observe())
+    def observe(self, *, deadline=None):
+        """Observe once within a caller-owned deadline, or use transition retries."""
+        return self._public(self._observe(deadline=deadline))
 
     def _wait(self, predicate, description, timeout=15):
         _require(timeout > 0, "Wait timeout must be positive")

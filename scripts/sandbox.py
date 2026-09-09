@@ -443,7 +443,7 @@ def unique_path(root, pattern):
 
 
 def launch(root, service):
-    from sandbox_ui import Inspector
+    from sandbox_ui import Inspector, InspectorConnectionError
     config = configuration(root)
     if live_process(root, service):
         raise RuntimeError("Sandbox service is already running")
@@ -472,18 +472,24 @@ def launch(root, service):
         while True:
             if child.poll() is not None:
                 raise RuntimeError(service + " exited before readiness; inspect its private log")
+            if time.monotonic() >= deadline:
+                raise RuntimeError(service + " did not become ready; inspect its private log")
             try:
                 if service == "server":
                     server_client.request("/api/v1/source/list")
                 else:
-                    Inspector(root).observe()
+                    Inspector(root).observe(deadline=deadline)
+                if child.poll() is not None:
+                    raise RuntimeError(service + " exited before readiness; inspect its private log")
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(service + " did not become ready; inspect its private log")
                 break
             except urllib.error.HTTPError as error:
                 raise RuntimeError(service + " readiness returned HTTP " + str(error.code)) from error
-            except (urllib.error.URLError, ConnectionError, TimeoutError):
+            except (InspectorConnectionError, urllib.error.URLError, ConnectionError, TimeoutError):
                 if time.monotonic() >= deadline:
                     raise RuntimeError(service + " did not become ready; inspect its private log")
-                time.sleep(0.25)
+                time.sleep(min(0.25, max(0, deadline - time.monotonic())))
         if service == "server":
             seed_library(server_client)
         print(service + " ready", flush=True)
