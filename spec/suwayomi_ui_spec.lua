@@ -1339,7 +1339,7 @@ describe("suwayomi/ui", function()
         login_dialog.buttons[2][1].callback()
         local picker = shown_dialog
         assert.is_true(picker.buttons[1][1].checked_func())
-        picker.buttons[2][1].callback()
+        picker.buttons[3][1].callback()
         assert.are.equal(picker, closed_dialog)
         assert.are.same(entered_fields, login_dialog:getFields())
         login_dialog.buttons[1][2].callback()
@@ -1348,11 +1348,11 @@ describe("suwayomi/ui", function()
             server_url = entered_fields[1],
             username = entered_fields[2],
             password = entered_fields[3],
-            auth_method = "simple_login",
+            auth_method = "ui_login",
         }, saved_credentials)
         ui.showLoginDialog({ credentials = saved_credentials })
         shown_dialog.buttons[2][1].callback()
-        assert.is_true(shown_dialog.buttons[2][1].checked_func())
+        assert.is_true(shown_dialog.buttons[3][1].checked_func())
     end)
 
     it("shows onboarding connection dialog with test and continue actions", function()
@@ -1482,13 +1482,13 @@ describe("suwayomi/ui", function()
         shown_dialog.buttons[1][1].callback()
         assert.is_false(continue_button.enabled_func())
         auth_button.callback()
-        shown_dialog.buttons[2][1].callback()
+        shown_dialog.buttons[3][1].callback()
         test_button.callback()
         assert.are.same({
             server_url = dialog_fields[1],
             username = dialog_fields[2],
             password = dialog_fields[3],
-            auth_method = "simple_login",
+            auth_method = "ui_login",
         }, tested_credentials)
         assert.is_true(continue_button.enabled_func())
         continue_button.callback()

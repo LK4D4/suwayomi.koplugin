@@ -1355,6 +1355,9 @@ msgstr ""
 msgid "Timed out."
 msgstr ""
 
+msgid "UI Login"
+msgstr ""
+
 msgctxt "extension action"
 msgid "Uninstall"
 msgstr ""

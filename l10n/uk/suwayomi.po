@@ -1441,6 +1441,9 @@ msgstr "Це джерело не має манґи."
 msgid "Timed out."
 msgstr "Час очікування минув."
 
+msgid "UI Login"
+msgstr ""
+
 msgctxt "extension action"
 msgid "Uninstall"
 msgstr "Видалити"

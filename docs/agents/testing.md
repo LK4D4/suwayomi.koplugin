@@ -46,7 +46,7 @@ python3 scripts/sandbox.py --root "$ROOT" deploy --source "$SOURCE" --revision "
 
 `setup` requires an absent or empty root. It refuses existing contents; there is no destructive reset. For another clean comparison, choose a new root. To select unused ports, add `--server-port 4569 --inspector-port 8083` to `setup` with your chosen values. An occupied service port is an error, not permission to kill an unrelated process.
 
-Authentication is explicit. `setup --auth-mode basic_auth` is the default; use `setup --auth-mode simple_login` in a different empty root for Simple Login. `sandbox.json` records `auth_mode`, and setup writes the matching server and plugin settings. Roots created before this field existed remain Basic Auth. The launcher does not switch or fall back between modes.
+Authentication is explicit. `setup --auth-mode basic_auth` is the default; use `setup --auth-mode simple_login` or `setup --auth-mode ui_login` in a different empty root for either login method. `sandbox.json` records `auth_mode`, and setup writes the matching server and plugin settings. Roots created before this field existed remain Basic Auth. The launcher does not switch or fall back between modes.
 
 Setup creates isolated runtime trees, server data, a KOReader profile, and client downloads. It generates `server-data/local/Sandbox Alpha/Chapter 001.cbz` through `Chapter 003.cbz`, each containing three visibly labeled PNG pages. No personal server, settings, credentials, or library copy is needed.
 
@@ -65,6 +65,8 @@ python3 scripts/sandbox.py --root "$ROOT" run server
 Wait for **`server ready`**. This requires authenticated readiness and real API seeding of the Local source library, not just process creation. In the second terminal, start KOReader:
 
 For Simple Login, readiness uses a launcher-owned, in-memory cookie jar and posts the generated credentials to `/login.html`. The pinned release must return `303` with `Location: /` and a session cookie; the launcher does not follow that redirect or any API redirect. Authenticated API calls then discover and seed the fixtures, and a separate cookie-free request must be rejected. No cookie is written to disk, printed, or shared with KOReader. This proves server readiness, not plugin authentication.
+
+For UI Login, readiness uses a launcher-owned, in-memory access/refresh token pair obtained through GraphQL login. Protected API calls send the access token as a Bearer header. A rejected access token permits one refresh and one replay; only definite refresh-token rejection permits a new login. Login and refresh carry no old access credentials, and no API redirect is followed. A separate token-free request must be rejected. Tokens are never persisted, printed, or shared with KOReader; launcher readiness does not prove plugin authentication.
 
 ```sh
 python3 scripts/sandbox.py --root "$ROOT" run reader
@@ -115,13 +117,13 @@ python3 scripts/sandbox.py --root "$ROOT" status
 
 ### Exercise authentication through the actual setup UI
 
-Choose a fresh root with `setup --auth-mode simple_login`, deploy the candidate, and start both services as above. Then run:
+Choose a fresh root with the authentication mode under test, deploy the candidate, and start both services as above. For UI Login, use `setup --auth-mode ui_login`. Then run:
 
 ```sh
 python3 scripts/sandbox.py --root "$ROOT" auth-smoke
 ```
 
-This English-profile scenario opens **Settings > Setup wizard**, fills all three visible inputs from the sandbox's private configuration, and selects the other authentication method followed by the configured method. It tests a deliberately wrong password, requires the failed setup title and disabled **Continue**, restores the correct password, and requires the real worker's success message and tested title with **Continue** enabled. It dismisses result messages through ordinary widget handlers, continues setup, selects the existing sandbox download directory with **Use this folder > Choose**, and runs the single-chapter smoke above. It saves credentials through the real setup callback, not by editing plugin settings. Run it once per fresh comparison root; like `smoke`, it needs an unused fixture chapter.
+This English-profile scenario opens **Settings > Setup wizard**, fills all three visible inputs from the sandbox's private configuration, and visits all three authentication choices before selecting the configured method. It tests a deliberately wrong password, requires the failed setup title and disabled **Continue**, restores the correct password, and requires the real worker's success message and tested title with **Continue** enabled. It dismisses result messages through ordinary widget handlers, continues setup, selects the existing sandbox download directory with **Use this folder > Choose**, and runs the single-chapter smoke above. It saves credentials through the real setup callback, not by editing plugin settings. Run it once per fresh comparison root; like `smoke`, it needs an unused fixture chapter.
 
 For deliberate failed credentials or individual controls, use the observed field hint or its 1-based index:
 
@@ -136,15 +138,17 @@ python3 scripts/sandbox.py --root "$ROOT" ui tap "Test connection"
 python3 scripts/sandbox.py --root "$ROOT" ui observe
 ```
 
-Wait for the final failure message, not the loading message. `ui tap "Dismiss message"` dismisses an ordinary informational popup; it does not dismiss a loading operation. Require the failed setup title and disabled **Continue**. Restore the password with `ui fill "Password" --credential password`, test again, dismiss the success message, and require the tested title before continuing. To change methods, tap the observed **Authentication: Basic Auth** or **Authentication: Simple Login** button, then **Basic Auth** or **Simple Login** in **Authentication method**. Existing typed fields stay in the connection dialog.
+Wait for the final failure message, not the loading message. `ui tap "Dismiss message"` dismisses an ordinary informational popup; it does not dismiss a loading operation. Require the failed setup title and disabled **Continue**. Restore the password with `ui fill "Password" --credential password`, test again, dismiss the success message, and require the tested title before continuing. To change methods, tap the observed **Authentication: Basic Auth**, **Authentication: Simple Login**, or **Authentication: UI Login** button, then the desired method in **Authentication method**. Existing typed fields stay in the connection dialog.
 
 For saved-credential controls, open **Settings > Connection > Login information**, fill the visible fields, choose the method, and tap **Save**. Dismiss its saved message, then use the existing **Test connection** action. Correcting settings does not retry failed downloads: navigate to the failed chapter and invoke its ordinary **Retry** action explicitly. Use `ui observe` between steps rather than assuming a previous dialog remains current.
 
 `ui fill FIELD --stdin` accepts exact text from standard input for other visible single-line inputs, including numeric settings. Supply sensitive text through a private pipe or a Python caller, not command arguments or shell history; a trailing newline is rejected. Do not capture screenshots while any password is revealed. Field observations and fill results omit all input values. Screenshots are raw framebuffer evidence and can still contain visible usernames, endpoints, or revealed passwords.
 
-`auth-smoke` does not establish restart, session expiry, independent concurrent sessions, concurrent download limits, read sync, credential changes during active work, ambiguous mutation failures, or the one-login/one-replay bound. Exercise those separately using the plugin's ordinary widgets and owned-service `stop`/`run` controls. The launcher cookie session is intentionally independent of plugin sessions, so successful seeding cannot establish those contracts.
+`auth-smoke` does not establish restart, session expiry, independent concurrent sessions, concurrent download limits, read sync, credential changes during active work, ambiguous mutation failures, or bounded authentication recovery. Exercise those separately using the plugin's ordinary widgets and owned-service `stop`/`run` controls. Launcher sessions are intentionally independent of plugin sessions, so successful seeding cannot establish those contracts.
 
 For a server-restart control, keep the plugin process alive while using `stop server` followed by `run server`, wait for authenticated readiness, then exercise another protected operation. Restart probes tolerate TIME_WAIT sockets but still refuse live listeners. A new plugin process alone cannot prove recovery of an existing cookie. For idle-session behavior without a 30-minute wait, a disposable transport control may send an invalid cookie to the real server; record that as injected session invalidation, not elapsed-time expiry.
+
+For UI Login, a normal server restart can preserve JWT validity. Test access rejection and refresh-token rejection separately, including a refresh timeout/server error that must not trigger login fallback. Use short configured token lifetimes for elapsed-time expiry, or label injected invalid-token controls explicitly. Neither control establishes the other.
 
 ## Inspect the UI safely
 
@@ -158,7 +162,7 @@ The inspector also discovers button layouts nested in visual containers, includi
 
 Reader transitions can briefly interrupt inspector access. The helper bounds connection-refused retries to a 15-second transition deadline. It also retries connection resets for read-only observations during that interval, but never replays a possibly executed control action. Other network errors are failures.
 
-The inspector's Bearer token is unrelated to Suwayomi authentication and remains mandatory in both server modes. The allowlist does not expose arbitrary Lua evaluation, global-object browsing, settings assignment, or generic method invocation. When changing input controls, verify rejected missing/wrong tokens, stale fields, unsupported routes/methods, and oversized bodies as well as a real dialog edit. These instructions describe required checks, not checks already executed.
+The inspector's Bearer token is unrelated to Suwayomi authentication and remains mandatory in all server modes. The allowlist does not expose arbitrary Lua evaluation, global-object browsing, settings assignment, or generic method invocation. When changing input controls, verify rejected missing/wrong tokens, stale fields, unsupported routes/methods, and oversized bodies as well as a real dialog edit. These instructions describe required checks, not checks already executed.
 
 ### Native reader controls and incomplete observations
 

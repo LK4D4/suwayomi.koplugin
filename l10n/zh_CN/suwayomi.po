@@ -1397,6 +1397,9 @@ msgstr "此源没有漫画。"
 msgid "Timed out."
 msgstr "已超时。"
 
+msgid "UI Login"
+msgstr ""
+
 msgctxt "extension action"
 msgid "Uninstall"
 msgstr "卸载"

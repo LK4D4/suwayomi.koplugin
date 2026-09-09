@@ -138,14 +138,16 @@ describe("suwayomi/settings", function()
         assert.are.equal("basic_auth", settings:load().auth_method)
     end)
 
-    it("saves Simple Login credentials without session data and flushes the settings file", function()
+    it("saves UI Login credentials without session data and flushes the settings file", function()
         local settings = require("suwayomi/settings")
         settings:save({
             server_url = "suwayomi.local:4567",
             username = "alice",
             password = "secret",
-            auth_method = "simple_login",
+            auth_method = "ui_login",
             cookie = "session-cookie",
+            accessToken = "access-token",
+            refreshToken = "refresh-token",
         })
 
         assert.is_true(flushed)
@@ -153,7 +155,7 @@ describe("suwayomi/settings", function()
             server_url = "http://suwayomi.local:4567",
             username = "alice",
             password = "secret",
-            auth_method = "simple_login",
+            auth_method = "ui_login",
         }, stored_data.credentials)
         assert.are.same(stored_data.credentials, settings:load())
     end)

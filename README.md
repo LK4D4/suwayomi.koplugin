@@ -27,12 +27,14 @@ To update a manual install, replace the plugin folder with the new release and r
 ## Connect
 
 1. Open **Search > Suwayomi** in KOReader's top menu.
-2. Enter your server URL and credentials. Select **Basic Auth** or **Simple Login** to match your server, then tap **Test connection**.
+2. Enter your server URL and credentials. Select **Basic Auth**, **Simple Login**, or **UI Login** to match your server, then tap **Test connection**.
 3. Continue and choose a folder for downloaded chapters.
 
 You can repeat setup from **Suwayomi > Settings > Setup wizard**.
 
-Simple Login reconnects automatically using saved credentials; session cookies are never saved. If authentication fails during a download, correct your login settings and retry it from **Downloads**.
+Simple Login and UI Login reconnect automatically using saved credentials; session cookies and JWT tokens are never saved. UI Login refreshes rejected access tokens silently and logs in again if the refresh token is rejected. If authentication fails during a download, correct your login settings and retry it from **Downloads**.
+
+Use HTTPS when connecting over a network. HTTP remains supported but exposes passwords and session tokens to network observers. Suwayomi UI Login tokens can remain valid after the server password changes; changing saved credentials does not cancel already-running downloads.
 
 ## Read
 

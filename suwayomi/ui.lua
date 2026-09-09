@@ -553,12 +553,17 @@ local function getCredentialsFromDialog(dialog)
     }
 end
 
+local function normalizeAuthMethod(method)
+    return (method == "simple_login" or method == "ui_login") and method or "basic_auth"
+end
+
 local function authMethodLabel(method)
+    if method == "ui_login" then return I18n.t("UI Login") end
     return method == "simple_login" and I18n.t("Simple Login") or I18n.t("Basic Auth")
 end
 
 local function buildAuthMethodButton(credentials, getDialog, onChanged)
-    local method = credentials.auth_method == "simple_login" and "simple_login" or "basic_auth"
+    local method = normalizeAuthMethod(credentials.auth_method)
     local button_options
     button_options = {
         id = "auth_method",
@@ -571,6 +576,7 @@ local function buildAuthMethodButton(credentials, getDialog, onChanged)
                 choices = {
                     { value = "basic_auth", text = I18n.t("Basic Auth") },
                     { value = "simple_login", text = I18n.t("Simple Login") },
+                    { value = "ui_login", text = I18n.t("UI Login") },
                 },
                 onSelect = function(selected)
                     if selected == dialog.auth_method then
@@ -600,7 +606,7 @@ function SuwayomiUI.showLoginDialog(options)
     local dialog
 
     dialog = MultiInputDialog:new{
-        auth_method = credentials.auth_method == "simple_login" and "simple_login" or "basic_auth",
+        auth_method = normalizeAuthMethod(credentials.auth_method),
         title = I18n.t("Suwayomi login"),
         fields = {
             {
@@ -702,7 +708,7 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
 
     dialog = MultiInputDialog:new{
         title = formatOnboardingConnectionTitle(options.connection_status),
-        auth_method = credentials.auth_method == "simple_login" and "simple_login" or "basic_auth",
+        auth_method = normalizeAuthMethod(credentials.auth_method),
         fields = {
             {
                 hint = I18n.t("Server URL"),

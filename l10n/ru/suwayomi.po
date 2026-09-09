@@ -1498,6 +1498,9 @@ msgstr "У этого источника нет манги."
 msgid "Timed out."
 msgstr "Время ожидания истекло."
 
+msgid "UI Login"
+msgstr ""
+
 msgctxt "extension action"
 msgid "Uninstall"
 msgstr "Удалить"
