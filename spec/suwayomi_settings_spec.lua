@@ -95,7 +95,7 @@ describe("suwayomi/settings", function()
             server_url = "https://suwayomi.example",
             username = "alice",
             password = "secret",
-            auth_method = "basic_auth",
+            auth_method = "simple_login",
         }
 
         local settings = require("suwayomi/settings")
@@ -134,22 +134,28 @@ describe("suwayomi/settings", function()
         assert.are.equal("false", credentials.username)
         assert.are.equal("456", credentials.password)
         assert.are.equal("basic_auth", credentials.auth_method)
+        stored_data.credentials.auth_method = nil
+        assert.are.equal("basic_auth", settings:load().auth_method)
     end)
 
-    it("saves credentials and flushes the settings file", function()
+    it("saves Simple Login credentials without session data and flushes the settings file", function()
         local settings = require("suwayomi/settings")
         settings:save({
             server_url = "suwayomi.local:4567",
             username = "alice",
             password = "secret",
-            auth_method = "bad",
+            auth_method = "simple_login",
+            cookie = "session-cookie",
         })
 
         assert.is_true(flushed)
-        assert.are.equal("http://suwayomi.local:4567", stored_data.credentials.server_url)
-        assert.are.equal("alice", stored_data.credentials.username)
-        assert.are.equal("secret", stored_data.credentials.password)
-        assert.are.equal("basic_auth", stored_data.credentials.auth_method)
+        assert.are.same({
+            server_url = "http://suwayomi.local:4567",
+            username = "alice",
+            password = "secret",
+            auth_method = "simple_login",
+        }, stored_data.credentials)
+        assert.are.same(stored_data.credentials, settings:load())
     end)
 
     it("loads an empty versioned finished cleanup journal by default", function()

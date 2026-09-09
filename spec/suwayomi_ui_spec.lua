@@ -30,6 +30,7 @@ describe("suwayomi/ui", function()
         package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/settings/retention_labels"] = nil
         package.loaded["suwayomi/ui/browse"] = nil
+        package.loaded["suwayomi/ui/choice_dialogs"] = nil
         package.loaded["suwayomi/ui/directory"] = nil
         package.loaded["suwayomi/ui/downloads"] = nil
         package.loaded["suwayomi/ui/list_menu"] = nil
@@ -596,6 +597,7 @@ describe("suwayomi/ui", function()
     after_each(function()
         package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/settings/retention_labels"] = nil
+        package.loaded["suwayomi/ui/choice_dialogs"] = nil
         package.preload.gettext = nil
         package.preload["suwayomi/i18n"] = nil
         package.preload["ui/widget/menu"] = nil
@@ -1316,6 +1318,41 @@ describe("suwayomi/ui", function()
         assert.are.equal("saved-pass", shown_dialog.fields[3].text)
         assert.are.equal("tx:Cancel", shown_dialog.buttons[1][1].text)
         assert.are.equal("tx:Save", shown_dialog.buttons[1][2].text)
+        assert.are.equal("tx:Authentication: tx:Basic Auth", shown_dialog.buttons[2][1].text)
+        shown_dialog.buttons[2][1].callback()
+        assert.are.equal("tx:Authentication method", shown_dialog.title)
+        assert.are.equal("tx:Basic Auth", shown_dialog.buttons[1][1].text)
+        assert.are.equal("tx:Simple Login", shown_dialog.buttons[2][1].text)
+    end)
+
+    it("preserves entered login fields across method selection and reopening", function()
+        local ui = require("suwayomi/ui")
+        local saved_credentials
+        ui.showLoginDialog({
+            onSave = function(credentials)
+                saved_credentials = credentials
+            end,
+        })
+        local login_dialog = shown_dialog
+        local entered_fields = { "https://edited.example", "edited-user", "edited-password" }
+        dialog_fields = entered_fields
+        login_dialog.buttons[2][1].callback()
+        local picker = shown_dialog
+        assert.is_true(picker.buttons[1][1].checked_func())
+        picker.buttons[2][1].callback()
+        assert.are.equal(picker, closed_dialog)
+        assert.are.same(entered_fields, login_dialog:getFields())
+        login_dialog.buttons[1][2].callback()
+
+        assert.are.same({
+            server_url = entered_fields[1],
+            username = entered_fields[2],
+            password = entered_fields[3],
+            auth_method = "simple_login",
+        }, saved_credentials)
+        ui.showLoginDialog({ credentials = saved_credentials })
+        shown_dialog.buttons[2][1].callback()
+        assert.is_true(shown_dialog.buttons[2][1].checked_func())
     end)
 
     it("shows onboarding connection dialog with test and continue actions", function()
@@ -1409,6 +1446,56 @@ describe("suwayomi/ui", function()
         assert.is_nil(closed_dialog)
     end)
 
+    it("requires a new onboarding test after changing the authentication method", function()
+        local ui = require("suwayomi/ui")
+        local passed_method
+        local tested_credentials
+        local continued_credentials
+        local dialog = ui.showOnboardingConnectionDialog({
+            onTestConnection = function(credentials)
+                tested_credentials = credentials
+                passed_method = credentials.auth_method
+            end,
+            canContinue = function(credentials)
+                return credentials.auth_method == passed_method
+            end,
+            onAuthMethodChanged = function()
+                passed_method = nil
+            end,
+            onContinue = function(credentials)
+                continued_credentials = credentials
+            end,
+        })
+        local test_button = dialog.buttons[1][2]
+        local continue_button = dialog.buttons[2][1]
+        local auth_button = dialog.buttons[3][1]
+        test_button.callback()
+        ui.updateOnboardingConnectionDialogStatus(dialog, "passed")
+        assert.is_true(continue_button.enabled_func())
+        auth_button.callback()
+        shown_dialog.buttons[2][1].callback()
+        assert.is_false(continue_button.enabled_func())
+        continue_button.callback()
+        assert.is_nil(continued_credentials)
+
+        auth_button.callback()
+        shown_dialog.buttons[1][1].callback()
+        assert.is_false(continue_button.enabled_func())
+        auth_button.callback()
+        shown_dialog.buttons[2][1].callback()
+        test_button.callback()
+        assert.are.same({
+            server_url = dialog_fields[1],
+            username = dialog_fields[2],
+            password = dialog_fields[3],
+            auth_method = "simple_login",
+        }, tested_credentials)
+        assert.is_true(continue_button.enabled_func())
+        continue_button.callback()
+        assert.are.same(tested_credentials, continued_credentials)
+        assert.are.equal(dialog, closed_dialog)
+    end)
+
     it("keeps onboarding connection test status visible", function()
         local ui = require("suwayomi/ui")
 
@@ -1449,6 +1536,7 @@ describe("suwayomi/ui", function()
         assert.are.equal("tx:Cancel", shown_dialog.buttons[1][1].text)
         assert.are.equal("tx:Test connection", shown_dialog.buttons[1][2].text)
         assert.are.equal("tx:Continue", shown_dialog.buttons[2][1].text)
+        assert.are.equal("tx:Authentication: tx:Basic Auth", shown_dialog.buttons[3][1].text)
 
         ui.updateOnboardingConnectionDialogStatus(shown_dialog, "passed")
         assert.are.equal("tx:Suwayomi setup: connection (tx:tested)", shown_dialog.title)

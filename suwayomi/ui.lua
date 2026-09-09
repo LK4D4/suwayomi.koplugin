@@ -543,12 +543,64 @@ function SuwayomiUI.updateLanguageMenu(menu, _options, _onToggleCallback)
     return menu
 end
 
+local function getCredentialsFromDialog(dialog)
+    local fields = dialog:getFields()
+    return {
+        server_url = fields[1],
+        username = fields[2],
+        password = fields[3],
+        auth_method = dialog.auth_method,
+    }
+end
+
+local function authMethodLabel(method)
+    return method == "simple_login" and I18n.t("Simple Login") or I18n.t("Basic Auth")
+end
+
+local function buildAuthMethodButton(credentials, getDialog, onChanged)
+    local method = credentials.auth_method == "simple_login" and "simple_login" or "basic_auth"
+    local button_options
+    button_options = {
+        id = "auth_method",
+        text = I18n.f("Authentication: %1", authMethodLabel(method)),
+        callback = function()
+            local dialog = getDialog()
+            ChoiceDialogs.showChoiceDialog({
+                title = I18n.t("Authentication method"),
+                current = dialog.auth_method,
+                choices = {
+                    { value = "basic_auth", text = I18n.t("Basic Auth") },
+                    { value = "simple_login", text = I18n.t("Simple Login") },
+                },
+                onSelect = function(selected)
+                    if selected == dialog.auth_method then
+                        return
+                    end
+                    dialog.auth_method = selected
+                    button_options.text = I18n.f("Authentication: %1", authMethodLabel(selected))
+                    local button = dialog.button_table
+                        and dialog.button_table:getButtonById("auth_method")
+                    if button then
+                        button:setText(button_options.text, button.width)
+                        require("ui/uimanager"):setDirty(dialog, "ui")
+                    end
+                    if onChanged then
+                        onChanged()
+                    end
+                end,
+            })
+        end,
+    }
+    return button_options
+end
+
 function SuwayomiUI.showLoginDialog(options)
     local credentials = options.credentials or {}
     local UIManager = require("ui/uimanager")
     local dialog
 
     dialog = MultiInputDialog:new{
+        auth_method = credentials.auth_method == "simple_login" and "simple_login" or "basic_auth",
         title = I18n.t("Suwayomi login"),
         fields = {
             {
@@ -578,34 +630,22 @@ function SuwayomiUI.showLoginDialog(options)
                     text = I18n.t("Save"),
                     is_enter_default = true,
                     callback = function()
-                        local fields = dialog:getFields()
+                        local dialog_credentials = getCredentialsFromDialog(dialog)
                         UIManager:close(dialog)
                         if options.onSave then
-                            options.onSave({
-                                server_url = fields[1],
-                                username = fields[2],
-                                password = fields[3],
-                                auth_method = "basic_auth",
-                            })
+                            options.onSave(dialog_credentials)
                         end
                     end,
                 },
+            },
+            {
+                buildAuthMethodButton(credentials, function() return dialog end),
             },
         },
     }
 
     UIManager:show(dialog)
     dialog:onShowKeyboard()
-end
-
-local function getCredentialsFromDialog(dialog)
-    local fields = dialog:getFields()
-    return {
-        server_url = fields[1],
-        username = fields[2],
-        password = fields[3],
-        auth_method = "basic_auth",
-    }
 end
 
 local function formatOnboardingConnectionTitle(status)
@@ -662,6 +702,7 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
 
     dialog = MultiInputDialog:new{
         title = formatOnboardingConnectionTitle(options.connection_status),
+        auth_method = credentials.auth_method == "simple_login" and "simple_login" or "basic_auth",
         fields = {
             {
                 hint = I18n.t("Server URL"),
@@ -717,6 +758,14 @@ function SuwayomiUI.showOnboardingConnectionDialog(options)
                         end
                     end,
                 },
+            },
+            {
+                buildAuthMethodButton(credentials, function() return dialog end, function()
+                    if options.onAuthMethodChanged then
+                        options.onAuthMethodChanged()
+                    end
+                    SuwayomiUI.updateOnboardingConnectionDialogStatus(dialog, "untested")
+                end),
             },
         },
         close_callback = runClose,

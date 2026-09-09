@@ -384,7 +384,7 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.truthy(state.onboarding_connection_options)
 
         connection_menu.sub_item_table[1].callback(state.touchmenu)
-        state.login_dialog_options.onSave({ server_url = "https://new.example" })
+        state.login_dialog_options.onSave({ server_url = "https://new.example", auth_method = "simple_login" })
 
         assert.are.equal("https://new.example", state.saved_credentials.server_url)
         assert.are.equal(1, state.refresh_count)
@@ -392,6 +392,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         connection_menu.sub_item_table[2].callback(state.touchmenu)
         assert.are.equal("https://new.example", state.started_connection_job.active.credentials.server_url)
+        assert.are.equal("simple_login", state.started_connection_job.active.credentials.auth_method)
         state.started_connection_job.on_finish(state.started_connection_job.active, {
             ok = true,
             message = "Connection test passed.",
@@ -817,7 +818,7 @@ describe("suwayomi/plugin/settings_controller", function()
             server_url = "https://suwayomi.example",
             username = "alice",
             password = "secret",
-            auth_method = "basic_auth",
+            auth_method = "simple_login",
         }))
         assert.are.equal("Test connection before continuing.", state.messages[#state.messages])
         assert.is_nil(state.saved_credentials)
@@ -826,16 +827,21 @@ describe("suwayomi/plugin/settings_controller", function()
             server_url = "https://suwayomi.example",
             username = "alice",
             password = "secret",
-            auth_method = "basic_auth",
+            auth_method = "simple_login",
         })
+        assert.is_true(state.onboarding_connection_options.canContinue(state.tested_credentials))
+        state.onboarding_connection_options.onAuthMethodChanged()
+        assert.is_false(state.onboarding_connection_options.canContinue(state.tested_credentials))
+        state.onboarding_connection_options.onTestConnection(state.tested_credentials)
         assert.is_true(state.onboarding_connection_options.onContinue({
             server_url = "https://suwayomi.example",
             username = "alice",
             password = "secret",
-            auth_method = "basic_auth",
+            auth_method = "simple_login",
         }))
 
         assert.are.equal("https://suwayomi.example", state.saved_credentials.server_url)
+        assert.are.equal("simple_login", state.saved_credentials.auth_method)
         assert.truthy(state.choose_download_callback)
         assert.are.same({
             next_tick = true,

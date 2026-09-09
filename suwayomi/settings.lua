@@ -26,6 +26,7 @@ local DEFAULT_CREDENTIALS = {
 }
 local SUPPORTED_AUTH_METHODS = {
     basic_auth = true,
+    simple_login = true,
 }
 
 local DEFAULT_SOURCE_LANGUAGES = { "en" }

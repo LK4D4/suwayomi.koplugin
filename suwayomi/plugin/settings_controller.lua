@@ -306,6 +306,9 @@ function Methods:showOnboardingConnectionStep(options)
         onTestConnection = function(credentials)
             self:startOnboardingConnectionTest(credentials)
         end,
+        onAuthMethodChanged = function()
+            self.onboarding_connection_test_key = nil
+        end,
         onClose = function()
             self:clearOnboardingConnectionTest()
             self.onboarding_connection_dialog = nil
