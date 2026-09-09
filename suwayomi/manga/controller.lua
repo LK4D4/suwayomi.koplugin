@@ -864,6 +864,9 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
         if self:showChapterResultForManga(manga, result) then accept(self.current_chapter_context) end
     end, I18n.t("Could not load chapters."), "chapter_context")
 end
+function Methods:getMangaKeepNextUnreadDownloadsLimit(manga)
+    return SuwayomiSettings:loadMangaKeepNextUnreadDownloads(manga)
+end
 
 
 MangaController.methods = Methods

@@ -334,6 +334,32 @@ describe("suwayomi/manga/controller", function()
         })
     end)
 
+    it("shows the saved ahead policy through the real controller rather than a stale owner fallback", function()
+        local limits = { m1 = 5, m2 = 10 }
+        local plugin, state = installController({ keep_next_limits = limits })
+        local manga = { id = "m1", title = "Manga" }
+        local retained = plugin:getMangaActions(manga)
+        local ahead
+        for _, action in ipairs(retained) do
+            if action.id == "keep_downloaded" then ahead = action end
+        end
+        local function selected(target)
+            plugin:showKeepDownloadedMangaActions(target)
+            local choices = {}
+            for _, action in ipairs(state.manga_actions_options.actions) do
+                if action.checked then choices[#choices + 1] = action.id end
+            end
+            return choices
+        end
+
+        local enabled_label = ahead.text_func()
+        assert.are.same({ "keep_next_5_unread" }, selected(manga))
+        assert.are.same({ "keep_next_10_unread" }, selected({ id = "m2", title = "Other" }))
+        limits.m1 = 0
+        assert.are_not.equal(enabled_label, ahead.text_func())
+        assert.are.same({ "keep_next_0_unread" }, selected(manga))
+    end)
+
     it("builds full manga action lists for chapter menus", function()
         local plugin, state = installController({
             first_unread_downloaded = true,
