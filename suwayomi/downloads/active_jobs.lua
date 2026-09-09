@@ -244,16 +244,12 @@ function ActiveJobs:process()
     end
     local started_count = 0
     local earliest_retry_at
-    local terminating_pending = false
     self:reapStoppingJobs()
+    -- Stopping workers reserve their own slots, not every available slot.
     if next(self.terminating_pids) then
         earliest_retry_at = queue.now() + 1
-        terminating_pending = true
     end
     while self:getCount() < queue.max_active_chapters do
-        if terminating_pending then
-            break
-        end
         local ready_retry_index
         local ready_fresh_index
         local delayed_retry_at
