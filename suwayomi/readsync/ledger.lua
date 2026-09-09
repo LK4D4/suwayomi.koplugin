@@ -132,7 +132,7 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters)
             changed = true
         elseif entry and entry.read == true then
             if entry.path or hasUnrelatedFields(entry) then
-                entry.read = nil
+                entry.read = false
                 entry.pending_read_sync = nil
                 ledger[key] = entry
             else

@@ -215,9 +215,9 @@ local function mergeLedger(doc, ledger, replace_read_state)
         if type(supplied) == "table" then
             local current = doc.chapter_ledger[key]
             local merged = type(current) == "table" and copy(current) or {}
-            merged.read = supplied.read
             merged.pending_read_sync, merged.pending_read_state = supplied.pending_read_sync, supplied.pending_read_state
             for field, value in pairs(supplied) do merged[field] = copy(value) end
+            merged.read = supplied.read == true
             -- Read reconciliation must not restore a stale archive association.
             if type(current) == "table" and current.archive_generation ~= supplied.archive_generation then
                 merged.path, merged.archive_generation = current.path, current.archive_generation
@@ -241,7 +241,7 @@ function ManualDeletion:commitRead(ledger, captures, unread_keys, mangas, replac
                     for _, candidate in ipairs(unread_keys) do if candidate == key then unread = true; break end end
                 end
                 local entry = doc.chapter_ledger[key]
-                if (unread or (type(entry) == "table" and entry.read == false)) and validRequest(request, key)
+                if (unread or (type(entry) == "table" and entry.read ~= true)) and validRequest(request, key)
                     and pending(request) then
                     request.state, request.reason, request.retry_after = "revoked", "unread", 0
                 end
@@ -558,7 +558,7 @@ end
 
 function ManualDeletion:_processRequest(request)
     local entry = (self:_document().chapter_ledger or {})[request.key]
-    if type(entry) == "table" and entry.read == false then
+    if type(entry) == "table" and entry.read ~= true then
         return self:_transition(request.key, request.revision, function(current)
             current.state, current.reason, current.retry_after = "revoked", "unread", 0
         end)
