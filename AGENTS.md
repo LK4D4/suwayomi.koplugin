@@ -75,6 +75,7 @@ An explicit request to "finalize" authorizes the integration owner to commit, pu
 
 ## Tests
 
+- Before planning verification, running integration/UI/device checks, or handing off manual QA, read `docs/agents/testing.md`.
 - Specs isolate KOReader/runtime dependencies with `package.preload` and clear `package.loaded`; follow that pattern.
 - Clear module-level state in specs before requiring changed modules.
 - Keep `spec/main_spec.lua` focused on KOReader lifecycle and shell composition.

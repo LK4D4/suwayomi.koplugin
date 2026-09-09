@@ -1,3 +1,4 @@
 .codex/
 .opencode/
 .worktrees/
+__pycache__/

@@ -16,7 +16,7 @@ Runtime files shipped in releases are:
 - `suwayomi/`
 - `l10n/<locale>/suwayomi.mo` when compiled catalogs exist
 
-Tests, docs, CI files, worktrees, `AGENTS.md`, source `.po` files, and template `.pot` files are development-only and must not be included in manual Android plugin pushes or release payloads.
+Tests, docs, `scripts/`, sandbox profiles and generated data, CI files, worktrees, `AGENTS.md`, source `.po` files, and template `.pot` files are development-only and must not be included in manual Android plugin pushes or release payloads.
 
 ## Download ownership
 
@@ -207,6 +207,16 @@ External data is treated as untrusted at module boundaries: API responses are pa
 ## Test Strategy
 
 Specs run from the plugin root with `package.path = "?.lua;" .. package.path`. KOReader modules are stubbed through `package.preload`, and modules with state are cleared from `package.loaded` before requiring them.
+
+For opt-in live-server checks, local KOReader UI automation, and device evidence, use the [agent testing workflow](agents/testing.md). Normal specs remain offline and require neither installed applications nor a personal library.
+
+Development tooling under `scripts/` stays separate from the production plugin:
+
+- `sandbox.py` owns a disposable root, pinned application downloads, generated Local source fixtures, exact-hash runtime deployment, and foreground service lifecycle. Its launcher targets Linux x86_64 with a graphical session; Python uses only the standard library. It does not install OS packages, change network configuration, or manage unrelated services.
+- `sandbox_ui.py` owns authenticated observations, existing-widget actions, bounded waits, framebuffer capture, and the single-chapter smoke against the real UI.
+- `sandbox-inspector.lua` is installed only in the sandbox profile. It restricts KOReader's bundled inspector to loopback and a private token; it does not modify the production plugin or upstream runtime files.
+
+Credentials, inspector access files, settings, archives, and raw evidence remain private sandbox data outside the runtime payload. Live checks complement isolated specs; desktop evidence does not establish device lifecycle, permissions, sleep/wake, or e-ink behavior.
 
 Coverage is organized around runtime boundaries:
 
