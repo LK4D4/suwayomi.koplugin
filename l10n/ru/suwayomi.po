@@ -47,15 +47,15 @@ msgstr[2] "%1 глав"
 
 msgid "%1 download is busy. Delete it after it finishes."
 msgid_plural "%1 downloads are busy. Delete them after they finish."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "%1 загрузка занята. Удалите её после завершения."
+msgstr[1] "%1 загрузки заняты. Удалите их после завершения."
+msgstr[2] "%1 загрузок заняты. Удалите их после завершения."
 
 msgid "%1 download is busy. Mark it read again after it finishes."
 msgid_plural "%1 downloads are busy. Mark them read again after they finish."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "%1 загрузка занята. После её завершения снова отметьте главу прочитанной."
+msgstr[1] "%1 загрузки заняты. После их завершения снова отметьте главы прочитанными."
+msgstr[2] "%1 загрузок заняты. После их завершения снова отметьте главы прочитанными."
 
 msgid "%1 failed for %2"
 msgstr "%1: ошибка для %2"
@@ -69,13 +69,12 @@ msgstr[0] "%1 манга"
 msgstr[1] "%1 манги"
 msgstr[2] "%1 манг"
 
-#, fuzzy
 msgid "%1 more chapter is available. Run this action again to download it."
 msgid_plural ""
 "%1 more chapters are available. Run this action again to download them."
-msgstr[0] "Нет непрочитанных глав для скачивания."
-msgstr[1] "Нет непрочитанных глав для скачивания."
-msgstr[2] "Нет непрочитанных глав для скачивания."
+msgstr[0] "Доступна ещё %1 глава. Повторите это действие, чтобы скачать её."
+msgstr[1] "Доступны ещё %1 главы. Повторите это действие, чтобы скачать их."
+msgstr[2] "Доступно ещё %1 глав. Повторите это действие, чтобы скачать их."
 
 msgid "%1 result"
 msgid_plural "%1 results"
@@ -108,14 +107,18 @@ msgid ""
 "A chapter in the buffer failed. Use that chapter's Retry or Redownload "
 "action."
 msgstr ""
+"Ошибка загрузки главы в буфере. Используйте действие «Повторить» или "
+"«Скачать заново» для этой главы."
 
 msgid ""
 "A chapter in the buffer has pending manual deletion. Automatic refill cannot "
 "replace it."
 msgstr ""
+"Глава в буфере ожидает удаления по ручному запросу. Автоматическое пополнение "
+"не может заменить её."
 
 msgid "Accepted manual deletion"
-msgstr ""
+msgstr "Принятый ручной запрос удаления"
 
 msgid "Actions"
 msgstr "Действия"
@@ -127,19 +130,21 @@ msgid "Adding to library..."
 msgstr "Добавление в библиотеку..."
 
 msgid "Ahead blocked"
-msgstr ""
+msgstr "Предзагрузка заблокирована"
 
 msgid ""
 "Ahead five with two existing positions needs only three downloads. Next five "
 "can add five more. Neither starts at the current reader page."
 msgstr ""
+"Для предзагрузки пяти глав при двух уже занятых позициях нужны лишь три "
+"загрузки. «Скачать следующие 5» может добавить ещё пять. Ни одно из действий "
+"не начинает отсчёт с текущей страницы в читалке."
 
-#, fuzzy
 msgid "Ahead pending"
-msgstr "По возрастанию"
+msgstr "Предзагрузка запланирована"
 
 msgid "Ahead waiting"
-msgstr ""
+msgstr "Предзагрузка ожидает"
 
 msgid "All manga"
 msgstr "Вся манга"
@@ -150,9 +155,8 @@ msgstr "Все сканлейторы"
 msgid "Always ask"
 msgstr "Всегда спрашивать"
 
-#, fuzzy
 msgid "Another download is being verified."
-msgstr "Загрузка больше не находится в состоянии ошибки."
+msgstr "Проверяется другая загрузка."
 
 msgctxt "source filter tri-state"
 msgid "Any"
@@ -165,18 +169,20 @@ msgid "Apply saved filter"
 msgstr "Применить сохранённый фильтр"
 
 msgid "Archive deletion blocked; file preserved"
-msgstr ""
+msgstr "Удаление архива заблокировано; файл сохранён"
 
 msgid "Archive deletion pending"
-msgstr ""
+msgstr "Архив ожидает удаления"
 
 msgid "Archive deletion pending: close reader"
-msgstr ""
+msgstr "Архив ожидает удаления: закройте читалку"
 
 msgid ""
 "Archive or download ownership is not verified. Existing files and work are "
 "preserved."
 msgstr ""
+"Принадлежность архива или задания загрузки не подтверждена. "
+"Существующие файлы и задания сохранены."
 
 msgid "Artist"
 msgstr "Художник"
@@ -195,9 +201,11 @@ msgid ""
 "Automatic chapter cleanup is paused because its saved data uses an "
 "unsupported version."
 msgstr ""
+"Автоматическая очистка глав приостановлена: сохранённые данные имеют "
+"неподдерживаемую версию."
 
 msgid "Automatic chapter cleanup paused for %1 unsafe files."
-msgstr ""
+msgstr "Автоматическая очистка глав приостановлена: безопасность %1 файлов не подтверждена."
 
 msgid "Available"
 msgstr "Доступно"
@@ -239,19 +247,19 @@ msgid "Cancel search"
 msgstr "Отменить поиск"
 
 msgid "Cannot cancel download: storage is ambiguous"
-msgstr ""
+msgstr "Нельзя отменить загрузку: состояние хранилища не определено"
 
 msgid "Cannot cancel downloads: storage is ambiguous"
-msgstr ""
+msgstr "Нельзя отменить загрузки: состояние хранилища не определено"
 
 msgid "Cannot delete chapter: storage is ambiguous"
-msgstr ""
+msgstr "Нельзя удалить главу: состояние хранилища не определено"
 
 msgid "Cannot enqueue download: storage is ambiguous"
-msgstr ""
+msgstr "Нельзя добавить загрузку в очередь: состояние хранилища не определено"
 
 msgid "Cannot enqueue downloads: storage is ambiguous"
-msgstr ""
+msgstr "Нельзя добавить загрузки в очередь: состояние хранилища не определено"
 
 msgid "Categories"
 msgstr "Категории"
@@ -278,7 +286,7 @@ msgid "Chapter downloads"
 msgstr "Загрузки глав"
 
 msgid "Chapter view changed. Run this download action again."
-msgstr ""
+msgstr "Список глав изменился. Повторите это действие загрузки."
 
 msgid "Chapters"
 msgstr "Главы"
@@ -286,9 +294,8 @@ msgstr "Главы"
 msgid "Chapters are loading."
 msgstr "Главы загружаются."
 
-#, fuzzy
 msgid "Check the connection and download folder in Settings."
-msgstr "Укажите папку загрузок в Настройки > Загрузки."
+msgstr "Проверьте подключение и папку загрузок в настройках."
 
 msgid "Checking chapters"
 msgstr "Проверка глав"
@@ -324,9 +331,14 @@ msgid ""
 "authorize deletion. A completion without an archive occupies a position but "
 "cannot authorize deleting a later download."
 msgstr ""
+"Учитываются статус «Завершено» и закрытие главы; одного перехода на последнюю "
+"страницу недостаточно. Ручные отметки о завершении также учитываются при "
+"хранении. Старые отметки о прочтении не дают права на удаление. Завершение без "
+"архива занимает позицию в истории, но не даёт права удалить более позднюю "
+"загрузку."
 
 msgid "Completion and archive removal"
-msgstr ""
+msgstr "Завершение и удаление архивов"
 
 msgid "Connection"
 msgstr "Подключение"
@@ -340,33 +352,34 @@ msgstr "Проверка подключения успешна."
 msgid "Continue"
 msgstr "Продолжить"
 
-#, fuzzy
 msgid "Could not cancel download: %1"
-msgstr "Не удалось начать загрузку главы: %1"
+msgstr "Не удалось отменить загрузку: %1"
 
-#, fuzzy
 msgid "Could not clear failed downloads: %1"
-msgstr "Не удалось начать загрузку главы: %1"
+msgstr "Не удалось очистить загрузки с ошибками: %1"
 
-#, fuzzy
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
-msgstr[0] "Не удалось начать загрузку главы: %1"
-msgstr[1] "Не удалось начать загрузку главы: %1"
-msgstr[2] "Не удалось начать загрузку главы: %1"
+msgstr[0] "Не удалось подтвердить %1 загрузку главы."
+msgstr[1] "Не удалось подтвердить %1 загрузки глав."
+msgstr[2] "Не удалось подтвердить %1 загрузок глав."
 
 msgid "Could not confirm saved refill work. No new downloads are confirmed."
-msgstr ""
+msgstr "Не удалось подтвердить сохранение задания пополнения. Новые загрузки не подтверждены."
 
 msgid ""
 "Could not confirm the read state was saved. No deletion was started. Reopen "
 "the chapter list and try again."
 msgstr ""
+"Не удалось подтвердить сохранение отметки о прочтении. Удаление не начато. "
+"Снова откройте список глав и повторите попытку."
 
 msgid ""
 "Could not confirm the unread state was saved. Pending deletion may still "
 "run. Reopen the chapter list and try again."
 msgstr ""
+"Не удалось подтвердить сохранение отметки «Непрочитано». Ожидающее удаление "
+"всё ещё может выполниться. Снова откройте список глав и повторите попытку."
 
 msgid "Could not connect to Suwayomi."
 msgstr "Не удалось подключиться к Suwayomi."
@@ -375,16 +388,16 @@ msgid ""
 "Could not delete %1 download safely. Check its status in the chapter list."
 msgid_plural ""
 "Could not delete %1 downloads safely. Check their status in the chapter list."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Не удалось безопасно удалить %1 загрузку. Проверьте её статус в списке глав."
+msgstr[1] "Не удалось безопасно удалить %1 загрузки. Проверьте их статус в списке глав."
+msgstr[2] "Не удалось безопасно удалить %1 загрузок. Проверьте их статус в списке глав."
 
 msgid "Could not delete %1 download. Reopen the chapter list and try again."
 msgid_plural ""
 "Could not delete %1 downloads. Reopen the chapter list and try again."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Не удалось удалить %1 загрузку. Снова откройте список глав и повторите попытку."
+msgstr[1] "Не удалось удалить %1 загрузки. Снова откройте список глав и повторите попытку."
+msgstr[2] "Не удалось удалить %1 загрузок. Снова откройте список глав и повторите попытку."
 
 msgid "Could not delete saved filter."
 msgstr "Не удалось удалить сохранённый фильтр."
@@ -405,7 +418,7 @@ msgid "Could not load chapters."
 msgstr "Не удалось загрузить главы."
 
 msgid "Could not load chapters. Refill will retry automatically."
-msgstr ""
+msgstr "Не удалось загрузить главы. Пополнение автоматически повторит попытку."
 
 msgid "Could not load library categories."
 msgstr "Не удалось загрузить категории библиотеки."
@@ -419,16 +432,14 @@ msgstr "Не удалось загрузить сохранённые фильт
 msgid "Could not load source filters."
 msgstr "Не удалось загрузить фильтры источника."
 
-#, fuzzy
 msgid "Could not queue download: %1"
-msgstr "Не удалось начать загрузку главы: %1"
+msgstr "Не удалось добавить загрузку в очередь: %1"
 
 msgid "Could not queue downloads. Reopen the chapter list and try again."
-msgstr ""
+msgstr "Не удалось добавить загрузки в очередь. Снова откройте список глав и повторите попытку."
 
-#, fuzzy
 msgid "Could not redownload chapter."
-msgstr "Не удалось загрузить главы."
+msgstr "Не удалось скачать главу заново."
 
 msgid "Could not retry download."
 msgstr "Не удалось повторить загрузку."
@@ -436,9 +447,8 @@ msgstr "Не удалось повторить загрузку."
 msgid "Could not save saved filter."
 msgstr "Не удалось сохранить фильтр."
 
-#, fuzzy
 msgid "Could not start chapter download"
-msgstr "Не удалось начать загрузку главы: %1"
+msgstr "Не удалось начать загрузку главы"
 
 msgid "Could not start chapter download: %1"
 msgstr "Не удалось начать загрузку главы: %1"
@@ -473,16 +483,14 @@ msgstr "Не удалось начать загрузку источников: 
 msgid "Could not start source loading: unknown error"
 msgstr "Не удалось начать загрузку источников: неизвестная ошибка"
 
-#, fuzzy
 msgid "Could not update download ahead: %1"
-msgstr "Не удалось начать загрузку главы: %1"
+msgstr "Не удалось изменить предзагрузку: %1"
 
 msgid "Could not update library."
 msgstr "Не удалось обновить библиотеку."
 
-#, fuzzy
 msgid "Could not verify download"
-msgstr "Не удалось повторить загрузку."
+msgstr "Не удалось проверить загрузку"
 
 msgid "Delete"
 msgstr "Удалить"
@@ -527,7 +535,7 @@ msgid "Delete saved filter \"%1\"?"
 msgstr "Удалить сохранённый фильтр \"%1\"?"
 
 msgid "Deletion not accepted: download busy; request again"
-msgstr ""
+msgstr "Удаление не принято: загрузка занята; повторите запрос"
 
 msgctxt "source filter sort direction"
 msgid "Descending"
@@ -544,23 +552,19 @@ msgid "Download"
 msgstr "Скачать"
 
 msgid "Download ahead"
-msgstr "Скачать заранее"
+msgstr "Предзагрузка"
 
-#, fuzzy
 msgid "Download ahead: %1"
-msgstr "Скачать заранее"
+msgstr "Предзагрузка: %1"
 
-#, fuzzy
 msgid "Download all chapters (up to 50 new)"
-msgstr "Скачать все главы"
+msgstr "Скачать все главы (до 50 новых)"
 
-#, fuzzy
 msgid "Download all unread (up to 50 new)"
-msgstr "Скачать все непрочитанные"
+msgstr "Скачать все непрочитанные (до 50 новых)"
 
-#, fuzzy
 msgid "Download damaged; redownload"
-msgstr "Загрузка уже выполняется."
+msgstr "Загрузка повреждена; скачайте заново"
 
 msgid "Download directory: %1"
 msgstr "Папка загрузок: %1"
@@ -577,9 +581,8 @@ msgstr "Скачать первую непрочитанную"
 msgid "Download folder"
 msgstr "Папка загрузок"
 
-#, fuzzy
 msgid "Download help"
-msgstr "Скачать заранее"
+msgstr "Справка по загрузкам"
 
 msgid "Download is already downloading."
 msgstr "Загрузка уже выполняется."
@@ -593,9 +596,8 @@ msgstr "Загрузка больше не находится в состоян�
 msgid "Download is no longer queued."
 msgstr "Загрузка больше не в очереди."
 
-#, fuzzy
 msgid "Download next %1 (up to 50 new)"
-msgstr "Скачать следующие 10"
+msgstr "Скачать следующие %1 (до 50 новых)"
 
 msgid "Download next 10"
 msgstr "Скачать следующие 10"
@@ -612,13 +614,17 @@ msgid ""
 "source order and the exact saved scanlator filter, never a silent fallback "
 "to All."
 msgstr ""
+"«Скачать следующие» добавляет подходящие непрочитанные главы для загрузки. "
+"Предзагрузка заполняет первые непрочитанные позиции; уже скачанные главы и "
+"задания в очереди учитываются. Оба действия используют порядок источника и "
+"точный сохранённый фильтр сканлейторов, без незаметного перехода к варианту "
+"«Все сканлейторы»."
 
 msgid "Download selected"
 msgstr "Скачать выбранное"
 
-#, fuzzy
 msgid "Download selected (up to 50 new)"
-msgstr "Скачать выбранное"
+msgstr "Скачать выбранное (до 50 новых)"
 
 msgid "Download the chapter first."
 msgstr "Сначала скачайте главу."
@@ -653,9 +659,8 @@ msgstr "Изменить фильтры"
 msgid "Edit search"
 msgstr "Изменить поиск"
 
-#, fuzzy
 msgid "Enable download ahead"
-msgstr "Остановить предварительную загрузку"
+msgstr "Включить предзагрузку"
 
 msgid "Enter a search query."
 msgstr "Введите поисковый запрос."
@@ -713,19 +718,17 @@ msgstr "Истекло время ожидания обновления расш
 msgid "Failed"
 msgstr "Ошибка"
 
-#, fuzzy
 msgid "Failed to queue %1 chapter download."
 msgid_plural "Failed to queue %1 chapter downloads."
-msgstr[0] "Не удалось удалить %1 загрузку."
-msgstr[1] "Не удалось удалить %1 загрузки."
-msgstr[2] "Не удалось удалить %1 загрузок."
+msgstr[0] "Не удалось добавить в очередь %1 загрузку главы."
+msgstr[1] "Не удалось добавить в очередь %1 загрузки глав."
+msgstr[2] "Не удалось добавить в очередь %1 загрузок глав."
 
-#, fuzzy
 msgid "Failed to save scanlator filter."
-msgstr "Не удалось сохранить фильтр."
+msgstr "Не удалось сохранить фильтр сканлейторов."
 
 msgid "Failed to save settings."
-msgstr ""
+msgstr "Не удалось сохранить настройки."
 
 msgid "Filter"
 msgstr "Фильтр"
@@ -733,9 +736,8 @@ msgstr "Фильтр"
 msgid "Filter name"
 msgstr "Название фильтра"
 
-#, fuzzy
 msgid "Finish retention: %1"
-msgstr "Искать расширения: %1"
+msgstr "Хранение завершённых: %1"
 
 msgid "First unread"
 msgstr "Первая непрочитанная"
@@ -777,40 +779,46 @@ msgstr "KOReader не смог открыть эту главу сейчас."
 
 msgid "Keep %1 newest completion"
 msgid_plural "Keep %1 newest completions"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Хранить %1 последнюю завершённую главу"
+msgstr[1] "Хранить %1 последние завершённые главы"
+msgstr[2] "Хранить %1 последних завершённых глав"
 
 msgid ""
 "Keep 2 newest completions: after completing A, B, then C in one manga, A "
 "becomes eligible for removal. B and C remain. Live readers stay protected."
 msgstr ""
+"«Хранить 2 последние завершённые главы»: после завершения A, B, затем C в "
+"одной манге главу A можно удалить. B и C остаются. Открытые в читалке главы "
+"защищены от удаления."
 
 msgid "Keep downloads"
 msgstr "Сохранять загрузки"
 
-#, fuzzy
 msgid "Keep first 10 unread"
-msgstr "Открыть первую непрочитанную"
+msgstr "Хранить первые 10 непрочитанных"
 
-#, fuzzy
 msgid "Keep first 5 unread"
-msgstr "Открыть первую непрочитанную"
+msgstr "Хранить первые 5 непрочитанных"
 
-#, fuzzy
 msgid "Keep first 50 unread"
-msgstr "Открыть первую непрочитанную"
+msgstr "Хранить первые 50 непрочитанных"
 
 msgid ""
 "Keep the first 50 filtered unread chapters available? Existing downloads and "
 "queued chapters count toward this buffer."
 msgstr ""
+"Держать доступными первые 50 непрочитанных глав, соответствующих фильтру? "
+"Уже скачанные главы и главы в очереди входят в этот буфер."
 
 msgid ""
 "Keep the newest recorded completions per manga, not chapter-list positions. "
 "Completion requires completed status and close, or a plugin manual mark-read "
 "action. Live readers remain protected."
 msgstr ""
+"Хранить последние записанные завершения для каждой манги, а не позиции в "
+"списке глав. Для завершения нужны статус «Завершено» и закрытие главы либо "
+"ручная отметка о прочтении в плагине. Открытые в читалке главы защищены от "
+"удаления."
 
 msgctxt "source mode"
 msgid "Latest"
@@ -864,9 +872,8 @@ msgstr "Загрузка..."
 msgid "Login information"
 msgstr "Данные входа"
 
-#, fuzzy
 msgid "Manga"
-msgstr "%1 манга"
+msgstr "Манга"
 
 msgid "Manga actions"
 msgstr "Действия с мангой"
@@ -875,7 +882,7 @@ msgid "Manga information"
 msgstr "Информация о манге"
 
 msgid "Manga or source details are unavailable. Refresh the chapter list."
-msgstr ""
+msgstr "Данные манги или источника недоступны. Обновите список глав."
 
 msgid "Mark as read"
 msgstr "Отметить как прочитанное"
@@ -899,6 +906,12 @@ msgid ""
 "uncertain, duplicate, or automatic downloads do not. See the README for "
 "examples and safety details."
 msgstr ""
+"Отметка о прочтении может сохраниться, даже если удаление занято или "
+"заблокировано. Принятое удаление сохраняет сопутствующие файлы, резервные "
+"копии и метаданные чтения. Отметка «Непрочитано» или принятая позже явная "
+"команда «Скачать»/«Повторить» отменяет оставшееся удаление; неудачные, "
+"неподтверждённые, дублирующие или автоматические загрузки этого не делают. "
+"Примеры и сведения о безопасности приведены в README."
 
 msgid "Never ask"
 msgstr "Никогда не спрашивать"
@@ -911,10 +924,12 @@ msgid ""
 "downloads keep running; request deletion again after they finish. Accepted "
 "removal continues with this setting Off."
 msgstr ""
+"Новые ручные отметки о прочтении могут удалять только локальный архив. "
+"Занятые загрузки продолжаются; повторите запрос удаления после их завершения. "
+"Принятое удаление продолжается и при выключенной настройке."
 
-#, fuzzy
 msgid "Next downloads and download ahead"
-msgstr "Остановить предварительную загрузку"
+msgstr "Следующие загрузки и предзагрузка"
 
 msgid "Next page"
 msgstr "Следующая страница"
@@ -925,20 +940,22 @@ msgstr "Следующая попытка: %1"
 msgid "No actions available"
 msgstr "Нет доступных действий"
 
-#, fuzzy
 msgid "No chapters available to download."
-msgstr "Нет непрочитанных глав для скачивания."
+msgstr "Нет глав для скачивания."
 
 msgid ""
 "No chapters match the saved scanlator filter. Choose another scanlator or "
 "All scanlators."
 msgstr ""
+"Нет глав, соответствующих сохранённому фильтру сканлейторов. Выберите другого "
+"сканлейтора или «Все сканлейторы»."
 
-#, fuzzy
 msgid ""
 "No chapters match the saved scanlator filter. Other scanlators are not "
 "selected."
-msgstr "Не удалось сохранить фильтр."
+msgstr ""
+"Нет глав, соответствующих сохранённому фильтру сканлейторов. Другие "
+"сканлейторы не выбраны."
 
 msgid "No chapters selected."
 msgstr "Главы не выбраны."
@@ -949,9 +966,8 @@ msgstr "Описание недоступно."
 msgid "No downloads queued."
 msgstr "Нет загрузок в очереди."
 
-#, fuzzy
 msgid "No eligible chapters match the saved scanlator filter."
-msgstr "Не удалось сохранить фильтр."
+msgstr "Нет подходящих для загрузки глав, соответствующих сохранённому фильтру сканлейторов."
 
 msgid "No error details were recorded."
 msgstr "Подробности ошибки не сохранены."
@@ -968,11 +984,10 @@ msgstr "Нет манги, соответствующей этому поиск�
 msgid "No matching extensions"
 msgstr "Нет подходящих расширений"
 
-#, fuzzy
 msgid ""
 "No new downloads available: chapters are already downloaded or in the "
 "download queue."
-msgstr "Буфер предварительной загрузки уже скачан или стоит в очереди."
+msgstr "Новых загрузок нет: главы уже скачаны или находятся в очереди загрузок."
 
 msgid "No new downloads queued."
 msgstr "Новые загрузки не добавлены в очередь."
@@ -980,9 +995,8 @@ msgstr "Новые загрузки не добавлены в очередь."
 msgid "No poster"
 msgstr "Нет обложки"
 
-#, fuzzy
 msgid "No read downloads to delete."
-msgstr "Новые загрузки не добавлены в очередь."
+msgstr "Нет прочитанных загрузок для удаления."
 
 msgid "No results"
 msgstr "Нет результатов"
@@ -1002,7 +1016,6 @@ msgstr "Не установлено"
 msgid "Obsolete"
 msgstr "Устарело"
 
-#, fuzzy
 msgid "Off"
 msgstr "Выкл."
 
@@ -1061,12 +1074,11 @@ msgstr "Предыдущая страница"
 msgid "Queue"
 msgstr "Очередь"
 
-#, fuzzy
 msgid "Queue up to %1 new chapter download?"
 msgid_plural "Queue up to %1 new chapter downloads?"
-msgstr[0] "Добавить в очередь %1 непрочитанную главу?"
-msgstr[1] "Добавить в очередь %1 непрочитанные главы?"
-msgstr[2] "Добавить в очередь %1 непрочитанных глав?"
+msgstr[0] "Добавить в очередь до %1 новой загрузки главы?"
+msgstr[1] "Добавить в очередь до %1 новых загрузок глав?"
+msgstr[2] "Добавить в очередь до %1 новых загрузок глав?"
 
 msgid "Queued"
 msgstr "В очереди"
@@ -1088,16 +1100,18 @@ msgstr "Синхронизация состояния прочтения уже 
 
 msgid ""
 "Reading or download choices changed. Refill will use the current choices."
-msgstr ""
+msgstr "Состояние прочтения или параметры загрузки изменились. Пополнение использует текущий выбор."
 
-#, fuzzy
 msgid "Redownload"
-msgstr "Скачать"
+msgstr "Скачать заново"
 
 msgid ""
 "Refill Retry reevaluates current unread positions. It does not retry a "
 "failed chapter or override pending manual deletion."
 msgstr ""
+"«Повторить пополнение» заново проверяет текущие непрочитанные позиции. "
+"Действие не повторяет загрузку главы с ошибкой и не отменяет ожидающее "
+"удаление по ручному запросу."
 
 msgid ""
 "Refill Retry reevaluates the buffer; it does not retry failed chapters or "
@@ -1106,6 +1120,12 @@ msgid ""
 "Cancel all retires every refill. Cancellation keeps ahead enabled for later "
 "reading or chapter actions."
 msgstr ""
+"«Повторить пополнение» заново проверяет буфер; действие не повторяет загрузку "
+"глав с ошибками и не отменяет ожидающее удаление. «Остановить предзагрузку» "
+"выключает правило, но сохраняет принятые задания. Отмена загрузки прекращает "
+"текущее пополнение для этой манги; отмена всех загрузок прекращает все "
+"пополнения. Отмена оставляет предзагрузку включённой для последующих событий "
+"чтения или действий с главами."
 
 msgid ""
 "Refill follows completed close, including native next-file reading; manual "
@@ -1114,6 +1134,12 @@ msgid ""
 "do not create refill requests. Pending work survives offline operation and "
 "restart."
 msgstr ""
+"Пополнение следует за закрытием завершённой главы, в том числе при переходе "
+"к следующему файлу средствами читалки; ручными отметками «Прочитано»/"
+"«Непрочитано»; фактическим согласованием состояния прочтения; успешной "
+"загрузкой списка глав, возвратом к нему или обновлением; изменениями "
+"предзагрузки или сканлейтора. Перерисовка, ход загрузки и отмена не создают "
+"запросов пополнения. Ожидающие задания сохраняются без сети и после перезапуска."
 
 msgid "Refresh chapters"
 msgstr "Обновить главы"
@@ -1140,7 +1166,7 @@ msgid "Removing from library..."
 msgstr "Удаление из библиотеки..."
 
 msgid "Reopen the chapter list and try again."
-msgstr ""
+msgstr "Снова откройте список глав и повторите попытку."
 
 msgid "Reset filters"
 msgstr "Сбросить фильтры"
@@ -1148,12 +1174,11 @@ msgstr "Сбросить фильтры"
 msgid "Retry"
 msgstr "Повторить"
 
-#, fuzzy
 msgid "Retry download ahead"
-msgstr "Остановить предварительную загрузку"
+msgstr "Повторить предзагрузку"
 
 msgid "Retry refill"
-msgstr ""
+msgstr "Повторить пополнение"
 
 msgid "Retry scheduled"
 msgstr "Повтор запланирован"
@@ -1162,7 +1187,7 @@ msgid "Retry time unavailable."
 msgstr "Время повторной попытки недоступно."
 
 msgid "Retry, Stop, and Cancel"
-msgstr ""
+msgstr "Повтор, остановка и отмена"
 
 msgid "Save"
 msgstr "Сохранить"
@@ -1192,16 +1217,14 @@ msgstr "Сервер не поддерживает сохранённые фил
 msgid "Saved filters metadata is not valid JSON."
 msgstr "Метаданные сохранённых фильтров не являются корректным JSON."
 
-#, fuzzy
 msgid "Saved refill state is unsupported. Existing data is preserved."
-msgstr "Сервер не поддерживает сохранённые фильтры."
+msgstr "Сохранённое состояние пополнения не поддерживается. Существующие данные сохранены."
 
 msgid "Scanlator filter"
 msgstr "Фильтр сканлейторов"
 
-#, fuzzy
 msgid "Scanlator: %1"
-msgstr "Фильтр сканлейторов"
+msgstr "Сканлейтор: %1"
 
 msgctxt "extension action"
 msgid "Search"
@@ -1249,11 +1272,15 @@ msgid ""
 "Server association unknown. Open this manga on the current server and choose "
 "Download ahead again."
 msgstr ""
+"Неизвестно, с каким сервером связана манга. Откройте эту мангу на текущем "
+"сервере и снова выберите «Предзагрузка»."
 
 msgid ""
 "Server changed. Open this manga on the current server and choose Download "
 "ahead again."
 msgstr ""
+"Сервер изменился. Откройте эту мангу на текущем сервере и снова выберите "
+"«Предзагрузка»."
 
 msgid "Set a download folder in Settings > Downloads."
 msgstr "Укажите папку загрузок в Настройки > Загрузки."
@@ -1295,12 +1322,14 @@ msgid "Status"
 msgstr "Статус"
 
 msgid "Stop download ahead"
-msgstr "Остановить предварительную загрузку"
+msgstr "Остановить предзагрузку"
 
 msgid ""
 "Stop download ahead turns this manga's policy Off and stops pending refill. "
 "Already accepted chapter downloads remain."
 msgstr ""
+"«Остановить предзагрузку» выключает правило для этой манги и прекращает "
+"ожидающее пополнение. Уже принятые загрузки глав сохраняются."
 
 msgid "Suwayomi"
 msgstr "Suwayomi"
@@ -1392,6 +1421,8 @@ msgid ""
 "The server rejected the chapter request. Check connection settings, then "
 "choose Retry refill."
 msgstr ""
+"Сервер отклонил запрос глав. Проверьте настройки подключения, затем выберите "
+"«Повторить пополнение»."
 
 msgid "This book is not linked to Suwayomi chapters."
 msgstr "Эта книга не связана с главами Suwayomi."
@@ -1464,20 +1495,17 @@ msgstr "Использовать эту папку"
 msgid "Username"
 msgstr "Имя пользователя"
 
-#, fuzzy
 msgid "Verify download"
-msgstr "Сохранять загрузки"
+msgstr "Проверить загрузку"
 
-#, fuzzy
 msgid "Verifying download"
-msgstr "%1 отсутствующая загрузка."
+msgstr "Проверка загрузки"
 
 msgid "Waiting to evaluate the unread buffer."
-msgstr ""
+msgstr "Ожидание проверки буфера непрочитанных глав."
 
-#, fuzzy
 msgid "When download ahead runs"
-msgstr "Остановить предварительную загрузку"
+msgstr "Когда работает предзагрузка"
 
 msgid "You can continue."
 msgstr "Можно продолжить."
