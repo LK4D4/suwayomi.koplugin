@@ -1,11 +1,12 @@
 -- Boundary: HTTP transport for Suwayomi GraphQL and binary downloads.
 --
 -- Responsibility: build request headers/URLs, choose the right HTTP client, map
--- transport failures to plugin errors, and stream downloaded bytes to files.
+-- transport/source failures to safe plugin errors, and stream downloads to files.
 -- Owned state: one credential-scoped cookie or UI Login token pair in memory.
 -- Dependencies: socket/http, ssl.https, ltn12, and Lua file IO at call time.
 -- External data: credentials, URLs, HTTP status codes, and downloaded bytes are
--- normalized here before the API facade parses or returns them.
+-- normalized here before the API facade parses or returns them. GraphQL errors
+-- retain only transient classification or public schema-compatibility fields.
 
 local Transport = {}
 local session
@@ -455,6 +456,63 @@ local function graphQLAuthRejected(request_body, response_body)
     return true
 end
 
+local COMPATIBILITY_FIELDS = {
+    "iconUrl", "isNsfw", "supportsLatest", "apkName", "repo",
+    "author", "artist", "description", "genre", "status", "filters", "meta", "setSourceMetas",
+}
+local TRANSIENT_SOURCE_ERRORS = {
+    "timed out", "timeout", "could not reach", "could not download chapter page",
+    "too many requests", "rate limit", "server error", "bad gateway", "service unavailable",
+}
+
+local function graphQLFailure(response_body, strict)
+    local json = require("dkjson")
+    local response, position, decode_error = json.decode(response_body, 1, json.null)
+    local failure = { ok = false, error = "Suwayomi GraphQL request failed.", retryable = false }
+    if decode_error or type(response) ~= "table" or response_body:sub(position):find("%S") then
+        return strict and failure or nil
+    end
+    if response.errors == nil then return end
+    if type(response.errors) ~= "table" or #response.errors == 0 then return failure end
+
+    -- Only validation without execution may reach the facade's legacy fallbacks.
+    -- Rebuild its error body from public constants, never server diagnostics.
+    local schema_errors = {}
+    local schema_only = response.data == nil or response.data == json.null
+    local transient = true
+    for _, err in ipairs(response.errors) do
+        if type(err) ~= "table" or type(err.message) ~= "string" then return failure end
+        local message = err.message
+        local schema = err.path == nil and (message:find("Cannot query field", 1, true)
+            or message:find("Unknown field", 1, true) or message:find("FieldUndefined", 1, true))
+        local recognized = false
+        if schema then
+            for _, field in ipairs(COMPATIBILITY_FIELDS) do
+                if message:find("%f[%w_]" .. field .. "%f[^%w_]") then
+                    schema_errors[#schema_errors + 1] = { message = 'Cannot query field "' .. field .. '"' }
+                    recognized = true
+                end
+            end
+        end
+        schema_only = schema_only and recognized
+        local normalized, temporary = message:lower(), false
+        for _, phrase in ipairs(TRANSIENT_SOURCE_ERRORS) do
+            if normalized:find(phrase, 1, true) then temporary = true; break end
+        end
+        -- An auth or validation error mixed with a timeout is not a source retry.
+        if schema or normalized:find("unauthorized", 1, true)
+            or normalized:find("forbidden", 1, true) or normalized:find("authentication", 1, true)
+        then temporary = false end
+        transient = transient and temporary
+    end
+    if schema_only then
+        return { ok = true, response_body = json.encode({ errors = schema_errors }) }
+    end
+    failure.retryable = transient
+    if transient then failure.error = "Temporary Suwayomi source failure." end
+    return failure
+end
+
 local function performGraphQLRequest(credentials, request_body, operation_name, log_debug_event, options)
     local server_url = credentials and credentials.server_url
     options = options or {}
@@ -508,13 +566,10 @@ local function performGraphQLRequest(credentials, request_body, operation_name, 
     then
         return { ok = false, error = "Authentication failed.", retryable = false, status_code = 401 }
     end
-    if ok and code == 200 and credentials and credentials.auth_method == "ui_login" then
-        local json = require("dkjson")
-        local response, position, decode_error = json.decode(response_body, 1, json.null)
-        if decode_error or type(response) ~= "table" or response_body:sub(position):find("%S")
-            or response.errors ~= nil
-        then
-            return { ok = false, error = "Suwayomi GraphQL request failed.", retryable = false }
+    if ok and code == 200 then
+        local failure = graphQLFailure(response_body, credentials and credentials.auth_method == "ui_login")
+        if failure then
+            return failure
         end
     end
     if ok and code == 200 then
