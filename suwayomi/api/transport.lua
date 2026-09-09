@@ -297,31 +297,44 @@ local function graphQLAuthRejected(request_body, response_body)
     local json = require("dkjson")
     local response = json.decode(response_body, 1, json.null)
     local request = json.decode(request_body)
-    if type(response) ~= "table" or type(response.errors) ~= "table" or #response.errors ~= 1
+    if type(response) ~= "table" or type(response.errors) ~= "table"
         or type(request) ~= "table" or type(request.query) ~= "string"
     then return false end
-    -- Only the single-root operations emitted by our builders are replayable.
-    -- A multi-root mutation can have effects even when its overall data is null.
+    -- Prove that every root emitted by our builders failed before execution.
+    -- Missing errors or partial data can hide effects from a multi-root mutation.
     local query = request.query
     if query:find('"""', 1, true) then return false end
     query = query:gsub("\\.", ""):gsub('"[^"]*"', '""'):gsub("#[^\r\n]*", ""):gsub("%b()", "")
     local selection = query:match("^[%s%w_]*{(.*)}%s*$")
-    local field = selection and selection:gsub("%b{}", ""):match("^%s*([%a_][%w_]*)%s*$")
-    local err = response.errors[1]
-    if not field or type(err) ~= "table" or type(err.path) ~= "table"
-        or #err.path ~= 1 or err.path[1] ~= field or type(err.message) ~= "string"
-    then return false end
+    if not selection then return false end
+    local fields, count = {}, 0
+    for field in selection:gsub("%b{}", " "):gmatch("%S+") do
+        if not field:match("^[%a_][%w_]*$") or fields[field] then return false end
+        fields[field] = true
+        count = count + 1
+    end
+    if count == 0 or #response.errors ~= count then return false end
     if response.data ~= nil and response.data ~= json.null then
         if type(response.data) ~= "table" then return false end
-        for key, value in pairs(response.data) do
-            if key ~= field or value ~= json.null then return false end
+        for field, value in pairs(response.data) do
+            if not fields[field] or value ~= json.null then return false end
         end
     end
     -- Suwayomi reports resolver auth failures with HTTP 200 and a stack trace.
     -- Match the pre-resolver guard, not arbitrary "Unauthorized" application text.
-    return err.message:match("^Exception while fetching data %(/" .. field .. "%) : Unauthorized[\r\n]") ~= nil
-        and err.message:find("suwayomi.tachidesk.server.user.UserTypeKt.requireUser", 1, true) ~= nil
-        and err.message:find("suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring", 1, true) ~= nil
+    for _, err in ipairs(response.errors) do
+        if type(err) ~= "table" or type(err.path) ~= "table" or #err.path ~= 1
+            or type(err.path[1]) ~= "string" or type(err.message) ~= "string"
+        then return false end
+        local field = err.path[1]
+        if not fields[field]
+            or not err.message:match("^Exception while fetching data %(/" .. field .. "%) : Unauthorized[\r\n]")
+            or not err.message:find("suwayomi.tachidesk.server.user.UserTypeKt.requireUser", 1, true)
+            or not err.message:find("suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring", 1, true)
+        then return false end
+        fields[field] = nil
+    end
+    return true
 end
 
 local function performGraphQLRequest(credentials, request_body, operation_name, log_debug_event, options)
@@ -372,7 +385,7 @@ local function performGraphQLRequest(credentials, request_body, operation_name, 
         request_bytes = #request_body,
         response_bytes = #response_body,
     })
-    if ok and code == 200 and credentials and credentials.auth_method == "simple_login"
+    if ok and code == 200
         and graphQLAuthRejected(request_body, response_body)
     then
         return { ok = false, error = "Authentication failed.", retryable = false, status_code = 401 }

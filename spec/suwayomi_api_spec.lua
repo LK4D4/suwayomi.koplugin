@@ -246,13 +246,36 @@ describe("suwayomi/api facade", function()
         assert.is_nil(refresh_request.bodies[2]:match("genre"))
     end)
 
-    it("tests connection with a lightweight GraphQL request", function()
-        local request = install_graphql_stub([[{"data":{"__typename":"Query"}}]])
-
+    it("rejects a connection that permits introspection but denies protected access", function()
+        install_graphql_stub("")
+        local calls = 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                calls = calls + 1
+                local query = require("dkjson").decode(options.source).query
+                if query:find("__typename", 1, true) then
+                    options.sink([[{"data":{"__typename":"Query"}}]])
+                else
+                    options.sink([[{"data":null,"errors":[{"message":"Unauthorized"}]}]])
+                end
+                return 1, 200
+            end }
+        end
         local result = api.testConnection(valid_credentials())
+        assert.is_false(result.ok)
+        assert.are.equal(1, calls)
+    end)
 
-        assert.is_true(result.ok)
-        assert.are.equal([[{"query":"query { __typename }"}]], request.bodies[1])
+    it("accepts an empty authenticated library and rejects malformed connection data", function()
+        install_graphql_stub([[{"data":{"categories":{"nodes":[]}}}]])
+        assert.is_true(api.testConnection(valid_credentials()).ok)
+        install_graphql_stub("5")
+        assert.is_false(api.testConnection(valid_credentials()).ok)
+    end)
+
+    it("does not approve a connection with GraphQL errors alongside category data", function()
+        install_graphql_stub([[{"data":{"categories":{"nodes":[]}},"errors":[{"message":"Unauthorized"}]}]])
+        assert.is_false(api.testConnection(valid_credentials()).ok)
     end)
 
     it("fetches extensions and updates extension install state", function()

@@ -51,7 +51,7 @@ end
 
 function Queries._buildConnectionTestQuery()
     return json.encode({
-        query = "query { __typename }",
+        query = "query { categories { nodes { id } } }",
     })
 end
 

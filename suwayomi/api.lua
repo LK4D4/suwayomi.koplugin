@@ -120,6 +120,10 @@ function SuwayomiAPI.testConnection(credentials, options)
     if not result.ok then
         return result
     end
+    local categories, parse_error = parsers.parseCategoryResponse(result.response_body)
+    if not categories then
+        return { ok = false, error = parse_error, retryable = false }
+    end
     return {
         ok = true,
     }

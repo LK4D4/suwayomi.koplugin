@@ -584,17 +584,21 @@ end
 
 function Parsers.parseCategoryResponse(response_body)
     local payload, _, err = json.decode(response_body, 1, nil)
-    if err then
+    if err or type(payload) ~= "table" then
         return nil, "Invalid response from Suwayomi server."
     end
 
-    local category_nodes = payload
-        and payload.data
-        and payload.data.categories
+    local first_error = type(payload.errors) == "table" and payload.errors[1]
+    if first_error then
+        local graph_error = type(first_error) == "table" and first_error.message
+        return nil, type(graph_error) == "string" and graph_error or "Invalid response from Suwayomi server."
+    end
+
+    local category_nodes = type(payload.data) == "table"
+        and type(payload.data.categories) == "table"
         and payload.data.categories.nodes
     if type(category_nodes) ~= "table" then
-        local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
-        return nil, graph_error or "Suwayomi server did not return categories."
+        return nil, "Suwayomi server did not return categories."
     end
 
     local categories = {}

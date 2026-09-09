@@ -137,6 +137,43 @@ describe("suwayomi/api/transport", function()
         assert.are.equal(1, mutations)
     end)
 
+    it("renews a refresh session only when every mutation root was rejected before execution", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "simple_login"
+        local logins, refreshes = 0, 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                if options.url:match("/login%.html$") then
+                    logins = logins + 1
+                    return 1, 303, { ["set-cookie"] = "JSESSIONID=session-" .. logins .. "; Path=/" }
+                end
+                local json = require("dkjson")
+                if options.headers.Cookie == "JSESSIONID=session-1" then
+                    local errors = {}
+                    for _, field in ipairs({ "fetchManga", "fetchChapters" }) do
+                        errors[#errors + 1] = { path = { field }, message =
+                            "Exception while fetching data (/" .. field .. ") : Unauthorized\r\n"
+                            .. "suwayomi.tachidesk.server.user.UserTypeKt.requireUser\n"
+                            .. "suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring" }
+                    end
+                    options.sink(json.encode({ errors = errors, data = {
+                        fetchManga = json.null, fetchChapters = json.null,
+                    } }))
+                else
+                    refreshes = refreshes + 1
+                    options.sink([[{"data":{"fetchManga":{"manga":{"id":1}},"fetchChapters":{"chapters":[]}}}]])
+                end
+                return 1, 200
+            end }
+        end
+        local result = transport.performGraphQLRequest(credentials,
+            require("suwayomi/api/queries")._buildRefreshMangaMutation(1), "refreshManga")
+        assert.is_true(result.ok)
+        assert.are.equal(1, refreshes)
+        assert.are.equal(2, logins)
+    end)
+
     it("stops after one re-login when the server keeps rejecting the session", function()
         install_ltn12()
         local credentials = valid_credentials()
@@ -202,7 +239,7 @@ describe("suwayomi/api/transport", function()
         assert.are.equal(1, logins)
     end)
 
-    it("does not replay multi-root mutations or partial GraphQL results", function()
+    it("does not replay partially rejected multi-root mutations or partial GraphQL results", function()
         install_ltn12()
         local credentials = valid_credentials()
         credentials.auth_method = "simple_login"

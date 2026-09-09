@@ -30,16 +30,16 @@ No new glossary entry is needed: the agreed terms are general authentication con
 
 ## Protocol evidence
 
-The [Suwayomi v2.3.2243 login handler](https://github.com/Suwayomi/Suwayomi-Server/blob/v2.3.2243/server/src/main/kotlin/suwayomi/tachidesk/server/JavalinSetup.kt) uses a per-session `logged-in` attribute and returns a cookie with HTTP 303. GraphQL reports resolver authentication errors with HTTP 200; transport recovery recognizes the pre-resolver guard only for the plugin's single-root operations and refuses ambiguous or partial replay.
+The [Suwayomi v2.3.2243 login handler](https://github.com/Suwayomi/Suwayomi-Server/blob/v2.3.2243/server/src/main/kotlin/suwayomi/tachidesk/server/JavalinSetup.kt) uses a per-session `logged-in` attribute and returns a cookie with HTTP 303. GraphQL reports resolver authentication errors with HTTP 200; transport recovery requires the pre-resolver guard to reject every unaliased root emitted by the builder, including both roots of manga refresh. It refuses ambiguous or partial replay. Connection testing uses protected category access rather than public introspection and rejects GraphQL errors.
 
 ## Laptop acceptance
 
 Exercised with Suwayomi v2.3.2243 and KOReader v2026.07.1 under Ubuntu WSLg, using isolated Basic Auth and Simple Login profiles and generated three-page CBZs. Deployment manifests and raw evidence remain private sandbox data.
 
-- Both authentication modes passed actual setup field entry, method selection, wrong-password rejection, disabled continuation after rejection, corrected credentials, and successful continuation.
+- Both authentication modes passed actual setup field entry, method selection, wrong-password rejection, disabled continuation after rejection, corrected credentials, and successful continuation. Live API probes also rejected the wrong authentication method and accepted the correct method against each server; Basic Auth selection on the Simple Login server did not trigger a login fallback.
 - Both modes passed UI download, exact source-page byte comparison, Open, visible page rendering, and Go to Suwayomi return.
 - Simple Login loaded the library after a KOReader restart without a credential prompt. A separate live plugin process retained an old session across an actual server restart and recovered with exactly one new login.
-- Live plugin API calls recovered from controlled invalid-session cookies for GraphQL read-state mutation and binary pages. This exercises real server rejection and recovery; a wall-clock 30-minute idle expiry was not waited out.
+- Live plugin API calls recovered from controlled invalid-session cookies for GraphQL read-state mutation, two-root manga refresh, and binary pages. Refresh produced two real pre-resolver rejections, then one login and one replay returned all three fixture chapters. This exercises real server rejection and recovery; a wall-clock 30-minute idle expiry was not waited out.
 - A temporary loopback timing proxy held two real download workers while a third chapter remained queued. Editing the saved password did not interrupt the two captured-credential workers. The newly launched third job failed authentication. Correcting the saved password left that job failed until the user-facing Retry action completed it. All nine downloaded pages matched their generated fixtures.
 - The user-facing Mark as read action updated the server. Mark as unread during a controlled server outage persisted one pending sync entry. After the server restarted, automatic sync updated the server and cleared that entry without another user action.
 - Inspector probes rejected missing/wrong tokens, arbitrary controls, stale fields, and oversized input. The port check rejected an active listener and accepted stopped-service TIME_WAIT sockets. Actual confirmation buttons were observed and activated through the inspector.
