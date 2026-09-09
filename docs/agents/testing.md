@@ -162,7 +162,7 @@ The inspector's Bearer token is unrelated to Suwayomi authentication and remains
 
 ### Native reader controls and incomplete observations
 
-The inspector does not expose every widget. Native configuration choices can have empty labels, and a bulk `ConfirmBox` can show its message with no observed buttons even though **Cancel** and **Queue** are visible. In those cases, capture the framebuffer and use the actual visible control through desktop input. Do not bypass the confirmation by calling the downloader, or widen the inspector's method allowlist.
+The inspector does not expose every widget. Native configuration choices can have empty labels. If a visible control is still missing after re-observation, capture the framebuffer and use the actual visible control through desktop input. Nested confirmation buttons are now observed directly, so try their labels first. Do not bypass confirmation by calling the downloader, or widen the inspector's method allowlist.
 
 For an X11/WSLg session, `xdotool` is an optional input tool. Identify the window by a process whose `/proc/<pid>/environ` contains the exact sandbox `KO_HOME`; matching only the title can select another KOReader session. Send keys to that window, and derive click coordinates from a current screenshot rather than reusing another dialog's coordinates. On the pinned desktop reader, **Return** opens the bottom configuration panel, **Escape** dismisses it, and **Right** advances the reader. Wait for reader initialization after opening, then verify the page change independently.
 
