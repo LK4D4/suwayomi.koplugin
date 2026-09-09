@@ -91,7 +91,7 @@ python3 scripts/sandbox.py --root "$ROOT" smoke
 
 Use returned labels and titles for further navigation. Smoke follows Library, Sandbox Alpha, Open chapters, and a not-yet-downloaded fixture chapter. It invokes Download, waits for Downloaded, checks exactly one new CBZ and unchanged existing archives, and compares all three PNG pages with the source fixture. It then opens that archive, captures a screenshot, and uses the reader menu's Go to Suwayomi action to return. Inspect the returned evidence and screenshot; invocation alone is not success. This does not cover bulk limits, retention, auth failures, or hardware behavior.
 
-If a document remains open after manual checks, close it with:
+If a bundled fixture chapter remains open after manual checks, close it with:
 
 ```sh
 python3 scripts/sandbox.py --root "$ROOT" ui close-reader
@@ -105,7 +105,7 @@ python3 scripts/sandbox.py --root "$ROOT" stop server
 python3 scripts/sandbox.py --root "$ROOT" status
 ```
 
-`ui close-reader` is a reader transition, not process shutdown. Keep a failed sandbox for diagnosis; starting fresh does not require deleting it.
+`ui close-reader` is a reader transition, not process shutdown. It expects a return to the bundled `Chapter 001`–`003` list; it is not a general document-close helper. For custom fixtures, use observed reader-menu controls to return and verify the intended screen before `stop reader`, which also uses this helper if a document is open. Keep a failed sandbox for diagnosis; starting fresh does not require deleting it.
 
 ## Inspect the UI safely
 
@@ -138,7 +138,7 @@ Read synchronization is asynchronous. A pending local read entry immediately aft
 
 Use the actual user path for UI and lifecycle checks. Direct downloader calls cannot establish button wiring. Injected completion flags cannot establish completion-plus-close behavior. Label programmatic preconditions and faults separately from actions under test.
 
-- **Fixtures:** follow [Suwayomi Local source layout](https://github.com/Suwayomi/Suwayomi-Server/blob/master/docs/Local-Source.md). Add more than 200 chapters for pagination, at least six eligible chapters for ahead-five refill, more than 50 for bulk limits, or independent A/B/C completions for retention. Record expected identities/order and discover server-assigned IDs. Refresh and seed through supported server operations. Numbered CBZs alone do not cover scanlator restrictions, tied source order, extension failures, or archive-export fallback.
+- **Fixtures:** follow [Suwayomi Local source layout](https://github.com/Suwayomi/Suwayomi-Server/blob/master/docs/Local-Source.md). Keep `Sandbox Alpha` and its three chapter names unchanged: every server start seeds and validates that baseline, and the bundled smoke expects it. Create separate fixture series for more than 200 chapters (pagination), at least six eligible chapters (ahead-five refill), more than 50 (bulk limits), or independent A/B/C completions (retention). Record expected identities/order and discover server-assigned IDs. Refresh and seed additional series through supported server operations; setup does not create them. Numbered CBZs alone do not cover scanlator restrictions, tied source order, extension failures, or archive-export fallback.
 - **Auth:** check GraphQL and binary covers/pages, rejected credentials, expiry/relogin, workers, and server/credential changes. A passing connection check alone is insufficient.
 - **Downloads:** compare admitted IDs with actual workers and jobs. Check CBZ entries/CRC and page bytes against fixtures, not just file existence or a “Downloaded” label. Include Open, visible page, and reader return when relevant.
 - **Cleanup/read sync:** compare archives, sidecars/backups, committed state, server read state, and displayed status. Keep final-page-only and completed-plus-close controls distinct.
