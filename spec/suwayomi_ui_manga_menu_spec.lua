@@ -172,6 +172,7 @@ describe("suwayomi/ui/manga_menu", function()
                 end,
                 new = function(_, options)
                     options = options or {}
+                    assert(options.width == nil or options.width > 0, "text width must be strictly positive")
                     options.kind = "textbox"
                     local font_size = options.face and options.face.size or 12
                     function options:getSize()
@@ -280,6 +281,16 @@ describe("suwayomi/ui/manga_menu", function()
                 options.itemnumber = 1
                 options.item_group = newGroup()
                 options.inner_dimen = { w = 480, h = 641 }
+                -- Native Menu measures mandatory text before rendering each title.
+                for _, item in ipairs(options.item_table or {}) do
+                    if item.mandatory then
+                        local mandatory = require("ui/widget/textwidget"):new{ text = item.mandatory }
+                        require("ui/widget/textboxwidget"):new{
+                            text = item.text,
+                            width = options.inner_dimen.w - mandatory:getWidth(),
+                        }
+                    end
+                end
                 options.page_info = {
                     resetLayout = function() end,
                     getSize = function() return { h = 0 } end,
@@ -432,6 +443,29 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_nil(menu.item_table[2].height)
         assert.are.equal(menu.item_height, menu.item_group[1].dimen.h)
         assert.are.equal(menu.item_height, menu.item_group[2].dimen.h)
+    end)
+
+    it("renders long pending-deletion status on first display without consuming the title width", function()
+        local list_menu = require("suwayomi/ui/list_menu")
+        local status = "Read · Archive deletion pending: close reader · Downloaded"
+        local menu = list_menu.show{
+            title = "Chapters",
+            item_table = {
+                { text = "Chapter 2", mandatory = status },
+            },
+        }
+
+        local title_width, status_width
+        for _, widget in ipairs(collectWidgetsByKind(menu.item_group[1], "textbox")) do
+            if widget.text == "Chapter 2" then
+                title_width = widget.width
+            elseif widget.text == status then
+                status_width = widget.width
+            end
+        end
+        assert.is_true(title_width > 0)
+        assert.is_true(status_width > 0)
+        assert.is_true(title_width + status_width <= menu.item_group[1].dimen.w)
     end)
 
     it("opens the page containing the requested initial item", function()

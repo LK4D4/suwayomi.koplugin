@@ -1048,7 +1048,8 @@ function ListMenu.show(options)
         title = options.title,
         subtitle = subtitle,
         title_bar_left_icon = options.title_bar_left_icon,
-        item_table = options.item_table or {},
+        -- Native rows leave no title width for long status text; install our renderer first.
+        item_table = {},
         items_per_page = options.items_per_page,
         itemnumber = options.itemnumber,
         state_w = options.state_w,
@@ -1068,6 +1069,7 @@ function ListMenu.show(options)
         menu.items_max_lines = items_max_lines
     end
     ListMenu.install(menu, options)
+    menu.item_table = options.item_table or {}
     applyOptions(menu, options)
     menu._suwayomi_pending_itemnumber = options.itemnumber
     menu:updateItems()
