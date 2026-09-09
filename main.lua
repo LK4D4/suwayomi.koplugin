@@ -170,6 +170,7 @@ end
 
 function SuwayomiPlugin:onCloseWidget()
     self:retireChapterHost()
+    self:cancelSourceFetchWorker()
     self.download_host_closed = true
     if self.detach_download_subscription then self.detach_download_subscription() end
     self.detach_download_subscription = nil
