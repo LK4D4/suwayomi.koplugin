@@ -141,7 +141,7 @@ describe("completion enrollment storage recovery (#40)", function()
             if writing_enrollment and reject_enrollment then return nil, "injected enrollment rejection" end
             return open(...)
         end
-        timers = {}
+        advance(0)
     end)
     after_each(function()
         os.time = original_time

@@ -81,6 +81,9 @@ describe("issue 46 keep-policy suppression", function()
         local ui = require("ui/uimanager")
         ui.quit = function() end
         ui.nextTick = function(_, callback) ui:scheduleIn(0, callback) end
+        local debug = require("suwayomi/debug")
+        debug.now = function() return clock end
+        debug.elapsedMs = function(start) return (clock - start) * 1000 end
         local ffi_util = require("ffi/util")
         local next_pid = 0
         ffi_util.runInSubProcess = function()
