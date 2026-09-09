@@ -107,10 +107,16 @@ class Inspector:
             port = configuration["inspector_port"]
             self.token = (self.root / "profile/inspector.token").read_text(encoding="ascii").strip()
             secrets = json.loads((self.root / "secrets.json").read_text(encoding="utf-8"))
+            self.auth_mode = configuration.get("auth_mode", "basic_auth")
+            self.credentials = {
+                "server_url": f"http://127.0.0.1:{configuration['server_port']}",
+                "username": secrets["username"], "password": secrets["password"],
+            }
         except (OSError, ValueError, KeyError):
             raise SandboxUIError("Missing or invalid sandbox inspector configuration") from None
         _require(type(port) is int and 1024 <= port <= 65535, "Invalid inspector port")
         _require(re.fullmatch(r"[0-9a-fA-F]{64}", self.token), "Invalid inspector token")
+        _require(self.auth_mode in ("basic_auth", "simple_login"), "Invalid sandbox authentication mode")
         self.url = f"http://127.0.0.1:{port}"
         self._private = [self.token, str(self.root)] + [
             value for value in secrets.values() if isinstance(value, str) and value
@@ -119,10 +125,16 @@ class Inspector:
         self._http = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
         self._transition_until = time.monotonic() + 15
 
-    def _request(self, path):
+    def _request(self, path, data=None):
         _require(path.startswith("/koreader/") and "?" not in path and "#" not in path,
                  "Invalid inspector control")
-        request = urllib.request.Request(self.url + path, headers={"Authorization": "Bearer " + self.token})
+        headers = {"Authorization": "Bearer " + self.token}
+        body = None
+        if data is not None:
+            headers["Content-Type"] = "application/json"
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            _require(len(body) <= 8192, "Inspector input is too large")
+        request = urllib.request.Request(self.url + path, headers=headers, data=body)
         observation = path in ("/koreader/ui/httpinspector/observe/", "/koreader/device/screen/bb")
         while True:
             try:
@@ -156,6 +168,9 @@ class Inspector:
                      "Invalid inspector observation")
             state = response[0]
             state["controls"] = state.get("controls") or []
+            state["fields"] = state.get("fields") or []
+            _require(isinstance(state["fields"], list) and all(isinstance(item, dict) for item in state["fields"]),
+                     "Invalid inspector fields")
             _require(isinstance(state["controls"], list) and all(isinstance(item, dict) for item in state["controls"]),
                      "Invalid inspector controls")
             return state
@@ -165,7 +180,7 @@ class Inspector:
     def _public(self, value):
         if isinstance(value, dict):
             return {key: self._public(item) for key, item in value.items()
-                    if key not in ("activate", "document_file")}
+                    if key not in ("activate", "fill", "document_file", "directory_path")}
         if isinstance(value, list):
             return [self._public(item) for item in value]
         if isinstance(value, str):
@@ -218,6 +233,67 @@ class Inspector:
 
     def tap(self, label):
         return self._public(self._tap(label))
+
+    def credential(self, name, invalid=False):
+        _require(name in self.credentials, "Unknown sandbox credential")
+        _require(not invalid or name == "password", "Only the password supports the invalid control")
+        return self.credentials[name] + ("-invalid" if invalid else "")
+
+    def fill(self, field, value):
+        """Fill one observed InputText without exposing its old or new content."""
+        _require(isinstance(value, str) and len(value.encode("utf-8")) <= 4096
+                 and not any(char in value for char in "\0\r\n"), "Invalid field input")
+        before = self._observe()
+        matches = [item for item in before["fields"]
+                   if item.get("hint") == str(field) or str(item.get("index")) == str(field)]
+        _require(len(matches) == 1 and matches[0].get("enabled") is True,
+                 "Field must identify exactly one editable input on the current screen")
+        if value:
+            self._private.insert(0, value)
+        self._request("/koreader/ui/httpinspector/fill/", {"field": matches[0]["fill"], "value": value})
+        self._wait(lambda state: state.get("input_revision", 0) > before.get("input_revision", 0),
+                   "field edit")
+        return {"filled_field": matches[0]["index"], "value_omitted": True}
+
+    def auth_smoke(self):
+        """Exercise setup fields, method selection and connection test before smoke."""
+        self.home()
+        self._tap("Settings")
+        self._tap("Setup wizard")
+        self.wait("Suwayomi setup: connection (not tested)")
+        for field, name in (("Server URL", "server_url"), ("Username", "username"), ("Password", "password")):
+            self.fill(field, self.credential(name))
+        desired = "Simple Login" if self.auth_mode == "simple_login" else "Basic Auth"
+        other = "Basic Auth" if self.auth_mode == "simple_login" else "Simple Login"
+        # Exercise selection even when setup prefilled the desired method.
+        for choice in (other, desired):
+            state = self._observe()
+            controls = [item for item in state["controls"]
+                        if item.get("label") in ("Authentication: Basic Auth", "Authentication: Simple Login")]
+            _require(len(controls) == 1, "Expected the setup authentication selector")
+            self._tap(controls[0]["label"])
+            self.wait("Authentication method")
+            self._tap(choice)
+        self._tap("Test connection")
+        result = self._wait(lambda state: bool(state.get("message"))
+                            and state.get("message") != "Testing Suwayomi connection...",
+                            "connection test result", 40)
+        _require(result.get("message", "").startswith("Connection test passed"),
+                 "Setup connection test failed")
+        self._tap("Dismiss message")
+        self.wait("Suwayomi setup: connection (tested)")
+        self._tap("Continue")
+        directory = self._wait(lambda state: state.get("directory_path") is not None,
+                               "download directory chooser")
+        _require(Path(directory["directory_path"]).resolve() == self.root / "downloads",
+                 "Setup directory is not the sandbox downloads directory")
+        self._tap("Use this folder")
+        self._tap("Choose")
+        self.wait("Suwayomi")
+        result = self.smoke()
+        return {"auth_mode": self.auth_mode, "setup_fields_filled": True,
+                "method_selected_via_ui": True, "setup_connection_test_passed": True,
+                "credentials_saved_via_continue": True, "chapter_smoke": result}
 
     def home(self):
         before = self._observe()

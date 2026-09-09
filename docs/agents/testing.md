@@ -44,6 +44,8 @@ python3 scripts/sandbox.py --root "$ROOT" deploy --source "$SOURCE" --revision "
 
 `setup` requires an absent or empty root. It refuses existing contents; there is no destructive reset. For another clean comparison, choose a new root. To select unused ports, add `--server-port 4569 --inspector-port 8083` to `setup` with your chosen values. An occupied service port is an error, not permission to kill an unrelated process.
 
+Authentication is explicit. `setup --auth-mode basic_auth` is the default; use `setup --auth-mode simple_login` in a different empty root for Simple Login. `sandbox.json` records `auth_mode`, and setup writes the matching server and plugin settings. Roots created before this field existed remain Basic Auth. The launcher does not switch or fall back between modes.
+
 Setup creates isolated runtime trees, server data, a KOReader profile, and client downloads. It generates `server-data/local/Sandbox Alpha/Chapter 001.cbz` through `Chapter 003.cbz`, each containing three visibly labeled PNG pages. No personal server, settings, credentials, or library copy is needed.
 
 Deployment copies only the canonical runtime payload into `profile/plugins/suwayomi.koplugin`. `deployment.json` records the caller-supplied revision label and SHA-256 for every deployed file. The script does not authenticate the label against Git; record dirty changes separately and compare the manifest with the intended candidate when reporting exact-hash coverage. The copy does not follow later source edits. Stop KOReader before redeploying. Deployment refuses changed or unrecorded files in an existing payload rather than overwriting uncertain data.
@@ -59,6 +61,8 @@ python3 scripts/sandbox.py --root "$ROOT" run server
 ```
 
 Wait for **`server ready`**. This requires authenticated readiness and real API seeding of the Local source library, not just process creation. In the second terminal, start KOReader:
+
+For Simple Login, readiness uses a launcher-owned, in-memory cookie jar and posts the generated credentials to `/login.html`. The pinned release must return `303` with `Location: /` and a session cookie; the launcher does not follow that redirect or any API redirect. Authenticated API calls then discover and seed the fixtures, and a separate cookie-free request must be rejected. No cookie is written to disk, printed, or shared with KOReader. This proves server readiness, not plugin authentication.
 
 ```sh
 python3 scripts/sandbox.py --root "$ROOT" run reader
@@ -107,15 +111,48 @@ python3 scripts/sandbox.py --root "$ROOT" status
 
 `ui close-reader` is a reader transition, not process shutdown. It expects a return to the bundled `Chapter 001`–`003` list; it is not a general document-close helper. For custom fixtures, use observed reader-menu controls to return and verify the intended screen before `stop reader`, which also uses this helper if a document is open. Keep a failed sandbox for diagnosis; starting fresh does not require deleting it.
 
+### Exercise authentication through the actual setup UI
+
+Choose a fresh root with `setup --auth-mode simple_login`, deploy the candidate, and start both services as above. Then run:
+
+```sh
+python3 scripts/sandbox.py --root "$ROOT" auth-smoke
+```
+
+This English-profile scenario opens **Settings > Setup wizard**, fills all three visible inputs from the sandbox's private configuration, selects the other authentication method and then the configured method, invokes **Test connection**, waits for the real worker's success message, and dismisses it through the ordinary message gesture. It requires the tested setup title before **Continue**, selects the existing sandbox download directory with **Use this folder > Choose**, and runs the single-chapter smoke above. It saves credentials through the real setup callback, not by editing plugin settings. Run it once per fresh comparison root; like `smoke`, it needs an unused fixture chapter.
+
+For deliberate failed credentials or individual controls, use the observed field hint or its 1-based index:
+
+```sh
+python3 scripts/sandbox.py --root "$ROOT" ui home
+python3 scripts/sandbox.py --root "$ROOT" ui tap "Settings"
+python3 scripts/sandbox.py --root "$ROOT" ui tap "Setup wizard"
+python3 scripts/sandbox.py --root "$ROOT" ui fill "Server URL" --credential server_url
+python3 scripts/sandbox.py --root "$ROOT" ui fill "Username" --credential username
+python3 scripts/sandbox.py --root "$ROOT" ui fill "Password" --credential password --invalid
+python3 scripts/sandbox.py --root "$ROOT" ui tap "Test connection"
+python3 scripts/sandbox.py --root "$ROOT" ui observe
+```
+
+Wait for the final failure message, not the loading message. `ui tap "Dismiss message"` dismisses an ordinary informational popup; it does not dismiss a loading operation. Require the failed setup title and disabled **Continue**. Restore the password with `ui fill "Password" --credential password`, test again, dismiss the success message, and require the tested title before continuing. To change methods, tap the observed **Authentication: Basic Auth** or **Authentication: Simple Login** button, then **Basic Auth** or **Simple Login** in **Authentication method**. Existing typed fields stay in the connection dialog.
+
+For saved-credential controls, open **Settings > Connection > Login information**, fill the visible fields, choose the method, and tap **Save**. Dismiss its saved message, then use the existing **Test connection** action. Correcting settings does not retry failed downloads: navigate to the failed chapter and invoke its ordinary **Retry** action explicitly. Use `ui observe` between steps rather than assuming a previous dialog remains current.
+
+`ui fill FIELD --stdin` accepts exact text from standard input for other visible single-line inputs, including numeric settings. Supply sensitive text through a private pipe or a Python caller, not command arguments or shell history; a trailing newline is rejected. Do not capture screenshots while any password is revealed. Field observations and fill results omit all input values. Screenshots are raw framebuffer evidence and can still contain visible usernames, endpoints, or revealed passwords.
+
+`auth-smoke` does not establish restart, session expiry, independent concurrent sessions, concurrent download limits, read sync, credential changes during active work, ambiguous mutation failures, or the one-login/one-replay bound. Exercise those separately using the plugin's ordinary widgets and owned-service `stop`/`run` controls. The launcher cookie session is intentionally independent of plugin sessions, so successful seeding cannot establish those contracts.
+
 ## Inspect the UI safely
 
 The repository ships [sandbox_ui.py](../../scripts/sandbox_ui.py) and [sandbox-inspector.lua](../../scripts/sandbox-inspector.lua); machine-local inspector prototypes are no longer prerequisites. Setup installs the patch only into the sandbox profile as `patches/2-sandbox-inspector.lua`. It uses KOReader's bundled HTTP inspector, not a production plugin modification or a separate execution service.
 
 The inspector binds to `127.0.0.1` and requires the private `profile/inspector.token`; its port comes from `profile/inspector.port`. Server credentials live in `secrets.json`. Helpers read these files internally. Do not pass secrets as command arguments, print them, or enable transport logging that records headers. Keep the root private and never expose the inspector to a LAN or the Internet. Verify rejected missing/wrong tokens when changing this boundary.
 
-Prefer `observe` for titles, labels, enabled controls, and page state. `tap` resolves a unique enabled label, waits for its first paint, then queues the existing widget handler on KOReader's next UI tick. Missing or ambiguous controls are failures. Re-observe after navigation or asynchronous updates. `wait` has a deadline and reports the last observation on failure; a matching title does not establish download completion. Use framebuffer screenshots for layout, clipping, covers, rendered pages, and unexpected dialogs, not after every tap. An empty or unsupported observation needs investigation, not a passing assertion.
+Prefer `observe` for titles, labels, enabled controls, field hints/indices, and page state. `tap` resolves a unique enabled label, waits for its first paint, then queues the existing widget handler on KOReader's next UI tick. `fill` sends a bounded, authenticated POST only to an observed editable input; it uses the widget's ordinary delete/insert methods and waits for the edit acknowledgment without exposing text. The inspector recognizes a dialog's own virtual keyboard, but never skips unrelated modal windows. Missing, stale, or ambiguous controls are failures. Re-observe after navigation or asynchronous updates. `wait` has a deadline and reports the last observation on failure; a matching title does not establish download completion. Use framebuffer screenshots for layout, clipping, covers, rendered pages, and unexpected dialogs, not after every tap. An empty or unsupported observation needs investigation, not a passing assertion.
 
 Reader transitions can briefly interrupt inspector access. The helper bounds connection-refused retries to a 15-second transition deadline. It also retries connection resets for read-only observations during that interval, but never replays a possibly executed control action. Other network errors are failures.
+
+The inspector's Bearer token is unrelated to Suwayomi authentication and remains mandatory in both server modes. The allowlist does not expose arbitrary Lua evaluation, global-object browsing, settings assignment, or generic method invocation. When changing input controls, verify rejected missing/wrong tokens, stale fields, unsupported routes/methods, and oversized bodies as well as a real dialog edit. These instructions describe required checks, not checks already executed.
 
 ### Native reader controls and incomplete observations
 

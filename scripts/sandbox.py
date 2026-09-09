@@ -4,6 +4,7 @@ import argparse
 import base64
 import ctypes.util
 import hashlib
+import http.cookiejar
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,7 @@ import sys
 import tarfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 import zlib
@@ -59,6 +61,9 @@ def configuration(root):
     value = read_json(root / "sandbox.json")
     if value.get("format") != 1:
         raise RuntimeError("Not a supported sandbox root")
+    value.setdefault("auth_mode", "basic_auth")
+    if value["auth_mode"] not in ("basic_auth", "simple_login"):
+        raise RuntimeError("Unsupported sandbox authentication mode")
     return value
 
 
@@ -127,6 +132,7 @@ def setup(root, args):
     for name in RELEASES:
         fetch_release(root, name)
     values = {"format": 1, "server_port": args.server_port, "inspector_port": args.inspector_port,
+              "auth_mode": args.auth_mode,
               "versions": {"suwayomi": RELEASES["server"]["version"], "koreader": RELEASES["koreader"]["version"]}}
     credentials = {"username": "sandbox", "password": secrets.token_hex(24)}
     write_json(root / "secrets.json", credentials)
@@ -135,7 +141,7 @@ def setup(root, args):
     (root / "profile/inspector.port").write_text(str(args.inspector_port) + "\n", encoding="utf-8")
     shutil.copyfile(HERE / "sandbox-inspector.lua", root / "profile/patches/2-sandbox-inspector.lua")
     server = {
-        "ip": "127.0.0.1", "port": args.server_port, "authMode": "basic_auth",
+        "ip": "127.0.0.1", "port": args.server_port, "authMode": args.auth_mode,
         "authUsername": credentials["username"], "authPassword": credentials["password"],
         "systemTrayEnabled": False, "initialOpenInBrowserEnabled": False,
         "webUIEnabled": True, "webUIChannel": "BUNDLED", "webUIUpdateCheckInterval": 0,
@@ -148,7 +154,8 @@ def setup(root, args):
     profile = (
         "return {\n"
         f"  credentials = {{ server_url = {json.dumps('http://127.0.0.1:' + str(args.server_port))}, "
-        f"username = {json.dumps(credentials['username'])}, password = {json.dumps(credentials['password'])}, auth_method = 'basic_auth' }},\n"
+        f"username = {json.dumps(credentials['username'])}, password = {json.dumps(credentials['password'])}, "
+        f"auth_method = {json.dumps(args.auth_mode)} }},\n"
         f"  download_directory = {json.dumps(str(root / 'downloads'), ensure_ascii=False)},\n"
         "  source_languages = { 'en' }, library_category_picker_behavior = 'automatic',\n"
         "  max_parallel_chapter_downloads = 1, manga_keep_next_unread_downloads = {},\n"
@@ -172,7 +179,7 @@ def setup(root, args):
     (fixture / "cover.png").write_bytes(fixture_png(1, 1))
     write_json(root / "fixtures.json", {"version": 1, "archives": fixture_hashes})
     write_json(root / "sandbox.json", values)
-    return {"setup": "complete", "versions": values["versions"], "fixture_chapters": 3}
+    return {"setup": "complete", "versions": values["versions"], "fixture_chapters": 3, "auth_mode": args.auth_mode}
 
 
 def process_identity(pid):
@@ -248,37 +255,82 @@ def deploy(root, source, revision):
     return {"deployed_files": len(hashes), "revision": revision, "exact_bytes_verified": True}
 
 
-def server_request(root, path, authorized=True):
-    config = configuration(root)
-    headers = {}
-    if authorized:
-        values = read_json(root / "secrets.json")
-        headers["Authorization"] = "Basic " + base64.b64encode(
-            (values["username"] + ":" + values["password"]).encode()).decode()
-    request = urllib.request.Request(f"http://127.0.0.1:{config['server_port']}" + path, headers=headers)
-    local_http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    with local_http.open(request, timeout=5) as response:
-        body = response.read()
-        return json.loads(body) if body else None
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, file, code, message, headers, new_url):
+        return None
 
 
-def seed_library(root):
-    sources = server_request(root, "/api/v1/source/list")
+class ServerClient:
+    """One launcher-owned in-memory session; never share it with KOReader."""
+
+    def __init__(self, root):
+        config = configuration(root)
+        self.url = f"http://127.0.0.1:{config['server_port']}"
+        self.mode = config["auth_mode"]
+        self.credentials = read_json(root / "secrets.json")
+        self.cookies = http.cookiejar.CookieJar()
+        self.http = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}), _NoRedirect(),
+            urllib.request.HTTPCookieProcessor(self.cookies))
+        self.plain_http = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+        self.logged_in = False
+
+    def login(self):
+        self.cookies.clear()
+        body = urllib.parse.urlencode({
+            "user": self.credentials["username"], "pass": self.credentials["password"],
+        }).encode("utf-8")
+        request = urllib.request.Request(self.url + "/login.html", data=body, headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+        })
+        # The pinned release returns 303 to /. Do not follow even that redirect:
+        # the next authenticated API call proves the session, not a WebUI page.
+        try:
+            with self.http.open(request, timeout=5):
+                raise RuntimeError("Simple Login did not establish a session")
+        except urllib.error.HTTPError as error:
+            try:
+                if error.code != 303 or error.headers.get("Location") != "/" or not self.cookies:
+                    raise RuntimeError("Simple Login did not establish a session") from None
+            finally:
+                error.close()
+        self.logged_in = True
+
+    def request(self, path, authorized=True):
+        if not path.startswith("/api/") or "\\" in path or "#" in path:
+            raise RuntimeError("Invalid sandbox API path")
+        headers = {}
+        if authorized:
+            if self.mode == "simple_login":
+                if not self.logged_in:
+                    self.login()
+            else:
+                headers["Authorization"] = "Basic " + base64.b64encode(
+                    (self.credentials["username"] + ":" + self.credentials["password"]).encode()).decode()
+        request = urllib.request.Request(self.url + path, headers=headers)
+        client = self.http if authorized and self.mode == "simple_login" else self.plain_http
+        with client.open(request, timeout=5) as response:
+            body = response.read()
+            return json.loads(body) if body else None
+
+
+def seed_library(client):
+    sources = client.request("/api/v1/source/list")
     local = [source for source in sources if source["name"] == "Local source"]
     if len(local) != 1:
         raise RuntimeError("Expected one Local source")
-    page = server_request(root, f"/api/v1/source/{local[0]['id']}/popular/1")
+    page = client.request(f"/api/v1/source/{local[0]['id']}/popular/1")
     manga = [manga for manga in page["mangaList"] if manga["title"] == "Sandbox Alpha"]
     if len(manga) != 1:
         raise RuntimeError("Generated fixture was not discovered")
     manga_id = manga[0]["id"]
-    server_request(root, f"/api/v1/manga/{manga_id}?onlineFetch=true")
-    server_request(root, f"/api/v1/manga/{manga_id}/library")
-    chapters = server_request(root, f"/api/v1/manga/{manga_id}/chapters?onlineFetch=true")
+    client.request(f"/api/v1/manga/{manga_id}?onlineFetch=true")
+    client.request(f"/api/v1/manga/{manga_id}/library")
+    chapters = client.request(f"/api/v1/manga/{manga_id}/chapters?onlineFetch=true")
     if len(chapters) != 3:
         raise RuntimeError("Fixture chapter discovery did not return three chapters")
     try:
-        server_request(root, "/api/v1/source/list", authorized=False)
+        client.request("/api/v1/source/list", authorized=False)
     except urllib.error.HTTPError as error:
         if error.code != 401:
             raise
@@ -309,6 +361,7 @@ def launch(root, service):
     available_port(config["server_port" if service == "server" else "inspector_port"])
     environment = os.environ.copy()
     if service == "server":
+        server_client = ServerClient(root)
         runtime = unique_path(root / "runtime/server", "*/bin/Suwayomi-Server.jar").parent.parent
         command = [str(runtime / "jre/bin/java"),
                    "-Dsuwayomi.tachidesk.config.server.rootDir=" + str(root / "server-data"),
@@ -334,7 +387,7 @@ def launch(root, service):
                 raise RuntimeError(service + " exited before readiness; inspect its private log")
             try:
                 if service == "server":
-                    server_request(root, "/api/v1/source/list")
+                    server_client.request("/api/v1/source/list")
                 else:
                     Inspector(root).observe()
                 break
@@ -345,7 +398,7 @@ def launch(root, service):
                     raise RuntimeError(service + " did not become ready; inspect its private log")
                 time.sleep(0.25)
         if service == "server":
-            seed_library(root)
+            seed_library(server_client)
         print(service + " ready", flush=True)
         code = child.wait()
         if code not in ((0, -signal.SIGTERM, 128 + signal.SIGTERM) if service == "server" else (0,)):
@@ -396,6 +449,7 @@ def main():
     setup_args = commands.add_parser("setup", help="Download pinned releases into an empty root")
     setup_args.add_argument("--server-port", type=int, default=4569)
     setup_args.add_argument("--inspector-port", type=int, default=8083)
+    setup_args.add_argument("--auth-mode", choices=("basic_auth", "simple_login"), default="basic_auth")
     deploy_args = commands.add_parser("deploy", help="Copy and hash the runtime payload with reader stopped")
     deploy_args.add_argument("--source", required=True, type=Path)
     deploy_args.add_argument("--revision", required=True, help="Candidate revision label; exact bytes are recorded separately")
@@ -403,10 +457,17 @@ def main():
         commands.add_parser(name).add_argument("service", choices=("server", "reader"))
     commands.add_parser("status")
     commands.add_parser("smoke", help="Download and open one unused fixture chapter through the real UI")
+    commands.add_parser("auth-smoke", help="Fill and test the real setup connection dialog, then download a fixture")
     ui = commands.add_parser("ui").add_subparsers(dest="action", required=True)
     for name in ("observe", "home", "close-reader"):
         ui.add_parser(name)
     ui.add_parser("tap").add_argument("label")
+    fill = ui.add_parser("fill", help="Fill a visible field without putting secrets in arguments or output")
+    fill.add_argument("field", help="Observed field hint or 1-based index")
+    source = fill.add_mutually_exclusive_group(required=True)
+    source.add_argument("--credential", choices=("server_url", "username", "password"))
+    source.add_argument("--stdin", action="store_true", help="Read the exact field text from standard input")
+    fill.add_argument("--invalid", action="store_true", help="Use a deliberately wrong sandbox password")
     wait = ui.add_parser("wait")
     wait.add_argument("title")
     wait.add_argument("--timeout", type=float, default=15)
@@ -436,6 +497,13 @@ def main():
         client = Inspector(root)
         if args.command == "smoke":
             result = client.smoke()
+        elif args.command == "auth-smoke":
+            result = client.auth_smoke()
+        elif args.action == "fill":
+            if args.invalid and args.credential != "password":
+                parser.error("--invalid requires --credential password")
+            value = sys.stdin.read(4097) if args.stdin else client.credential(args.credential, args.invalid)
+            result = client.fill(args.field, value)
         elif args.action == "tap":
             result = client.tap(args.label)
         elif args.action == "wait":
