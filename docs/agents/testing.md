@@ -15,6 +15,8 @@ Match each requirement to a precondition, action, observable outcome, and enviro
 
 Reuse focused specs and prior evidence. A closed issue with accepted gaps does not establish its unchecked cases. Ordinary specs stay offline and independent of a server, KOReader installation, or personal library. Sandbox runs are opt-in.
 
+Run isolated specs with `busted --lua=luajit spec` when the installed Busted launcher does not already select LuaJIT. A LuaRocks launcher can hardcode plain Lua 5.1, which lacks `ffi` and cannot exercise the native archive and durable-storage boundaries.
+
 ## Start a fresh sandbox
 
 ### Prerequisites
@@ -142,6 +144,8 @@ For saved-credential controls, open **Settings > Connection > Login information*
 
 `auth-smoke` does not establish restart, session expiry, independent concurrent sessions, concurrent download limits, read sync, credential changes during active work, ambiguous mutation failures, or the one-login/one-replay bound. Exercise those separately using the plugin's ordinary widgets and owned-service `stop`/`run` controls. The launcher cookie session is intentionally independent of plugin sessions, so successful seeding cannot establish those contracts.
 
+For a server-restart control, keep the plugin process alive while using `stop server` followed by `run server`, wait for authenticated readiness, then exercise another protected operation. Restart probes tolerate TIME_WAIT sockets but still refuse live listeners. A new plugin process alone cannot prove recovery of an existing cookie. For idle-session behavior without a 30-minute wait, a disposable transport control may send an invalid cookie to the real server; record that as injected session invalidation, not elapsed-time expiry.
+
 ## Inspect the UI safely
 
 The repository ships [sandbox_ui.py](../../scripts/sandbox_ui.py) and [sandbox-inspector.lua](../../scripts/sandbox-inspector.lua); machine-local inspector prototypes are no longer prerequisites. Setup installs the patch only into the sandbox profile as `patches/2-sandbox-inspector.lua`. It uses KOReader's bundled HTTP inspector, not a production plugin modification or a separate execution service.
@@ -149,6 +153,8 @@ The repository ships [sandbox_ui.py](../../scripts/sandbox_ui.py) and [sandbox-i
 The inspector binds to `127.0.0.1` and requires the private `profile/inspector.token`; its port comes from `profile/inspector.port`. Server credentials live in `secrets.json`. Helpers read these files internally. Do not pass secrets as command arguments, print them, or enable transport logging that records headers. Keep the root private and never expose the inspector to a LAN or the Internet. Verify rejected missing/wrong tokens when changing this boundary.
 
 Prefer `observe` for titles, labels, enabled controls, field hints/indices, and page state. `tap` resolves a unique enabled label, waits for its first paint, then queues the existing widget handler on KOReader's next UI tick. `fill` sends a bounded, authenticated POST only to an observed editable input; it uses the widget's ordinary delete/insert methods and waits for the edit acknowledgment without exposing text. The inspector recognizes a dialog's own virtual keyboard, but never skips unrelated modal windows. Missing, stale, or ambiguous controls are failures. Re-observe after navigation or asynchronous updates. `wait` has a deadline and reports the last observation on failure; a matching title does not establish download completion. Use framebuffer screenshots for layout, clipping, covers, rendered pages, and unexpected dialogs, not after every tap. An empty or unsupported observation needs investigation, not a passing assertion.
+
+The inspector also discovers button layouts nested in visual containers, including ordinary confirmation dialogs. Re-observe the confirmation and activate its exact visible label; do not bypass confirmation callbacks or traverse arbitrary object properties.
 
 Reader transitions can briefly interrupt inspector access. The helper bounds connection-refused retries to a 15-second transition deadline. It also retries connection resets for read-only observations during that interval, but never replays a possibly executed control action. Other network errors are failures.
 

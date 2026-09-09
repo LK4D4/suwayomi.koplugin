@@ -30,6 +30,15 @@ userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
                 and not (control.item and control.item.enabled == false)
                 and (not control.isEnabled or control:isEnabled())
         end
+        local function nestedLayout(widget, path, depth)
+            if type(widget) ~= "table" or depth == 0 then return end
+            if type(widget.layout) == "table" then return widget.layout, path .. "layout/" end
+            -- ConfirmBox keeps its buttons inside visual containers, not a named field.
+            for index, child in ipairs(widget) do
+                local layout, child_path = nestedLayout(child, path .. index .. "/", depth - 1)
+                if layout then return layout, child_path end
+            end
+        end
         function Inspector:observe()
             -- Never walk settings, model graphs, or arbitrary object properties.
             local stack = UIManager._window_stack
@@ -115,6 +124,9 @@ userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
             local layout, layout_path = widget.layout, path .. "layout/"
             if not layout and widget.button_table then
                 layout, layout_path = widget.button_table.layout, path .. "button_table/layout/"
+            end
+            if not layout then
+                layout, layout_path = nestedLayout(widget, path, 8)
             end
             for row_index, row in ipairs(layout or {}) do
                 local columns = {}

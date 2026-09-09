@@ -75,6 +75,229 @@ describe("suwayomi/api/transport", function()
         )
     end)
 
+    it("silently logs in and reuses the session for GraphQL and page bytes", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "simple_login"
+        credentials.username = "alice+reader"
+        credentials.password = "secret&word"
+        local logins = 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                assert.is_nil(options.headers.Authorization)
+                assert.is_false(options.redirect)
+                if options.url == "https://suwayomi.example/login.html" then
+                    logins = logins + 1
+                    assert.are.equal("user=alice%2Breader&pass=secret%26word", options.source)
+                    return 1, 303, { ["set-cookie"] = "JSESSIONID=session-one; Path=/; HttpOnly", location = "/" }
+                end
+                if options.headers.Cookie ~= "JSESSIONID=session-one" then
+                    return 1, 401
+                end
+                options.sink(options.method == "POST" and [[{"data":{"ok":true}}]] or "PNG")
+                return 1, 200, { ["content-type"] = "image/png" }
+            end }
+        end
+
+        local result = transport.performGraphQLRequest(credentials, [[{"query":"query { ok }"}]], "test")
+        assert.is_true(result.ok)
+        assert.are.equal([[{"data":{"ok":true}}]], result.response_body)
+        assert.are.equal("PNG", transport.downloadBinary(credentials, "/page.png").body)
+        assert.are.equal(1, logins)
+        assert.is_nil(credentials.cookie)
+    end)
+
+    it("renews an expired session after a rejected single-field GraphQL mutation", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "simple_login"
+        local logins, mutations = 0, 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                if options.url:match("/login%.html$") then
+                    logins = logins + 1
+                    return 1, 303, { ["set-cookie"] = "JSESSIONID=session-" .. logins .. "; Path=/" }
+                end
+                if options.headers.Cookie == "JSESSIONID=session-1" then
+                    options.sink([[{"errors":[{"message":"Exception while fetching data (/updateChapter) : Unauthorized\r\n\r\nsuwayomi.tachidesk.server.user.UnauthorizedException: Unauthorized\n\tat suwayomi.tachidesk.server.user.UserTypeKt.requireUser(UserType.kt:27)\n\tat suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring.onField(RequireAuthDirectiveWiring.kt:35)","path":["updateChapter"]}],"data":null}]])
+                else
+                    mutations = mutations + 1
+                    options.sink([[{"data":{"updateChapter":{"isRead":true}}}]])
+                end
+                return 1, 200
+            end }
+        end
+
+        local result = transport.performGraphQLRequest(credentials,
+            [[{"query":"mutation Read($input: UpdateChapterInput!) { updateChapter(input: $input) { isRead } }","variables":{"input":{"id":1,"isRead":true}}}]],
+            "markRead")
+        assert.is_true(result.ok)
+        assert.are.equal([[{"data":{"updateChapter":{"isRead":true}}}]], result.response_body)
+        assert.are.equal(2, logins)
+        assert.are.equal(1, mutations)
+    end)
+
+    it("stops after one re-login when the server keeps rejecting the session", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "simple_login"
+        local logins, requests = 0, 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                if options.url:match("/login%.html$") then
+                    logins = logins + 1
+                    return 1, 303, { ["set-cookie"] = "JSESSIONID=expired; Path=/" }
+                end
+                requests = requests + 1
+                return 1, 401
+            end }
+        end
+        local result = transport.downloadBinary(credentials, "/page.png")
+        assert.is_false(result.ok)
+        assert.is_false(result.retryable)
+        assert.are.equal(401, result.status_code)
+        assert.are.equal(2, logins)
+        assert.are.equal(2, requests)
+    end)
+
+    it("rejects a login form response without trying the protected operation", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "simple_login"
+        local requests = 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                requests = requests + 1
+                assert.truthy(options.url:match("/login%.html$"))
+                options.sink("<html>Invalid username or password</html>")
+                return 1, 200, { ["set-cookie"] = "JSESSIONID=unauthenticated; Path=/" }
+            end }
+        end
+        local result = transport.performGraphQLRequest(credentials, [[{"query":"query { __typename }"}]], "test")
+        assert.is_false(result.ok)
+        assert.is_false(result.retryable)
+        assert.are.equal(1, requests)
+        assert.is_nil(result.response_body)
+    end)
+
+    it("never replays a mutation after an ambiguous network failure", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "simple_login"
+        local mutations, logins = 0, 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                if options.url:match("/login%.html$") then
+                    logins = logins + 1
+                    return 1, 303, { ["set-cookie"] = "JSESSIONID=valid; Path=/" }
+                end
+                mutations = mutations + 1
+                return nil, "closed"
+            end }
+        end
+        local result = transport.performGraphQLRequest(credentials,
+            [[{"query":"mutation { updateChapter(input: {id: 1}) { id } }"}]], "markRead")
+        assert.is_false(result.ok)
+        assert.are.equal(1, mutations)
+        assert.are.equal(1, logins)
+    end)
+
+    it("does not replay multi-root mutations or partial GraphQL results", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "simple_login"
+        local json = require("dkjson")
+        local calls = 0
+        local response
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                if options.url:match("/login%.html$") then
+                    return 1, 303, { ["set-cookie"] = "JSESSIONID=valid; Path=/" }
+                end
+                calls = calls + 1
+                options.sink(json.encode(response))
+                return 1, 200
+            end }
+        end
+        response = {
+            data = json.null,
+            errors = { { path = { "updateChapter" }, message =
+                "Exception while fetching data (/updateChapter) : Unauthorized\r\n"
+                .. "suwayomi.tachidesk.server.user.UserTypeKt.requireUser\n"
+                .. "suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring" } },
+        }
+        transport.performGraphQLRequest(credentials,
+            [[{"query":"mutation { updateChapter(input: {id: 1}) { id } updateManga(input: {id: 2}) { id } }"}]], "update")
+        assert.are.equal(1, calls)
+        response.data = { updateChapter = { id = 1 } }
+        transport.performGraphQLRequest(credentials,
+            [[{"query":"mutation { updateChapter(input: {id: 1}) { id } }"}]], "update")
+        assert.are.equal(2, calls)
+    end)
+
+    it("scopes cookies to saved credentials and never sends them to external images", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "simple_login"
+        local logins = 0
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                if options.url:match("/login%.html$") then
+                    logins = logins + 1
+                    assert.is_nil(options.headers.Cookie)
+                    return 1, 303, { ["set-cookie"] = "JSESSIONID=session-" .. logins .. "; Path=/" }
+                end
+                if options.url == "https://cdn.example/page.png" then
+                    assert.is_nil(options.headers.Cookie)
+                    assert.is_nil(options.headers.Authorization)
+                    return 1, 401
+                end
+                assert.are.equal("JSESSIONID=session-" .. logins, options.headers.Cookie)
+                options.sink("PNG")
+                return 1, 200
+            end }
+        end
+        assert.is_true(transport.downloadBinary(credentials, "/page.png").ok)
+        credentials.password = "changed"
+        assert.is_true(transport.downloadBinary(credentials, "/page.png").ok)
+        credentials.server_url = "https://other.example"
+        assert.is_true(transport.downloadBinary(credentials, "/page.png").ok)
+        assert.is_false(transport.downloadBinary(credentials, "https://cdn.example/page.png").ok)
+        assert.are.equal(3, logins)
+    end)
+
+    it("restarts archive output after authentication rejection without retaining error bytes", function()
+        install_ltn12()
+        local credentials = valid_credentials()
+        credentials.auth_method = "simple_login"
+        local logins = 0
+        local path = os.tmpname()
+        package.preload["ssl.https"] = function()
+            return { request = function(options)
+                if options.url:match("/login%.html$") then
+                    logins = logins + 1
+                    return 1, 303, { ["set-cookie"] = "JSESSIONID=session-" .. logins .. "; Path=/" }
+                end
+                if options.headers.Cookie == "JSESSIONID=session-1" then
+                    options.sink("Unauthorized")
+                    return 1, 401
+                end
+                options.sink("PK\003\004archive")
+                return 1, 200
+            end }
+        end
+        local result = transport.downloadChapterArchive(credentials, 1, path)
+        local file = assert(io.open(path, "rb"))
+        local bytes = file:read("*a")
+        file:close()
+        os.remove(path)
+        assert.is_true(result.ok)
+        assert.are.equal("PK\003\004archive", bytes)
+        assert.are.equal(#bytes, result.bytes)
+        assert.are.equal("PK\003\004", result.header_bytes)
+        assert.are.equal(2, logins)
+    end)
+
     it("performs GraphQL requests with auth headers and debug metadata", function()
         install_ltn12()
         local request = {}

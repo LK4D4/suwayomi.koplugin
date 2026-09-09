@@ -184,6 +184,12 @@ msgctxt "source filter sort direction"
 msgid "Ascending"
 msgstr "За зростанням"
 
+msgid "Authentication method"
+msgstr ""
+
+msgid "Authentication: %1"
+msgstr ""
+
 msgid "Author"
 msgstr "Автор"
 
@@ -203,6 +209,9 @@ msgstr "Доступно"
 
 msgid "Back"
 msgstr "Назад"
+
+msgid "Basic Auth"
+msgstr ""
 
 msgid "Browse"
 msgstr "Огляд"
@@ -1274,6 +1283,9 @@ msgstr "Майстер налаштування"
 
 msgid "Show NSFW sources: %1"
 msgstr "Показувати джерела NSFW: %1"
+
+msgid "Simple Login"
+msgstr ""
 
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."

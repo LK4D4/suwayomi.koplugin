@@ -169,6 +169,12 @@ msgctxt "source filter sort direction"
 msgid "Ascending"
 msgstr ""
 
+msgid "Authentication method"
+msgstr ""
+
+msgid "Authentication: %1"
+msgstr ""
+
 msgid "Author"
 msgstr ""
 
@@ -187,6 +193,9 @@ msgid "Available"
 msgstr ""
 
 msgid "Back"
+msgstr ""
+
+msgid "Basic Auth"
 msgstr ""
 
 msgid "Browse"
@@ -1202,6 +1211,9 @@ msgid "Setup wizard"
 msgstr ""
 
 msgid "Show NSFW sources: %1"
+msgstr ""
+
+msgid "Simple Login"
 msgstr ""
 
 msgid "Skipped %1 already downloaded or queued."

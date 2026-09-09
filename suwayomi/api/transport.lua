@@ -2,12 +2,21 @@
 --
 -- Responsibility: build request headers/URLs, choose the right HTTP client, map
 -- transport failures to plugin errors, and stream downloaded bytes to files.
--- Owned state: none.
+-- Owned state: one credential-scoped Simple Login cookie in this process only.
 -- Dependencies: socket/http, ssl.https, ltn12, and Lua file IO at call time.
 -- External data: credentials, URLs, HTTP status codes, and downloaded bytes are
 -- normalized here before the API facade parses or returns them.
 
 local Transport = {}
+local session
+
+local function sessionMatches(credentials)
+    return session and credentials
+        and credentials.auth_method == "simple_login"
+        and session.server_url == credentials.server_url
+        and session.username == credentials.username
+        and session.password == credentials.password
+end
 
 local BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local REQUEST_TIMEOUT_SECONDS = 15
@@ -193,6 +202,8 @@ function Transport.buildRequestHeaders(credentials)
 
     if credentials and credentials.auth_method == "basic_auth" then
         headers.Authorization = Transport.buildBasicAuthHeader(credentials.username, credentials.password)
+    elseif sessionMatches(credentials) then
+        headers.Cookie = session.cookie
     end
 
     return headers
@@ -217,7 +228,103 @@ function Transport.buildChapterArchiveDownloadURL(server_url, chapter_id)
     )
 end
 
-function Transport.performGraphQLRequest(credentials, request_body, operation_name, log_debug_event, options)
+local function login(credentials, timeout_seconds)
+    session = nil
+    local server_url = credentials and credentials.server_url
+    if type(server_url) ~= "string" or server_url == "" then
+        return { ok = false, error = "Missing Suwayomi server URL.", retryable = false }
+    end
+    local function formEncode(value)
+        return tostring(value or ""):gsub("([^%w%-_%.~])", function(character)
+            return string.format("%%%02X", character:byte())
+        end)
+    end
+    local body = "user=" .. formEncode(credentials.username) .. "&pass=" .. formEncode(credentials.password)
+    local client = server_url:match("^https://") and require("ssl.https") or require("socket.http")
+    local ltn12 = require("ltn12")
+    local ok, code, headers = client.request{
+        url = Transport.buildRequestURL(server_url, "/login.html"),
+        method = "POST",
+        redirect = false,
+        headers = {
+            ["Content-Type"] = "application/x-www-form-urlencoded",
+            ["Content-Length"] = tostring(#body),
+        },
+        source = ltn12.source.string(body),
+        sink = buildGuardedTableSink({}, { max_bytes = 64 * 1024 }),
+        timeout = timeout_seconds or REQUEST_TIMEOUT_SECONDS,
+    }
+    if not ok or type(code) ~= "number" then
+        return { ok = false, error = formatReachabilityError(code), retryable = isRetryableTransportCode(code) }
+    end
+    local set_cookie = headers and (headers["set-cookie"] or headers["Set-Cookie"])
+    -- Jetty issues JSESSIONID on a successful form login. Never follow its redirect.
+    local cookie = type(set_cookie) == "string" and #set_cookie <= 8192
+        and ("," .. set_cookie):match(",%s*(JSESSIONID=[^;,%s]+)")
+    if code ~= 303 or not cookie or cookie:find("[%c]") then
+        return { ok = false, error = "Simple Login failed. Check authentication method, username, and password.",
+            retryable = isRetryableHttpStatus(code), status_code = code }
+    end
+    session = {
+        server_url = credentials.server_url,
+        username = credentials.username,
+        password = credentials.password,
+        cookie = cookie,
+    }
+    return { ok = true }
+end
+
+local function withSession(credentials, timeout_seconds, request, ...)
+    if not credentials or credentials.auth_method ~= "simple_login" then
+        session = nil
+        return request(credentials, ...)
+    end
+    if not sessionMatches(credentials) then
+        local authenticated = login(credentials, timeout_seconds)
+        if not authenticated.ok then return authenticated end
+    end
+    local result = request(credentials, ...)
+    if result.status_code ~= 401 and result.status_code ~= 403 then return result end
+    local authenticated = login(credentials, timeout_seconds)
+    if not authenticated.ok then return authenticated end
+    result = request(credentials, ...)
+    if result.status_code == 401 or result.status_code == 403 then session = nil end
+    return result
+end
+
+local function graphQLAuthRejected(request_body, response_body)
+    if not response_body:find("Unauthorized", 1, true) then return false end
+    local json = require("dkjson")
+    local response = json.decode(response_body, 1, json.null)
+    local request = json.decode(request_body)
+    if type(response) ~= "table" or type(response.errors) ~= "table" or #response.errors ~= 1
+        or type(request) ~= "table" or type(request.query) ~= "string"
+    then return false end
+    -- Only the single-root operations emitted by our builders are replayable.
+    -- A multi-root mutation can have effects even when its overall data is null.
+    local query = request.query
+    if query:find('"""', 1, true) then return false end
+    query = query:gsub("\\.", ""):gsub('"[^"]*"', '""'):gsub("#[^\r\n]*", ""):gsub("%b()", "")
+    local selection = query:match("^[%s%w_]*{(.*)}%s*$")
+    local field = selection and selection:gsub("%b{}", ""):match("^%s*([%a_][%w_]*)%s*$")
+    local err = response.errors[1]
+    if not field or type(err) ~= "table" or type(err.path) ~= "table"
+        or #err.path ~= 1 or err.path[1] ~= field or type(err.message) ~= "string"
+    then return false end
+    if response.data ~= nil and response.data ~= json.null then
+        if type(response.data) ~= "table" then return false end
+        for key, value in pairs(response.data) do
+            if key ~= field or value ~= json.null then return false end
+        end
+    end
+    -- Suwayomi reports resolver auth failures with HTTP 200 and a stack trace.
+    -- Match the pre-resolver guard, not arbitrary "Unauthorized" application text.
+    return err.message:match("^Exception while fetching data %(/" .. field .. "%) : Unauthorized[\r\n]") ~= nil
+        and err.message:find("suwayomi.tachidesk.server.user.UserTypeKt.requireUser", 1, true) ~= nil
+        and err.message:find("suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring", 1, true) ~= nil
+end
+
+local function performGraphQLRequest(credentials, request_body, operation_name, log_debug_event, options)
     local server_url = credentials and credentials.server_url
     options = options or {}
 
@@ -245,6 +352,7 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
         url = Transport.buildGraphQLEndpoint(server_url),
         method = "POST",
         headers = headers,
+        redirect = not (credentials and credentials.auth_method == "simple_login"),
         source = ltn12.source.string(request_body),
         sink = buildGuardedTableSink(response_chunks, {
             max_bytes = MAX_GRAPHQL_RESPONSE_BYTES,
@@ -264,6 +372,11 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
         request_bytes = #request_body,
         response_bytes = #response_body,
     })
+    if ok and code == 200 and credentials and credentials.auth_method == "simple_login"
+        and graphQLAuthRejected(request_body, response_body)
+    then
+        return { ok = false, error = "Authentication failed.", retryable = false, status_code = 401 }
+    end
     if code == 200 then
         return {
             ok = true,
@@ -304,7 +417,7 @@ function Transport.performGraphQLRequest(credentials, request_body, operation_na
     }
 end
 
-function Transport.downloadBinary(credentials, page_url, log_debug_event, request_options)
+local function downloadBinary(credentials, page_url, log_debug_event, request_options)
     log_debug_event, request_options = normalizeBinaryCallOptions(log_debug_event, request_options)
     local server_url = credentials and credentials.server_url
     if not server_url or server_url == "" then
@@ -334,6 +447,7 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event, reques
         url = request_url,
         method = "GET",
         headers = headers,
+        redirect = not (credentials and credentials.auth_method == "simple_login"),
         sink = buildGuardedTableSink(response_chunks, {
             max_bytes = request_options.max_bytes or MAX_BINARY_RESPONSE_BYTES,
             total_timeout_seconds = request_options.total_timeout_seconds,
@@ -400,7 +514,7 @@ function Transport.downloadBinary(credentials, page_url, log_debug_event, reques
     }
 end
 
-function Transport.downloadChapterArchive(credentials, chapter_id, target_path, log_debug_event, request_options)
+local function downloadChapterArchive(credentials, chapter_id, target_path, log_debug_event, request_options)
     request_options = request_options or {}
     local server_url = credentials and credentials.server_url
     if not server_url or server_url == "" then
@@ -443,6 +557,7 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
         url = request_url,
         method = "GET",
         headers = headers,
+        redirect = not (credentials and credentials.auth_method == "simple_login"),
         sink = function(chunk)
             if chunk then
                 if now() - started_at > total_timeout_seconds then
@@ -562,6 +677,29 @@ function Transport.downloadChapterArchive(credentials, chapter_id, target_path, 
         retryable = isRetryableHttpStatus(code),
         status_code = code,
     }
+end
+
+function Transport.performGraphQLRequest(credentials, request_body, operation_name, log_debug_event, options)
+    return withSession(credentials, options and options.timeout_seconds, performGraphQLRequest,
+        request_body, operation_name, log_debug_event, options)
+end
+
+function Transport.downloadBinary(credentials, page_url, log_debug_event, request_options)
+    -- External images must neither receive our cookie nor trigger a server login.
+    if type(page_url) ~= "string" or page_url == ""
+        or (page_url:match("^https?://") and not isSameOrigin(credentials and credentials.server_url, page_url))
+    then
+        return downloadBinary(credentials, page_url, log_debug_event, request_options)
+    end
+    return withSession(credentials, nil, downloadBinary, page_url, log_debug_event, request_options)
+end
+
+function Transport.downloadChapterArchive(credentials, chapter_id, target_path, log_debug_event, request_options)
+    if not target_path or target_path == "" then
+        return downloadChapterArchive(credentials, chapter_id, target_path, log_debug_event, request_options)
+    end
+    return withSession(credentials, request_options and request_options.timeout_seconds, downloadChapterArchive,
+        chapter_id, target_path, log_debug_event, request_options)
 end
 
 return Transport

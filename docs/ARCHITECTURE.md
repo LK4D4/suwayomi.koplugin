@@ -34,6 +34,12 @@ Use this map before broad searches. Directory-qualified paths are relative to th
 | One-shot requests | `suwayomi/network/request_job.lua`/`request_worker.lua` serve Library, reader return, and chapter-context requests. `suwayomi/subprocess/job.lua` owns JSON result files, polling, timeout/cancel, reaping, and cleanup; callers supply workers/parsers/callbacks. |
 | Localization and diagnostics | `suwayomi/i18n.lua` owns gettext/template formatting; `suwayomi/i18n/locales.lua` owns locale aliases/fallbacks. `suwayomi/debug.lua` owns opt-in redacted diagnostics. |
 
+## Authentication
+
+- `suwayomi/api/transport.lua`: Basic Auth and Simple Login, endpoint construction, GraphQL requests, archive downloads, binary page fetches, and bounded response sinks. Simple Login owns one credential-scoped cookie per process; credentials remain in settings, but cookies never enter settings, worker results, or logs. A rejected session permits one login and one request replay. GraphQL's HTTP-200 auth errors are replayable only for single-root builder operations rejected by Suwayomi's pre-resolver auth guard, with no returned data; ambiguous network failures and partial/multi-root mutations are never replayed by authentication recovery. External image origins receive neither credentials nor cookies. Simple Login requests do not follow redirects.
+
+Credential dialogs explicitly select the authentication method. Changing the method invalidates the setup connection test. Existing workers retain their captured credentials; later attempts load the current settings. Processes renew their own sessions without cross-process coordination. Authentication failures retain the existing manual download Retry behavior and pending read-sync policy.
+
 ## Download ownership
 
 [ADR-0002](adr/0002-navigation-safe-download-ownership.md) owns navigation and bounded quit; [ADR-0005](adr/0005-automatic-download-restart.md) owns restart, isolated attempts, and archive validation. Navigation and sleep/wake preserve the queue, workers, retry deadlines, and concurrency limit. Subscriber deliveries are deferred, isolated, and invalidated on detach; reopened or uncovered screens render current snapshots.
@@ -135,9 +141,9 @@ For opt-in live-server checks, local KOReader UI automation, and device evidence
 
 Development tooling under `scripts/` stays separate from the production plugin:
 
-- `sandbox.py` owns a disposable root, pinned application downloads, generated Local source fixtures, exact-hash runtime deployment, and foreground service lifecycle. Its launcher targets Linux x86_64 with a graphical session; Python uses only the standard library. It does not install OS packages, change network configuration, or manage unrelated services.
-- `sandbox_ui.py` owns authenticated observations, existing-widget actions, bounded waits, framebuffer capture, and the single-chapter smoke against the real UI.
-- `sandbox-inspector.lua` is installed only in the sandbox profile. It restricts KOReader's bundled inspector to loopback and a private token; it does not modify the production plugin or upstream runtime files.
+- `sandbox.py` owns a disposable root, pinned application downloads, generated Local source fixtures, exact-hash runtime deployment, and foreground service lifecycle. Setup selects Basic Auth or Simple Login; readiness and seeding use the selected protocol without fallback. Cookies remain in the launcher's memory. Port probes allow stopped-service TIME_WAIT sockets while still rejecting live listeners. Its launcher targets Linux x86_64 with a graphical session and uses only Python's standard library.
+- `sandbox_ui.py` owns authenticated observations, existing-widget actions, bounded waits, framebuffer capture, and the chapter/auth smoke workflows. Auth smoke uses real credential fields, method selection, rejected-password correction, connection testing, and setup continuation before the chapter smoke.
+- `sandbox-inspector.lua` is installed only in the sandbox profile. It restricts KOReader's bundled inspector to loopback and a private token. Input observations expose metadata, not values; bounded authenticated edits use ordinary InputText methods. Visible controls include nested confirmation buttons. It does not modify the production plugin or upstream runtime files.
 
 Credentials, inspector access files, settings, archives, and raw evidence remain private sandbox data outside the runtime payload. Live checks complement isolated specs; desktop evidence does not establish device lifecycle, permissions, sleep/wake, or e-ink behavior.
 

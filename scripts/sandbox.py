@@ -340,6 +340,8 @@ def seed_library(client):
 
 def available_port(port):
     with socket.socket() as probe:
+        # A stopped sandbox can leave TIME_WAIT sockets; live listeners still fail.
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             probe.bind(("127.0.0.1", port))
         except OSError as error:

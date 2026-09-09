@@ -166,6 +166,12 @@ msgctxt "source filter sort direction"
 msgid "Ascending"
 msgstr "升序"
 
+msgid "Authentication method"
+msgstr ""
+
+msgid "Authentication: %1"
+msgstr ""
+
 msgid "Author"
 msgstr "作者"
 
@@ -185,6 +191,9 @@ msgstr "可用"
 
 msgid "Back"
 msgstr "返回"
+
+msgid "Basic Auth"
+msgstr ""
 
 msgid "Browse"
 msgstr "浏览"
@@ -1234,6 +1243,9 @@ msgstr "设置向导"
 
 msgid "Show NSFW sources: %1"
 msgstr "显示 NSFW 源：%1"
+
+msgid "Simple Login"
+msgstr ""
 
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
