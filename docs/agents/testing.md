@@ -74,6 +74,8 @@ If SDL display selection is necessary, prefix the reader command with `SDL_VIDEO
 
 `status` reports running/stopped state, not readiness. A spawned PID, open TCP port, or HTTP acknowledgment alone is not readiness or a successful plugin request. Report startup failure directly. `stop` targets only sandbox-owned services; never stop another application to free a port.
 
+An immediate restart after graceful shutdown can fail with `Requested sandbox port is already in use` while only old `TIME-WAIT` connections remain. Check the configured port with `ss -ltn` for a listener and `ss -tan` for connection state. If there is no listener and the owned service is stopped, wait for those connections to expire and retry the same launch. Do not kill another process or change an existing sandbox's recorded ports to bypass this transient preflight failure.
+
 ### Observe and run the single-chapter smoke
 
 From the plugin root, with both services ready and the fresh English-language profile:
