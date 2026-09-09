@@ -254,7 +254,8 @@ function SettingsStore:serializeValue(value, indent, visited)
         if not isFiniteNumber(value) then
             return nil, "non_finite_number"
         end
-        return tostring(value)
+        -- LuaJIT numbers need 17 significant digits to round-trip exactly.
+        return string.format("%.17g", value)
     end
     if value_type ~= "table" then
         return nil, "unsupported_type_" .. value_type
@@ -290,7 +291,7 @@ function SettingsStore:serializeValue(value, indent, visited)
         if type(key) == "string" then
             key_repr = "[" .. string.format("%q", key) .. "]"
         else
-            key_repr = "[" .. tostring(key) .. "]"
+            key_repr = "[" .. string.format("%.17g", key) .. "]"
         end
 
         local item_str, err = self:serializeValue(value[key], next_indent, visited)
