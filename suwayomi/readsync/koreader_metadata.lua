@@ -336,8 +336,7 @@ function Methods:isKoreaderMetadataFinished(metadata_path)
         return true
     end
 
-    local percent_finished = tonumber(content:match('%["percent_finished"%]%s*=%s*([%d%.]+)'))
-    return percent_finished ~= nil and percent_finished >= 1
+    return false
 end
 
 

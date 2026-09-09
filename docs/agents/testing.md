@@ -115,6 +115,23 @@ Prefer `observe` for titles, labels, enabled controls, and page state. `tap` res
 
 Reader transitions can briefly interrupt inspector access. The helper bounds connection-refused retries to a 15-second transition deadline. It also retries connection resets for read-only observations during that interval, but never replays a possibly executed control action. Other network errors are failures.
 
+### Native reader controls and incomplete observations
+
+The inspector does not expose every widget. Native configuration choices can have empty labels, and a bulk `ConfirmBox` can show its message with no observed buttons even though **Cancel** and **Queue** are visible. In those cases, capture the framebuffer and use the actual visible control through desktop input. Do not bypass the confirmation by calling the downloader, or widen the inspector's method allowlist.
+
+For an X11/WSLg session, `xdotool` is an optional input tool. Identify the window by a process whose `/proc/<pid>/environ` contains the exact sandbox `KO_HOME`; matching only the title can select another KOReader session. Send keys to that window, and derive click coordinates from a current screenshot rather than reusing another dialog's coordinates. On the pinned desktop reader, **Return** opens the bottom configuration panel, **Escape** dismisses it, and **Right** advances the reader. Wait for reader initialization after opening, then verify the page change independently.
+
+The generated three-page CBZ can fit entirely on one screen in the default cropped continuous view. Advancing can then show the end-of-document dialog while the reported top page and saved progress remain **1/3**, not 100%. That is not a valid final-page-only control.
+
+For a final-page test:
+
+1. Open the bottom configuration panel and select **View Mode: page** under the page-view icon. Use a screenshot if the choices have empty observed labels.
+2. Advance through native input until observation reports `document_page == document_pages`; also inspect the rendered last-page label.
+3. Leave the document unfinished and close through **Go to Suwayomi**. Check saved `percent_finished == 1`, non-completed status, plugin/server unread state, and archive presence.
+4. For the positive control, reopen and use the native **Mark as finished** action. Check archive protection while open and the configured outcome after close. A completed document can remain downloaded when retention is Off.
+
+Read synchronization is asynchronous. A pending local read entry immediately after close is not a failed server update; wait for the server result and cleared pending state within a bounded deadline.
+
 ## Extend the smoke only where needed
 
 Use the actual user path for UI and lifecycle checks. Direct downloader calls cannot establish button wiring. Injected completion flags cannot establish completion-plus-close behavior. Label programmatic preconditions and faults separately from actions under test.

@@ -1664,6 +1664,40 @@ describe("process-owned download navigation", function()
         end)
     end
 
+    for _, route in ipairs({ "chapter list", "downloaded ledger" }) do
+        it("requires completed status rather than final-page progress through " .. route, function()
+            local plugin = manualHost(0)
+            local path = directory .. "/c1.cbz"
+            local metadata_path = path .. ".sdr/metadata.lua"
+            write(path, "last-page archive")
+            assert(require("lfs").mkdir(path .. ".sdr"))
+            write(metadata_path, 'return { ["summary"] = { ["status"] = "reading" }, ["percent_finished"] = 1 }')
+            assert(settings:saveChapterLedger({
+                ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path, read = false },
+            }))
+            plugin:setCurrentMangaChapterContext(manga, {
+                { id = "c1", name = "Chapter 1", is_read = false },
+            })
+            local function reconcile()
+                if route == "chapter list" then plugin:refreshChapterMenu()
+                else plugin:reconcileDownloadedChapterLedger() end
+            end
+            reconcile()
+            local entry = settings:loadChapterLedger()["m1:c1"]
+            assert.is_false(entry.read)
+            assert.is_nil(entry.pending_read_sync)
+            local metadata = assert(loadfile(metadata_path))()
+            assert.are.equal("reading", metadata.summary.status)
+            assert.are.equal(1, metadata.percent_finished)
+            assert.are.equal("last-page archive", read(path))
+
+            write(metadata_path, 'return { ["summary"] = { ["status"] = "complete" }, ["percent_finished"] = 0.5 }')
+            reconcile()
+            assert.is_true(settings:loadChapterLedger()["m1:c1"].read)
+            assert.are.equal("last-page archive", read(path))
+        end)
+    end
+
     for _, already_read in ipairs({ false, true }) do
     it("records completed close for retention with ahead Off and prior read " .. tostring(already_read), function()
         local path = directory .. "/c1.cbz"
