@@ -33,7 +33,12 @@ jobs:
         luarocks install luacheck
 
     - name: Install gettext and native archive test dependencies
-      run: sudo apt-get update && sudo apt-get install -y gettext libarchive-dev
+      run: |
+        # These dependencies use Ubuntu packages, not the runner's third-party feeds.
+        test -s /etc/apt/sources.list.d/ubuntu.sources
+        apt_sources=(-o Dir::Etc::sourcelist=sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=-)
+        sudo apt-get "${apt_sources[@]}" update
+        sudo apt-get "${apt_sources[@]}" install -y gettext libarchive-dev
 
     - name: Run lint
       run: luacheck --codes spec suwayomi main.lua _meta.lua
