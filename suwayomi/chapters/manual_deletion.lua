@@ -118,7 +118,7 @@ function ManualDeletion:_document()
 end
 
 function ManualDeletion:_blocked()
-    return self.settings:getStore():isBlocked() or self.queue.stopped == true or self.queue.recovery_pending == true
+    return self.settings:getStore():isBlocked() or self.queue:isStopped() or self.queue:isRecovering()
 end
 
 function ManualDeletion:_save(mutator)
@@ -137,13 +137,7 @@ function ManualDeletion:_save(mutator)
 end
 
 function ManualDeletion:_busy(key, doc)
-    if self.queue.isChapterBusy and self.queue:isChapterBusy(key) then return true end
-    if self.queue.recovery_completions and self.queue.recovery_completions[key] then return true end
-    for _, item in pairs(self.queue.items or {}) do
-        if keyFor(item) == key then return true end
-    end
-    local status = (self.queue.statuses or {})[key]
-    if type(status) == "table" and owned_states[status.state] then return true end
+    if self.queue:ownsChapter(key) then return true end
     if doc.download_queue ~= nil and type(doc.download_queue) ~= "table" then return true end
     for _, job in pairs(doc.download_queue or {}) do
         if keyFor(job) == key then
@@ -328,8 +322,9 @@ function ManualDeletion:admitDownloads(doc, jobs, provenance)
     return true
 end
 
-function ManualDeletion:validateJob(job)
-    if self.settings:getStore():isBlocked() or self.queue.stopped then return false, "persistence_failed" end
+function ManualDeletion:validateJob(job, generation)
+    if self.settings:getStore():isBlocked() or self.queue:isStopped() then return false, "persistence_failed" end
+    if generation == nil then generation = job.archive_generation end
     local doc = self:_document()
     local state, err = collection(doc)
     if err then return false, err end
@@ -339,16 +334,15 @@ function ManualDeletion:validateJob(job)
     if pending(request) then return false, "manual_deletion_pending" end
     for _, stored in pairs(doc.download_queue or {}) do
         if keyFor(stored) == key then
-            if stored.archive_generation == job.archive_generation then return true end
+            if stored.archive_generation == generation then return true end
             return false, "generation_changed"
         end
     end
     local archive = state and state.archives[key]
-    if validTarget(archive) and not archive.retired and archive.generation == job.archive_generation then return true end
-    local lifecycle = self.queue.active_job_lifecycle
-    if lifecycle and lifecycle.getStoppingJob and lifecycle:getStoppingJob(key) == job
-        and state and integer(job.archive_generation) and job.archive_generation < state.next_revision
-        and (archive == nil or (validTarget(archive) and archive.generation < job.archive_generation)) then
+    if validTarget(archive) and not archive.retired and archive.generation == generation then return true end
+    if self.queue:ownsStoppingAttempt(job)
+        and state and integer(generation) and generation < state.next_revision
+        and (archive == nil or (validTarget(archive) and archive.generation < generation)) then
         -- Cancellation retires queue intent, not the exact still-owned child's
         -- publication. A reconstructed/stale callback has no such authority.
         return true
@@ -356,7 +350,8 @@ function ManualDeletion:validateJob(job)
     return false, "job_superseded"
 end
 
-function ManualDeletion:publish(doc, job, path)
+function ManualDeletion:publish(doc, job, path, generation)
+    if generation == nil then generation = job.archive_generation end
     local state, err = collection(doc, true)
     if not state then error(err) end
     local key = keyFor(job)
@@ -365,10 +360,9 @@ function ManualDeletion:publish(doc, job, path)
         error("unsupported_state")
     end
     if pending(request) then error("manual_deletion_pending") end
-    if archive and job.archive_generation and archive.generation > job.archive_generation then error("job_superseded") end
+    if archive and generation and archive.generation > generation then error("job_superseded") end
     local evidence, reason = Identity.inspect(path, job.download_directory)
     if not evidence then error(reason) end
-    local generation = job.archive_generation
     if not generation then generation = allocate(state) end
     if not integer(generation) then error("unsupported_identity") end
     if archive and archive.generation == generation and (archive.retired or archive.path ~= path
@@ -518,11 +512,11 @@ end
 
 function ManualDeletion:_changed(target)
     if target then
-        local status = (self.queue.statuses or {})[target.key]
+        local status = self.queue:getStatusByKey(target.key)
         if type(status) == "table" and not owned_states[status.state]
             and (status.archive_generation == target.generation
                 or (status.archive_generation == nil and not self:_busy(target.key, self:_document()))) then
-            self.queue.statuses[target.key] = nil
+            self.queue:forgetChapterStatus(target.key)
         end
     end
     pcall(self.onChanged)

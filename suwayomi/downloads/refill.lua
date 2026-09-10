@@ -79,7 +79,7 @@ function Refill:_endpoint()
     return self.settings:normalizeEndpointScope(self.settings:load().server_url) or ""
 end
 function Refill:_save(mutator)
-    if self.stopped or self.queue.stopped then return nil, "stopped" end
+    if self.stopped or self.queue:isStopped() then return nil, "stopped" end
     local store = self.settings:getStore()
     if store:isBlocked() then self.queue:scheduleReconciliation(); return nil, "persistence_failed" end
     local called, ok, err = pcall(store.saveDocument, store, mutator)
@@ -404,7 +404,7 @@ function Refill:_apply(active, result)
             end
         end
         if choices.filter and matches == 0 then blocker = "scanlator_missing" end
-        self.queue.job_store:admitDocument(doc, admitted, "automatic", self.queue.manual_deletion)
+        self.queue:admitDocument(doc, admitted, "automatic")
         state.associations[request.manga_id] = { version = 1, manga = copy(manga), endpoint_scope = request.endpoint_scope }
         if blocker then current.state, current.reason, current.next_retry_at = "blocked", blocker, 0
         else state.requests[request.manga_id] = nil end
@@ -460,7 +460,7 @@ function Refill:process()
     if self.storage_retry_at and self.storage_retry_at > self.now() then
         self:_schedule(self.storage_retry_at - self.now()); return
     end
-    if self.queue:isBlocked() or self.queue.recovery_pending then self:_schedule(5); return end
+    if self.queue:isBlocked() or self.queue:isRecovering() then self:_schedule(5); return end
     local state = collection(self:_document())
     local due, deadline = {}, nil
     for id, request in pairs(state and state.requests or {}) do

@@ -1,7 +1,7 @@
 -- Boundary: ChapterDeleteActions.
 --
 -- Responsibility: Delete device-local archives and coordinate queue/ledger cleanup independently of completion history.
--- Owned state: Mutates plugin queue status and settings-backed read ledger through injected plugin methods.
+-- Owned state: Coordinates queue status cleanup and settings-backed read ledger through injected methods.
 -- Dependencies: Plugin mixin methods, local download helpers, settings, and i18n.
 -- External data: Queue state, ledger entries, and filesystem paths are checked before destructive cleanup.
 
@@ -144,11 +144,11 @@ function Methods:deleteChapterFromDeviceWithOptions(manga, chapter, options)
         local key = queue:getKey(manga, chapter)
         options.ledger[key] = self:loadChapterLedger()[key]
     end
-    local current = queue:getStatus(manga, chapter)
+    local current = queue:getStatusByKey(target.key)
     if current and not queue:isChapterBusy(target.key)
         and (current.state == "downloaded" or current.state == "skipped" or current.state == "failed")
         and (current.archive_generation == nil or current.archive_generation == target.generation) then
-        queue.statuses[target.key] = nil
+        queue:forgetChapterStatus(target.key)
     end
     removal:wake()
 

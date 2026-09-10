@@ -110,9 +110,9 @@ local function convergeMissingDownload(self, ledger, _entry, manga_id, chapter_i
     if not saved then return false end
     local key = manga_id .. ":" .. chapter_id
     ledger[key] = self:loadChapterLedger()[key]
-    local status = queue:getStatus({ id = manga_id }, { id = chapter_id })
+    local status = queue:getStatusByKey(key)
     if status and status.archive_generation == target.generation and not queue:isChapterBusy(key) then
-        queue.statuses[key] = nil
+        queue:forgetChapterStatus(key)
     end
     changed_mangas[manga_id] = true
     return true
