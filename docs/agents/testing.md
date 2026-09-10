@@ -54,6 +54,22 @@ Deployment copies only the canonical runtime payload into `profile/plugins/suway
 
 Deployment also refreshes the sandbox-only inspector patch and records its digest. Stop the reader and redeploy after changing the tooling; this leaves credentials and downloaded fixtures intact.
 
+### HTTPS coverage
+
+Use HTTPS when changing transport or authentication. HTTP-only smoke checks do not exercise KOReader's LuaSec client. Install `openssl` and `socat` in the Linux environment, then add `--https-port 4570` to `setup` in a fresh root. The HTTPS, backend, and inspector ports must differ.
+
+Setup generates a private, 30-day localhost certificate under `tls/` and sets the plugin and setup wizard to the HTTPS endpoint. No system trust store is changed. The Python readiness client trusts only this root's certificate; KOReader retains its existing LuaSec certificate policy. This checks HTTPS transport compatibility, not production certificate validation. Create a fresh root after certificate expiry.
+
+Start `run server` and wait for `server ready`, then start this command in another supervised process:
+
+```sh
+python3 scripts/sandbox.py --root "$ROOT" run tls
+```
+
+Wait for **`tls ready`** before starting the reader. This requires certificate-verified HTTPS, authenticated API access, and HTTP 401 without credentials. The TLS proxy and HTTP backend bind only to loopback. Socat's `verify=0` means clients need no client certificate; it does not disable the readiness client's server-certificate validation.
+
+Run `auth-smoke` and the normal UI checks against the configured HTTPS endpoint. Authentication modes remain separate fresh-root controls. Stop the reader, then `stop tls`, then the server; `status` must show all three stopped. Keep TLS keys and raw proxy logs private with the rest of the sandbox.
+
 ### Run and wait for readiness
 
 Keep each command in a separate terminal or harness-supervised foreground process. Start the server first:

@@ -192,6 +192,13 @@ local function normalizeBinaryCallOptions(log_debug_event, request_options)
     return log_debug_event, request_options or {}
 end
 
+local function redirectPolicy(credentials)
+    -- LuaSec rejects true before connecting. Preserve client defaults for Basic Auth.
+    if credentials and (credentials.auth_method == "simple_login" or credentials.auth_method == "ui_login") then
+        return false
+    end
+end
+
 function Transport.buildBasicAuthHeader(username, password)
     return "Basic " .. base64Encode(string.format("%s:%s", username or "", password or ""))
 end
@@ -541,7 +548,7 @@ local function performGraphQLRequest(credentials, request_body, operation_name, 
         url = Transport.buildGraphQLEndpoint(server_url),
         method = "POST",
         headers = headers,
-        redirect = not (credentials and (credentials.auth_method == "simple_login" or credentials.auth_method == "ui_login")),
+        redirect = redirectPolicy(credentials),
         source = ltn12.source.string(request_body),
         sink = buildGuardedTableSink(response_chunks, {
             max_bytes = MAX_GRAPHQL_RESPONSE_BYTES,
@@ -642,7 +649,7 @@ local function downloadBinary(credentials, page_url, log_debug_event, request_op
         url = request_url,
         method = "GET",
         headers = headers,
-        redirect = not (credentials and (credentials.auth_method == "simple_login" or credentials.auth_method == "ui_login")),
+        redirect = redirectPolicy(credentials),
         sink = buildGuardedTableSink(response_chunks, {
             max_bytes = request_options.max_bytes or MAX_BINARY_RESPONSE_BYTES,
             total_timeout_seconds = request_options.total_timeout_seconds,
@@ -752,7 +759,7 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
         url = request_url,
         method = "GET",
         headers = headers,
-        redirect = not (credentials and (credentials.auth_method == "simple_login" or credentials.auth_method == "ui_login")),
+        redirect = redirectPolicy(credentials),
         sink = function(chunk)
             if chunk then
                 if now() - started_at > total_timeout_seconds then

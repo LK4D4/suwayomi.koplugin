@@ -23,6 +23,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 import zlib
+import ssl
 
 # Digests published by the upstream GitHub release API. Updates are deliberate.
 RELEASES = {
@@ -64,6 +65,7 @@ def configuration(root):
     value.setdefault("auth_mode", "basic_auth")
     if value["auth_mode"] not in ("basic_auth", "simple_login", "ui_login"):
         raise RuntimeError("Unsupported sandbox authentication mode")
+    value.setdefault("server_url", f"http://127.0.0.1:{value['server_port']}")
     return value
 
 
@@ -122,8 +124,13 @@ def fixture_png(chapter, page):
 def setup(root, args):
     if root.exists() and any(root.iterdir()):
         raise RuntimeError("Setup requires an empty directory; existing data is never reset")
-    if args.server_port == args.inspector_port:
-        raise RuntimeError("Server and inspector require different ports")
+    ports = [args.server_port, args.inspector_port]
+    if args.https_port is not None:
+        ports.append(args.https_port)
+        if not shutil.which("openssl") or not shutil.which("socat"):
+            raise RuntimeError("HTTPS setup requires openssl and socat")
+    if len(set(ports)) != len(ports):
+        raise RuntimeError("Server, inspector, and HTTPS require different ports")
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     root.chmod(0o700)
     for name in ("packages", "runtime", "server-data/local/Sandbox Alpha", "profile/settings",
@@ -134,6 +141,20 @@ def setup(root, args):
     values = {"format": 1, "server_port": args.server_port, "inspector_port": args.inspector_port,
               "auth_mode": args.auth_mode,
               "versions": {"suwayomi": RELEASES["server"]["version"], "koreader": RELEASES["koreader"]["version"]}}
+    values["server_url"] = f"http://127.0.0.1:{args.server_port}"
+    if args.https_port is not None:
+        values["https_port"] = args.https_port
+        values["server_url"] = f"https://127.0.0.1:{args.https_port}"
+        tls = root / "tls"
+        tls.mkdir(mode=0o700)
+        result = subprocess.run([
+            "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "30",
+            "-subj", "/CN=localhost", "-addext", "subjectAltName=IP:127.0.0.1,DNS:localhost",
+            "-keyout", str(tls / "key.pem"), "-out", str(tls / "cert.pem"),
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if result.returncode:
+            raise RuntimeError("Could not generate the sandbox TLS certificate")
+        (tls / "key.pem").chmod(0o600)
     credentials = {"username": "sandbox", "password": secrets.token_hex(24)}
     write_json(root / "secrets.json", credentials)
     (root / "profile/inspector.token").write_text(secrets.token_hex(32) + "\n", encoding="utf-8")
@@ -153,7 +174,7 @@ def setup(root, args):
     (root / "server-data/server.conf").chmod(0o600)
     profile = (
         "return {\n"
-        f"  credentials = {{ server_url = {json.dumps('http://127.0.0.1:' + str(args.server_port))}, "
+        f"  credentials = {{ server_url = {json.dumps(values['server_url'])}, "
         f"username = {json.dumps(credentials['username'])}, password = {json.dumps(credentials['password'])}, "
         f"auth_method = {json.dumps(args.auth_mode)} }},\n"
         f"  download_directory = {json.dumps(str(root / 'downloads'), ensure_ascii=False)},\n"
@@ -263,16 +284,20 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 class ServerClient:
     """One launcher-owned in-memory session; never share it with KOReader."""
 
-    def __init__(self, root):
+    def __init__(self, root, *, backend=False):
         config = configuration(root)
-        self.url = f"http://127.0.0.1:{config['server_port']}"
+        self.url = f"http://127.0.0.1:{config['server_port']}" if backend else config["server_url"]
         self.mode = config["auth_mode"]
         self.credentials = read_json(root / "secrets.json")
         self.cookies = http.cookiejar.CookieJar()
+        tls_handlers = []
+        if self.url.startswith("https://"):
+            context = ssl.create_default_context(cafile=str(root / "tls/cert.pem"))
+            tls_handlers.append(urllib.request.HTTPSHandler(context=context))
         self.http = urllib.request.build_opener(
             urllib.request.ProxyHandler({}), _NoRedirect(),
-            urllib.request.HTTPCookieProcessor(self.cookies))
-        self.plain_http = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+            urllib.request.HTTPCookieProcessor(self.cookies), *tls_handlers)
+        self.plain_http = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect(), *tls_handlers)
         self.logged_in = False
         self.access_token = None
         self.refresh_token = None
@@ -447,14 +472,25 @@ def launch(root, service):
     config = configuration(root)
     if live_process(root, service):
         raise RuntimeError("Sandbox service is already running")
-    available_port(config["server_port" if service == "server" else "inspector_port"])
+    if service == "tls" and not config.get("https_port"):
+        raise RuntimeError("This sandbox was not configured with --https-port")
+    port_key = {"server": "server_port", "reader": "inspector_port", "tls": "https_port"}[service]
+    available_port(config[port_key])
     environment = os.environ.copy()
     if service == "server":
-        server_client = ServerClient(root)
+        server_client = ServerClient(root, backend=True)
         runtime = unique_path(root / "runtime/server", "*/bin/Suwayomi-Server.jar").parent.parent
         command = [str(runtime / "jre/bin/java"),
                    "-Dsuwayomi.tachidesk.config.server.rootDir=" + str(root / "server-data"),
                    "-jar", str(runtime / "bin/Suwayomi-Server.jar")]
+    elif service == "tls":
+        server_client = ServerClient(root)
+        runtime = root
+        command = [
+            "socat",
+            f"OPENSSL-LISTEN:{config['https_port']},bind=127.0.0.1,reuseaddr,fork,cert=tls/cert.pem,key=tls/key.pem,verify=0",
+            f"TCP:127.0.0.1:{config['server_port']}",
+        ]
     else:
         if not (environment.get("DISPLAY") or environment.get("WAYLAND_DISPLAY")):
             raise RuntimeError("KOReader needs a desktop display (Linux, WSLg, or a Linux VM)")
@@ -475,7 +511,7 @@ def launch(root, service):
             if time.monotonic() >= deadline:
                 raise RuntimeError(service + " did not become ready; inspect its private log")
             try:
-                if service == "server":
+                if service in ("server", "tls"):
                     server_client.request("/api/v1/source/list")
                 else:
                     Inspector(root).observe(deadline=deadline)
@@ -492,9 +528,18 @@ def launch(root, service):
                 time.sleep(min(0.25, max(0, deadline - time.monotonic())))
         if service == "server":
             seed_library(server_client)
+        elif service == "tls":
+            # HTTPS readiness validates this root's certificate and real authentication.
+            try:
+                server_client.request("/api/v1/source/list", authorized=False)
+            except urllib.error.HTTPError as error:
+                if error.code != 401:
+                    raise
+            else:
+                raise RuntimeError("HTTPS accepted an unauthenticated request")
         print(service + " ready", flush=True)
         code = child.wait()
-        if code not in ((0, -signal.SIGTERM, 128 + signal.SIGTERM) if service == "server" else (0,)):
+        if code not in ((0, -signal.SIGTERM, 128 + signal.SIGTERM) if service != "reader" else (0,)):
             raise RuntimeError(service + " exited unsuccessfully; inspect its private log")
     except BaseException:
         if child.poll() is None:
@@ -543,11 +588,12 @@ def main():
     setup_args.add_argument("--server-port", type=int, default=4569)
     setup_args.add_argument("--inspector-port", type=int, default=8083)
     setup_args.add_argument("--auth-mode", choices=("basic_auth", "simple_login", "ui_login"), default="basic_auth")
+    setup_args.add_argument("--https-port", type=int, help="Expose loopback HTTPS through socat with a private test certificate")
     deploy_args = commands.add_parser("deploy", help="Copy and hash the runtime payload with reader stopped")
     deploy_args.add_argument("--source", required=True, type=Path)
     deploy_args.add_argument("--revision", required=True, help="Candidate revision label; exact bytes are recorded separately")
     for name in ("run", "stop"):
-        commands.add_parser(name).add_argument("service", choices=("server", "reader"))
+        commands.add_parser(name).add_argument("service", choices=("server", "reader", "tls"))
     commands.add_parser("status")
     commands.add_parser("smoke", help="Download and open one unused fixture chapter through the real UI")
     commands.add_parser("auth-smoke", help="Fill and test the real setup connection dialog, then download a fixture")
@@ -571,7 +617,8 @@ def main():
     os.umask(0o077)
     root = args.root.expanduser().resolve()
     if args.command == "setup":
-        if not all(1024 <= port <= 65535 for port in (args.server_port, args.inspector_port)):
+        ports = [args.server_port, args.inspector_port] + ([] if args.https_port is None else [args.https_port])
+        if not all(1024 <= port <= 65535 for port in ports):
             parser.error("Use unprivileged ports between 1024 and 65535")
         result = setup(root, args)
     elif args.command == "deploy":
@@ -582,8 +629,9 @@ def main():
     elif args.command == "stop":
         result = stop(root, args.service)
     elif args.command == "status":
-        configuration(root)
-        result = {service: "running" if live_process(root, service) else "stopped" for service in ("server", "reader")}
+        config = configuration(root)
+        services = ("server", "tls", "reader") if config.get("https_port") else ("server", "reader")
+        result = {service: "running" if live_process(root, service) else "stopped" for service in services}
     else:
         from sandbox_ui import Inspector
         configuration(root)

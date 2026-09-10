@@ -596,6 +596,38 @@ describe("suwayomi/api/transport", function()
         assert.are.equal(3, mutations)
     end)
 
+    it("uses real LuaSec for Basic Auth queries, images, and chapter archives", function()
+        local archive_path = os.tmpname()
+        local archive_bytes = "PK\003\004archive"
+        -- Keep LuaSec's option validation; replace only the downstream network.
+        package.preload["socket.http"] = function()
+            return { request = function(options)
+                assert.are.equal("Basic YWxpY2U6c2VjcmV0", options.headers.Authorization)
+                local body = options.method == "POST" and [[{"data":{"ok":true}}]]
+                    or options.url:find("/download", 1, true) and archive_bytes or "png-bytes"
+                options.sink(body)
+                return 1, 200, { ["content-length"] = tostring(#body) }
+            end }
+        end
+        local ok, err = pcall(function()
+            local credentials = valid_credentials()
+            local query = transport.performGraphQLRequest(credentials, "{}", "basic")
+            assert.is_true(query.ok, query.error)
+            assert.are.equal([[{"data":{"ok":true}}]], query.response_body)
+            local image = transport.downloadBinary(credentials, "/page/1")
+            assert.is_true(image.ok, image.error)
+            assert.are.equal("png-bytes", image.body)
+            local archive = transport.downloadChapterArchive(credentials, 1, archive_path)
+            assert.is_true(archive.ok, archive.error)
+            local file = assert(io.open(archive_path, "rb"))
+            local content = file:read("*a")
+            file:close()
+            assert.are.equal(archive_bytes, content)
+        end)
+        os.remove(archive_path)
+        assert(ok, err)
+    end)
+
     it("performs GraphQL requests with auth headers and debug metadata", function()
         install_ltn12()
         local request = {}

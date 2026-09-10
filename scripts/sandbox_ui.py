@@ -113,7 +113,7 @@ class Inspector:
             secrets = json.loads((self.root / "secrets.json").read_text(encoding="utf-8"))
             self.auth_mode = configuration.get("auth_mode", "basic_auth")
             self.credentials = {
-                "server_url": f"http://127.0.0.1:{configuration['server_port']}",
+                "server_url": configuration.get("server_url", f"http://127.0.0.1:{configuration['server_port']}"),
                 "username": secrets["username"], "password": secrets["password"],
             }
         except (OSError, ValueError, KeyError):
