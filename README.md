@@ -49,6 +49,16 @@ The **Download ahead** menu shows **Off** or the saved buffer size for that mang
 
 Downloads continue while you read. Network failures retry in the background, and unfinished downloads resume after a KOReader restart. Files are organized by source and manga in your chosen download folder.
 
+### Faster downloads with server predownloads
+
+Downloading chapters on your Suwayomi server first can make transfers to KOReader much faster, especially for remote sources. The plugin automatically tries to copy a complete archive instead of fetching pages one at a time and building a CBZ on your device. Saving server downloads as CBZ files also avoids rebuilding the archive on the server for each transfer.
+
+Use Suwayomi's WebUI to queue chapters in advance, or configure its automatic downloads for future chapter updates. The server can do the slow source fetching while your device is asleep or off. Automatic downloads depend on your server's category and unread-chapter settings; they do not automatically fill an existing backlog.
+
+A CBZ in Suwayomi's **Local source** is not the same as a server download. Local source chapters can still transfer page by page, so a predownloaded remote chapter can be faster.
+
+Your device still needs to connect to copy chapters for offline reading. The plugin does not queue or delete server downloads; its **Download ahead** and removal settings affect only device-local copies.
+
 ## Need help?
 
 - **Plugin missing?** Check that its folder is named `suwayomi.koplugin`, then restart KOReader.
