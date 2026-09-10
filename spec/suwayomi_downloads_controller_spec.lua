@@ -10,7 +10,7 @@ local modules_to_clear = {
     "suwayomi/ui",
     "suwayomi/downloads/controller",
     "suwayomi/downloads/queue",
-    "suwayomi/downloads/active_jobs",
+    "suwayomi/downloads/lifecycle",
     "suwayomi/downloads/status_formatter",
 }
 

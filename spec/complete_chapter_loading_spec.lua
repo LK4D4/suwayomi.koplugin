@@ -18,7 +18,7 @@ describe("complete stored chapter loading", function()
         "suwayomi/chapters/context", "suwayomi/chapters/menu", "suwayomi/chapters/actions",
         "suwayomi/chapters/local_downloads", "suwayomi/chapters/read_actions",
         "suwayomi/chapters/delete_actions", "suwayomi/readsync/ledger",
-        "suwayomi/downloads/queue", "suwayomi/downloads/active_jobs",
+        "suwayomi/downloads/queue", "suwayomi/downloads/lifecycle",
         "suwayomi/downloads/job_store", "suwayomi/downloads/status_formatter",
         "suwayomi/downloads/downloader", "suwayomi/downloads/progress_file",
         "suwayomi/downloads/archive", "ffi/libarchive_h",

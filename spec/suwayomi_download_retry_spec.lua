@@ -5,7 +5,7 @@ local runtime_helper = require("spec/support/plugin_runtime_spec_helper")
 describe("download retry across live menus", function()
     local extra_modules = {
         "suwayomi/ui/downloads", "suwayomi/ui/list_menu", "suwayomi/ui/menu_utils",
-        "suwayomi/ui/list_rows", "suwayomi/downloads/active_jobs",
+        "suwayomi/ui/list_rows", "suwayomi/downloads/lifecycle",
         "suwayomi/downloads/job_store", "suwayomi/downloads/status_formatter",
         "ui/widget/textviewer",
     }
@@ -255,7 +255,7 @@ describe("download retry across live menus", function()
                 queue:poll()
                 flushTimers()
                 assert.are.equal(remaining and 1 or 0, queue:getActiveCount())
-                assert.are.equal(0, #queue.items)
+                assert.are.equal(0, #queue:getSnapshot().queued)
                 assert.is_nil(queue:findPersistentJob(key))
                 assert.are.equal(terminal, queue:getStatus(manga, chapter).state)
 
@@ -264,10 +264,8 @@ describe("download retry across live menus", function()
                 end
                 if not remaining then
                     assert.are.equal("No downloads queued.", downloads_menu.item_table[3].text)
-                    assert.is_false(queue.active_job_lifecycle.poll_scheduled)
                 else
                     assert.are.equal("Downloading", downloads_menu.item_table[1].mandatory)
-                    assert.is_true(queue.active_job_lifecycle.poll_scheduled)
                 end
                 assert.are.equal(1, #observed)
                 assert.is_nil(observed[1].active)
@@ -307,12 +305,11 @@ describe("download retry across live menus", function()
             for _, state in ipairs(states) do assert.are.equal("failed", state) end
             assert.is_false(ready)
             assert.are.equal(0, queue:getActiveCount())
-            assert.are.equal(0, #queue.items)
+            assert.are.equal(0, #queue:getSnapshot().queued)
             assert.are.equal("failed", queue:findPersistentJob(active.key).state)
 
             assert.are.equal("Failed", downloads_menu.item_table[1].mandatory)
             assert.are.equal("Downloads · 1 failed", plugin:showHome().actions[3].text)
-            assert.is_false(queue.active_job_lifecycle.poll_scheduled)
         end)
     end
 
@@ -330,7 +327,7 @@ describe("download retry across live menus", function()
             local before = #stack - 1
             click("retry")
             assert.are.equal(before, #stack)
-            assert.are.equal(1, #queue.items)
+            assert.are.equal(1, #queue:getSnapshot().queued)
             assertStatus("queued", "Queued")
             assert.are.equal(downloads_menu, plugin.current_downloads_menu)
             queue:process(); flushTimers()
@@ -343,7 +340,7 @@ describe("download retry across live menus", function()
         plugin:showChapterActions(manga, chapter)
         assert.are.equal("Retry", stack[#stack].actions[1].text)
         selectAction("retry_download")
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assertStatus("queued", "Queued")
     end)
 
@@ -356,25 +353,30 @@ describe("download retry across live menus", function()
         click("retry")
         queue:process(); flushTimers()
         assertStatus("queued", "Queued")
-        queue.active_job_lifecycle:removeJob(queue:getActiveJob(queue:getKey(manga, other)))
-        queue:process(); flushTimers()
+        queue:cancelPending(manga, other)
+        require("ffi/util").isSubProcessDone = function() return true end
+        queue:poll(); flushTimers()
         assertStatus("downloading", "Downloading")
     end)
 
     for _, state in ipairs({ "queued", "downloading", "scheduled" }) do
         it("keeps Downloads tracked after dismissing " .. state .. " job actions", function()
             showScreens()
+            local retry_error = "HTTP 503: temporary source failure"
             queue:retryFailed(queue:getKey(manga, chapter))
             if state ~= "queued" then queue:process(); flushTimers() end
             if state == "scheduled" then
-                queue.active_job_lifecycle:scheduleTransientRetry(
-                    queue:getActiveJob(queue:getKey(manga, chapter)), { error = full_error })
+                local active = queue:getActiveJob(queue:getKey(manga, chapter))
+                require("suwayomi/downloads/progress_file").writeFallback(
+                    active.progress_path, "failed", 0, 1, nil, retry_error, true)
+                table.insert(temporary_paths, active.progress_path)
+                queue:poll()
             end
             flushTimers()
             downloads_menu:onMenuSelect(downloads_menu.item_table[1])
             if state == "scheduled" then
                 selectAction("download_error")
-                assert.is_truthy(stack[#stack].text:find(full_error, 1, true))
+                assert.is_truthy(stack[#stack].text:find(retry_error, 1, true))
                 click("close")
                 assert.are.equal("Retry scheduled", downloads_menu.item_table[1].mandatory)
                 assert.is_truthy(queue:findPersistentJob(queue:getKey(manga, chapter)).retry_at)
@@ -387,8 +389,11 @@ describe("download retry across live menus", function()
                 queue:process(); flushTimers()
                 assertStatus("downloading", "Downloading")
             elseif state == "downloading" then
-                queue.active_job_lifecycle:finishWithFailure(
-                    queue:getActiveJob(queue:getKey(manga, chapter)), full_error)
+                local active = queue:getActiveJob(queue:getKey(manga, chapter))
+                require("suwayomi/downloads/progress_file").writeFallback(
+                    active.progress_path, "failed", 0, 1, nil, full_error, false)
+                table.insert(temporary_paths, active.progress_path)
+                queue:poll()
                 flushTimers()
                 assert.are.equal("Failed", downloads_menu.item_table[1].mandatory)
 
@@ -429,19 +434,19 @@ describe("download retry across live menus", function()
     it("keeps ordinary queued and scheduled retry actions distinct from terminal Retry", function()
         showScreens()
         for _, scheduled_retry in ipairs({ false, true }) do
-            queue.statuses[queue:getKey(manga, chapter)] = { state = "queued", retry_at = scheduled_retry and 130 or nil }
+            queue:setStatus(manga, chapter, { state = "queued", retry_at = scheduled_retry and 130 or nil })
             local actions = plugin:getChapterActions(manga, chapter)
             assert.are.equal("cancel_download", actions[1].id)
             assert.are.equal(scheduled_retry and "download_error" or "mark_read", actions[2].id)
         end
-        queue.statuses[queue:getKey(manga, chapter)] = nil
+        queue:forgetChapterStatus(queue:getKey(manga, chapter))
         queue:removePersistentJob(queue:getKey(manga, chapter))
         assert.are.equal("download", plugin:getChapterActions(manga, chapter)[1].id)
         plugin.isChapterDownloaded = function() return true end
         assert.are.equal("open", plugin:getChapterActions(manga, chapter)[1].id)
-        queue.statuses[queue:getKey(manga, chapter)] = { state = "failed" }
+        queue:setStatus(manga, chapter, { state = "failed" })
         assert.are.equal("open", plugin:getChapterActions(manga, chapter)[1].id)
-        queue.statuses[queue:getKey(manga, chapter)] = { state = "downloading" }
+        queue:setStatus(manga, chapter, { state = "downloading" })
         local actions = plugin:getChapterActions(manga, chapter)
         assert.are.equal("cancel_download", actions[1].id)
         assert.are.equal("mark_read", actions[2].id)
@@ -452,7 +457,7 @@ describe("download retry across live menus", function()
         chapters_menu.item_table[1].callback()
         queue:retryFailed(queue:getKey(manga, chapter))
         selectAction("retry_download")
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assertStatus("queued", "Queued")
     end)
 
@@ -464,8 +469,8 @@ describe("download retry across live menus", function()
         assert.are.equal(old_queue, queue)
         plugin:init()
         click("retry")
-        assert.are.equal(1, #old_queue.items)
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #old_queue:getSnapshot().queued)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assertStatus("queued", "Queued")
     end)
 
@@ -476,8 +481,8 @@ describe("download retry across live menus", function()
         replacement.chapter.name = "Replacement chapter"
         queue:upsertPersistentJob(replacement)
         click("retry")
-        assert.are.equal(1, #queue.items)
-        assert.are.equal("Replacement chapter", queue.items[1].chapter.name)
+        assert.are.equal(1, #queue:getSnapshot().queued)
+        assert.are.equal("Replacement chapter", queue:getSnapshot().queued[1].chapter.name)
         assert.are.equal("queued", queue:findPersistentJob(queue:getKey(manga, chapter)).state)
         assert.are.equal("Queued", chapters_menu.item_table[1].mandatory)
         assert.are.equal(0, queue:getFailedCount())
@@ -497,9 +502,9 @@ describe("download retry across live menus", function()
                 queue:removePersistentJob(key)
                 queue:setStatus(manga, chapter, { state = "downloaded" })
             end
-            local pending, active = #queue.items, queue:getActiveCount()
+            local pending, active = #queue:getSnapshot().queued, queue:getActiveCount()
             click("retry")
-            assert.are.equal(pending, #queue.items)
+            assert.are.equal(pending, #queue:getSnapshot().queued)
             assert.are.equal(active, queue:getActiveCount())
             assert.are.equal(0, queue:getFailedCount())
 

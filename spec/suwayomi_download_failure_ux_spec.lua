@@ -7,7 +7,7 @@ describe("download failure user actions", function()
         "gettext", "suwayomi/i18n", "suwayomi/settings", "suwayomi/ui",
         "suwayomi/ui/downloads", "suwayomi/ui/list_menu", "suwayomi/ui/menu_utils",
         "suwayomi/downloads/controller", "suwayomi/downloads/queue",
-        "suwayomi/downloads/active_jobs", "suwayomi/downloads/job_store",
+        "suwayomi/downloads/lifecycle", "suwayomi/downloads/job_store",
         "suwayomi/downloads/status_formatter", "ui/uimanager", "ui/widget/textviewer",
         "suwayomi/plugin/home", "ui/widget/infomessage",
         "suwayomi/chapters/delete_actions",
@@ -78,6 +78,17 @@ describe("download failure user actions", function()
             end,
             onMessage = function(text) table.insert(messages, text) end,
         }
+    end
+
+    local function failDownload(message, retryable)
+        assert(queue:enqueue(manga, chapter, "/books"))
+        queue:process()
+        local active = queue:getActiveJob(queue:getKey(manga, chapter))
+        local path = os.tmpname()
+        active.progress_path = path
+        require("suwayomi/downloads/progress_file").writeFallback(path, "failed", 0, 1, nil, message, retryable)
+        queue:poll()
+        os.remove(path)
     end
 
     local function restoreSession(jobs)
@@ -266,7 +277,7 @@ describe("download failure user actions", function()
         button(viewer, "retry").callback()
         assert.are.same({ chapter_screen }, stack)
         assert.are.equal("queued", queue:getStatus(manga, chapter).state)
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assert.are.equal("queued", queue:findPersistentJob("m1:c1").state)
         assert.are.equal(0, queue:getFailedCount())
     end)
@@ -278,7 +289,7 @@ describe("download failure user actions", function()
         button(stack[2], "retry").callback()
         assert.are.same({ menu }, stack)
         assert.are.equal("Queued", menu.item_table[1].mandatory)
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assert.are.equal(0, queue:getFailedCount())
     end)
 
@@ -337,7 +348,7 @@ describe("download failure user actions", function()
         local menu = plugin:showDownloads()
         menu.item_table[1].callback()
         stack[2].select("cancel_queued")
-        assert.are.equal(0, #queue.items)
+        assert.are.equal(0, #queue:getSnapshot().queued)
         assert.is_nil(queue:findPersistentJob("m1:c1"))
         assert.is_nil(queue:getStatus(manga, chapter))
         assert.are.equal("No downloads queued.", plugin.current_downloads_menu.item_table[3].text)
@@ -358,7 +369,7 @@ describe("download failure user actions", function()
                 queue:setStatus(manga, chapter, { state = state })
             end
             button(viewer, "retry").callback()
-            assert.are.equal(state == "failed" and 1 or 0, #queue.items)
+            assert.are.equal(state == "failed" and 1 or 0, #queue:getSnapshot().queued)
             assert.are.same({ menu }, stack)
             ui:close(menu)
         end
@@ -371,18 +382,15 @@ describe("download failure user actions", function()
         local old_queue = queue
         restoreSession({ job("queued", "scheduled error", 130) })
         button(viewer, "retry").callback()
-        assert.are.equal(0, #old_queue.items)
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(0, #old_queue:getSnapshot().queued)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assert.are.equal(130, queue:findPersistentJob("m1:c1").retry_at)
     end)
 
     it("refreshes the visible home failure count after real failure, retry, and clear actions", function()
         local home = plugin:showHome()
         assert.are.equal("Downloads", home.actions[3].text)
-        local active = job("downloading")
-        active.progress_path = os.tmpname()
-        queue:setActiveJob(active)
-        queue.active_job_lifecycle:finishWithFailure(active, full_error)
+        failDownload(full_error, false)
         assert.are.same({ home }, stack)
         assert.are.equal("Downloads · 1 failed", home.actions[3].text)
         plugin:showChapterDownloadError(manga, chapter)
@@ -390,9 +398,7 @@ describe("download failure user actions", function()
         assert.are.equal("queued", queue:getStatus(manga, chapter).state)
         assert.are.equal("Downloads", home.actions[3].text)
         queue:cancelPending(manga, chapter)
-        active.progress_path = os.tmpname()
-        queue:setActiveJob(active)
-        queue.active_job_lifecycle:finishFromProgress(active, { state = "failed", error = "terminal error" })
+        failDownload("terminal error", false)
         assert.are.equal("Downloads · 1 failed", home.actions[3].text)
         plugin:performDownloadsTitleAction({ id = "clear_failed" })
         assert.are.equal("Downloads", home.actions[3].text)
@@ -402,22 +408,17 @@ describe("download failure user actions", function()
 
     it("publishes terminal and scheduled failures only after complete queue state is available", function()
         local menu = plugin:showDownloads()
-        local active = job("downloading")
-        active.progress_path = os.tmpname()
-        active.downloader = queue.downloader
-        queue:setActiveJob(active)
-        queue.active_job_lifecycle:finishWithoutProgress(active)
+        failDownload("terminal error", false)
         assert.are.equal(1, queue:getFailedCount())
         assert.are.equal("Failed", menu.item_table[1].mandatory)
         menu.item_table[#menu.item_table].callback()
         assert.are.equal(0, queue:getFailedCount())
         assert.are.same({}, messages)
         local current_menu = plugin.current_downloads_menu
-        active.progress_path = os.tmpname()
-        queue:setActiveJob(active)
-        queue.active_job_lifecycle:scheduleTransientRetry(active, { error = full_error })
+        local retry_error = "HTTP 503: temporary source failure"
+        failDownload(retry_error, true)
         assert.are.equal("Retry scheduled", current_menu.item_table[1].mandatory)
-        assert.are.equal(full_error, queue:getSnapshot().queued[1].progress.error)
+        assert.are.equal(retry_error, queue:getSnapshot().queued[1].progress.error)
         assert.are.same({}, messages)
     end)
 end)

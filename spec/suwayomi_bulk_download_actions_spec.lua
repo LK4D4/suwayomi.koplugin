@@ -20,7 +20,7 @@ describe("bounded bulk download actions", function()
         "suwayomi/chapters/local_downloads", "suwayomi/chapters/delete_actions", "suwayomi/chapters/read_actions",
         "suwayomi/manga/controller", "suwayomi/manga/action_menu", "suwayomi/downloads/queue",
         "suwayomi/downloads/downloader",
-        "suwayomi/downloads/active_jobs", "suwayomi/downloads/job_store", "suwayomi/downloads/status_formatter",
+        "suwayomi/downloads/lifecycle", "suwayomi/downloads/job_store", "suwayomi/downloads/status_formatter",
         "suwayomi/downloads/service", "suwayomi/downloads/refill", "suwayomi/downloads/cleanup_adapter",
         "suwayomi/downloads/controller", "suwayomi/downloads/directory", "suwayomi/downloads/archive",
         "suwayomi/downloads/progress_file", "suwayomi/chapters/manual_deletion", "suwayomi/chapters/archive_identity",

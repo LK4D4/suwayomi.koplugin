@@ -416,8 +416,8 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal("m1:399", context.saved_queue()[1].key)
         assert.is_nil(context.queue:getStatus(manga, chapter))
         assert.are.equal("queued", context.queue:getStatus(manga, other_chapter).state)
-        assert.are.equal(1, #context.queue.items)
-        assert.are.equal("m1:399", context.queue.items[1].key)
+        assert.are.equal(1, #context.queue:getSnapshot().queued)
+        assert.are.equal("m1:399", context.queue:getSnapshot().queued[1].key)
     end)
 
     it("batch enqueues multiple chapters with one persistence write and process schedule", function()
@@ -480,22 +480,6 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal(3, build_queue({ max_active_chapters = "3" }).queue.max_active_chapters)
     end)
 
-    it("keeps active job state and lifecycle internals behind the active facade", function()
-        local context = build_queue()
-
-        assert.is_nil(rawget(context.queue, "active_jobs"))
-        assert.is_function(context.queue.getActiveCount)
-        assert.is_function(context.queue.getActiveJob)
-        assert.is_function(context.queue.setActiveJob)
-        assert.is_function(context.queue.removeActiveJob)
-        assert.is_function(context.queue.schedulePoll)
-        assert.is_function(context.queue.process)
-        assert.is_function(context.queue.poll)
-        assert.is_nil(context.queue.writeProgressFallback)
-        assert.is_nil(context.queue.runDownloaderJob)
-        assert.is_nil(context.queue.finishActiveWithFailure)
-        assert.is_nil(context.queue.readProgress)
-    end)
 
     it("uses the human chapter number in failure messages when available", function()
         local context = build_queue()
@@ -613,15 +597,7 @@ describe("suwayomi/downloads/queue", function()
         })
 
         context.queue:recover()
-        context.queue.items = {
-            {
-                key = "m-queued:192",
-                state = "queued",
-                download_directory = "/books",
-                manga = queued_manga,
-                chapter = queued_chapter,
-            },
-        }
+        assert.is_true(context.queue:enqueue(queued_manga, queued_chapter, "/books"))
         context.queue:setActiveJob({
             key = "m-active:144",
             state = "downloading",
@@ -740,6 +716,9 @@ describe("suwayomi/downloads/queue", function()
         local failed_manga = { id = "m-failed", title = "Chainsaw Man" }
         local failed_chapter = { id = "205", name = "Ch. 205" }
         local context = build_queue({
+            max_active_chapters = 1,
+            subprocess_done = false,
+            skip_subprocess_callback = true,
             saved_queue = {
                 {
                     key = "m-active:144",
@@ -765,22 +744,7 @@ describe("suwayomi/downloads/queue", function()
             },
         })
         context.queue:recover()
-        context.queue.items = {
-            {
-                key = "m-queued:192",
-                state = "queued",
-                download_directory = "/books",
-                manga = queued_manga,
-                chapter = queued_chapter,
-            },
-        }
-        context.queue:setActiveJob({
-            key = "m-active:144",
-            state = "downloading",
-            download_directory = "/books",
-            manga = active_manga,
-            chapter = active_chapter,
-        })
+        context.queue:process()
         context.queue:setStatus(active_manga, active_chapter, {
             state = "downloading",
             current = 7,
@@ -791,7 +755,7 @@ describe("suwayomi/downloads/queue", function()
         local cancelled = context.queue:cancelQueued()
 
         assert.are.equal(1, cancelled)
-        assert.are.equal(0, #context.queue.items)
+        assert.are.equal(0, #context.queue:getSnapshot().queued)
         assert.is_nil(context.queue:getStatus(queued_manga, queued_chapter))
         assert.are.same({
             state = "downloading",
@@ -833,7 +797,7 @@ describe("suwayomi/downloads/queue", function()
 
         assert.are.equal(2, canceled)
         assert.are.equal(1, context.active_count())
-        assert.are.equal(0, #context.queue.items)
+        assert.are.equal(0, #context.queue:getSnapshot().queued)
         assert.is_nil(context.queue:getStatus(manga, active_chapter))
         assert.is_nil(context.queue:getStatus(manga, queued_chapter))
         assert.are.equal("failed", context.queue:getStatus(failed_manga, failed_chapter).state)
@@ -859,7 +823,7 @@ describe("suwayomi/downloads/queue", function()
             assert.are.equal(2, job.retry_count)
             assert.are.equal(130, job.retry_at)
             assert.are.equal(0, context.active_count())
-            assert.are.equal(1, #context.queue.items)
+            assert.are.equal(1, #context.queue:getSnapshot().queued)
             assert.are.same({}, removed_paths)
             context.advance(30)
             context.queue:process()
@@ -887,7 +851,7 @@ describe("suwayomi/downloads/queue", function()
         local context = build_queue({ saved_queue = { job } })
         assert(context.queue:recover())
         assert.are.same({ job }, context.saved_queue())
-        assert.are.same({}, context.queue.items)
+        assert.are.same({}, context.queue:getSnapshot().queued)
         assert.are.same({}, context.scheduled)
         assert.are.same({}, removed_paths)
     end)
@@ -905,7 +869,7 @@ describe("suwayomi/downloads/queue", function()
         assert.are.equal("m1:c1", context.saved_queue()[1].key)
         assert.are.equal("m1:c2", context.saved_queue()[2].key)
         assert.are.equal(0, context.queue:getFailedCount())
-        assert.are.equal(2, #context.queue.items)
+        assert.are.equal(2, #context.queue:getSnapshot().queued)
     end)
 
     it("requires explicit repair and preserves damage through queued cancellation and restart", function()

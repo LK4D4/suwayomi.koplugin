@@ -500,7 +500,7 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_truthy(status and status:match("replacement_failed"))
 
         -- In-memory queue must remain empty, status must remain nil
-        assert.are.equal(0, #queue.items)
+        assert.are.equal(0, #queue:getSnapshot().queued)
         assert.is_nil(queue:getStatus(manga, chapter))
 
         -- Unblock rename
@@ -510,7 +510,7 @@ describe("suwayomi settings atomic failure handling", function()
         local ok2, status2 = queue:enqueue(manga, chapter, "/sdcard/manga")
         assert.is_true(ok2)
         assert.are.equal("queued", status2)
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assert.are.equal("queued", queue:getStatus(manga, chapter).state)
     end)
 
@@ -529,7 +529,7 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_truthy(err and err:match("write_failed"))
 
         -- Items and statuses must not be populated
-        assert.are.equal(0, #queue.items)
+        assert.are.equal(0, #queue:getSnapshot().queued)
         assert.is_nil(queue:getStatus(manga, chapters[1]))
         assert.is_nil(queue:getStatus(manga, chapters[2]))
 
@@ -537,7 +537,7 @@ describe("suwayomi settings atomic failure handling", function()
         io_adapter.fail_write = false
         local count2 = queue:enqueueBatch(manga, chapters, "/sdcard/manga")
         assert.are.equal(2, count2)
-        assert.are.equal(2, #queue.items)
+        assert.are.equal(2, #queue:getSnapshot().queued)
     end)
 
     it("DownloadQueue:cancelPending does not remove job if save fails", function()
@@ -549,7 +549,7 @@ describe("suwayomi settings atomic failure handling", function()
         -- Enqueue successfully
         local ok = queue:enqueue(manga, chapter, "/sdcard/manga")
         assert.is_true(ok)
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
 
         -- Inject failure on cancel
         io_adapter.fail_rename = true
@@ -558,7 +558,7 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_truthy(err and err:match("replacement_failed"))
 
         -- Job must remain in queue
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assert.is_not_nil(queue:getStatus(manga, chapter))
 
         -- Unblock failure and cancel succeeds
@@ -566,7 +566,7 @@ describe("suwayomi settings atomic failure handling", function()
         local cancelled2, state = queue:cancelPending(manga, chapter)
         assert.is_true(cancelled2)
         assert.are.equal("queued", state)
-        assert.are.equal(0, #queue.items)
+        assert.are.equal(0, #queue:getSnapshot().queued)
         assert.is_nil(queue:getStatus(manga, chapter))
     end)
 
@@ -587,7 +587,7 @@ describe("suwayomi settings atomic failure handling", function()
                 download_directory = "/sdcard/manga",
             },
         })
-        queue.statuses[key] = { state = "failed" }
+        queue:setStatus(manga, chapter, { state = "failed" })
 
         -- Fail write
         io_adapter.fail_write = true
@@ -690,9 +690,7 @@ describe("suwayomi settings atomic failure handling", function()
         local chapter = { id = "c1", name = "Chapter 1" }
         queue:enqueue(manga, chapter, "/sdcard/manga")
 
-        local item = table.remove(queue.items, 1)
-        local started = queue.active_job_lifecycle:startQueuedJob(item)
-        assert.is_true(started)
+        queue:process()
         assert.are.equal("downloading", queue:getStatus(manga, chapter).state)
 
         io_adapter.fail_rename = true
@@ -724,7 +722,7 @@ describe("suwayomi settings atomic failure handling", function()
         local manga = { id = "m1", title = "Manga 1" }
         local chapter = { id = "c1", name = "Chapter 1" }
         queue:enqueue(manga, chapter, "/sdcard/manga")
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
 
         io_adapter.fail_sync_dir = true
         local saved, err = SuwayomiSettings:saveMaxParallelChapterDownloads(3)
@@ -735,11 +733,11 @@ describe("suwayomi settings atomic failure handling", function()
 
         queue:process()
         assert.is_false(launched)
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
 
         local cancel_ok = queue:cancelPending(manga, chapter)
         assert.is_false(cancel_ok)
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
 
         io_adapter.fail_sync_dir = false
         local reconciled = queue:reconcile()
@@ -856,7 +854,7 @@ describe("suwayomi settings atomic failure handling", function()
         assert.are.same({}, SuwayomiSettings:loadReaderReturnContexts())
     end)
 
-    it("ActiveJobs does not launch worker and preserves queued item when upsertPersistentJob fails", function()
+    it("preserves the queued download without launching when its launch save fails", function()
         local queue = build_test_queue()
         local launched = false
         queue.ffi_util = {
@@ -866,13 +864,13 @@ describe("suwayomi settings atomic failure handling", function()
         local manga = { id = "m1", title = "Manga 1" }
         local chapter = { id = "c1", name = "Chapter 1" }
         queue:enqueue(manga, chapter, "/sdcard/manga")
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
 
         io_adapter.fail_sync_dir = true
         queue:process()
 
         assert.is_false(launched)
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assert.is_true(queue:isBlocked())
     end)
 
@@ -946,20 +944,20 @@ describe("suwayomi settings atomic failure handling", function()
         local manga = { id = "m1", title = "Manga 1" }
         local chapter = { id = "c1", name = "Chapter 1" }
         queue:enqueue(manga, chapter, "/sdcard/manga")
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
 
         io_adapter.fail_sync_dir = true
         local ok_cancel, err_cancel = queue:cancelPending(manga, chapter)
         assert.is_false(ok_cancel)
         assert.is_truthy(err_cancel and err_cancel:match("ambiguous"))
-        assert.are.equal(1, #queue.items)
+        assert.are.equal(1, #queue:getSnapshot().queued)
         assert.is_true(queue:isBlocked())
 
         io_adapter.fail_sync_dir = false
         local ok, res = queue:reconcile()
         assert.is_true(ok)
         assert.are.equal("committed", res)
-        assert.are.equal(0, #queue.items)
+        assert.are.equal(0, #queue:getSnapshot().queued)
         assert.is_nil(queue:getStatus(manga, chapter))
     end)
 

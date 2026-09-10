@@ -40,7 +40,7 @@ local MODULES_TO_CLEAR = {
     "suwayomi/downloads/cleanup_adapter",
     "suwayomi/downloads/refill",
     "suwayomi/downloads/downloader",
-    "suwayomi/downloads/active_jobs",
+    "suwayomi/downloads/lifecycle",
     "suwayomi/downloads/job_store",
     "suwayomi/downloads/progress_file",
     "suwayomi/downloads/status_formatter",

@@ -122,6 +122,8 @@ describe("suwayomi/chapters/finished_cleanup", function()
             getStatus = function(_, manga, chapter)
                 return queue_status[tostring(manga.id) .. ":" .. tostring(chapter.id)]
             end,
+            getStatusByKey = function(_, key) return queue_status[key] end,
+            forgetChapterStatus = function(_, key) queue_status[key] = nil end,
         }
         local plugin = {
             state = state,
@@ -181,7 +183,6 @@ describe("suwayomi/chapters/finished_cleanup", function()
             end,
         }
         state.plugin = plugin
-        queue.statuses = queue_status
         queue.isChapterBusy = function() return false end
         queue.manual_deletion = {
             snapshot = function() return {} end,

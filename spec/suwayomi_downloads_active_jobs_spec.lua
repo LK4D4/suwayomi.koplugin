@@ -1,11 +1,10 @@
 package.path = "?.lua;" .. package.path
 
--- Active job specs exercise subprocess lifecycle and progress polling behind
--- the queue facade. Queue persistence/facade behavior stays in queue specs.
+-- These specs exercise download commands and progress polling on the queue owner.
 local Marker = require("spec/support/i18n_marker")
 local checkedQueueSettings = require("spec/support/checked_queue_settings")
 
-describe("suwayomi/downloads/active_jobs", function()
+describe("download queue lifecycle", function()
     local original_io_open
     local original_os_remove
     local original_os_rename
@@ -95,7 +94,7 @@ describe("suwayomi/downloads/active_jobs", function()
 
     local function build_queue(options)
         options = options or {}
-        package.loaded["suwayomi/downloads/active_jobs"] = nil
+        package.loaded["suwayomi/downloads/lifecycle"] = nil
         package.loaded["suwayomi/downloads/queue"] = nil
         local DownloadQueue = require("suwayomi/downloads/queue")
         local scheduled = {}
@@ -272,7 +271,7 @@ describe("suwayomi/downloads/active_jobs", function()
         io.open = original_io_open
         os.remove = original_os_remove
         os.rename = original_os_rename
-        package.loaded["suwayomi/downloads/active_jobs"] = nil
+        package.loaded["suwayomi/downloads/lifecycle"] = nil
         package.loaded["suwayomi/downloads/queue"] = nil
         package.loaded.gettext = nil
         package.loaded["ffi/util"] = nil
@@ -285,12 +284,6 @@ describe("suwayomi/downloads/active_jobs", function()
         end
     end)
 
-    it("loads as the active download lifecycle module", function()
-        local ActiveJobs = require("suwayomi/downloads/active_jobs")
-
-        assert.is_table(ActiveJobs)
-        assert.is_function(ActiveJobs.new)
-    end)
 
     it("starts downloads up to the active chapter limit", function()
         local context = build_queue({
@@ -335,7 +328,7 @@ describe("suwayomi/downloads/active_jobs", function()
         assert.are.equal(1, #context.scheduled)
     end)
 
-    it("skips queued jobs whose key is already active", function()
+    it("rejects a duplicate request while the chapter already has an attempt", function()
         local context = build_queue({
             max_active_chapters = 2,
             subprocess_done = false,
@@ -343,27 +336,13 @@ describe("suwayomi/downloads/active_jobs", function()
         })
         local manga = { id = "m1", title = "Sousou no Frieren" }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
-
-        context.queue:setActiveJob({
-            key = context.queue:getKey(manga, chapter),
-            manga = manga,
-            chapter = chapter,
-            pid = 999,
-        })
-        table.insert(context.queue.items, {
-            key = context.queue:getKey(manga, chapter),
-            download_directory = "/books",
-            manga = manga,
-            chapter = chapter,
-            downloader = context.queue.downloader,
-        })
-
+        assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
         context.queue:process()
-
+        local accepted = context.queue:enqueue(manga, chapter, "/books")
+        assert.is_false(accepted)
         assert.are.equal(1, context.active_count())
-        assert.are.equal(999, context.active_job(manga, chapter).pid)
-        assert.are.equal(0, context.download_calls())
-        assert.are.equal(0, #context.queue.items)
+        assert.are.same({}, context.queue:getSnapshot().queued)
+        assert.are.equal(1, #context.saved_queue())
     end)
 
 
@@ -532,7 +511,7 @@ describe("suwayomi/downloads/active_jobs", function()
         context.advance(1)
         table.remove(context.scheduled, 1).callback()
 
-        assert.is_nil(context.queue.active_job_lifecycle.terminating_pids[1234])
+        assert.is_false(context.queue:isChapterBusy("m1:398"))
         assert.are.equal(0, context.download_calls())
     end)
 

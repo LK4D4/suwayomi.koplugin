@@ -17,7 +17,7 @@ local modules_to_clear = {
     "datastorage", "luasettings", "suwayomi/fs",
     "suwayomi/downloads/service", "suwayomi/downloads/refill",
     "suwayomi/downloads/queue", "suwayomi/downloads/cleanup_adapter",
-    "suwayomi/downloads/active_jobs", "suwayomi/downloads/job_store",
+    "suwayomi/downloads/lifecycle", "suwayomi/downloads/job_store",
     "suwayomi/downloads/progress_file", "suwayomi/downloads/status_formatter",
     "suwayomi/downloads/archive", "suwayomi/downloads/downloader",
     "suwayomi/chapters/manual_deletion", "suwayomi/chapters/archive_identity",

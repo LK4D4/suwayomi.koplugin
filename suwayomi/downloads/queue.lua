@@ -1,16 +1,16 @@
 -- Boundary: public device-local download queue facade.
 --
--- Responsibility: shared eligibility, checked enqueue results, retry, cancel, recovery, snapshots, and status
--- while delegating persistence and active worker lifecycle to focused modules.
--- Owned state: pending queue items, chapter status map, active lifecycle
--- controller, and settings-backed job store.
+-- Responsibility: checked download commands, pending jobs, attempts, status and
+-- recovery. Lifecycle methods run on this same owner; JobStore owns persistence.
+-- Explicit inspection has a distinct lifecycle and never publishes a generation.
+-- Owned state: pending/active/stopping jobs, completion retries, statuses and timers.
 -- Dependencies: settings, downloader, UI manager, subprocess helpers, progress
 -- files, status formatter, clock, credentials callback, and optional callbacks.
 -- External data: queue settings, manga/chapter tables, progress files, and
 -- worker results are normalized before callers see snapshots.
 
 local I18n = require("suwayomi/i18n")
-local ActiveJobs = require("suwayomi/downloads/active_jobs")
+local Lifecycle = require("suwayomi/downloads/lifecycle")
 local JobStore = require("suwayomi/downloads/job_store")
 local ProgressFile = require("suwayomi/downloads/progress_file")
 local StatusFormatter = require("suwayomi/downloads/status_formatter")
@@ -57,12 +57,12 @@ function DownloadQueue:new(options)
         manual_deletion = options.manual_deletion,
         items = {},
         statuses = {},
+        active_jobs = {},
+        stopping_jobs = {},
+        poll_scheduled = false,
         max_active_chapters = self:normalizeActiveChapterLimit(options.max_active_chapters),
     }
     setmetatable(queue, self)
-    queue.active_job_lifecycle = options.active_job_lifecycle or ActiveJobs:new{
-        queue = queue,
-    }
     queue.job_store = options.job_store or JobStore:new{
         settings = queue.settings,
         getKey = function(manga, chapter)
@@ -78,28 +78,56 @@ function DownloadQueue:logDebug(event)
     end
 end
 
-function DownloadQueue:getActiveCount()
-    return self.active_job_lifecycle:getCount()
-end
-
-function DownloadQueue:getActiveJob(key)
-    return self.active_job_lifecycle:getJob(key)
-end
-
 function DownloadQueue:isChapterBusy(key)
-    return self:getActiveJob(key) ~= nil or self.active_job_lifecycle:getStoppingJob(key) ~= nil
+    return self:getActiveJob(key) ~= nil or self:getStoppingJob(key) ~= nil
 end
 
-function DownloadQueue:setActiveJob(job)
-    self.active_job_lifecycle:setJob(job)
+function DownloadQueue:ownsChapter(key)
+    if self:isChapterBusy(key) then return true end
+    for _, item in ipairs(self.items) do
+        if (item.key or self:getKey(item.manga, item.chapter)) == key then return true end
+    end
+    local status = self.statuses[key]
+    local state = status and status.state
+    return state == "queued" or state == "downloading" or state == "running"
+        or state == "stopping" or state == "finalizing"
 end
 
-function DownloadQueue:removeActiveJob(job)
-    self.active_job_lifecycle:removeJob(job)
+function DownloadQueue:ownsStoppingAttempt(job)
+    return self:getStoppingJob(job.key or self:getKey(job.manga, job.chapter)) == job
 end
 
-function DownloadQueue:schedulePoll()
-    self.active_job_lifecycle:schedulePoll()
+function DownloadQueue:getStatusByKey(key)
+    return self.statuses[key]
+end
+
+function DownloadQueue:forgetChapterStatus(key)
+    self.statuses[key] = nil
+end
+
+function DownloadQueue:isStopped()
+    return self.stopped == true
+end
+
+function DownloadQueue:isRecovering()
+    return self.recovery_pending == true
+end
+
+function DownloadQueue:stopAdmission()
+    self.stopped = true
+end
+
+function DownloadQueue:shutdown(deadline, now)
+    self:stopAdmission()
+    now = now or require("socket").gettime
+    deadline = deadline or now() + 2
+    if now() < deadline then self:invalidateVerification()
+    elseif self.verification then self.verification.canceled = true end
+    self:shutdownAttempts(deadline, now)
+end
+
+function DownloadQueue:isVerification(job)
+    return self.verification == job
 end
 
 function DownloadQueue:getKey(manga, chapter)
@@ -161,6 +189,10 @@ function DownloadQueue:admitPersistentJobs(jobs, provenance)
     local ok, err = self.job_store:admit(jobs, provenance, self.manual_deletion)
     if not ok and self:isBlocked() then self:scheduleReconciliation() end
     return ok, err
+end
+
+function DownloadQueue:admitDocument(doc, jobs, provenance)
+    return self.job_store:admitDocument(doc, jobs, provenance, self.manual_deletion)
 end
 
 function DownloadQueue:validateJob(job)
@@ -240,14 +272,12 @@ function DownloadQueue:reconcile()
     end
 
     local previous_pids = {}
-    if self.active_job_lifecycle and self.active_job_lifecycle.jobs then
-        for key, active in pairs(self.active_job_lifecycle.jobs) do
-            local pjob = persistent_map[key]
-            if (not pjob or pjob.state ~= "downloading") and not active.pending_completion then
-                previous_pids[key] = active.pid
-                self.active_job_lifecycle:terminateJob(active)
-                self.active_job_lifecycle:removeJob(active)
-            end
+    for key, active in pairs(self.active_jobs) do
+        local pjob = persistent_map[key]
+        if (not pjob or pjob.state ~= "downloading") and not active.pending_completion then
+            previous_pids[key] = active.pid
+            self:terminateJob(active)
+            self:removeActiveJob(active)
         end
     end
 
@@ -284,10 +314,8 @@ function DownloadQueue:reconcile()
     for key, pjob in pairs(persistent_map) do
         new_statuses[key] = self:statusForJob(pjob, pjob.state)
     end
-    if self.active_job_lifecycle and self.active_job_lifecycle.jobs then
-        for key, active in pairs(self.active_job_lifecycle.jobs) do
-            new_statuses[key] = self:statusForJob(active, "downloading")
-        end
+    for key, active in pairs(self.active_jobs) do
+        new_statuses[key] = self:statusForJob(active, "downloading")
     end
     self.statuses = new_statuses
     self.onStatusChanged()
@@ -332,7 +360,7 @@ function DownloadQueue:getSnapshot()
         snapshot.manual_deletion, snapshot.manual_deletion_error = self.manual_deletion:snapshot()
     end
 
-    self.active_job_lifecycle:appendSnapshotJobs(snapshot)
+    self:appendSnapshotJobs(snapshot)
 
     for _index, job in ipairs(self.items or {}) do
         table.insert(snapshot.queued, self:copySnapshotJob(job, "queued"))
@@ -555,11 +583,16 @@ end
 
 function DownloadQueue:commitChapterCompletion(active, path)
     active.pending_completion = path
-    local ok, err
+    local ok, err, generation, pending_generation
     if self.commitChapterArchive then
-        ok, err = self.commitChapterArchive(active, path)
+        ok, err, generation, pending_generation = self.commitChapterArchive(active, path)
     else
         ok, err = self:removePersistentJob(active.key or self:getKey(active.manga, active.chapter))
+    end
+    if not self:isVerification(active) then
+        if generation ~= nil then active.archive_generation = generation end
+        if ok then active.pending_archive_generation = nil
+        elseif pending_generation ~= nil then active.pending_archive_generation = pending_generation end
     end
     if not ok and self:isBlocked() then self:scheduleReconciliation() end
     return ok, err
@@ -623,7 +656,7 @@ function DownloadQueue:cancelPending(manga, chapter)
     self:invalidateVerification(key)
     local active = self:getActiveJob(key)
     if active then
-        local ok, err = self.active_job_lifecycle:finishWithCancel(active)
+        local ok, err = self:finishWithCancel(active)
         if not ok then
             self:notifyDownloadFailure(err or "Failed to cancel active download")
             return false, err or "save_failed"
@@ -654,7 +687,7 @@ function DownloadQueue:cancelPending(manga, chapter)
         return true, "queued"
     end
 
-    if self.active_job_lifecycle:getStoppingJob(key) then return false, "downloading" end
+    if self:getStoppingJob(key) then return false, "downloading" end
     if status then
         return false, status.state
     end
@@ -675,7 +708,7 @@ function DownloadQueue:cancelDownloads(include_active)
         end
     end
     if include_active then
-        for key, active in pairs(self.active_job_lifecycle.jobs or {}) do targets[key] = active end
+        for key, active in pairs(self.active_jobs) do targets[key] = active end
     end
     for _ in pairs(targets) do count = count + 1 end
     if count == 0 and not include_active then return 0 end
@@ -690,8 +723,8 @@ function DownloadQueue:cancelDownloads(include_active)
         for key in pairs(targets) do
             local active = self:getActiveJob(key)
             if active then
-                self.active_job_lifecycle:terminateJob(active)
-                self.active_job_lifecycle:removeJob(active)
+                self:terminateJob(active)
+                self:removeActiveJob(active)
             end
         end
     end
@@ -1104,15 +1137,8 @@ function DownloadQueue:getCredentialsForJob()
     return self.settings and self.settings.load and self.settings:load() or {}
 end
 
-function DownloadQueue:process()
-    if not self:checkStoreFence() then
-        return
-    end
-    return self.active_job_lifecycle:process()
-end
-
-function DownloadQueue:poll()
-    return self.active_job_lifecycle:poll()
+for name, method in pairs(Lifecycle) do
+    DownloadQueue[name] = method
 end
 
 return DownloadQueue

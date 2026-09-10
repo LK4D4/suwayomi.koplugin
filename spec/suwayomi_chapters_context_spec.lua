@@ -24,7 +24,7 @@ describe("suwayomi/chapters/context", function()
         for _, name in ipairs({
             "suwayomi/downloads/controller",
             "suwayomi/downloads/queue",
-            "suwayomi/downloads/active_jobs",
+            "suwayomi/downloads/lifecycle",
             "suwayomi/downloads/status_formatter",
             "suwayomi/downloads/refill",
             "suwayomi/ui",
@@ -71,7 +71,7 @@ describe("suwayomi/chapters/context", function()
         for _, name in ipairs({
             "suwayomi/downloads/controller",
             "suwayomi/downloads/queue",
-            "suwayomi/downloads/active_jobs",
+            "suwayomi/downloads/lifecycle",
             "suwayomi/downloads/status_formatter",
             "suwayomi/downloads/refill",
             "suwayomi/ui",

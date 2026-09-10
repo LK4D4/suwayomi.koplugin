@@ -1,20 +1,14 @@
--- Boundary: active download subprocess lifecycle.
---
--- Responsibility: own in-memory active jobs, launch downloader workers, poll
--- progress files, handle terminal states, and schedule follow-up polls.
--- Owned state: active and stopping jobs, completion retries and timers; persisted state still
--- flows through the queue facade and JobStore.
--- Dependencies: queue facade callbacks, KOReader subprocess utilities, progress
--- files, and the plugin i18n facade.
--- External data: worker progress files and subprocess status are treated as
--- untrusted until normalized into queue status and persisted job records.
+-- Boundary: private download lifecycle implementation on the queue owner.
+-- These methods share the queue's pending jobs, attempts, statuses and timers;
+-- there is no second state owner or queue callback protocol.
+-- Dependencies: injected process/clock/storage adapters and archive/progress IO.
+-- External progress and process observations are validated before transitions.
 
 local I18n = require("suwayomi/i18n")
 local ProgressFile = require("suwayomi/downloads/progress_file")
 local Archive = require("suwayomi/downloads/archive")
 
-local ActiveJobs = {}
-ActiveJobs.__index = ActiveJobs
+local Lifecycle = {}
 
 local function retryJitterSeconds(key, retry_count)
     local key_text = tostring(key or "")
@@ -25,40 +19,27 @@ local function retryJitterSeconds(key, retry_count)
     return hash
 end
 
-function ActiveJobs:new(options)
-    options = options or {}
-    local active_jobs = {
-        queue = options.queue,
-        jobs = options.jobs or {},
-        poll_scheduled = false,
-        retry_wakeup_at = nil,
-        terminating_pids = {},
-    }
-    setmetatable(active_jobs, self)
-    return active_jobs
-end
-
-function ActiveJobs:getCount()
+function Lifecycle:getActiveCount()
     local count = 0
-    for _ in pairs(self.jobs or {}) do
+    for _ in pairs(self.active_jobs or {}) do
         count = count + 1
     end
-    for _, job in pairs(self.terminating_pids) do
-        if not self.jobs[job.key] then count = count + 1 end
+    for _, job in pairs(self.stopping_jobs) do
+        if not self.active_jobs[job.key] then count = count + 1 end
     end
     return count
 end
 
-function ActiveJobs:getStoppingJob(key)
-    for _, job in pairs(self.terminating_pids) do
+function Lifecycle:getStoppingJob(key)
+    for _, job in pairs(self.stopping_jobs) do
         if job.key == key then return job end
     end
 end
 
-function ActiveJobs:isWorkerDone(job)
+function Lifecycle:isWorkerDone(job)
     if job.worker_done then return true end
     if not job.pid then job.worker_done = true; return true end
-    local ok, done = pcall(self.queue.ffi_util.isSubProcessDone, job.pid)
+    local ok, done = pcall(self.ffi_util.isSubProcessDone, job.pid)
     if ok and done then job.worker_done = true end
     return job.worker_done == true
 end
@@ -76,7 +57,7 @@ local function completionProgress(active)
 end
 
 local function completedArchivePath(lifecycle, active, progress)
-    local queue = lifecycle.queue
+    local queue = lifecycle
     local successful = progress and (progress.state == "downloaded" or progress.state == "skipped")
     local path
     if successful then
@@ -94,14 +75,13 @@ local function completedArchivePath(lifecycle, active, progress)
     return path
 end
 
-function ActiveJobs:cleanupStoppedJob(job)
-    self.queue:cleanupAttempt(job)
+function Lifecycle:cleanupStoppedJob(job)
+    self:cleanupAttempt(job)
 end
 
-function ActiveJobs:reapStoppingJobs()
-    local queue = self.queue
-    for pid, job in pairs(self.terminating_pids) do
-        if not queue:checkStoreFence() then return end
+function Lifecycle:reapStoppingJobs()
+    for pid, job in pairs(self.stopping_jobs) do
+        if not self:checkStoreFence() then return end
         if self:isWorkerDone(job) then
             local progress = completionProgress(job) or ProgressFile.read(job.progress_path)
             local path = completedArchivePath(self, job, progress)
@@ -114,53 +94,51 @@ function ActiveJobs:reapStoppingJobs()
                 self:completeArchive(job, path, progress)
             else
                 self:cleanupStoppedJob(job)
-                self.terminating_pids[pid] = nil
-                queue.onStatusChanged()
+                self.stopping_jobs[pid] = nil
+                self.onStatusChanged()
             end
         end
     end
 end
 
-function ActiveJobs:getJob(key)
-    return self.jobs and self.jobs[key] or nil
+function Lifecycle:getActiveJob(key)
+    return self.active_jobs and self.active_jobs[key] or nil
 end
 
-function ActiveJobs:setJob(job)
-    self.jobs = self.jobs or {}
-    self.jobs[job.key or self.queue:getKey(job.manga, job.chapter)] = job
+function Lifecycle:setActiveJob(job)
+    self.active_jobs = self.active_jobs or {}
+    self.active_jobs[job.key or self:getKey(job.manga, job.chapter)] = job
 end
 
-function ActiveJobs:removeJob(job)
-    if not self.jobs then
+function Lifecycle:removeActiveJob(job)
+    if not self.active_jobs then
         return
     end
-    self.jobs[job.key or self.queue:getKey(job.manga, job.chapter)] = nil
+    self.active_jobs[job.key or self:getKey(job.manga, job.chapter)] = nil
 end
 
-function ActiveJobs:appendSnapshotJobs(snapshot)
-    -- Snapshot construction stays here so queue.lua does not need to know the
-    -- active job table shape.
-    for _index, job in pairs(self.jobs or {}) do
-        table.insert(snapshot.active, self.queue:copySnapshotJob(job, "downloading"))
+function Lifecycle:appendSnapshotJobs(snapshot)
+    for _index, job in pairs(self.active_jobs or {}) do
+        table.insert(snapshot.active, self:copySnapshotJob(job, "downloading"))
     end
 end
 
-function ActiveJobs:schedulePoll()
-    if self.poll_scheduled or self:getCount() == 0 then
+function Lifecycle:schedulePoll()
+    if self.poll_scheduled or self:getActiveCount() == 0 then
         return
     end
 
     self.poll_scheduled = true
-    self.queue.ui_manager:scheduleIn(self.queue.POLL_INTERVAL_SECONDS, function()
-        self.queue:poll()
+    self.ui_manager:scheduleIn(self.POLL_INTERVAL_SECONDS, function()
+        self:poll()
     end)
 end
 
-function ActiveJobs:writeProgressFallback(progress_path, state, current, total, path, error_message, retryable, details)
+function Lifecycle:writeProgressFallback(progress_path, state, current, total, path, error_message, retryable, details)
     return ProgressFile.writeFallback(progress_path, state, current, total, path, error_message, retryable, details)
 end
 
-function ActiveJobs:runDownloaderJob(queued)
+function Lifecycle:runDownloaderJob(queued)
     if queued.downloader.downloadChapterWithProgress then
         queued.downloader:downloadChapterWithProgress(
             queued.credentials,
@@ -211,24 +189,23 @@ function ActiveJobs:runDownloaderJob(queued)
     until not result.ok or result.done
 end
 
-function ActiveJobs:startQueuedJob(queued)
-    local queue = self.queue
-    if queue and queue.checkStoreFence and not queue:checkStoreFence() then
+function Lifecycle:startQueuedJob(queued)
+    if self and self.checkStoreFence and not self:checkStoreFence() then
         return false
     end
-    local key = queued.key or queue:getKey(queued.manga, queued.chapter)
-    if self:getJob(key) then
-        queue:setStatus(queued.manga, queued.chapter, { state = "downloading" })
+    local key = queued.key or self:getKey(queued.manga, queued.chapter)
+    if self:getActiveJob(key) then
+        self:setStatus(queued.manga, queued.chapter, { state = "downloading" })
         return false, "already_active"
     end
-    local valid, reason = queue:validateJob(queued)
+    local valid, reason = self:validateJob(queued)
     if not valid then return false, reason end
     if queued.start_failure then
         local saved, save_err = self:finishWithFailure(queued, queued.start_failure)
         return false, saved and "terminal_failure" or save_err
     end
     queued.key = key
-    queued.started_at = queue.now()
+    queued.started_at = self.now()
     queued.last_progress_at = queued.started_at
     queued.last_progress_current = nil
     queued.last_progress_state = nil
@@ -239,12 +216,12 @@ function ActiveJobs:startQueuedJob(queued)
         return false, saved and "terminal_failure" or save_err
     end
     queued.attempt_id = attempt_id
-    queued.progress = queue:withArchiveEvidence(queued, {
+    queued.progress = self:withArchiveEvidence(queued, {
         state = "downloading", current = 0, total = 0, updated_at = queued.last_progress_at,
     })
-    queued.progress_path = queue:buildProgressPath(queued.manga, queued.chapter, queued.download_directory, attempt_id)
-    queued.credentials = queue:getCredentialsForJob()
-    local ok, err = queue:upsertPersistentJob(queue:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading", {
+    queued.progress_path = self:buildProgressPath(queued.manga, queued.chapter, queued.download_directory, attempt_id)
+    queued.credentials = self:getCredentialsForJob()
+    local ok, err = self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading", {
         started_at = queued.started_at,
         last_progress_at = queued.last_progress_at,
         retry_count = queued.retry_count,
@@ -256,10 +233,10 @@ function ActiveJobs:startQueuedJob(queued)
     if not ok then
         return false, err
     end
-    valid, reason = queue:validateJob(queued)
+    valid, reason = self:validateJob(queued)
     if not valid then return false, reason end
 
-    local pid, subproc_err = queue.ffi_util.runInSubProcess(function()
+    local pid, subproc_err = self.ffi_util.runInSubProcess(function()
         self:runDownloaderJob(queued)
     end)
 
@@ -271,14 +248,13 @@ function ActiveJobs:startQueuedJob(queued)
     end
 
     queued.pid = pid
-    self:setJob(queued)
-    queue:setStatus(queued.manga, queued.chapter, queue:statusForJob(queued, "downloading"))
+    self:setActiveJob(queued)
+    self:setStatus(queued.manga, queued.chapter, self:statusForJob(queued, "downloading"))
     return true
 end
 
-function ActiveJobs:process()
-    local queue = self.queue
-    if queue and queue.checkStoreFence and not queue:checkStoreFence() then
+function Lifecycle:process()
+    if self and self.checkStoreFence and not self:checkStoreFence() then
         return
     end
     local started_at = os.time()
@@ -290,17 +266,17 @@ function ActiveJobs:process()
     local earliest_retry_at
     self:reapStoppingJobs()
     -- Stopping workers reserve their own slots, not every available slot.
-    if next(self.terminating_pids) then
-        earliest_retry_at = queue.now() + 1
+    if next(self.stopping_jobs) then
+        earliest_retry_at = self.now() + 1
     end
-    while self:getCount() < queue.max_active_chapters do
+    while self:getActiveCount() < self.max_active_chapters do
         local ready_retry_index
         local ready_fresh_index
         local delayed_retry_at
-        local current_time = queue.now()
-        for index, item in ipairs(queue.items or {}) do
+        local current_time = self.now()
+        for index, item in ipairs(self.items or {}) do
             local retry_ready = not item.retry_at or item.retry_at <= current_time
-            if retry_ready and item.previous_pid and self.terminating_pids[item.previous_pid] then
+            if retry_ready and item.previous_pid and self.stopping_jobs[item.previous_pid] then
                 item.retry_at = current_time + 1
                 retry_ready = false
             elseif retry_ready then
@@ -322,7 +298,7 @@ function ActiveJobs:process()
             earliest_retry_at = delayed_retry_at
         end
         local ready_index = ready_retry_index or ready_fresh_index
-        local queued = ready_index and table.remove(queue.items, ready_index) or nil
+        local queued = ready_index and table.remove(self.items, ready_index) or nil
         if not queued then
             break
         end
@@ -331,8 +307,8 @@ function ActiveJobs:process()
         if ok then
             started_count = started_count + 1
         elseif err ~= "already_active" and err ~= "terminal_failure" then
-            table.insert(queue.items, ready_index, queued)
-            earliest_retry_at = queue.now() + 1
+            table.insert(self.items, ready_index, queued)
+            earliest_retry_at = self.now() + 1
             break
         end
     end
@@ -346,23 +322,23 @@ function ActiveJobs:process()
     if ok_socket and socket and socket.gettime then
         finished_at = socket.gettime()
     end
-    queue:logDebug({
+    self:logDebug({
         operation = "downloadQueue.process",
         event = "end",
         started_count = started_count,
-        active_count = self:getCount(),
-        queued_count = #(queue.items or {}),
+        active_count = self:getActiveCount(),
+        queued_count = #(self.items or {}),
         elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
     })
 end
 
-function ActiveJobs:scheduleRetryWakeup(retry_at)
+function Lifecycle:scheduleRetryWakeup(retry_at)
     if self.retry_wakeup_at and self.retry_wakeup_at <= retry_at then
         return
     end
     self.retry_wakeup_at = retry_at
-    local delay = math.max(0, retry_at - self.queue.now())
-    self.queue.ui_manager:scheduleIn(delay, function()
+    local delay = math.max(0, retry_at - self.now())
+    self.ui_manager:scheduleIn(delay, function()
         if self.retry_wakeup_at ~= retry_at then
             return
         end
@@ -371,45 +347,44 @@ function ActiveJobs:scheduleRetryWakeup(retry_at)
     end)
 end
 
-function ActiveJobs:scheduleTransientRetry(active, progress)
-    local queue = self.queue
-    if queue and queue.checkStoreFence and not queue:checkStoreFence() then
+function Lifecycle:scheduleTransientRetry(active, progress)
+    if self and self.checkStoreFence and not self:checkStoreFence() then
         return false, "store_blocked"
     end
-    local valid, reason = queue:validateJob(active)
+    local valid, reason = self:validateJob(active)
     if not valid then return false, reason end
     local retry_count = (tonumber(active.retry_count) or 0) + 1
-    local base_retry_delay = queue.RETRY_DELAYS_SECONDS[retry_count]
+    local base_retry_delay = self.RETRY_DELAYS_SECONDS[retry_count]
     local retry_delay = base_retry_delay and (base_retry_delay + retryJitterSeconds(active.key, retry_count))
     if not retry_delay then
         return false
     end
 
-    local retry_at = queue.now() + retry_delay
-    local persistent_job = active.pending_retry or queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "queued", {
+    local retry_at = self.now() + retry_delay
+    local persistent_job = active.pending_retry or self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "queued", {
         retry_count = retry_count,
         retry_at = retry_at,
         archive_generation = active.archive_generation,
         provenance = active.provenance,
         repair = active.repair,
-        progress = queue:withArchiveEvidence(active, {
+        progress = self:withArchiveEvidence(active, {
             state = "queued",
             current = progress and progress.current or active.last_progress_current or 0,
             total = progress and progress.total or active.last_progress_total or 0,
             error = progress and progress.error or active.last_progress_error,
             retryable = true,
-            updated_at = queue.now(),
+            updated_at = self.now(),
         }),
     })
     active.pending_retry = persistent_job
     retry_at = persistent_job.retry_at
-    local ok, err = queue:upsertPersistentJob(persistent_job)
+    local ok, err = self:upsertPersistentJob(persistent_job)
     if not ok then
         return false, err or "save_failed"
     end
 
     self:terminateJob(active)
-    self:removeJob(active)
+    self:removeActiveJob(active)
 
     local queued = {
         key = active.key,
@@ -425,9 +400,9 @@ function ActiveJobs:scheduleTransientRetry(active, progress)
         provenance = active.provenance,
         repair = active.repair,
     }
-    table.insert(queue.items, queued)
-    queue:setStatus(active.manga, active.chapter, queue:statusForJob(persistent_job, "queued"))
-    queue:logDebug({
+    table.insert(self.items, queued)
+    self:setStatus(active.manga, active.chapter, self:statusForJob(persistent_job, "queued"))
+    self:logDebug({
         operation = "downloadQueue.retry",
         event = "scheduled",
         key = active.key,
@@ -437,63 +412,60 @@ function ActiveJobs:scheduleTransientRetry(active, progress)
     return true
 end
 
-function ActiveJobs:terminateJob(active)
-    local queue = self.queue
+function Lifecycle:terminateJob(active)
     if not active or not active.pid then
         return
     end
-    self.terminating_pids[active.pid] = active
-    if not self:isWorkerDone(active) and queue and queue.ffi_util and queue.ffi_util.terminateSubProcess then
-        pcall(queue.ffi_util.terminateSubProcess, active.pid)
+    self.stopping_jobs[active.pid] = active
+    if not self:isWorkerDone(active) and self and self.ffi_util and self.ffi_util.terminateSubProcess then
+        pcall(self.ffi_util.terminateSubProcess, active.pid)
     end
 end
 
-function ActiveJobs:finishWithFailure(active, message)
-    local queue = self.queue
-    if queue and queue.checkStoreFence and not queue:checkStoreFence() then
+function Lifecycle:finishWithFailure(active, message)
+    if self and self.checkStoreFence and not self:checkStoreFence() then
         return false, "store_blocked"
     end
-    local failure_message = queue:formatFailureMessage(active.manga, active.chapter, message or I18n.t("Chapter download failed."))
-    local ok, err = queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
+    local failure_message = self:formatFailureMessage(active.manga, active.chapter, message or I18n.t("Chapter download failed."))
+    local ok, err = self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
         started_at = active.started_at,
-        last_progress_at = queue.now(),
+        last_progress_at = self.now(),
         archive_generation = active.archive_generation,
         provenance = active.provenance,
         retry_count = active.retry_count,
         repair = active.repair,
-        progress = queue:withArchiveEvidence(active, {
+        progress = self:withArchiveEvidence(active, {
             state = "failed",
             current = active.last_progress_current or 0,
             total = active.last_progress_total or 0,
             path = active.last_progress_path,
             error = failure_message,
-            updated_at = queue.now(),
+            updated_at = self.now(),
         }),
     }))
     if not ok then
         return false, err
     end
     self:terminateJob(active)
-    self:removeJob(active)
-    local failed = queue:findPersistentJob(active.key)
-    queue:setStatus(active.manga, active.chapter, queue:statusForJob(failed, "failed"))
-    queue:notifyDownloadFailure(failure_message)
+    self:removeActiveJob(active)
+    local failed = self:findPersistentJob(active.key)
+    self:setStatus(active.manga, active.chapter, self:statusForJob(failed, "failed"))
+    self:notifyDownloadFailure(failure_message)
     return true
 end
 
-function ActiveJobs:finishWithCancel(active, options)
+function Lifecycle:finishWithCancel(active, options)
     options = options or {}
-    local queue = self.queue
-    local key = active.key or queue:getKey(active.manga, active.chapter)
-    queue:invalidateVerification(key)
-    local ok, err = queue:cancelJobRecord(active)
+    local key = active.key or self:getKey(active.manga, active.chapter)
+    self:invalidateVerification(key)
+    local ok, err = self:cancelJobRecord(active)
     if not ok then
         return false, err
     end
     self:terminateJob(active)
-    self:removeJob(active)
+    self:removeActiveJob(active)
     if not options.quiet then
-        queue.onStatusChanged()
+        self.onStatusChanged()
     end
     if options.process ~= false then
         self:process()
@@ -501,34 +473,7 @@ function ActiveJobs:finishWithCancel(active, options)
     return true
 end
 
-function ActiveJobs:cancelAll()
-    local active_jobs = {}
-    for _index, active in pairs(self.jobs or {}) do
-        table.insert(active_jobs, active)
-    end
-
-    local canceled = 0
-    local last_err = nil
-    for _index, active in ipairs(active_jobs) do
-        local ok, err = self:finishWithCancel(active, { process = false, quiet = true })
-        if ok then
-            canceled = canceled + 1
-        else
-            last_err = last_err or err
-        end
-    end
-    self:process()
-    if canceled > 0 and self.queue then
-        self.queue.onStatusChanged()
-    end
-    if canceled == 0 and last_err then
-        return 0, last_err
-    end
-    return canceled, last_err
-end
-
-function ActiveJobs:recordProgress(active, progress)
-    local queue = self.queue
+function Lifecycle:recordProgress(active, progress)
     if not progress or not progress.state then
         return
     end
@@ -537,18 +482,18 @@ function ActiveJobs:recordProgress(active, progress)
         or progress.total ~= active.last_progress_total
         or progress.state ~= active.last_progress_state
     if changed then
-        active.last_progress_at = queue.now()
+        active.last_progress_at = self.now()
         active.last_progress_current = progress.current
         active.last_progress_total = progress.total
         active.last_progress_path = progress.path
         active.last_progress_error = progress.error
         active.last_progress_state = progress.state
         progress.updated_at = active.last_progress_at
-        active.progress = queue:withArchiveEvidence(active, progress)
+        active.progress = self:withArchiveEvidence(active, progress)
         -- Terminal progress is only an observation until finishFromProgress
         -- validates the archive and finalizes active and persistent state.
         if progress.state ~= "downloaded" and progress.state ~= "skipped" and progress.state ~= "failed" then
-            queue:upsertPersistentJob(queue:buildPersistentJob(active.manga, active.chapter, active.download_directory, progress.state, {
+            self:upsertPersistentJob(self:buildPersistentJob(active.manga, active.chapter, active.download_directory, progress.state, {
                 started_at = active.started_at,
                 last_progress_at = active.last_progress_at,
                 retry_count = active.retry_count,
@@ -557,38 +502,36 @@ function ActiveJobs:recordProgress(active, progress)
                 repair = active.repair,
                 progress = active.progress,
             }))
-            queue:setStatus(active.manga, active.chapter, queue:statusForJob(active, progress.state))
+            self:setStatus(active.manga, active.chapter, self:statusForJob(active, progress.state))
         end
     end
 end
 
-function ActiveJobs:completeArchive(active, path, progress)
-    local queue = self.queue
+function Lifecycle:completeArchive(active, path, progress)
     active.pending_completion = path
     active.pending_identity = active.pending_identity or progress and progress.identity or Archive.identity(path)
     if not self:isWorkerDone(active) then return false, "worker_stopping" end
-    local ok, err = queue:commitChapterCompletion(active, path)
+    local ok, err = self:commitChapterCompletion(active, path)
     if not ok then return false, err end
-    self:removeJob(active)
-    if active.pid then self.terminating_pids[active.pid] = nil end
+    self:removeActiveJob(active)
+    if active.pid then self.stopping_jobs[active.pid] = nil end
     local remaining = {}
-    for _, item in ipairs(queue.items) do
+    for _, item in ipairs(self.items) do
         if item.key ~= active.key then remaining[#remaining + 1] = item end
     end
-    queue.items = remaining
+    self.items = remaining
     self:cleanupStoppedJob(active)
-    queue:setStatus(active.manga, active.chapter, {
+    self:setStatus(active.manga, active.chapter, {
         state = progress and progress.state == "skipped" and "skipped" or "downloaded",
         current = progress and progress.current or active.last_progress_current,
         total = progress and progress.total or active.last_progress_total,
     })
-    queue:notifyChapterArchiveReady(active.manga, active.chapter, path)
+    self:notifyChapterArchiveReady(active.manga, active.chapter, path)
     return true
 end
 
-function ActiveJobs:finishFromProgress(active, progress)
-    local queue = self.queue
-    if not queue:checkStoreFence() then return false, "store_blocked" end
+function Lifecycle:finishFromProgress(active, progress)
+    if not self:checkStoreFence() then return false, "store_blocked" end
     local path = completedArchivePath(self, active, progress)
     if path then return self:completeArchive(active, path, progress) end
     if progress and progress.state == "failed" and progress.retryable == true then
@@ -602,14 +545,13 @@ function ActiveJobs:finishFromProgress(active, progress)
     return self:finishWithFailure(active, message)
 end
 
-function ActiveJobs:finishWithoutProgress(active)
+function Lifecycle:finishWithoutProgress(active)
     return self:finishFromProgress(active)
 end
 
-function ActiveJobs:poll()
-    local queue = self.queue
+function Lifecycle:poll()
     self.poll_scheduled = false
-    if queue and queue.checkStoreFence and not queue:checkStoreFence() then
+    if self and self.checkStoreFence and not self:checkStoreFence() then
         return
     end
     local started_at = os.time()
@@ -617,17 +559,17 @@ function ActiveJobs:poll()
     if ok_socket and socket and socket.gettime then
         started_at = socket.gettime()
     end
-    if self:getCount() == 0 then
+    if self:getActiveCount() == 0 then
         return
     end
 
     local active_jobs = {}
-    for _index, active in pairs(self.jobs or {}) do
+    for _index, active in pairs(self.active_jobs or {}) do
         table.insert(active_jobs, active)
     end
 
     for index = 1, #active_jobs do
-        if queue and queue.checkStoreFence and not queue:checkStoreFence() then
+        if self and self.checkStoreFence and not self:checkStoreFence() then
             break
         end
         local active = active_jobs[index]
@@ -636,14 +578,14 @@ function ActiveJobs:poll()
             retryable = true,
         } or ProgressFile.read(active.progress_path)
         self:recordProgress(active, progress)
-        if queue and queue.checkStoreFence and not queue:checkStoreFence() then
+        if self and self.checkStoreFence and not self:checkStoreFence() then
             break
         end
 
         if active.pending_completion then
             -- Storage retries cannot turn a completed transfer into a network timeout.
             self:finishFromProgress(active, progress)
-        elseif queue.now() - (active.last_progress_at or active.started_at or queue.now()) > queue.WATCHDOG_TIMEOUT_SECONDS then
+        elseif self.now() - (active.last_progress_at or active.started_at or self.now()) > self.WATCHDOG_TIMEOUT_SECONDS then
             -- The worker may have died without writing terminal progress. The
             -- watchdog converts that silent active state into a recoverable
             -- failed job instead of leaving a permanent "downloading" row.
@@ -676,32 +618,32 @@ function ActiveJobs:poll()
     if ok_socket and socket and socket.gettime then
         finished_at = socket.gettime()
     end
-    queue:logDebug({
+    self:logDebug({
         operation = "downloadQueue.poll",
         event = "end",
         polled_count = #active_jobs,
-        active_count = self:getCount(),
-        queued_count = #(queue.items or {}),
+        active_count = self:getActiveCount(),
+        queued_count = #(self.items or {}),
         elapsed_ms = math.floor(((finished_at - started_at) * 1000) + 0.5),
     })
 end
 
-function ActiveJobs:shutdown(deadline, now)
+function Lifecycle:shutdownAttempts(deadline, now)
     self.retry_wakeup_at, self.poll_scheduled = nil, false
     now = now or require("socket").gettime
     deadline = deadline or now() + 2
     local workers = {}
-    for _, job in pairs(self.jobs) do if job.pid then workers[job.pid] = job end end
-    for pid, job in pairs(self.terminating_pids) do workers[pid] = job end
+    for _, job in pairs(self.active_jobs) do if job.pid then workers[job.pid] = job end end
+    for pid, job in pairs(self.stopping_jobs) do workers[pid] = job end
     -- Both helpers are nonblocking without isSubProcessDone's optional wait flag.
     -- One pass shares the entire budget; no file IO or final save is required.
     for pid, job in pairs(workers) do
         if now() >= deadline then break end
         if not self:isWorkerDone(job) then
-            pcall(self.queue.ffi_util.terminateSubProcess, pid)
+            pcall(self.ffi_util.terminateSubProcess, pid)
             if now() < deadline then self:isWorkerDone(job) end
         end
     end
 end
 
-return ActiveJobs
+return Lifecycle

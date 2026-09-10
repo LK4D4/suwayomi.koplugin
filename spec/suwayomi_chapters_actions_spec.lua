@@ -28,7 +28,7 @@ describe("suwayomi/chapters/actions", function()
             "suwayomi/settings",
             "suwayomi/downloads/downloader",
             "suwayomi/downloads/queue",
-            "suwayomi/downloads/active_jobs",
+            "suwayomi/downloads/lifecycle",
             "suwayomi/downloads/status_formatter",
             "suwayomi/downloads/refill",
             "suwayomi/ui",
@@ -270,7 +270,17 @@ describe("suwayomi/chapters/actions", function()
                 return options.chapters_before or { selected }
             end,
         }
-        queue.statuses = queue.status
+        queue.isStopped = function() return false end
+        queue.isRecovering = function() return false end
+        queue.getStatusByKey = function(_, key) return queue.status[key] end
+        queue.forgetChapterStatus = function(_, key) queue.status[key] = nil end
+        queue.ownsStoppingAttempt = function() return false end
+        queue.ownsChapter = function(_, key)
+            if queue:isChapterBusy(key) then return true end
+            local state = queue.status[key] and queue.status[key].state
+            return state == "queued" or state == "downloading" or state == "running"
+                or state == "stopping" or state == "finalizing"
+        end
         queue.getKey = plugin.getChapterLedgerKey
         queue.isChapterBusy = queue.isChapterBusy or function() return false end
         local store = settings:getStore()
