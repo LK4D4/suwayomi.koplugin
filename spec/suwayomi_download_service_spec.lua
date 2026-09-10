@@ -569,9 +569,18 @@ describe("process-owned download navigation", function()
         end)
     end
 
-    it("commits archive, queue completion, ledger and return context with no hosts", function()
+    it("commits archive, queue completion, ledger and return context from read-only input with no hosts", function()
         local plugin, owner = host("files")
         local queue = plugin:getDownloadQueue()
+        local service = require("suwayomi/downloads/service").get()
+        local commit = service.commitCompletion
+        service.commitCompletion = function(self, job, path)
+            local input = setmetatable({}, {
+                __index = job,
+                __newindex = function() error("completion input is read-only") end,
+            })
+            return commit(self, input, path)
+        end
         assert(queue:enqueue(manga, chapters[1], directory))
         advance(0)
         local active = queue:getActiveJob("m1:c1")
@@ -608,15 +617,14 @@ describe("process-owned download navigation", function()
     }) do
         local failure, retry_count = case.failure, case.retry_count
         it("retains completed work beyond the watchdog with " .. failure .. " failure and " .. retry_count .. " retries", function()
+            assert(settings:saveDownloadQueue({ {
+                key = "m1:c1", manga = manga, chapter = chapters[1],
+                download_directory = directory, state = "downloading", retry_count = retry_count,
+            } }))
             local plugin, owner = host("files")
             local queue = plugin:getDownloadQueue()
-            assert(queue:enqueue(manga, chapters[1], directory))
             advance(0)
             local active = queue:getActiveJob("m1:c1")
-            active.retry_count = retry_count
-            assert(queue:upsertPersistentJob(queue:buildPersistentJob(manga, chapters[1], directory,
-                "downloading", { retry_count = retry_count, archive_generation = active.archive_generation,
-                    provenance = active.provenance })))
             local path = directory .. "/c1.cbz"
             write(path, "synthetic archive")
             write(active.progress_path, "state=downloaded\ncurrent=8\ntotal=8\npath=" .. path .. "\n")
@@ -1432,7 +1440,6 @@ describe("process-owned download navigation", function()
             worker.alive = false
             advance(0)
             assert.are.equal("valid", outcome)
-            assert.is_nil(queue.verification)
         end
         verify()
         assert.is_nil(queue.manual_deletion:getTarget("m1:c1", path))

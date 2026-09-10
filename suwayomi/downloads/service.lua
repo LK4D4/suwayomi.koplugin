@@ -135,20 +135,22 @@ end
 
 function Service:commitCompletion(job, path)
     local key = self.queue:getKey(job.manga, job.chapter)
-    local verification = self.queue.verification == job
-    if job.pending_archive_generation and not self.settings:isBlocked() then
+    local verification = self.queue:isVerification(job)
+    local archive_generation = job.archive_generation
+    local pending_generation = not verification and job.pending_archive_generation or nil
+    if pending_generation and not self.settings:isBlocked() then
         local state = self.settings:getStore():readKey("manual_archive_state")
         local archive = type(state) == "table" and type(state.archives) == "table" and state.archives[key]
-        if type(archive) == "table" and archive.generation == job.pending_archive_generation
+        if type(archive) == "table" and archive.generation == pending_generation
             and archive.path == path then
-            job.archive_generation = job.pending_archive_generation
+            archive_generation = pending_generation
         end
     end
     if verification then
         if not self.queue:verificationIsCurrent(job) then return nil, "verification_superseded" end
     else
-        local valid, reason = self.manual_deletion:validateJob(job)
-        if not valid then return nil, reason end
+        local valid, reason = self.manual_deletion:validateJob(job, archive_generation)
+        if not valid then return nil, reason, archive_generation, pending_generation end
     end
     local published_generation
     local call_ok, ok, err = pcall(function()
@@ -159,7 +161,7 @@ function Service:commitCompletion(job, path)
             local jobs, remove_indexes = doc.download_queue or {}, {}
             for index, stored in pairs(jobs) do
                 if type(stored) == "table" and stored.key == key then
-                    if stored.archive_generation ~= job.archive_generation or stored.version ~= nil
+                    if stored.archive_generation ~= archive_generation or stored.version ~= nil
                         or type(index) ~= "number" or index < 1 or index ~= math.floor(index) then
                         error("download_job_replaced_or_unsupported", 0)
                     end
@@ -185,20 +187,25 @@ function Service:commitCompletion(job, path)
             doc.reader_return_contexts[path] = context
             -- Inspection observes an existing archive; it never publishes a
             -- new generation or supersedes an accepted archive-only request.
-            if not verification then published_generation = self.manual_deletion:publish(doc, job, path) end
+            if not verification then
+                published_generation = self.manual_deletion:publish(doc, job, path, archive_generation)
+            end
             table.sort(remove_indexes, function(a, b) return a > b end)
             for _, index in ipairs(remove_indexes) do table.remove(jobs, index) end
             doc.download_queue = jobs
         end)
     end)
-    if not call_ok then return nil, ok end
-    if ok and not verification then
-        job.archive_generation = published_generation
-        job.pending_archive_generation = nil
-    elseif not ok and self.settings:isBlocked() then
-        job.pending_archive_generation = published_generation
+    if verification then
+        if not call_ok then return nil, ok end
+        return ok, err
     end
-    return ok, err
+    if not call_ok then return nil, ok, archive_generation, pending_generation end
+    if ok then
+        return ok, err, published_generation
+    elseif not ok and self.settings:isBlocked() then
+        pending_generation = published_generation or pending_generation
+    end
+    return ok, err, archive_generation, pending_generation
 end
 
 function Service:installQuit()
@@ -217,15 +224,15 @@ function Service:shutdown()
     if self.stopped then return end
     local now = require("socket").gettime
     local deadline = now() + 2
-    self.stopped, self.queue.stopped = true, true
+    self.stopped = true
+    self.queue:stopAdmission()
     for subscription in pairs(self.subscribers) do subscription.callback = nil end
     self.subscribers = {}
     pcall(self.cleanup.cancelFinishedChapterCleanup, self.cleanup)
     pcall(self.manual_deletion.stop, self.manual_deletion)
-    if now() < deadline then self.queue:invalidateVerification()
-    elseif self.queue.verification then self.queue.verification.canceled = true end
+    if now() < deadline then self.queue:invalidateVerification() end
     pcall(self.refill.shutdown, self.refill, deadline, now)
-    self.queue.active_job_lifecycle:shutdown(deadline, now)
+    self.queue:shutdown(deadline, now)
 end
 
 return Service
