@@ -1303,8 +1303,8 @@ msgstr "Suwayomi"
 msgid "Suwayomi Chapters"
 msgstr "Suwayomi 章节"
 
-msgid "Suwayomi Client v1.1.0"
-msgstr "Suwayomi 客户端 v1.1.0"
+msgid "Suwayomi Client v1.1.1"
+msgstr "Suwayomi 客户端 v1.1.1"
 
 msgid "Suwayomi Downloads"
 msgstr "Suwayomi 下载"
