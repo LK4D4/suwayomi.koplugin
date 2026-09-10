@@ -218,6 +218,14 @@ msgstr ""
 "Автоматическая очистка глав приостановлена: безопасность %1 файлов не "
 "подтверждена."
 
+msgid "Automatic finish marking"
+msgstr ""
+
+msgid ""
+"Automatically mark all KOReader documents finished at their end-of-document "
+"action?"
+msgstr ""
+
 msgid "Available"
 msgstr "Доступно"
 
@@ -571,6 +579,9 @@ msgstr "По убыванию"
 msgid "Details"
 msgstr "Сведения"
 
+msgid "Don't ask again"
+msgstr ""
+
 msgid "Done"
 msgstr "Готово"
 
@@ -580,6 +591,12 @@ msgstr "Скачать"
 
 msgid "Download ahead"
 msgstr "Предзагрузка"
+
+msgid ""
+"Download ahead works with manual read marking. For automatic marking, open a "
+"document, then use Cogwheel > Document > End of document action > Always "
+"mark as finished."
+msgstr ""
 
 msgid "Download ahead: %1"
 msgstr "Предзагрузка: %1"
@@ -689,6 +706,9 @@ msgstr "Изменить фильтры"
 msgid "Edit search"
 msgstr "Изменить поиск"
 
+msgid "Enable"
+msgstr ""
+
 msgid "Enable download ahead"
 msgstr "Включить предзагрузку"
 
@@ -781,6 +801,10 @@ msgstr "Глобальный поиск"
 msgid "Go to Suwayomi"
 msgstr "Перейти к Suwayomi"
 
+msgid ""
+"Helps Download ahead refill after chapters close. Manual marking still works."
+msgstr ""
+
 msgid "Hide in-library results: %1"
 msgstr "Скрывать результаты из библиотеки: %1"
 
@@ -820,6 +844,9 @@ msgstr ""
 "«Хранить 2 последние завершённые главы»: после завершения A, B, затем C в "
 "одной манге главу A можно удалить. B и C остаются. Открытые в читалке главы "
 "защищены от удаления."
+
+msgid "Keep disabled"
+msgstr ""
 
 msgid "Keep downloads"
 msgstr "Сохранять загрузки"
@@ -1465,6 +1492,11 @@ msgstr ""
 "Сервер отклонил запрос глав. Проверьте настройки подключения, затем выберите "
 "«Повторить пополнение»."
 
+msgid ""
+"This KOReader setting affects all documents. Your end action and removal "
+"settings stay unchanged. You can change it there at any time."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr "Эта книга не связана с главами Suwayomi."
 
@@ -1556,6 +1588,11 @@ msgstr "Можно продолжить."
 
 msgid "Your Suwayomi library is empty."
 msgstr "Ваша библиотека Suwayomi пуста."
+
+msgid ""
+"Your end action stays unchanged. Finished chapters follow your automatic "
+"removal settings."
+msgstr ""
 
 msgid "canceled"
 msgstr "отменено"

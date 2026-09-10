@@ -673,6 +673,13 @@ function Methods:buildSettingsMenu()
                             end,
                         },
                         {
+                            text = I18n.t("Automatic finish marking"),
+                            callback = function()
+                                self:showMessage(I18n.t("Download ahead works with manual read marking. For automatic marking, open a document, then use Cogwheel > Document > End of document action > Always mark as finished.")
+                                    .. "\n\n" .. I18n.t("This KOReader setting affects all documents. Your end action and removal settings stay unchanged. You can change it there at any time."))
+                            end,
+                        },
+                        {
                             text = I18n.t("Retry, Stop, and Cancel"),
                             callback = function()
                                 self:showMessage(I18n.t("Refill Retry reevaluates the buffer; it does not retry failed chapters or override pending deletion. Stop download ahead turns the policy Off but keeps accepted jobs. Cancel retires the current refill for that manga; Cancel all retires every refill. Cancellation keeps ahead enabled for later reading or chapter actions."))

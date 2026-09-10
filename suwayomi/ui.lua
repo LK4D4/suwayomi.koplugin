@@ -60,6 +60,7 @@ SuwayomiUI.showDownloadsMenu = DownloadsUI.showDownloadsMenu
 SuwayomiUI.updateDownloadsMenu = DownloadsUI.updateDownloadsMenu
 SuwayomiUI.showDownloadErrorDetails = DownloadsUI.showDownloadErrorDetails
 SuwayomiUI.formatRefillStatus = DownloadsUI.formatRefillStatus
+SuwayomiUI.showAutoMarkPrompt = DownloadsUI.showAutoMarkPrompt
 SuwayomiUI.buildMangaInformationText = MangaInfoUI.buildText
 SuwayomiUI.showMangaInformation = MangaInfoUI.show
 SuwayomiUI.showChoiceDialog = ChoiceDialogs.showChoiceDialog

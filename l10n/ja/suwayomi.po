@@ -183,6 +183,14 @@ msgstr ""
 msgid "Automatic chapter cleanup paused for %1 unsafe files."
 msgstr ""
 
+msgid "Automatic finish marking"
+msgstr ""
+
+msgid ""
+"Automatically mark all KOReader documents finished at their end-of-document "
+"action?"
+msgstr ""
+
 msgid "Available"
 msgstr ""
 
@@ -504,6 +512,9 @@ msgstr ""
 msgid "Details"
 msgstr ""
 
+msgid "Don't ask again"
+msgstr ""
+
 msgid "Done"
 msgstr ""
 
@@ -512,6 +523,12 @@ msgid "Download"
 msgstr ""
 
 msgid "Download ahead"
+msgstr ""
+
+msgid ""
+"Download ahead works with manual read marking. For automatic marking, open a "
+"document, then use Cogwheel > Document > End of document action > Always "
+"mark as finished."
 msgstr ""
 
 msgid "Download ahead: %1"
@@ -615,6 +632,9 @@ msgstr ""
 msgid "Edit search"
 msgstr ""
 
+msgid "Enable"
+msgstr ""
+
 msgid "Enable download ahead"
 msgstr ""
 
@@ -705,6 +725,10 @@ msgstr ""
 msgid "Go to Suwayomi"
 msgstr ""
 
+msgid ""
+"Helps Download ahead refill after chapters close. Manual marking still works."
+msgstr ""
+
 msgid "Hide in-library results: %1"
 msgstr ""
 
@@ -738,6 +762,9 @@ msgstr[0] ""
 msgid ""
 "Keep 2 newest completions: after completing A, B, then C in one manga, A "
 "becomes eligible for removal. B and C remain. Live readers stay protected."
+msgstr ""
+
+msgid "Keep disabled"
 msgstr ""
 
 msgid "Keep downloads"
@@ -1322,6 +1349,11 @@ msgid ""
 "choose Retry refill."
 msgstr ""
 
+msgid ""
+"This KOReader setting affects all documents. Your end action and removal "
+"settings stay unchanged. You can change it there at any time."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""
 
@@ -1412,6 +1444,11 @@ msgid "You can continue."
 msgstr ""
 
 msgid "Your Suwayomi library is empty."
+msgstr ""
+
+msgid ""
+"Your end action stays unchanged. Finished chapters follow your automatic "
+"removal settings."
 msgstr ""
 
 msgid "canceled"

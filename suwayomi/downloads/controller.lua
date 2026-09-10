@@ -1,6 +1,6 @@
 -- Boundary: DownloadsController.
 --
--- Responsibility: Owns Downloads controls, durable refill commands, and downloaded-read reconciliation.
+-- Responsibility: Owns Downloads controls, durable refill commands, optional global finish-marking setup, and downloaded-read reconciliation.
 -- Owned state: Uses the device-local queue only; it must not call Suwayomi server download mutations.
 -- Dependencies: KOReader UI helpers and Suwayomi runtime modules, including the plugin i18n facade.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -479,6 +479,27 @@ function Methods:requestMangaRefill(manga)
     return ok, err
 end
 
+local function offerAutoMarkPrompt(self)
+    local reader_settings = _G.G_reader_settings
+    if not reader_settings or reader_settings:readSetting("end_document_auto_mark") == true
+        or SuwayomiSettings:loadAutoMarkPromptDismissed() then return end
+
+    local function retirePrompt()
+        if self.suwayomi_host_retired then return false end
+        local ok, err = SuwayomiSettings:dismissAutoMarkPrompt()
+        if not ok then self:showMessage(err or I18n.t("Failed to save settings.")) end
+        return ok
+    end
+    SuwayomiUI.showAutoMarkPrompt({
+        onEnable = function()
+            if retirePrompt() then reader_settings:saveSetting("end_document_auto_mark", true) end
+        end,
+        onKeepDisabled = function(dont_ask_again)
+            if dont_ask_again then retirePrompt() end
+        end,
+    })
+end
+
 function Methods:setMangaDownloadAhead(manga, limit)
     if self.suwayomi_host_retired then return false end
     local ok, err = self:getDownloadQueue().refill:setPolicy(manga, limit)
@@ -487,6 +508,7 @@ function Methods:setMangaDownloadAhead(manga, limit)
         return false, err
     end
     if self.refreshChapterMenu then self:refreshChapterMenu({ quick = true }) end
+    if SuwayomiSettings:loadMangaKeepNextUnreadDownloads(manga) > 0 then offerAutoMarkPrompt(self) end
     return ok
 end
 

@@ -1,10 +1,10 @@
--- Boundary: Downloads hub menu UI.
+-- Boundary: Downloads hub and download-ahead setup UI.
 --
--- Responsibility: format chapter download and pending refill rows, wire commands
--- to the downloads controller, and display full error and refill details.
--- Owned state: none.
--- Dependencies: shared list menu widget, KOReader TextViewer/UIManager, plugin
--- i18n facade, and shared menu utilities.
+-- Responsibility: format download and refill rows, display their details, and
+-- offer optional automatic finish marking after explicit download-ahead setup.
+-- Owned state: returned widgets own their dialog and checkbox state.
+-- Dependencies: KOReader widgets/UIManager, plugin i18n, shared list menus,
+-- status formatting, and menu utilities.
 -- External data: queue snapshots are display-only here; controller actions own
 -- retries, cancellation, deletion, and navigation.
 
@@ -13,6 +13,35 @@ local StatusFormatter = require("suwayomi/downloads/status_formatter")
 local menu_utils = require("suwayomi/ui/menu_utils")
 
 local DownloadsUI = {}
+
+function DownloadsUI.showAutoMarkPrompt(options)
+    local ConfirmBox = require("ui/widget/confirmbox")
+    local CheckButton = require("ui/widget/checkbutton")
+    local UIManager = require("ui/uimanager")
+    local checkbox
+    local dialog = ConfirmBox:new{
+        text = I18n.t("Automatically mark all KOReader documents finished at their end-of-document action?")
+            .. "\n\n" .. I18n.t("Helps Download ahead refill after chapters close. Manual marking still works.")
+            .. "\n\n" .. I18n.t("Your end action stays unchanged. Finished chapters follow your automatic removal settings."),
+        ok_text = I18n.t("Enable"),
+        cancel_text = I18n.t("Keep disabled"),
+        ok_callback = options.onEnable,
+        cancel_callback = function() options.onKeepDisabled(checkbox.checked) end,
+        -- Native ConfirmBox treats dismissal as Cancel; only the button may retire this prompt.
+        onClose = function(self)
+            UIManager:close(self)
+            return true
+        end,
+    }
+    checkbox = CheckButton:new{
+        text = I18n.t("Don't ask again"),
+        checked = false,
+        parent = dialog,
+    }
+    dialog:addWidget(checkbox)
+    UIManager:show(dialog)
+    return dialog
+end
 
 local function getErrorText(job)
     local error_message = job and job.progress and job.progress.error

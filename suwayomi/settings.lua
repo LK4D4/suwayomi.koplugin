@@ -660,6 +660,14 @@ function SuwayomiSettings:saveDeleteChaptersSettings(value)
     return normalized
 end
 
+function SuwayomiSettings:loadAutoMarkPromptDismissed()
+    return self:getStore():readKey("auto_mark_prompt_dismissed") == true
+end
+
+function SuwayomiSettings:dismissAutoMarkPrompt()
+    return self:getStore():saveKey("auto_mark_prompt_dismissed", true)
+end
+
 function SuwayomiSettings:loadMangaKeepNextUnreadDownloads(manga)
     local key = self:getMangaKeepNextUnreadDownloadsKey(manga)
     if not key then

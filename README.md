@@ -47,6 +47,10 @@ Choose a manga, open its chapters, then tap a chapter to download or read it. Us
 
 The **Download ahead** menu shows **Off** or the saved buffer size for that manga. A checkmark identifies the current choice.
 
+Selecting a Download-ahead buffer may offer KOReader's **Always mark as finished** setting. This optional setting applies to **all KOReader documents** at their end-of-document action. Download ahead also works with manual read marking. **Keep disabled** leaves Download ahead active; check **Don't ask again** to stop reminders. **Enable** also stops future reminders.
+
+To change automatic finish marking later, open a document and use **Cogwheel > Document > End of document action > Always mark as finished**. The plugin leaves your end action and automatic removal settings unchanged; finished chapters remain subject to those removal settings. Stopping Download ahead does not turn automatic finish marking off.
+
 Downloads continue while you read. Network failures retry in the background, and unfinished downloads resume after a KOReader restart. Files are organized by source and manga in your chosen download folder.
 
 ### Faster downloads with server predownloads
