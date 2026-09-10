@@ -1294,7 +1294,7 @@ msgstr ""
 msgid "Suwayomi Chapters"
 msgstr ""
 
-msgid "Suwayomi Client v1.0.6"
+msgid "Suwayomi Client v1.1.0"
 msgstr ""
 
 msgid "Suwayomi Downloads"

@@ -146,6 +146,8 @@ Suwayomi server downloaded state never establishes device-local availability. Ne
 
 Normalize external input at existing boundaries: API parsing, settings normalization, serializable job records, parent-side progress parsing, and sanitized path construction. Release/manual-push allowlists and the Android destination are defined once in [AGENTS.md](../AGENTS.md#packaging), enforced by `.github/scripts/stage-release-payload.sh`.
 
+The tag-triggered release workflow requires non-empty notes in `docs/releases/<tag>.md` and passes that file as the GitHub release body alongside the plugin ZIP. Notes remain outside the runtime payload. The workflow checks the tag against `_meta.lua` before packaging; update the metadata, localization catalogs, and release notes together for each version.
+
 ## Test Strategy
 
 Use the commands and isolation rules in [AGENTS.md](../AGENTS.md#tests-and-commands). Most host/network boundaries are stubbed; selected composed specs use real temporary files. One-shot JSON jobs use `subprocess/job.lua`; downloads retain separate scheduling because they need progress files, persisted jobs, and replacement handling.

@@ -22,8 +22,13 @@ jobs:
 
       - uses: leafo/gh-actions-luarocks@v6
 
-      - name: Verify release tag matches metadata version
-        run: luajit .github/scripts/check-release-version.lua _meta.lua "$GITHUB_REF_NAME"
+      - name: Verify release version and notes
+        run: |
+          luajit .github/scripts/check-release-version.lua _meta.lua "$GITHUB_REF_NAME"
+          test -s "docs/releases/$GITHUB_REF_NAME.md" || {
+            echo "Missing release notes for $GITHUB_REF_NAME" >&2
+            exit 1
+          }
 
       - name: Install dependencies
         run: |
@@ -33,8 +38,13 @@ jobs:
           luarocks install luasec
           luarocks install luacheck
 
-      - name: Install gettext tools
-        run: sudo apt-get update && sudo apt-get install -y gettext
+      - name: Install gettext and native archive test dependencies
+        run: |
+          # These dependencies use Ubuntu packages, not the runner's third-party feeds.
+          test -s /etc/apt/sources.list.d/ubuntu.sources
+          apt_sources=(-o Dir::Etc::sourcelist=sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=-)
+          sudo apt-get "${apt_sources[@]}" update
+          sudo apt-get "${apt_sources[@]}" install -y gettext libarchive-dev
 
       - name: Run lint
         run: luacheck --codes spec suwayomi main.lua _meta.lua
@@ -60,5 +70,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: ${{ env.RELEASE_ASSET_NAME }}
+          body_path: docs/releases/${{ github.ref_name }}.md
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

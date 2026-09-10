@@ -75,7 +75,7 @@ xgettext \
     --sort-output \
     --no-location \
     --package-name="Suwayomi Client for KOReader" \
-    --package-version="1.0.4" \
+    --package-version="1.1.0" \
     --msgid-bugs-address="https://github.com/Suwayomi/Suwayomi-Server/issues" \
     --keyword=_ \
     --keyword=I18n.t:1 \
