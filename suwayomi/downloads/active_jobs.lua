@@ -63,16 +63,60 @@ function ActiveJobs:isWorkerDone(job)
     return job.worker_done == true
 end
 
+local function completionProgress(active)
+    if active.pending_completion then
+        return {
+            state = active.last_progress_state == "skipped" and "skipped" or "downloaded",
+            current = active.last_progress_current,
+            total = active.last_progress_total,
+            path = active.pending_completion,
+            identity = active.pending_identity,
+        }
+    end
+end
+
+local function completedArchivePath(lifecycle, active, progress)
+    local queue = lifecycle.queue
+    local successful = progress and (progress.state == "downloaded" or progress.state == "skipped")
+    local path
+    if successful then
+        path = queue:getCompletedArchivePath(active, progress)
+        if not path or not queue.downloader.chapterExists or not queue.downloader:chapterExists(path) then
+            path = nil
+        elseif progress.identity and Archive.identity(path) ~= progress.identity then
+            path = nil
+        end
+    else
+        path = queue:getExistingArchivePath(active, progress)
+        if not (path and lifecycle:isWorkerDone(active) and active.attempt_id
+            and Archive.attemptId(path) == active.attempt_id) then path = nil end
+    end
+    return path
+end
+
 function ActiveJobs:cleanupStoppedJob(job)
     self.queue:cleanupAttempt(job)
 end
 
 function ActiveJobs:reapStoppingJobs()
+    local queue = self.queue
     for pid, job in pairs(self.terminating_pids) do
+        if not queue:checkStoreFence() then return end
         if self:isWorkerDone(job) then
-            self:cleanupStoppedJob(job)
-            self.terminating_pids[pid] = nil
-            self.queue.onStatusChanged()
+            local progress = completionProgress(job) or ProgressFile.read(job.progress_path)
+            local path = completedArchivePath(self, job, progress)
+            if path and progress and (progress.state == "downloaded" or progress.state == "skipped") then
+                self:recordProgress(job, progress)
+            end
+            if path then
+                -- Cancellation retires transfer intent, not a published archive.
+                -- Keep ownership and progress if the completion save fails.
+                self:completeArchive(job, path, progress)
+            else
+                self:cleanupStoppedJob(job)
+                self.terminating_pids[pid] = nil
+                queue.onStatusChanged()
+            end
         end
     end
 end
@@ -545,20 +589,7 @@ end
 function ActiveJobs:finishFromProgress(active, progress)
     local queue = self.queue
     if not queue:checkStoreFence() then return false, "store_blocked" end
-    local successful = progress and (progress.state == "downloaded" or progress.state == "skipped")
-    local path
-    if successful then
-        path = queue:getCompletedArchivePath(active, progress)
-        if not path or not queue.downloader.chapterExists or not queue.downloader:chapterExists(path) then
-            path = nil
-        elseif progress.identity and Archive.identity(path) ~= progress.identity then
-            path = nil
-        end
-    else
-        path = queue:getExistingArchivePath(active, progress)
-        if not (path and self:isWorkerDone(active) and active.attempt_id
-            and Archive.attemptId(path) == active.attempt_id) then path = nil end
-    end
+    local path = completedArchivePath(self, active, progress)
     if path then return self:completeArchive(active, path, progress) end
     if progress and progress.state == "failed" and progress.retryable == true then
         local retried, err = self:scheduleTransientRetry(active, progress)
@@ -600,13 +631,7 @@ function ActiveJobs:poll()
             break
         end
         local active = active_jobs[index]
-        local progress = active.pending_completion and {
-            state = active.last_progress_state == "skipped" and "skipped" or "downloaded",
-            current = active.last_progress_current,
-            total = active.last_progress_total,
-            path = active.pending_completion,
-            identity = active.pending_identity,
-        } or active.pending_retry and {
+        local progress = completionProgress(active) or active.pending_retry and {
             state = "failed",
             retryable = true,
         } or ProgressFile.read(active.progress_path)
