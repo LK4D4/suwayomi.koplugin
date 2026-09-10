@@ -47,14 +47,20 @@ msgstr[2] "%1 розділів"
 msgid "%1 download is busy. Delete it after it finishes."
 msgid_plural "%1 downloads are busy. Delete them after they finish."
 msgstr[0] ""
+"Виконується %1 завантаження. Дочекайтеся завершення, перш ніж видаляти."
 msgstr[1] ""
+"Виконуються %1 завантаження. Дочекайтеся завершення, перш ніж видаляти."
 msgstr[2] ""
+"Виконується %1 завантажень. Дочекайтеся завершення, перш ніж видаляти."
 
 msgid "%1 download is busy. Mark it read again after it finishes."
 msgid_plural "%1 downloads are busy. Mark them read again after they finish."
 msgstr[0] ""
+"Виконується %1 завантаження. Після завершення знову позначте як прочитане."
 msgstr[1] ""
+"Виконуються %1 завантаження. Після завершення знову позначте як прочитані."
 msgstr[2] ""
+"Виконується %1 завантажень. Після завершення знову позначте як прочитані."
 
 msgid "%1 failed for %2"
 msgstr "Не вдалося виконати %1 для %2"
@@ -68,13 +74,15 @@ msgstr[0] "%1 манґа"
 msgstr[1] "%1 манґи"
 msgstr[2] "%1 манґ"
 
-#, fuzzy
 msgid "%1 more chapter is available. Run this action again to download it."
 msgid_plural ""
 "%1 more chapters are available. Run this action again to download them."
-msgstr[0] "Немає непрочитаних розділів для завантаження."
-msgstr[1] "Немає непрочитаних розділів для завантаження."
-msgstr[2] "Немає непрочитаних розділів для завантаження."
+msgstr[0] ""
+"Доступний ще %1 розділ. Виконайте цю дію ще раз, щоб завантажити його."
+msgstr[1] ""
+"Доступні ще %1 розділи. Виконайте цю дію ще раз, щоб завантажити їх."
+msgstr[2] ""
+"Доступно ще %1 розділів. Виконайте цю дію ще раз, щоб завантажити їх."
 
 msgid "%1 result"
 msgid_plural "%1 results"
@@ -99,7 +107,7 @@ msgstr[2] "%1 вибраних розділів"
 
 msgid "1 selected"
 msgid_plural "%1 selected"
-msgstr[0] "1 вибрано"
+msgstr[0] "%1 вибрано"
 msgstr[1] "%1 вибрано"
 msgstr[2] "%1 вибрано"
 
@@ -107,14 +115,18 @@ msgid ""
 "A chapter in the buffer failed. Use that chapter's Retry or Redownload "
 "action."
 msgstr ""
+"Не вдалося завантажити розділ із буфера. Скористайтеся дією «Повторити» або "
+"«Завантажити заново» для цього розділу."
 
 msgid ""
 "A chapter in the buffer has pending manual deletion. Automatic refill cannot "
 "replace it."
 msgstr ""
+"Розділ із буфера очікує ручного видалення. Автоматичне поповнення не може "
+"замінити його."
 
 msgid "Accepted manual deletion"
-msgstr ""
+msgstr "Запит на ручне видалення прийнято"
 
 msgid "Actions"
 msgstr "Дії"
@@ -126,19 +138,21 @@ msgid "Adding to library..."
 msgstr "Додавання до бібліотеки..."
 
 msgid "Ahead blocked"
-msgstr ""
+msgstr "Завантаження наперед заблоковано"
 
 msgid ""
 "Ahead five with two existing positions needs only three downloads. Next five "
 "can add five more. Neither starts at the current reader page."
 msgstr ""
+"Завантаження наперед п’яти розділів, коли дві позиції вже зайняті, потребує "
+"лише трьох завантажень. Завантаження наступних п’яти може додати ще п’ять. "
+"Жодна з цих дій не починає відлік від поточної сторінки читання."
 
-#, fuzzy
 msgid "Ahead pending"
-msgstr "За зростанням"
+msgstr "Завантаження наперед заплановано"
 
 msgid "Ahead waiting"
-msgstr ""
+msgstr "Завантаження наперед очікує"
 
 msgid "All manga"
 msgstr "Уся манґа"
@@ -149,9 +163,8 @@ msgstr "Усі сканлейтори"
 msgid "Always ask"
 msgstr "Завжди питати"
 
-#, fuzzy
 msgid "Another download is being verified."
-msgstr "Завантаження більше не перебуває у стані помилки."
+msgstr "Зараз перевіряється інше завантаження."
 
 msgctxt "source filter tri-state"
 msgid "Any"
@@ -164,18 +177,20 @@ msgid "Apply saved filter"
 msgstr "Застосувати збережений фільтр"
 
 msgid "Archive deletion blocked; file preserved"
-msgstr ""
+msgstr "Видалення архіву заблоковано; файл збережено"
 
 msgid "Archive deletion pending"
-msgstr ""
+msgstr "Архів очікує видалення"
 
 msgid "Archive deletion pending: close reader"
-msgstr ""
+msgstr "Архів очікує видалення: закрийте його в читачі"
 
 msgid ""
 "Archive or download ownership is not verified. Existing files and work are "
 "preserved."
 msgstr ""
+"Належність архіву або завантаження не підтверджено. Наявні файли та завдання "
+"збережено."
 
 msgid "Artist"
 msgstr "Художник"
@@ -185,10 +200,10 @@ msgid "Ascending"
 msgstr "За зростанням"
 
 msgid "Authentication method"
-msgstr ""
+msgstr "Спосіб автентифікації"
 
 msgid "Authentication: %1"
-msgstr ""
+msgstr "Автентифікація: %1"
 
 msgid "Author"
 msgstr "Автор"
@@ -200,9 +215,13 @@ msgid ""
 "Automatic chapter cleanup is paused because its saved data uses an "
 "unsupported version."
 msgstr ""
+"Автоматичне очищення розділів призупинено, оскільки збережені дані мають "
+"непідтримувану версію."
 
 msgid "Automatic chapter cleanup paused for %1 unsafe files."
 msgstr ""
+"Автоматичне очищення розділів призупинено для %1 файлів, які небезпечно "
+"видаляти."
 
 msgid "Automatic finish marking"
 msgstr "Автопозначення прочитаним"
@@ -221,7 +240,7 @@ msgid "Back"
 msgstr "Назад"
 
 msgid "Basic Auth"
-msgstr ""
+msgstr "Базова (Basic Auth)"
 
 msgid "Browse"
 msgstr "Огляд"
@@ -257,19 +276,19 @@ msgid "Cancel search"
 msgstr "Скасувати пошук"
 
 msgid "Cannot cancel download: storage is ambiguous"
-msgstr ""
+msgstr "Неможливо скасувати завантаження: стан сховища неоднозначний"
 
 msgid "Cannot cancel downloads: storage is ambiguous"
-msgstr ""
+msgstr "Неможливо скасувати завантаження: стан сховища неоднозначний"
 
 msgid "Cannot delete chapter: storage is ambiguous"
-msgstr ""
+msgstr "Неможливо видалити розділ: стан сховища неоднозначний"
 
 msgid "Cannot enqueue download: storage is ambiguous"
-msgstr ""
+msgstr "Неможливо додати завантаження в чергу: стан сховища неоднозначний"
 
 msgid "Cannot enqueue downloads: storage is ambiguous"
-msgstr ""
+msgstr "Неможливо додати завантаження в чергу: стан сховища неоднозначний"
 
 msgid "Categories"
 msgstr "Категорії"
@@ -296,7 +315,7 @@ msgid "Chapter downloads"
 msgstr "Завантаження розділів"
 
 msgid "Chapter view changed. Run this download action again."
-msgstr ""
+msgstr "Подання розділів змінилося. Виконайте цю дію завантаження ще раз."
 
 msgid "Chapters"
 msgstr "Розділи"
@@ -304,9 +323,8 @@ msgstr "Розділи"
 msgid "Chapters are loading."
 msgstr "Розділи завантажуються."
 
-#, fuzzy
 msgid "Check the connection and download folder in Settings."
-msgstr "Задайте теку завантажень у Налаштування > Завантаження."
+msgstr "Перевірте з’єднання та теку завантажень у налаштуваннях."
 
 msgid "Checking chapters"
 msgstr "Перевірка розділів"
@@ -342,9 +360,14 @@ msgid ""
 "authorize deletion. A completion without an archive occupies a position but "
 "cannot authorize deleting a later download."
 msgstr ""
+"Враховується статус завершення разом із закриттям; самого переходу на "
+"останню сторінку недостатньо. Ручне позначення прочитаним також враховується "
+"для зберігання. Давні позначки прочитаного не дають дозволу на видалення. "
+"Запис про завершення без архіву займає позицію, але не дає дозволу видаляти "
+"пізніше завантажений файл."
 
 msgid "Completion and archive removal"
-msgstr ""
+msgstr "Завершення читання та видалення архівів"
 
 msgid "Connection"
 msgstr "З'єднання"
@@ -358,33 +381,36 @@ msgstr "Перевірку з'єднання пройдено."
 msgid "Continue"
 msgstr "Продовжити"
 
-#, fuzzy
 msgid "Could not cancel download: %1"
-msgstr "Не вдалося почати завантаження розділу: %1"
+msgstr "Не вдалося скасувати завантаження: %1"
 
-#, fuzzy
 msgid "Could not clear failed downloads: %1"
-msgstr "Не вдалося почати завантаження розділу: %1"
+msgstr "Не вдалося очистити невдалі завантаження: %1"
 
-#, fuzzy
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
-msgstr[0] "Не вдалося почати завантаження розділу: %1"
-msgstr[1] "Не вдалося почати завантаження розділу: %1"
-msgstr[2] "Не вдалося почати завантаження розділу: %1"
+msgstr[0] "Не вдалося підтвердити %1 завантаження розділу."
+msgstr[1] "Не вдалося підтвердити %1 завантаження розділів."
+msgstr[2] "Не вдалося підтвердити %1 завантажень розділів."
 
 msgid "Could not confirm saved refill work. No new downloads are confirmed."
 msgstr ""
+"Не вдалося підтвердити збережені завдання поповнення. Жодного нового "
+"завантаження не підтверджено."
 
 msgid ""
 "Could not confirm the read state was saved. No deletion was started. Reopen "
 "the chapter list and try again."
 msgstr ""
+"Не вдалося підтвердити збереження стану «Прочитано». Видалення не розпочато. "
+"Знову відкрийте список розділів і повторіть спробу."
 
 msgid ""
 "Could not confirm the unread state was saved. Pending deletion may still "
 "run. Reopen the chapter list and try again."
 msgstr ""
+"Не вдалося підтвердити збереження стану «Непрочитано». Заплановане видалення "
+"ще може відбутися. Знову відкрийте список розділів і повторіть спробу."
 
 msgid "Could not connect to Suwayomi."
 msgstr "Не вдалося під'єднатися до Suwayomi."
@@ -394,15 +420,27 @@ msgid ""
 msgid_plural ""
 "Could not delete %1 downloads safely. Check their status in the chapter list."
 msgstr[0] ""
+"Не вдалося безпечно видалити %1 завантаження. Перевірте стан у списку "
+"розділів."
 msgstr[1] ""
+"Не вдалося безпечно видалити %1 завантаження. Перевірте їхній стан у списку "
+"розділів."
 msgstr[2] ""
+"Не вдалося безпечно видалити %1 завантажень. Перевірте їхній стан у списку "
+"розділів."
 
 msgid "Could not delete %1 download. Reopen the chapter list and try again."
 msgid_plural ""
 "Could not delete %1 downloads. Reopen the chapter list and try again."
 msgstr[0] ""
+"Не вдалося видалити %1 завантаження. Знову відкрийте список розділів і "
+"повторіть спробу."
 msgstr[1] ""
+"Не вдалося видалити %1 завантаження. Знову відкрийте список розділів і "
+"повторіть спробу."
 msgstr[2] ""
+"Не вдалося видалити %1 завантажень. Знову відкрийте список розділів і "
+"повторіть спробу."
 
 msgid "Could not delete saved filter."
 msgstr "Не вдалося видалити збережений фільтр."
@@ -424,6 +462,7 @@ msgstr "Не вдалося завантажити розділи."
 
 msgid "Could not load chapters. Refill will retry automatically."
 msgstr ""
+"Не вдалося завантажити розділи. Спроба поповнення повториться автоматично."
 
 msgid "Could not load library categories."
 msgstr "Не вдалося завантажити категорії бібліотеки."
@@ -437,16 +476,16 @@ msgstr "Не вдалося завантажити збережені фільт
 msgid "Could not load source filters."
 msgstr "Не вдалося завантажити фільтри джерела."
 
-#, fuzzy
 msgid "Could not queue download: %1"
-msgstr "Не вдалося почати завантаження розділу: %1"
+msgstr "Не вдалося додати завантаження в чергу: %1"
 
 msgid "Could not queue downloads. Reopen the chapter list and try again."
 msgstr ""
+"Не вдалося додати завантаження в чергу. Знову відкрийте список розділів і "
+"повторіть спробу."
 
-#, fuzzy
 msgid "Could not redownload chapter."
-msgstr "Не вдалося завантажити розділи."
+msgstr "Не вдалося завантажити розділ заново."
 
 msgid "Could not retry download."
 msgstr "Не вдалося повторити завантаження."
@@ -454,9 +493,8 @@ msgstr "Не вдалося повторити завантаження."
 msgid "Could not save saved filter."
 msgstr "Не вдалося зберегти фільтр."
 
-#, fuzzy
 msgid "Could not start chapter download"
-msgstr "Не вдалося почати завантаження розділу: %1"
+msgstr "Не вдалося почати завантаження розділу"
 
 msgid "Could not start chapter download: %1"
 msgstr "Не вдалося почати завантаження розділу: %1"
@@ -491,16 +529,14 @@ msgstr "Не вдалося почати завантаження джерела
 msgid "Could not start source loading: unknown error"
 msgstr "Не вдалося почати завантаження джерела: невідома помилка"
 
-#, fuzzy
 msgid "Could not update download ahead: %1"
-msgstr "Не вдалося почати завантаження розділу: %1"
+msgstr "Не вдалося оновити завантаження наперед: %1"
 
 msgid "Could not update library."
 msgstr "Не вдалося оновити бібліотеку."
 
-#, fuzzy
 msgid "Could not verify download"
-msgstr "Не вдалося повторити завантаження."
+msgstr "Не вдалося перевірити завантаження"
 
 msgid "Delete"
 msgstr "Видалити"
@@ -546,6 +582,7 @@ msgstr "Видалити збережений фільтр \"%1\"?"
 
 msgid "Deletion not accepted: download busy; request again"
 msgstr ""
+"Запит на видалення не прийнято: триває завантаження; надішліть запит знову"
 
 msgctxt "source filter sort direction"
 msgid "Descending"
@@ -576,25 +613,20 @@ msgstr ""
 "автопозначення відкрийте документ: шестерня > Документ > Дія в кінці "
 "документа > Завжди позначати прочитаним."
 
-#, fuzzy
 msgid "Download ahead: %1"
-msgstr "Завантажувати наперед"
+msgstr "Завантажувати наперед: %1"
 
-#, fuzzy
 msgid "Download ahead: Off"
-msgstr "Завантажувати наперед"
+msgstr "Завантажувати наперед: вимкнено"
 
-#, fuzzy
 msgid "Download all chapters (up to 50 new)"
-msgstr "Завантажити всі розділи"
+msgstr "Завантажити всі розділи (до 50 нових)"
 
-#, fuzzy
 msgid "Download all unread (up to 50 new)"
-msgstr "Завантажити всі непрочитані"
+msgstr "Завантажити всі непрочитані (до 50 нових)"
 
-#, fuzzy
 msgid "Download damaged; redownload"
-msgstr "Завантаження вже виконується."
+msgstr "Завантажений файл пошкоджено; завантажте заново"
 
 msgid "Download directory: %1"
 msgstr "Тека завантажень: %1"
@@ -611,9 +643,8 @@ msgstr "Завантажити перший непрочитаний"
 msgid "Download folder"
 msgstr "Тека завантажень"
 
-#, fuzzy
 msgid "Download help"
-msgstr "Завантажувати наперед"
+msgstr "Довідка із завантаження"
 
 msgid "Download is already downloading."
 msgstr "Завантаження вже виконується."
@@ -627,9 +658,8 @@ msgstr "Завантаження більше не перебуває у ста�
 msgid "Download is no longer queued."
 msgstr "Завантаження вже не в черзі."
 
-#, fuzzy
 msgid "Download next %1 (up to 50 new)"
-msgstr "Завантажити наступні 10"
+msgstr "Завантажити наступні %1 (до 50 нових)"
 
 msgid "Download next 10"
 msgstr "Завантажити наступні 10"
@@ -646,13 +676,17 @@ msgid ""
 "source order and the exact saved scanlator filter, never a silent fallback "
 "to All."
 msgstr ""
+"«Завантажити наступні» додає придатні до завантаження непрочитані розділи. "
+"«Завантажувати наперед» заповнює перші непрочитані позиції; наявні "
+"завантаження та завдання в черзі враховуються. Обидві дії використовують "
+"порядок джерела й точний збережений фільтр сканлейтора, без непомітного "
+"переходу до всіх сканлейторів."
 
 msgid "Download selected"
 msgstr "Завантажити вибране"
 
-#, fuzzy
 msgid "Download selected (up to 50 new)"
-msgstr "Завантажити вибране"
+msgstr "Завантажити вибране (до 50 нових)"
 
 msgid "Download the chapter first."
 msgstr "Спочатку завантажте розділ."
@@ -690,9 +724,8 @@ msgstr "Редагувати пошук"
 msgid "Enable"
 msgstr "Увімкнути"
 
-#, fuzzy
 msgid "Enable download ahead"
-msgstr "Зупинити завантаження наперед"
+msgstr "Увімкнути завантаження наперед"
 
 msgid "Enter a search query."
 msgstr "Введіть пошуковий запит."
@@ -750,19 +783,17 @@ msgstr "Час очікування оновлення розширення ми
 msgid "Failed"
 msgstr "Невдало"
 
-#, fuzzy
 msgid "Failed to queue %1 chapter download."
 msgid_plural "Failed to queue %1 chapter downloads."
-msgstr[0] "Не вдалося видалити %1 завантаження."
-msgstr[1] "Не вдалося видалити %1 завантаження."
-msgstr[2] "Не вдалося видалити %1 завантажень."
+msgstr[0] "Не вдалося додати в чергу %1 завантаження розділу."
+msgstr[1] "Не вдалося додати в чергу %1 завантаження розділів."
+msgstr[2] "Не вдалося додати в чергу %1 завантажень розділів."
 
-#, fuzzy
 msgid "Failed to save scanlator filter."
-msgstr "Не вдалося зберегти фільтр."
+msgstr "Не вдалося зберегти фільтр сканлейтора."
 
 msgid "Failed to save settings."
-msgstr ""
+msgstr "Не вдалося зберегти налаштування."
 
 msgid "Filter"
 msgstr "Фільтр"
@@ -770,9 +801,8 @@ msgstr "Фільтр"
 msgid "Filter name"
 msgstr "Назва фільтра"
 
-#, fuzzy
 msgid "Finish retention: %1"
-msgstr "Пошук розширень: %1"
+msgstr "Зберігання завершених розділів: %1"
 
 msgid "First unread"
 msgstr "Перший непрочитаний"
@@ -820,14 +850,17 @@ msgstr "KOReader не може відкрити цей розділ зараз."
 
 msgid "Keep %1 newest completion"
 msgid_plural "Keep %1 newest completions"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Зберігати %1 останній завершений розділ"
+msgstr[1] "Зберігати %1 останні завершені розділи"
+msgstr[2] "Зберігати %1 останніх завершених розділів"
 
 msgid ""
 "Keep 2 newest completions: after completing A, B, then C in one manga, A "
 "becomes eligible for removal. B and C remain. Live readers stay protected."
 msgstr ""
+"Зберігати 2 останні завершені розділи: після завершення A, B, а потім C в "
+"одній манзі розділ A можна буде видалити. B і C залишаться. Відкриті в "
+"читачі розділи залишаються захищеними."
 
 msgid "Keep disabled"
 msgstr "Не вмикати"
@@ -835,28 +868,31 @@ msgstr "Не вмикати"
 msgid "Keep downloads"
 msgstr "Зберігати завантаження"
 
-#, fuzzy
 msgid "Keep first 10 unread"
-msgstr "Відкрити перший непрочитаний"
+msgstr "Зберігати перші 10 непрочитаних"
 
-#, fuzzy
 msgid "Keep first 5 unread"
-msgstr "Відкрити перший непрочитаний"
+msgstr "Зберігати перші 5 непрочитаних"
 
-#, fuzzy
 msgid "Keep first 50 unread"
-msgstr "Відкрити перший непрочитаний"
+msgstr "Зберігати перші 50 непрочитаних"
 
 msgid ""
 "Keep the first 50 filtered unread chapters available? Existing downloads and "
 "queued chapters count toward this buffer."
 msgstr ""
+"Підтримувати доступність перших 50 непрочитаних розділів, що відповідають "
+"фільтру? Наявні завантаження та розділи в черзі враховуються в цьому буфері."
 
 msgid ""
 "Keep the newest recorded completions per manga, not chapter-list positions. "
 "Completion requires completed status and close, or a plugin manual mark-read "
 "action. Live readers remain protected."
 msgstr ""
+"Зберігайте розділи за найновішими записами про завершення для кожної манґи, "
+"а не за позиціями у списку розділів. Завершення потребує статусу завершення "
+"та закриття або ручної дії позначення прочитаним у плагіні. Відкриті в "
+"читачі розділи залишаються захищеними."
 
 msgctxt "source mode"
 msgid "Latest"
@@ -910,9 +946,8 @@ msgstr "Завантаження..."
 msgid "Login information"
 msgstr "Дані входу"
 
-#, fuzzy
 msgid "Manga"
-msgstr "%1 манґа"
+msgstr "Манґа"
 
 msgid "Manga actions"
 msgstr "Дії з манґою"
@@ -921,7 +956,7 @@ msgid "Manga information"
 msgstr "Інформація про манґу"
 
 msgid "Manga or source details are unavailable. Refresh the chapter list."
-msgstr ""
+msgstr "Відомості про манґу або джерело недоступні. Оновіть список розділів."
 
 msgid "Mark as read"
 msgstr "Позначити як прочитане"
@@ -945,6 +980,13 @@ msgid ""
 "uncertain, duplicate, or automatic downloads do not. See the README for "
 "examples and safety details."
 msgstr ""
+"Позначення прочитаним може вдатися, навіть коли видалення неможливе через "
+"активне завантаження або блокування. Прийнятий запит на видалення зберігає "
+"супровідні файли, резервні копії та метадані читання. Позначення "
+"непрочитаним або пізніше прийнятий явний запит «Завантажити»/«Повторити» "
+"скасовує решту видалення; невдалі, непідтверджені, дубльовані чи автоматичні "
+"завантаження цього не роблять. Приклади та подробиці щодо безпеки наведено в "
+"README."
 
 msgid "Never ask"
 msgstr "Ніколи не питати"
@@ -957,10 +999,13 @@ msgid ""
 "downloads keep running; request deletion again after they finish. Accepted "
 "removal continues with this setting Off."
 msgstr ""
+"Нові ручні дії позначення прочитаним можуть видаляти лише локальний архів. "
+"Активні завантаження продовжуються; після їх завершення надішліть запит на "
+"видалення знову. Прийняті запити на видалення виконуються й після вимкнення "
+"цього налаштування."
 
-#, fuzzy
 msgid "Next downloads and download ahead"
-msgstr "Зупинити завантаження наперед"
+msgstr "Завантаження наступних розділів і завантаження наперед"
 
 msgid "Next page"
 msgstr "Наступна сторінка"
@@ -971,20 +1016,22 @@ msgstr "Наступна спроба: %1"
 msgid "No actions available"
 msgstr "Немає доступних дій"
 
-#, fuzzy
 msgid "No chapters available to download."
-msgstr "Немає непрочитаних розділів для завантаження."
+msgstr "Немає розділів, доступних для завантаження."
 
 msgid ""
 "No chapters match the saved scanlator filter. Choose another scanlator or "
 "All scanlators."
 msgstr ""
+"Жоден розділ не відповідає збереженому фільтру сканлейтора. Виберіть іншого "
+"сканлейтора або «Усі сканлейтори»."
 
-#, fuzzy
 msgid ""
 "No chapters match the saved scanlator filter. Other scanlators are not "
 "selected."
-msgstr "Не вдалося зберегти фільтр."
+msgstr ""
+"Жоден розділ не відповідає збереженому фільтру сканлейтора. Інших "
+"сканлейторів не вибрано."
 
 msgid "No chapters selected."
 msgstr "Розділи не вибрано."
@@ -995,9 +1042,10 @@ msgstr "Опис недоступний."
 msgid "No downloads queued."
 msgstr "У черзі немає завантажень."
 
-#, fuzzy
 msgid "No eligible chapters match the saved scanlator filter."
-msgstr "Не вдалося зберегти фільтр."
+msgstr ""
+"Жоден придатний до завантаження розділ не відповідає збереженому фільтру "
+"сканлейтора."
 
 msgid "No error details were recorded."
 msgstr "Подробиці помилки не збережено."
@@ -1014,11 +1062,12 @@ msgstr "Жодна манґа не відповідає цьому пошуку.
 msgid "No matching extensions"
 msgstr "Немає відповідних розширень"
 
-#, fuzzy
 msgid ""
 "No new downloads available: chapters are already downloaded or in the "
 "download queue."
-msgstr "Буфер завантаження наперед уже завантажено або додано в чергу."
+msgstr ""
+"Немає нових завантажень: розділи вже завантажено або додано в чергу "
+"завантажень."
 
 msgid "No new downloads queued."
 msgstr "Нові завантаження не додано в чергу."
@@ -1026,9 +1075,8 @@ msgstr "Нові завантаження не додано в чергу."
 msgid "No poster"
 msgstr "Немає постера"
 
-#, fuzzy
 msgid "No read downloads to delete."
-msgstr "Нові завантаження не додано в чергу."
+msgstr "Немає завантажених прочитаних розділів для видалення."
 
 msgid "No results"
 msgstr "Немає результатів"
@@ -1048,7 +1096,6 @@ msgstr "Не встановлено"
 msgid "Obsolete"
 msgstr "Застаріле"
 
-#, fuzzy
 msgid "Off"
 msgstr "Вимкнено"
 
@@ -1107,12 +1154,11 @@ msgstr "Попередня сторінка"
 msgid "Queue"
 msgstr "Черга"
 
-#, fuzzy
 msgid "Queue up to %1 new chapter download?"
 msgid_plural "Queue up to %1 new chapter downloads?"
-msgstr[0] "Додати в чергу завантаження %1 непрочитаного розділу?"
-msgstr[1] "Додати в чергу завантаження %1 непрочитаних розділів?"
-msgstr[2] "Додати в чергу завантаження %1 непрочитаних розділів?"
+msgstr[0] "Додати в чергу до %1 нового завантаження розділу?"
+msgstr[1] "Додати в чергу до %1 нових завантажень розділів?"
+msgstr[2] "Додати в чергу до %1 нових завантажень розділів?"
 
 msgid "Queued"
 msgstr "У черзі"
@@ -1135,15 +1181,19 @@ msgstr "Синхронізація стану прочитання вже вик
 msgid ""
 "Reading or download choices changed. Refill will use the current choices."
 msgstr ""
+"Вибір щодо читання або завантаження змінився. Поповнення використає поточний "
+"вибір."
 
-#, fuzzy
 msgid "Redownload"
-msgstr "Завантажити"
+msgstr "Завантажити заново"
 
 msgid ""
 "Refill Retry reevaluates current unread positions. It does not retry a "
 "failed chapter or override pending manual deletion."
 msgstr ""
+"«Повторити поповнення» повторно оцінює поточні непрочитані позиції. Ця дія "
+"не повторює невдале завантаження розділу й не скасовує заплановане ручне "
+"видалення."
 
 msgid ""
 "Refill Retry reevaluates the buffer; it does not retry failed chapters or "
@@ -1152,6 +1202,12 @@ msgid ""
 "Cancel all retires every refill. Cancellation keeps ahead enabled for later "
 "reading or chapter actions."
 msgstr ""
+"«Повторити поповнення» повторно оцінює буфер; ця дія не повторює невдалі "
+"завантаження розділів і не скасовує заплановане видалення. «Зупинити "
+"завантаження наперед» вимикає цю функцію, але зберігає прийняті завдання. "
+"«Скасувати» припиняє поточне поповнення для цієї манґи; «Скасувати всі "
+"завантаження» припиняє всі поповнення. Після скасування завантаження наперед "
+"залишається увімкненим для подальшого читання або дій із розділами."
 
 msgid ""
 "Refill follows completed close, including native next-file reading; manual "
@@ -1160,6 +1216,14 @@ msgid ""
 "do not create refill requests. Pending work survives offline operation and "
 "restart."
 msgstr ""
+"Поповнення відбувається після закриття завершеного розділу, зокрема під час "
+"вбудованого переходу до читання наступного файлу; ручного позначення "
+"прочитаним або непрочитаним; фактичного узгодження стану прочитання; "
+"успішного завантаження списку розділів, повернення до нього чи його "
+"оновлення; зміни завантаження наперед або сканлейтора. Перемальовування "
+"екрана, оновлення поступу завантаження та скасування не створюють запитів на "
+"поповнення. Невиконані завдання зберігаються під час роботи без мережі та "
+"після перезапуску."
 
 msgid "Refresh chapters"
 msgstr "Оновити розділи"
@@ -1186,7 +1250,7 @@ msgid "Removing from library..."
 msgstr "Вилучення з бібліотеки..."
 
 msgid "Reopen the chapter list and try again."
-msgstr ""
+msgstr "Знову відкрийте список розділів і повторіть спробу."
 
 msgid "Reset filters"
 msgstr "Скинути фільтри"
@@ -1194,12 +1258,11 @@ msgstr "Скинути фільтри"
 msgid "Retry"
 msgstr "Повторити"
 
-#, fuzzy
 msgid "Retry download ahead"
-msgstr "Зупинити завантаження наперед"
+msgstr "Повторити завантаження наперед"
 
 msgid "Retry refill"
-msgstr ""
+msgstr "Повторити поповнення"
 
 msgid "Retry scheduled"
 msgstr "Повтор заплановано"
@@ -1208,7 +1271,7 @@ msgid "Retry time unavailable."
 msgstr "Час повторної спроби недоступний."
 
 msgid "Retry, Stop, and Cancel"
-msgstr ""
+msgstr "Повторення, зупинка та скасування"
 
 msgid "Save"
 msgstr "Зберегти"
@@ -1237,16 +1300,14 @@ msgstr "Сервер не підтримує збережені фільтри."
 msgid "Saved filters metadata is not valid JSON."
 msgstr "Метадані збережених фільтрів не є коректним JSON."
 
-#, fuzzy
 msgid "Saved refill state is unsupported. Existing data is preserved."
-msgstr "Сервер не підтримує збережені фільтри."
+msgstr "Збережений стан поповнення не підтримується. Наявні дані збережено."
 
 msgid "Scanlator filter"
 msgstr "Фільтр сканлейтора"
 
-#, fuzzy
 msgid "Scanlator: %1"
-msgstr "Фільтр сканлейтора"
+msgstr "Сканлейтор: %1"
 
 msgctxt "extension action"
 msgid "Search"
@@ -1294,11 +1355,15 @@ msgid ""
 "Server association unknown. Open this manga on the current server and choose "
 "Download ahead again."
 msgstr ""
+"Зв’язок із сервером невідомий. Відкрийте цю манґу на поточному сервері та "
+"знову виберіть «Завантажувати наперед»."
 
 msgid ""
 "Server changed. Open this manga on the current server and choose Download "
 "ahead again."
 msgstr ""
+"Сервер змінився. Відкрийте цю манґу на поточному сервері та знову виберіть "
+"«Завантажувати наперед»."
 
 msgid "Set a download folder in Settings > Downloads."
 msgstr "Задайте теку завантажень у Налаштування > Завантаження."
@@ -1319,7 +1384,7 @@ msgid "Show NSFW sources: %1"
 msgstr "Показувати джерела NSFW: %1"
 
 msgid "Simple Login"
-msgstr ""
+msgstr "Простий вхід (Simple Login)"
 
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
@@ -1349,6 +1414,9 @@ msgid ""
 "Stop download ahead turns this manga's policy Off and stops pending refill. "
 "Already accepted chapter downloads remain."
 msgstr ""
+"«Зупинити завантаження наперед» вимикає цю функцію для цієї манґи та "
+"припиняє заплановане поповнення. Уже прийняті завантаження розділів "
+"залишаються."
 
 msgid "Suwayomi"
 msgstr "Suwayomi"
@@ -1440,6 +1508,8 @@ msgid ""
 "The server rejected the chapter request. Check connection settings, then "
 "choose Retry refill."
 msgstr ""
+"Сервер відхилив запит розділів. Перевірте налаштування з’єднання, а потім "
+"виберіть «Повторити поповнення»."
 
 msgid ""
 "This KOReader setting affects all documents. Your end action and removal "
@@ -1483,7 +1553,7 @@ msgid "Timed out."
 msgstr "Час очікування минув."
 
 msgid "UI Login"
-msgstr ""
+msgstr "Вхід UI Login"
 
 msgctxt "extension action"
 msgid "Uninstall"
@@ -1523,20 +1593,17 @@ msgstr "Використати цю теку"
 msgid "Username"
 msgstr "Ім'я користувача"
 
-#, fuzzy
 msgid "Verify download"
-msgstr "Зберігати завантаження"
+msgstr "Перевірити завантаження"
 
-#, fuzzy
 msgid "Verifying download"
-msgstr "%1 відсутнє завантаження."
+msgstr "Перевірка завантаження"
 
 msgid "Waiting to evaluate the unread buffer."
-msgstr ""
+msgstr "Очікування оцінювання буфера непрочитаних розділів."
 
-#, fuzzy
 msgid "When download ahead runs"
-msgstr "Зупинити завантаження наперед"
+msgstr "Коли виконується завантаження наперед"
 
 msgid "You can continue."
 msgstr "Можна продовжувати."

@@ -102,7 +102,7 @@ msgstr[2] "%1 выбранных глав"
 
 msgid "1 selected"
 msgid_plural "%1 selected"
-msgstr[0] "Выбран 1 элемент"
+msgstr[0] "Выбран %1 элемент"
 msgstr[1] "Выбрано %1 элемента"
 msgstr[2] "Выбрано %1 элементов"
 
@@ -195,10 +195,10 @@ msgid "Ascending"
 msgstr "По возрастанию"
 
 msgid "Authentication method"
-msgstr ""
+msgstr "Способ аутентификации"
 
 msgid "Authentication: %1"
-msgstr ""
+msgstr "Аутентификация: %1"
 
 msgid "Author"
 msgstr "Автор"
@@ -235,7 +235,7 @@ msgid "Back"
 msgstr "Назад"
 
 msgid "Basic Auth"
-msgstr ""
+msgstr "Базовая (Basic Auth)"
 
 msgid "Browse"
 msgstr "Обзор"
@@ -1373,7 +1373,7 @@ msgid "Show NSFW sources: %1"
 msgstr "Показывать NSFW-источники: %1"
 
 msgid "Simple Login"
-msgstr ""
+msgstr "Простой вход (Simple Login)"
 
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
@@ -1541,7 +1541,7 @@ msgid "Timed out."
 msgstr "Время ожидания истекло."
 
 msgid "UI Login"
-msgstr ""
+msgstr "Вход UI Login"
 
 msgctxt "extension action"
 msgid "Uninstall"
