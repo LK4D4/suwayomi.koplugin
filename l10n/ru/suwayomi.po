@@ -107,21 +107,13 @@ msgstr[1] "Выбрано %1 элемента"
 msgstr[2] "Выбрано %1 элементов"
 
 msgid ""
-"A chapter in the buffer failed. Use that chapter's Retry or Redownload "
-"action."
+"A chapter counts as finished after you or KOReader mark it finished and you "
+"close it, or you manually mark it read in the plugin. Reaching the last page "
+"alone does not count unless KOReader marks the chapter finished. Old read "
+"status alone does not trigger deletion. A finished chapter without a "
+"downloaded file still counts toward the keep limit, but a file downloaded "
+"later is not deleted for that earlier finish."
 msgstr ""
-"Ошибка загрузки главы в буфере. Используйте действие «Повторить» или "
-"«Скачать заново» для этой главы."
-
-msgid ""
-"A chapter in the buffer has pending manual deletion. Automatic refill cannot "
-"replace it."
-msgstr ""
-"Глава в буфере ожидает удаления по ручному запросу. Автоматическое "
-"пополнение не может заменить её."
-
-msgid "Accepted manual deletion"
-msgstr "Принятый ручной запрос удаления"
 
 msgid "Actions"
 msgstr "Действия"
@@ -132,23 +124,6 @@ msgstr "Добавить в библиотеку"
 msgid "Adding to library..."
 msgstr "Добавление в библиотеку..."
 
-msgid "Ahead blocked"
-msgstr "Предзагрузка заблокирована"
-
-msgid ""
-"Ahead five with two existing positions needs only three downloads. Next five "
-"can add five more. Neither starts at the current reader page."
-msgstr ""
-"Для предзагрузки пяти глав при двух уже занятых позициях нужны лишь три "
-"загрузки. «Скачать следующие 5» может добавить ещё пять. Ни одно из действий "
-"не начинает отсчёт с текущей страницы в читалке."
-
-msgid "Ahead pending"
-msgstr "Предзагрузка запланирована"
-
-msgid "Ahead waiting"
-msgstr "Предзагрузка ожидает"
-
 msgid "All manga"
 msgstr "Вся манга"
 
@@ -158,12 +133,39 @@ msgstr "Все сканлейторы"
 msgid "Always ask"
 msgstr "Всегда спрашивать"
 
+#, fuzzy
+msgid ""
+"An unread chapter could not be downloaded. Use its Retry or Redownload "
+"action."
+msgstr ""
+"Ошибка загрузки главы в буфере. Используйте действие «Повторить» или "
+"«Скачать заново» для этой главы."
+
+#, fuzzy
+msgid ""
+"An unread chapter is waiting for manual deletion. Auto-download will not "
+"replace it."
+msgstr ""
+"Глава в буфере ожидает удаления по ручному запросу. Автоматическое "
+"пополнение не может заменить её."
+
 msgid "Another download is being verified."
 msgstr "Проверяется другая загрузка."
 
 msgctxt "source filter tri-state"
 msgid "Any"
 msgstr "Любые"
+
+msgid ""
+"Applies when you manually mark chapters read in the plugin. Removes the "
+"downloaded file but keeps reading data. If a chapter is still downloading, "
+"request deletion again after it finishes. Turning this off does not cancel "
+"deletion requests already accepted."
+msgstr ""
+"Действует, когда вы вручную отмечаете главы прочитанными в плагине. Удаляет "
+"скачанный файл, но сохраняет данные чтения. Если глава ещё скачивается, "
+"повторите запрос удаления после завершения загрузки. Отключение настройки не "
+"отменяет уже принятые запросы удаления."
 
 msgid "Apply filters"
 msgstr "Применить фильтры"
@@ -203,6 +205,54 @@ msgstr "Аутентификация: %1"
 msgid "Author"
 msgstr "Автор"
 
+#, fuzzy
+msgid "Auto-download"
+msgstr "Скачать заново"
+
+#, fuzzy
+msgid "Auto-download blocked"
+msgstr "Остановить предзагрузку"
+
+msgid ""
+"Auto-download checks for missing chapters after you finish and close a "
+"chapter, including when you open the next file in KOReader. It also checks "
+"after read status changes, after you open or refresh the chapter list or "
+"return to it, and after you change auto-download or the scanlator filter. "
+"Pending checks survive offline use and restarts."
+msgstr ""
+"Автозагрузка проверяет, какие главы нужно скачать, после завершения и "
+"закрытия главы, в том числе при открытии следующего файла в KOReader. "
+"Проверка также выполняется после изменения статуса прочтения, открытия или "
+"обновления списка глав либо возврата к нему, а также после изменения "
+"автозагрузки или фильтра сканлейторов. Ожидающие проверки сохраняются без "
+"сети и после перезапуска."
+
+#, fuzzy
+msgid "Auto-download pending"
+msgstr "Остановить предзагрузку"
+
+#, fuzzy
+msgid "Auto-download waiting"
+msgstr "Предзагрузка ожидает"
+
+#, fuzzy
+msgid ""
+"Auto-download works with manual read marking. For automatic marking, open a "
+"document, then use Cogwheel > Document > End of document action > Always "
+"mark as finished."
+msgstr ""
+"Предзагрузка работает и при ручной отметке о прочтении. Для автоотметки "
+"откройте документ: шестерёнка > Документы > Действие в конце документа > "
+"Всегда помечать как прочитанное."
+
+#, fuzzy
+msgid "Auto-download: %1"
+msgstr "Скачивание %1"
+
+#, fuzzy
+msgid "Auto-download: Off"
+msgstr "Предзагрузка: выкл."
+
 msgid "Automatic"
 msgstr "Автоматически"
 
@@ -220,6 +270,14 @@ msgstr ""
 
 msgid "Automatic finish marking"
 msgstr "Автоотметка о прочтении"
+
+#, fuzzy
+msgid ""
+"Automatically download the first 50 unread chapters matching the saved "
+"scanlator filter? Downloaded and queued chapters count toward the 50."
+msgstr ""
+"Держать доступными первые 50 непрочитанных глав, соответствующих фильтру? "
+"Уже скачанные главы и главы в очереди входят в этот буфер."
 
 msgid ""
 "Automatically mark all KOReader documents finished at their end-of-document "
@@ -318,8 +376,39 @@ msgstr "Главы"
 msgid "Chapters are loading."
 msgstr "Главы загружаются."
 
+msgid "Check again"
+msgstr "Проверить снова"
+
+#, fuzzy
+msgid ""
+"Check again checks which unread chapters need downloading. It does not retry "
+"failed chapters or cancel pending deletion. Turn off auto-download prevents "
+"future automatic additions; queued and running downloads continue. Cancel "
+"stops the current check for that manga, and Cancel all stops all current "
+"checks. Auto-download stays enabled after cancellation and can run again "
+"after reading or chapter actions."
+msgstr ""
+"«Повторить пополнение» заново проверяет буфер; действие не повторяет "
+"загрузку глав с ошибками и не отменяет ожидающее удаление. «Остановить "
+"предзагрузку» выключает правило, но сохраняет принятые задания. Отмена "
+"загрузки прекращает текущее пополнение для этой манги; отмена всех загрузок "
+"прекращает все пополнения. Отмена оставляет предзагрузку включённой для "
+"последующих событий чтения или действий с главами."
+
+#, fuzzy
+msgid ""
+"Check again checks which unread chapters need downloading. It does not retry "
+"failed chapters or cancel pending manual deletion."
+msgstr ""
+"«Повторить пополнение» заново проверяет текущие непрочитанные позиции. "
+"Действие не повторяет загрузку главы с ошибкой и не отменяет ожидающее "
+"удаление по ручному запросу."
+
 msgid "Check the connection and download folder in Settings."
 msgstr "Проверьте подключение и папку загрузок в настройках."
+
+msgid "Check, turn off, or cancel"
+msgstr "Проверка, отключение и отмена"
 
 msgid "Checking chapters"
 msgstr "Проверка глав"
@@ -349,21 +438,6 @@ msgstr "Закрыть плагин"
 msgid "Completed"
 msgstr "Завершено"
 
-msgid ""
-"Completed status plus close counts; reaching the last page alone does not. "
-"Manual completions also count for retention. Historical read flags do not "
-"authorize deletion. A completion without an archive occupies a position but "
-"cannot authorize deleting a later download."
-msgstr ""
-"Учитываются статус «Завершено» и закрытие главы; одного перехода на "
-"последнюю страницу недостаточно. Ручные отметки о завершении также "
-"учитываются при хранении. Старые отметки о прочтении не дают права на "
-"удаление. Завершение без архива занимает позицию в истории, но не даёт права "
-"удалить более позднюю загрузку."
-
-msgid "Completion and archive removal"
-msgstr "Завершение и удаление архивов"
-
 msgid "Connection"
 msgstr "Подключение"
 
@@ -388,7 +462,10 @@ msgstr[0] "Не удалось подтвердить %1 загрузку гла
 msgstr[1] "Не удалось подтвердить %1 загрузки глав."
 msgstr[2] "Не удалось подтвердить %1 загрузок глав."
 
-msgid "Could not confirm saved refill work. No new downloads are confirmed."
+#, fuzzy
+msgid ""
+"Could not confirm that the auto-download request was saved. No new downloads "
+"are confirmed."
 msgstr ""
 "Не удалось подтвердить сохранение задания пополнения. Новые загрузки не "
 "подтверждены."
@@ -452,7 +529,8 @@ msgstr "Не удалось загрузить библиотеку Suwayomi."
 msgid "Could not load chapters."
 msgstr "Не удалось загрузить главы."
 
-msgid "Could not load chapters. Refill will retry automatically."
+#, fuzzy
+msgid "Could not load chapters. Auto-download will try again automatically."
 msgstr "Не удалось загрузить главы. Пополнение автоматически повторит попытку."
 
 msgid "Could not load library categories."
@@ -520,7 +598,8 @@ msgstr "Не удалось начать загрузку источников: 
 msgid "Could not start source loading: unknown error"
 msgstr "Не удалось начать загрузку источников: неизвестная ошибка"
 
-msgid "Could not update download ahead: %1"
+#, fuzzy
+msgid "Could not update auto-download: %1"
 msgstr "Не удалось изменить предзагрузку: %1"
 
 msgid "Could not update library."
@@ -544,7 +623,12 @@ msgstr[0] "Удалить %1 выбранную загрузку с устрой
 msgstr[1] "Удалить %1 выбранные загрузки с устройства?"
 msgstr[2] "Удалить %1 выбранных загрузок с устройства?"
 
-msgid "Delete after manual mark-read: %1"
+#, fuzzy
+msgid "Delete after reading"
+msgstr "Удалять после ручной отметки прочитанного: %1"
+
+#, fuzzy
+msgid "Delete after reading: %1"
 msgstr "Удалять после ручной отметки прочитанного: %1"
 
 msgid "Delete chapter settings are unavailable."
@@ -555,9 +639,6 @@ msgstr "Удалить скачанный файл для %1 с этого ус�
 
 msgid "Delete downloads"
 msgstr "Удалить загрузки"
-
-msgid "Delete finished chapters"
-msgstr "Удалить завершённые главы"
 
 msgid "Delete from device"
 msgstr "Удалить с устройства"
@@ -570,6 +651,10 @@ msgstr "Удалить сохранённый фильтр"
 
 msgid "Delete saved filter \"%1\"?"
 msgstr "Удалить сохранённый фильтр \"%1\"?"
+
+#, fuzzy
+msgid "Delete when marked read: %1"
+msgstr "Удалять после ручной отметки прочитанного: %1"
 
 msgid "Deletion not accepted: download busy; request again"
 msgstr "Удаление не принято: загрузка занята; повторите запрос"
@@ -591,29 +676,8 @@ msgctxt "chapter action"
 msgid "Download"
 msgstr "Скачать"
 
-msgid "Download ahead"
-msgstr "Предзагрузка"
-
-msgid ""
-"Download ahead works with manual read marking. For automatic marking, open a "
-"document, then use Cogwheel > Document > End of document action > Always "
-"mark as finished."
-msgstr ""
-"Предзагрузка работает и при ручной отметке о прочтении. Для автоотметки "
-"откройте документ: шестерёнка > Документы > Действие в конце документа > "
-"Всегда помечать как прочитанное."
-
-msgid "Download ahead: %1"
-msgstr "Предзагрузка: %1"
-
-msgid "Download ahead: Off"
-msgstr "Предзагрузка: выкл."
-
 msgid "Download all chapters (up to 50 new)"
 msgstr "Скачать все главы (до 50 новых)"
-
-msgid "Download all unread (up to 50 new)"
-msgstr "Скачать все непрочитанные (до 50 новых)"
 
 msgid "Download damaged; redownload"
 msgstr "Загрузка повреждена; скачайте заново"
@@ -660,17 +724,23 @@ msgstr "Скачать следующие 5"
 msgid "Download next 50"
 msgstr "Скачать следующие 50"
 
+#, fuzzy
 msgid ""
-"Download next adds eligible unread downloads. Download ahead fills the "
-"earliest unread positions; existing downloads and queue work count. Both use "
-"source order and the exact saved scanlator filter, never a silent fallback "
-"to All."
+"Download next adds up to the chosen number of new unread downloads once. "
+"Auto-download fills the first unread chapters up to its limit; downloaded "
+"and queued chapters count. Both use source order and your saved scanlator "
+"filter, not your current chapter. Auto-download does not delete other "
+"downloads. Bulk actions add at most 50 new downloads."
 msgstr ""
 "«Скачать следующие» добавляет подходящие непрочитанные главы для загрузки. "
 "Предзагрузка заполняет первые непрочитанные позиции; уже скачанные главы и "
 "задания в очереди учитываются. Оба действия используют порядок источника и "
 "точный сохранённый фильтр сканлейторов, без незаметного перехода к варианту "
 "«Все сканлейторы»."
+
+#, fuzzy
+msgid "Download next and auto-download"
+msgstr "Загрузка повреждена; скачайте заново"
 
 msgid "Download selected"
 msgstr "Скачать выбранное"
@@ -680,6 +750,10 @@ msgstr "Скачать выбранное (до 50 новых)"
 
 msgid "Download the chapter first."
 msgstr "Сначала скачайте главу."
+
+#, fuzzy
+msgid "Download unread (up to 50)"
+msgstr "Скачать все непрочитанные (до 50 новых)"
 
 msgid "Downloaded"
 msgstr "Скачано"
@@ -714,7 +788,8 @@ msgstr "Изменить поиск"
 msgid "Enable"
 msgstr "Включить"
 
-msgid "Enable download ahead"
+#, fuzzy
+msgid "Enable auto-download"
 msgstr "Включить предзагрузку"
 
 msgid "Enter a search query."
@@ -791,8 +866,21 @@ msgstr "Фильтр"
 msgid "Filter name"
 msgstr "Название фильтра"
 
-msgid "Finish retention: %1"
+#, fuzzy
+msgid "Finishing and deletion"
 msgstr "Хранение завершённых: %1"
+
+#, fuzzy
+msgid "First 10 unread"
+msgstr "Первая непрочитанная"
+
+#, fuzzy
+msgid "First 5 unread"
+msgstr "Первая непрочитанная"
+
+#, fuzzy
+msgid "First 50 unread"
+msgstr "Первая непрочитанная"
 
 msgid "First unread"
 msgstr "Первая непрочитанная"
@@ -806,8 +894,9 @@ msgstr "Глобальный поиск"
 msgid "Go to Suwayomi"
 msgstr "Перейти к Suwayomi"
 
+#, fuzzy
 msgid ""
-"Helps Download ahead refill after chapters close. Manual marking still works."
+"Helps Auto-download refill after chapters close. Manual marking still works."
 msgstr ""
 "Помогает предзагрузке пополнять запас после закрытия глав. Ручная отметка по-"
 "прежнему доступна."
@@ -838,51 +927,29 @@ msgstr "Установка расширения..."
 msgid "KOReader could not open this chapter right now."
 msgstr "KOReader не смог открыть эту главу сейчас."
 
-msgid "Keep %1 newest completion"
-msgid_plural "Keep %1 newest completions"
-msgstr[0] "Хранить %1 последнюю завершённую главу"
-msgstr[1] "Хранить %1 последние завершённые главы"
-msgstr[2] "Хранить %1 последних завершённых глав"
-
-msgid ""
-"Keep 2 newest completions: after completing A, B, then C in one manga, A "
-"becomes eligible for removal. B and C remain. Live readers stay protected."
-msgstr ""
-"«Хранить 2 последние завершённые главы»: после завершения A, B, затем C в "
-"одной манге главу A можно удалить. B и C остаются. Открытые в читалке главы "
-"защищены от удаления."
+msgid "Keep %1"
+msgid_plural "Keep %1"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Keep disabled"
 msgstr "Не включать"
 
-msgid "Keep downloads"
+#, fuzzy
+msgid "Keep downloading"
 msgstr "Сохранять загрузки"
 
-msgid "Keep first 10 unread"
-msgstr "Хранить первые 10 непрочитанных"
-
-msgid "Keep first 5 unread"
-msgstr "Хранить первые 5 непрочитанных"
-
-msgid "Keep first 50 unread"
-msgstr "Хранить первые 50 непрочитанных"
+#, fuzzy
+msgid "Keep none"
+msgstr "Сохранять загрузки"
 
 msgid ""
-"Keep the first 50 filtered unread chapters available? Existing downloads and "
-"queued chapters count toward this buffer."
+"Keeps the chapters finished most recently in each manga, not the highest "
+"chapter numbers. A chapter counts after you or KOReader mark it finished and "
+"you close it, or you manually mark it read in the plugin. Open chapters are "
+"not deleted. Off disables only this setting."
 msgstr ""
-"Держать доступными первые 50 непрочитанных глав, соответствующих фильтру? "
-"Уже скачанные главы и главы в очереди входят в этот буфер."
-
-msgid ""
-"Keep the newest recorded completions per manga, not chapter-list positions. "
-"Completion requires completed status and close, or a plugin manual mark-read "
-"action. Live readers remain protected."
-msgstr ""
-"Хранить последние записанные завершения для каждой манги, а не позиции в "
-"списке глав. Для завершения нужны статус «Завершено» и закрытие главы либо "
-"ручная отметка о прочтении в плагине. Открытые в читалке главы защищены от "
-"удаления."
 
 msgctxt "source mode"
 msgid "Latest"
@@ -948,6 +1015,10 @@ msgstr "Информация о манге"
 msgid "Manga or source details are unavailable. Refresh the chapter list."
 msgstr "Данные манги или источника недоступны. Обновите список глав."
 
+#, fuzzy
+msgid "Manual deletion"
+msgstr "Принятый ручной запрос удаления"
+
 msgid "Mark as read"
 msgstr "Отметить как прочитанное"
 
@@ -964,36 +1035,22 @@ msgid "Mark unread"
 msgstr "Отметить непрочитанным"
 
 msgid ""
-"Mark-read can succeed even when deletion is busy or blocked. Accepted "
-"removal keeps sidecars, backups, and reading metadata. Unread or a later "
-"accepted deliberate Download/Retry revokes remaining removal; failed, "
-"uncertain, duplicate, or automatic downloads do not. See the README for "
-"examples and safety details."
+"Marking a chapter read can succeed even if its file cannot be deleted. "
+"Manual mark-read deletion preserves reading data and backups. Marking the "
+"chapter unread cancels pending deletion. A new Download or Retry action also "
+"cancels it once accepted; failed requests and automatic downloads do not."
 msgstr ""
-"Отметка о прочтении может сохраниться, даже если удаление занято или "
-"заблокировано. Принятое удаление сохраняет сопутствующие файлы, резервные "
-"копии и метаданные чтения. Отметка «Непрочитано» или принятая позже явная "
-"команда «Скачать»/«Повторить» отменяет оставшееся удаление; неудачные, "
-"неподтверждённые, дублирующие или автоматические загрузки этого не делают. "
-"Примеры и сведения о безопасности приведены в README."
+"Главу можно отметить прочитанной, даже если её файл не удаётся удалить. "
+"Удаление после ручной отметки о прочтении сохраняет данные чтения и "
+"резервные копии. Отметка главы непрочитанной отменяет ожидающее удаление. "
+"Новый запрос «Скачать» или «Повторить» тоже отменяет его, если запрос "
+"принят; неудачные запросы и автозагрузка этого не делают."
 
 msgid "Never ask"
 msgstr "Никогда не спрашивать"
 
 msgid "New folder"
 msgstr "Новая папка"
-
-msgid ""
-"New manual mark-read actions may remove only the local archive. Busy "
-"downloads keep running; request deletion again after they finish. Accepted "
-"removal continues with this setting Off."
-msgstr ""
-"Новые ручные отметки о прочтении могут удалять только локальный архив. "
-"Занятые загрузки продолжаются; повторите запрос удаления после их "
-"завершения. Принятое удаление продолжается и при выключенной настройке."
-
-msgid "Next downloads and download ahead"
-msgstr "Следующие загрузки и предзагрузка"
 
 msgid "Next page"
 msgstr "Следующая страница"
@@ -1165,51 +1222,16 @@ msgstr "Состояние прочтения уже синхронизиров�
 msgid "Read state sync is already running."
 msgstr "Синхронизация состояния прочтения уже выполняется."
 
+#, fuzzy
 msgid ""
-"Reading or download choices changed. Refill will use the current choices."
+"Reading or download choices changed. Auto-download will use the current "
+"choices."
 msgstr ""
 "Состояние прочтения или параметры загрузки изменились. Пополнение использует "
 "текущий выбор."
 
 msgid "Redownload"
 msgstr "Скачать заново"
-
-msgid ""
-"Refill Retry reevaluates current unread positions. It does not retry a "
-"failed chapter or override pending manual deletion."
-msgstr ""
-"«Повторить пополнение» заново проверяет текущие непрочитанные позиции. "
-"Действие не повторяет загрузку главы с ошибкой и не отменяет ожидающее "
-"удаление по ручному запросу."
-
-msgid ""
-"Refill Retry reevaluates the buffer; it does not retry failed chapters or "
-"override pending deletion. Stop download ahead turns the policy Off but "
-"keeps accepted jobs. Cancel retires the current refill for that manga; "
-"Cancel all retires every refill. Cancellation keeps ahead enabled for later "
-"reading or chapter actions."
-msgstr ""
-"«Повторить пополнение» заново проверяет буфер; действие не повторяет "
-"загрузку глав с ошибками и не отменяет ожидающее удаление. «Остановить "
-"предзагрузку» выключает правило, но сохраняет принятые задания. Отмена "
-"загрузки прекращает текущее пополнение для этой манги; отмена всех загрузок "
-"прекращает все пополнения. Отмена оставляет предзагрузку включённой для "
-"последующих событий чтения или действий с главами."
-
-msgid ""
-"Refill follows completed close, including native next-file reading; manual "
-"read/unread; actual read reconciliation; successful chapter load/return/"
-"refresh; and ahead or scanlator changes. Repaint, progress, and cancellation "
-"do not create refill requests. Pending work survives offline operation and "
-"restart."
-msgstr ""
-"Пополнение следует за закрытием завершённой главы, в том числе при переходе "
-"к следующему файлу средствами читалки; ручными отметками "
-"«Прочитано»/«Непрочитано»; фактическим согласованием состояния прочтения; "
-"успешной загрузкой списка глав, возвратом к нему или обновлением; "
-"изменениями предзагрузки или сканлейтора. Перерисовка, ход загрузки и отмена "
-"не создают запросов пополнения. Ожидающие задания сохраняются без сети и "
-"после перезапуска."
 
 msgid "Refresh chapters"
 msgstr "Обновить главы"
@@ -1244,20 +1266,11 @@ msgstr "Сбросить фильтры"
 msgid "Retry"
 msgstr "Повторить"
 
-msgid "Retry download ahead"
-msgstr "Повторить предзагрузку"
-
-msgid "Retry refill"
-msgstr "Повторить пополнение"
-
 msgid "Retry scheduled"
 msgstr "Повтор запланирован"
 
 msgid "Retry time unavailable."
 msgstr "Время повторной попытки недоступно."
-
-msgid "Retry, Stop, and Cancel"
-msgstr "Повтор, остановка и отмена"
 
 msgid "Save"
 msgstr "Сохранить"
@@ -1267,6 +1280,12 @@ msgstr "Сохранить текущий фильтр"
 
 msgid "Save filter"
 msgstr "Сохранить фильтр"
+
+#, fuzzy
+msgid "Saved auto-download data is unsupported. Existing data is preserved."
+msgstr ""
+"Сохранённое состояние пополнения не поддерживается. Существующие данные "
+"сохранены."
 
 msgid "Saved filter deleted."
 msgstr "Фильтр удалён."
@@ -1286,11 +1305,6 @@ msgstr "Сервер не поддерживает сохранённые фил
 
 msgid "Saved filters metadata is not valid JSON."
 msgstr "Метаданные сохранённых фильтров не являются корректным JSON."
-
-msgid "Saved refill state is unsupported. Existing data is preserved."
-msgstr ""
-"Сохранённое состояние пополнения не поддерживается. Существующие данные "
-"сохранены."
 
 msgid "Scanlator filter"
 msgstr "Фильтр сканлейторов"
@@ -1340,16 +1354,18 @@ msgstr "Выбрать всё"
 msgid "Server URL"
 msgstr "URL сервера"
 
+#, fuzzy
 msgid ""
 "Server association unknown. Open this manga on the current server and choose "
-"Download ahead again."
+"Auto-download again."
 msgstr ""
 "Неизвестно, с каким сервером связана манга. Откройте эту мангу на текущем "
 "сервере и снова выберите «Предзагрузка»."
 
+#, fuzzy
 msgid ""
-"Server changed. Open this manga on the current server and choose Download "
-"ahead again."
+"Server changed. Open this manga on the current server and choose Auto-"
+"download again."
 msgstr ""
 "Сервер изменился. Откройте эту мангу на текущем сервере и снова выберите "
 "«Предзагрузка»."
@@ -1395,16 +1411,6 @@ msgstr "Истекло время ожидания загрузки источн
 
 msgid "Status"
 msgstr "Статус"
-
-msgid "Stop download ahead"
-msgstr "Остановить предзагрузку"
-
-msgid ""
-"Stop download ahead turns this manga's policy Off and stops pending refill. "
-"Already accepted chapter downloads remain."
-msgstr ""
-"«Остановить предзагрузку» выключает правило для этой манги и прекращает "
-"ожидающее пополнение. Уже принятые загрузки глав сохраняются."
 
 msgid "Suwayomi"
 msgstr "Suwayomi"
@@ -1492,9 +1498,10 @@ msgstr "Текст"
 msgid "Text filter"
 msgstr "Текстовый фильтр"
 
+#, fuzzy
 msgid ""
 "The server rejected the chapter request. Check connection settings, then "
-"choose Retry refill."
+"choose Check again."
 msgstr ""
 "Сервер отклонил запрос глав. Проверьте настройки подключения, затем выберите "
 "«Повторить пополнение»."
@@ -1539,6 +1546,16 @@ msgstr "У этого источника нет манги."
 
 msgid "Timed out."
 msgstr "Время ожидания истекло."
+
+msgid "Turn off auto-download"
+msgstr "Отключить автозагрузку"
+
+msgid ""
+"Turn off auto-download stops future automatic additions for this manga. "
+"Queued and running downloads continue."
+msgstr ""
+"«Отключить автозагрузку» запрещает новые автоматические добавления для этой "
+"манги. Загрузки в очереди и уже начатые загрузки продолжаются."
 
 msgid "UI Login"
 msgstr "Вход UI Login"
@@ -1587,11 +1604,28 @@ msgstr "Проверить загрузку"
 msgid "Verifying download"
 msgstr "Проверка загрузки"
 
-msgid "Waiting to evaluate the unread buffer."
-msgstr "Ожидание проверки буфера непрочитанных глав."
+msgid "Waiting to check which unread chapters need downloading."
+msgstr "Ожидание проверки непрочитанных глав для загрузки."
 
-msgid "When download ahead runs"
+#, fuzzy
+msgid "When auto-download runs"
 msgstr "Когда работает предзагрузка"
+
+#, fuzzy
+msgid ""
+"With Keep 2, finishing A, then B, then C in one manga makes A eligible for "
+"deletion. B and C stay downloaded. Open chapters are not deleted."
+msgstr ""
+"«Хранить 2 последние завершённые главы»: после завершения A, B, затем C в "
+"одной манге главу A можно удалить. B и C остаются. Открытые в читалке главы "
+"защищены от удаления."
+
+msgid ""
+"With auto-download set to 5, if 2 of the first 5 unread chapters are already "
+"downloaded, only 3 are added. Download next 5 can add 5 more."
+msgstr ""
+"Если автозагрузка настроена на 5 глав и 2 из первых 5 непрочитанных глав уже "
+"скачаны, добавятся только 3. «Скачать следующие 5» может добавить ещё 5."
 
 msgid "You can continue."
 msgstr "Можно продолжить."

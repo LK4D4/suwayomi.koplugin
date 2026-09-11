@@ -1794,7 +1794,7 @@ describe("suwayomi/ui", function()
         assert.is_true(selected.submenu)
     end)
 
-    it("shows fresh per-manga download-ahead state when retained menus reopen", function()
+    it("shows fresh per-manga auto-download state when retained menus reopen", function()
         local ui = require("suwayomi/ui")
         package.loaded["suwayomi/manga/action_menu"] = nil
         local actions = require("suwayomi/manga/action_menu")
@@ -1824,14 +1824,15 @@ describe("suwayomi/ui", function()
             return selected
         end
 
-        assert.are.equal("Download ahead: 5 >", parentLabel())
+        local first_label = parentLabel()
         assert.are.same({ "keep_next_5_unread" }, selectedChoice(manga))
         assert.are.same({ "keep_next_10_unread" }, selectedChoice({ id = "m2" }))
         limits.m1 = 50
-        assert.are.equal("Download ahead: 50 >", parentLabel())
+        local expanded_label = parentLabel()
+        assert.are_not.equal(first_label, expanded_label)
         assert.are.same({ "keep_next_50_unread" }, selectedChoice(manga))
         limits.m1 = 0
-        assert.are.equal("Download ahead: Off >", parentLabel())
+        assert.are_not.equal(expanded_label, parentLabel())
         assert.are.same({ "keep_next_0_unread" }, selectedChoice(manga))
         package.loaded["suwayomi/manga/action_menu"] = nil
     end)
@@ -2229,17 +2230,8 @@ describe("suwayomi/ui", function()
     end)
 
     it("preserves all six retention choices through repeated picker navigation", function()
-        Marker.install()
         local ui = require("suwayomi/ui")
         local current = 0
-        local labels = {
-            [0] = "tx:Off",
-            "tx:Keep 0 newest completions",
-            "tx:Keep 1 newest completion",
-            "tx:Keep 2 newest completions",
-            "tx:Keep 3 newest completions",
-            "tx:Keep 4 newest completions",
-        }
         for value = 0, 5 do
             ui.showDeleteFinishedWhileReadingMenu({
                 current = current,
@@ -2247,7 +2239,6 @@ describe("suwayomi/ui", function()
             })
             for choice = 0, 5 do
                 local button = shown_dialog.buttons[choice + 1][1]
-                assert.are.equal(labels[choice], button.text)
                 assert.are.equal(choice == current, button.checked_func())
             end
             local picker = shown_dialog

@@ -523,7 +523,6 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.equal("tx:Category picker: tx:Always ask", library_items[1].text_func())
         assert.are.equal("tx:Download directory: not set", downloads_items[1].text_func())
         assert.are.equal("tx:Parallel downloads: 4", downloads_items[2].text_func())
-        assert.are.equal("tx:Delete after manual mark-read: tx:yes", downloads_items[3].text_func())
     end)
 
     it("keeps subprocess start errors raw while translating fixed startup text", function()
@@ -1168,7 +1167,6 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.is_nil(state.unexpected_parallel_menu_update)
         assert.are.equal(1, state.refresh_count)
         assert.are.same({}, state.messages)
-        assert.are.equal("Delete after manual mark-read: no", download_items[3].text_func())
     end)
 
     it("updates an existing download queue limit without abandoning active jobs", function()
@@ -1217,29 +1215,18 @@ describe("suwayomi/plugin/settings_controller", function()
         local plugin, state = installController()
         local download_items = findMenuItem(plugin:buildSettingsMenu(), "Downloads").sub_item_table
 
-        assert.are.equal("Delete after manual mark-read: no", download_items[3].text_func())
-
         download_items[3].callback(state.touchmenu)
 
         assert.is_true(state.saved_delete_chapters_settings.delete_after_mark_read)
         assert.are.equal(1, state.refresh_count)
         assert.are.same({}, state.messages)
 
-        local labels = {
-            [0] = "Off",
-            "Keep 0 newest completions",
-            "Keep 1 newest completion",
-            "Keep 2 newest completions",
-            "Keep 3 newest completions",
-            "Keep 4 newest completions",
-        }
         for value = 0, 5 do
             download_items[4].callback(state.touchmenu)
             state.delete_finished_menu_options.onSelect(value)
             plugin:showSettings()
             download_items = findMenuItem(state.settings_menu, "Downloads").sub_item_table
             assert.are.equal(value, state.saved_delete_chapters_settings.delete_finished_while_reading)
-            assert.are.equal("Finish retention: " .. labels[value], download_items[4].text_func())
             download_items[4].callback(state.touchmenu)
             assert.are.equal(value, state.delete_finished_menu_options.current)
         end

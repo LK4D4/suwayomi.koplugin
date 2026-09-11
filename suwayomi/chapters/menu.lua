@@ -363,11 +363,11 @@ function Methods:getBulkChapterActions()
     local refill = context and self:getMangaRefillRequest(context.manga)
     if refill and refill.manga_id ~= nil and refill.revision ~= nil then
         table.insert(actions, {
-            id = "retry_refill", text = I18n.t("Retry download ahead") .. "\n" .. SuwayomiUI.formatRefillStatus(refill),
+            id = "retry_refill", text = I18n.t("Check again") .. "\n" .. SuwayomiUI.formatRefillStatus(refill),
             refill = refill, refill_action = "retry",
         })
         table.insert(actions, {
-            id = "stop_refill", text = I18n.t("Stop download ahead"), refill = refill, refill_action = "stop",
+            id = "stop_refill", text = I18n.t("Turn off auto-download"), refill = refill, refill_action = "stop",
         })
     elseif refill then
         table.insert(actions, { id = "refill_status", text = SuwayomiUI.formatRefillStatus(refill), enabled = false })
@@ -484,7 +484,7 @@ function Methods:showKeepDownloadedActions(menu_context)
     end
 
     SuwayomiUI.showChapterActionsMenu({
-        title = I18n.t("Download ahead"),
+        title = I18n.t("Auto-download"),
         actions = MangaActionMenu.buildKeepDownloadedActions(self, self.current_chapter_context and self.current_chapter_context.manga),
         anchor = menu_context and menu_context.anchor,
         on_back = guardChapterCallback(self, function()

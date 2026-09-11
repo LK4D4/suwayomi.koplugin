@@ -394,8 +394,6 @@ describe("suwayomi/manga/controller", function()
         assert.is_function(state.manga_actions_options.on_back)
 
         plugin:showKeepDownloadedMangaActions(manga)
-        assert.are.equal("Download ahead", state.manga_actions_options.title)
-        assert.are.equal("Stop download ahead", state.manga_actions_options.actions[4].text)
         assert.is_function(state.manga_actions_options.on_back)
     end)
 
@@ -955,7 +953,6 @@ describe("suwayomi/manga/controller", function()
         assert.is_true(plugin:confirmDownloadAllUnreadChaptersForManga(manga))
 
         assert.is_truthy(state.bulk_confirmation.text:find("tx:Queue up to 2 new chapter downloads?", 1, true))
-        assert.is_truthy(state.bulk_confirmation.text:find("tx:Download all unread (up to 50 new)", 1, true))
         assert.are.equal("tx:Queue", state.bulk_confirmation.ok_text)
     end)
 

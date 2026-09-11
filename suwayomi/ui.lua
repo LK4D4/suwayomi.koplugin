@@ -531,7 +531,7 @@ end
 function SuwayomiUI.showDeleteFinishedWhileReadingMenu(options)
     options = options or {}
     return ChoiceDialogs.showChoiceDialog({
-        title = I18n.t("Delete finished chapters"),
+        title = I18n.t("Delete after reading"),
         current = tonumber(options.current) or 0,
         choices = buildDeleteFinishedWhileReadingChoices(options.choices),
         onSelect = options.onSelect,
