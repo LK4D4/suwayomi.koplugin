@@ -1,6 +1,6 @@
 -- Boundary: ChapterReadActions.
--- Owns checked manual read transactions, captured completions, and immediate outcomes.
--- Filesystem removal belongs to the process-owned manual deletion coordinator.
+-- Owns manual read ordering, captured completions, and immediate outcomes.
+-- Ledger owns checked persistence; the process-owned manual deletion module removes archives.
 
 local SuwayomiDebug = require("suwayomi/debug")
 local SuwayomiSettings = require("suwayomi/settings")
@@ -165,7 +165,9 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
         -- Include reconciliation of visible non-target chapters in the same save.
         self:refreshChapterMenu({ ledger = ledger })
     end
-    local ok, err, outcomes = core:commitRead(ledger, captures, {}, { manga }, nil, options)
+    local ok, err, outcomes = self:commitChapterRead(ledger, {
+        captures = captures, mangas = { manga }, skip_keep_policy = options.skip_keep_policy,
+    })
     if not ok then
         refreshCommitted(self, options, options.ledger, previous)
         local result = { committed = false, error = err, marked_read = 0, removed = 0, pending = 0, busy = 0, blocked = #captures }
@@ -177,9 +179,11 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
     end
     for _, item in ipairs(prepared) do
         local completion = item.completion
-        if item.capture and item.capture.target and item.capture.target.generation then
-            completion.archive_generation = item.capture.target.generation
-            completion.archive_target = copyTarget(item.capture.target)
+        local outcome = item.capture and outcomes[item.capture.key]
+        local target = item.capture and (outcome and outcome.target or item.capture.target)
+        if target and target.generation then
+            completion.archive_generation = target.generation
+            completion.archive_target = copyTarget(target)
         end
         if self.recordFinishedChapter then
             if options.finished_entries then
@@ -238,7 +242,7 @@ local function markUnread(self, manga, chapters, options, batch, clear_selection
         ledger[keys[index]].pending_read_state = false
         updateContext(self, manga, chapter, false)
     end
-    local ok, err = core:commitRead(ledger, {}, keys, { manga })
+    local ok, err = self:commitChapterRead(ledger, { unread_keys = keys, mangas = { manga } })
     if not ok then
         refreshCommitted(self, options, options.ledger, previous)
         local result = { committed = false, marked_unread = 0, error = err }

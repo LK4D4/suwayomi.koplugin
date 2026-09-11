@@ -318,7 +318,7 @@ function Methods:onCloseDocument()
                 entry.pending_read_sync = true
                 entry.pending_read_state = true
             end
-            local saved = self:getDownloadQueue().refill:commitLedger(ledger, {
+            local saved = self:saveChapterLedger(ledger, {
                 { id = entry.manga_id, title = entry.manga_title, endpoint_scope = entry.endpoint_scope, require_origin = true },
             })
             if not saved then return end

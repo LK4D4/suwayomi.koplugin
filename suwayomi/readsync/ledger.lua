@@ -1,9 +1,7 @@
--- Boundary: ReadSyncLedger.
---
--- Responsibility: Owns read-ledger keys, upserts, pending batches, and downloaded chapter reconciliation.
--- Owned state: Works on settings-backed ledger tables and keeps network sync decisions explicit for the controller.
--- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and gettext are required at module load to match the original plugin runtime.
--- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
+-- Boundary: read-ledger merging and checked read/manual-intent/refill transaction composition.
+-- Read actions and reader lifecycle own metadata, completion publication, and sync ordering.
+-- Manual deletion and refill contribute policy to one staged document; archive bookkeeping
+-- remains with its existing owners. Failed or uncertain saves expose no committed targets.
 
 local SuwayomiSettings = require("suwayomi/settings")
 
@@ -25,6 +23,38 @@ local read_fields = {
     read = true, path = true, pending_read_sync = true, pending_read_state = true,
 }
 
+local function copy(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for key, item in pairs(value) do result[key] = copy(item) end
+    return result
+end
+
+
+local function mergeLedger(doc, ledger, replace_read_state)
+    if type(doc.chapter_ledger) ~= "table" then doc.chapter_ledger = {} end
+    if replace_read_state then
+        for key, entry in pairs(doc.chapter_ledger) do
+            if ledger[key] == nil and type(entry) == "table" then
+                entry.read, entry.pending_read_sync, entry.pending_read_state = false, nil, nil
+            end
+        end
+    end
+    for key, supplied in pairs(ledger or {}) do
+        if type(supplied) == "table" then
+            local current = doc.chapter_ledger[key]
+            local merged = type(current) == "table" and copy(current) or {}
+            merged.pending_read_sync, merged.pending_read_state = supplied.pending_read_sync, supplied.pending_read_state
+            for field, value in pairs(supplied) do merged[field] = copy(value) end
+            merged.read = supplied.read == true
+            -- Read reconciliation must not restore a stale archive association.
+            if type(current) == "table" and current.archive_generation ~= supplied.archive_generation then
+                merged.path, merged.archive_generation = current.path, current.archive_generation
+            end
+            doc.chapter_ledger[key] = merged
+        end
+    end
+end
 local function hasUnrelatedFields(entry)
     for key in pairs(entry or {}) do
         if not read_fields[key] then return true end
@@ -40,8 +70,40 @@ function Methods:loadChapterLedger()
 end
 
 
-function Methods:saveChapterLedger(ledger)
-    return self:getDownloadQueue().refill:commitLedger(ledger or {})
+function Methods:commitChapterRead(ledger, options)
+    ledger, options = ledger or {}, options or {}
+    local queue = self:getDownloadQueue()
+    local settings = queue.settings
+    local store = settings:getStore()
+    if store:isBlocked() or queue:isStopped() or queue:isRecovering() then
+        if queue.scheduleReconciliation then queue:scheduleReconciliation() end
+        return nil, "persistence_failed", {}
+    end
+    local outcomes, enrolled
+    local called, ok, result = pcall(store.saveDocument, store, function(doc)
+        -- Enrollment compares against the previous read state, before the merge.
+        if queue.refill then
+            enrolled = queue.refill:enrollLedger(doc, ledger, options.mangas, options)
+        end
+        mergeLedger(doc, ledger, options.replace_read_state)
+        outcomes = queue.manual_deletion:applyRead(doc, options.captures, options.unread_keys)
+    end)
+    if not called then return nil, "invalid_state", {} end
+    if not ok then
+        if queue.scheduleReconciliation then queue:scheduleReconciliation() end
+        return nil, result, {}
+    end
+    if queue.refill then
+        queue.refill:wake()
+        if enrolled then queue.refill.onChanged() end
+    end
+    return true, nil, outcomes
+end
+
+function Methods:saveChapterLedger(ledger, mangas)
+    local ok, err = self:commitChapterRead(ledger, { replace_read_state = true, mangas = mangas })
+    if not ok then return nil, err end
+    return self:getDownloadQueue().settings:loadChapterLedger()
 end
 
 

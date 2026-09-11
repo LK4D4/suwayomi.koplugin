@@ -52,15 +52,6 @@ end
 describe("suwayomi/readsync/ledger", function()
     after_each(clearModules)
 
-    it("exports read ledger state helpers", function()
-        helper.assertControllerModule("suwayomi/readsync/ledger", {
-            "loadChapterLedger",
-            "upsertChapterLedgerEntry",
-            "buildPendingReadSyncBatch",
-            "hasPendingReadSync",
-        })
-    end)
-
     it("clears pending sync when remote read state already matches", function()
         local plugin, state = installLedger({
             ledger = {

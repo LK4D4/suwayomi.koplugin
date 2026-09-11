@@ -297,6 +297,76 @@ describe("manual read completion integration", function()
         assert.same({}, recordIds())
     end)
 
+    it("returns committed read targets without changing captures or later archive authority", function()
+        enableAhead()
+        local chapter = { id = "E", name = "E" }
+        write(path("E"), "original archive")
+        local capture = service.manual_deletion:capture("m:E", path("E"), directory)
+        assert.is_nil(capture.target.generation)
+        local ledger = plugin:loadChapterLedger()
+        plugin:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, {
+            path = path("E"), read = true, pending_read_sync = true, pending_read_state = true,
+        })
+        local committed, err, outcomes = plugin:commitChapterRead(ledger, {
+            captures = { capture }, mangas = { manga },
+        })
+        assert.is_nil(err)
+        assert.is_true(committed)
+        local saved = plugin:loadChapterLedger()
+        assert.is_true(saved["m:E"].pending_read_state)
+        assert.is_nil(capture.target.generation)
+        local target = outcomes["m:E"].target
+        assert.equals(saved["m:E"].archive_generation, target.generation)
+        assert.is_true(service.manual_deletion:validateTarget(target))
+        assert.equals("pending", service.manual_deletion:snapshot()["m:E"].state)
+        assert.equals("m", service.queue:getSnapshot().refills[1].manga_id)
+
+        local completion = { manga_id = "m", chapter_id = "E", read = true,
+            path = target.path, archive_generation = target.generation, archive_target = target }
+        assert(os.remove(path("E")))
+        publish(chapter, "replacement archive")
+        assert.are_not.equal(target.generation, plugin:loadChapterLedger()["m:E"].archive_generation)
+        assert.is_false(service.manual_deletion:validateTarget(target))
+        assert(plugin:recordFinishedChapter(completion))
+        service.manual_deletion:process()
+        plugin:processFinishedChapterCleanup()
+        assert.equals("replacement archive", read(path("E")))
+        assert.is_nil(capture.target.generation)
+    end)
+
+    for _, failure in ipairs({ "rejected", "uncertain" }) do
+        it("withholds committed targets and read effects after a " .. failure .. " save", function()
+            enableAhead()
+            local capture = service.manual_deletion:capture("m:A", path("A"), directory)
+            local ledger = plugin:loadChapterLedger()
+            ledger["m:A"].read, ledger["m:A"].pending_read_sync, ledger["m:A"].pending_read_state = true, true, true
+            local io_adapter = settings.store.io
+            local operation = failure == "rejected" and "open" or "sync_dir"
+            local original = io_adapter[operation]
+            io_adapter[operation] = function() return nil, "injected storage failure" end
+            local saved, err, outcomes = plugin:commitChapterRead(ledger, {
+                captures = { capture }, mangas = { manga },
+            })
+            io_adapter[operation] = original
+            assert.is_nil(saved)
+            assert.matches(failure == "rejected" and "^open_failed" or "^ambiguous_post_replacement", err)
+            assert.same({}, outcomes)
+            assert.is_false(plugin:loadChapterLedger()["m:A"].read)
+            assert.is_nil(service.manual_deletion:snapshot()["m:A"])
+            assert.same({}, service.queue:getSnapshot().refills)
+            service.manual_deletion:process()
+            assert.equals("archive pages", read(path("A")))
+            assert.same({}, recordIds())
+            if failure == "uncertain" then
+                local retry, retry_error, retry_outcomes = plugin:commitChapterRead(ledger, { captures = { capture } })
+                assert.is_nil(retry)
+                assert.equals("persistence_failed", retry_error)
+                assert.same({}, retry_outcomes)
+                assert.is_true(settings.store:isBlocked())
+            end
+        end)
+    end
+
     it("keeps a failed checked save out of completion publication and immediate removal", function()
         configure(true, 3)
         local original_open = settings.store.io.open

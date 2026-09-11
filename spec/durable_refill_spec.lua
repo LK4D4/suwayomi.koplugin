@@ -3,7 +3,7 @@ package.path = "?.lua;" .. package.path
 local runtime_helper = require("spec/support/plugin_runtime_spec_helper")
 
 describe("durable refill through the process service", function()
-    local service, settings, directory, timers, workers, clock, responses, files
+    local service, settings, directory, timers, workers, clock, responses, files, ledger_owner
     local modules = { "suwayomi/downloads/refill", "suwayomi/chapters/manual_deletion",
         "suwayomi/chapters/archive_identity", "suwayomi/settings/store", "suwayomi/network/request_worker" }
     local function clear()
@@ -96,6 +96,9 @@ describe("durable refill through the process service", function()
             settings = settings, ui_manager = ui, ffi_util = ffi_util, downloader = downloader,
             now = function() return clock end,
         }
+        ledger_owner = setmetatable({
+            getDownloadQueue = function() return service.queue end,
+        }, { __index = require("suwayomi/readsync/ledger").methods })
         service:start()
         advance(0)
     end)
@@ -116,11 +119,11 @@ describe("durable refill through the process service", function()
         assert.are.equal(5, service.refill:setPolicy(owner, 5))
         local ledger = { ["1:1"] = { manga_id = "1", chapter_id = "1", read = true,
             pending_read_sync = true, pending_read_state = true } }
-        assert(service.refill:commitLedger(ledger, { owner }))
+        assert(ledger_owner:saveChapterLedger(ledger, { owner }))
         advance(0)
         local original = service:getSnapshot().refills[1].revision
         ledger["1:1"].pending_read_sync, ledger["1:1"].pending_read_state = nil, nil
-        assert(settings:saveChapterLedger(ledger))
+        assert(ledger_owner:saveChapterLedger(ledger))
         finishContext()
         assert.same({}, jobIds())
         assert.is_true(service:getSnapshot().refills[1].revision > original)
@@ -247,7 +250,7 @@ describe("durable refill through the process service", function()
         local current = manga()
         current.endpoint_scope = "http://other.invalid"
         assert(service.refill:associate(current))
-        assert(service.refill:commitLedger({}, { { id = "1", title = "Old archive", require_origin = true } }))
+        assert(ledger_owner:saveChapterLedger({}, { { id = "1", title = "Old archive", require_origin = true } }))
         assert.are.equal("origin_unknown", service:getSnapshot().refills[1].reason)
         assert.is_nil(service.refill:retry("1", service:getSnapshot().refills[1].revision))
         advance(0)

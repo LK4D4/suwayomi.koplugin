@@ -309,7 +309,7 @@ describe("suwayomi/chapters/actions", function()
 
     local function install_download_queue(plugin)
         plugin.max_batch_queue_chapters = 50
-        plugin.queue = require("suwayomi/downloads/queue"):new{ downloader = downloader }
+        plugin.queue = require("suwayomi/downloads/queue"):new{ settings = settings, downloader = downloader }
         plugin.queue.manual_deletion = require("suwayomi/chapters/manual_deletion"):new{
             settings = settings, queue = plugin.queue,
             ui_manager = { scheduleIn = function() end, unschedule = function() end },

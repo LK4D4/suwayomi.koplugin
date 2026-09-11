@@ -1,5 +1,6 @@
 -- Boundary: process-owned durable download-ahead evaluation in the checked shared document.
 -- Only the parent admits work. One read-only helper fetches context; no chapter cache is persisted.
+-- Ledger transactions compose enrollLedger with read state and manual intent in one checked save.
 local SubprocessJob = require("suwayomi/subprocess/job")
 local Archive = require("suwayomi/downloads/archive")
 local Refill = {}
@@ -175,12 +176,6 @@ function Refill:enrollLedger(doc, ledger, mangas, options)
         if self:enroll(doc, manga) then enrolled = true end
     end
     return enrolled
-end
-function Refill:commitLedger(ledger, mangas)
-    -- The manual coordinator already owns the merge that preserves archive generations.
-    local ok, err = self.queue.manual_deletion:commitRead(ledger, {}, nil, mangas, true)
-    if ok then return self.settings:loadChapterLedger() end
-    return nil, err
 end
 function Refill:setPolicy(manga, limit)
     local id = mangaId(manga)

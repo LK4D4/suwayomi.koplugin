@@ -1,5 +1,6 @@
 -- Boundary: checked, generation-bound manual archive deletion and recovery.
 -- The process service owns scheduling; only fresh actions/publications establish identity.
+-- Read transactions call applyRead on their staged document for admission and revocation.
 -- Unknown records and uncertain saves preserve files. Metadata is never removed here.
 
 local Identity = require("suwayomi/chapters/archive_identity")
@@ -196,110 +197,71 @@ function ManualDeletion:capture(key, path, root)
     return result
 end
 
-local function mergeLedger(doc, ledger, replace_read_state)
-    if type(doc.chapter_ledger) ~= "table" then doc.chapter_ledger = {} end
-    if replace_read_state then
-        for key, entry in pairs(doc.chapter_ledger) do
-            if ledger[key] == nil and type(entry) == "table" then
-                entry.read, entry.pending_read_sync, entry.pending_read_state = false, nil, nil
-            end
-        end
-    end
-    for key, supplied in pairs(ledger or {}) do
-        if type(supplied) == "table" then
-            local current = doc.chapter_ledger[key]
-            local merged = type(current) == "table" and copy(current) or {}
-            merged.pending_read_sync, merged.pending_read_state = supplied.pending_read_sync, supplied.pending_read_state
-            for field, value in pairs(supplied) do merged[field] = copy(value) end
-            merged.read = supplied.read == true
-            -- Read reconciliation must not restore a stale archive association.
-            if type(current) == "table" and current.archive_generation ~= supplied.archive_generation then
-                merged.path, merged.archive_generation = current.path, current.archive_generation
-            end
-            doc.chapter_ledger[key] = merged
-        end
-    end
-end
 
-function ManualDeletion:commitRead(ledger, captures, unread_keys, mangas, replace_read_state, options)
+function ManualDeletion:applyRead(doc, captures, unread_keys)
     local outcomes = {}
-    local enrolled = false
-    local ok, err = self:_save(function(doc)
-        if self.queue.refill then enrolled = self.queue.refill:enrollLedger(doc, ledger, mangas, options) end
-        mergeLedger(doc, ledger, replace_read_state)
-        local state, state_error = collection(doc, #(captures or {}) > 0)
-        if state then
-            for key, request in pairs(state.requests) do
-                local unread = unread_keys and unread_keys[key]
-                if not unread and type(unread_keys) == "table" then
-                    for _, candidate in ipairs(unread_keys) do if candidate == key then unread = true; break end end
-                end
-                local entry = doc.chapter_ledger[key]
-                if (unread or (type(entry) == "table" and entry.read ~= true)) and validRequest(request, key)
-                    and pending(request) then
-                    request.state, request.reason, request.retry_after = "revoked", "unread", 0
-                end
+    local state, state_error = collection(doc, #(captures or {}) > 0)
+    if state then
+        for key, request in pairs(state.requests) do
+            local unread = unread_keys and unread_keys[key]
+            if not unread and type(unread_keys) == "table" then
+                for _, candidate in ipairs(unread_keys) do if candidate == key then unread = true; break end end
+            end
+            local entry = doc.chapter_ledger[key]
+            if (unread or (type(entry) == "table" and entry.read ~= true)) and validRequest(request, key)
+                and pending(request) then
+                request.state, request.reason, request.retry_after = "revoked", "unread", 0
             end
         end
-        for _, captured in ipairs(captures or {}) do
-            local key = captured.key
-            local reason = state_error or captured.reason
-            local previous = state and state.requests[key]
-            local archive = state and state.archives[key]
-            if previous ~= nil and not validRequest(previous, key) then reason = "unsupported_state" end
-            if archive ~= nil and not validTarget(archive) then reason = "unsupported_state" end
-            if not reason and (archive and archive.generation) ~= captured.observed_generation then
-                reason = "generation_changed"
-            end
-            if self:_busy(key, doc) then reason = "busy" end
-            if not reason and captured.target then
-                local evidence, inspect_error = Identity.inspect(captured.target.path, captured.target.root, captured.target.evidence)
-                if not evidence then reason = inspect_error end
-            end
-            if reason == "busy" or reason == "missing" then
-                outcomes[key] = { state = reason, reason = reason }
-            elseif reason then
-                outcomes[key] = { state = "blocked", reason = reason }
-                if state and reason ~= "unsupported_state" and not pending(previous) then
-                    local request = { version = 1, key = key, revision = allocate(state), state = "blocked",
-                        reason = reason, retry_count = 0, retry_after = 0, metadata_retained = true }
-                    request.captured = copy(captured.target)
-                    state.requests[key] = request
-                    outcomes[key] = copy(request)
-                end
-            else
-                local target = copy(captured.target)
-                if archive and not archive.retired and archive.path == target.path and archive.root == target.root
-                    and Identity.same(archive.evidence, target.evidence) then
-                    target.generation = archive.generation
-                else
-                    target.generation = allocate(state)
-                    state.archives[key] = copy(target)
-                end
-                stamp(doc, target)
-                if validRequest(previous, key) and pending(previous) and sameTarget(previous.target, target) then
-                    outcomes[key] = copy(previous)
-                else
-                    local request = { version = 1, key = key, revision = allocate(state), target = target,
-                        state = "pending", retry_count = 0, retry_after = 0,
-                        archive_removed = false, bookkeeping_complete = false, metadata_retained = true }
-                    state.requests[key] = request
-                    outcomes[key] = copy(request)
-                end
-            end
-        end
-    end)
-    if not ok then return nil, err, {} end
+    end
     for _, captured in ipairs(captures or {}) do
-        if outcomes[captured.key] and outcomes[captured.key].target then
-            captured.target = copy(outcomes[captured.key].target)
+        local key = captured.key
+        local reason = state_error or captured.reason
+        local previous = state and state.requests[key]
+        local archive = state and state.archives[key]
+        if previous ~= nil and not validRequest(previous, key) then reason = "unsupported_state" end
+        if archive ~= nil and not validTarget(archive) then reason = "unsupported_state" end
+        if not reason and (archive and archive.generation) ~= captured.observed_generation then
+            reason = "generation_changed"
+        end
+        if self:_busy(key, doc) then reason = "busy" end
+        if not reason and captured.target then
+            local evidence, inspect_error = Identity.inspect(captured.target.path, captured.target.root, captured.target.evidence)
+            if not evidence then reason = inspect_error end
+        end
+        if reason == "busy" or reason == "missing" then
+            outcomes[key] = { state = reason, reason = reason }
+        elseif reason then
+            outcomes[key] = { state = "blocked", reason = reason }
+            if state and reason ~= "unsupported_state" and not pending(previous) then
+                local request = { version = 1, key = key, revision = allocate(state), state = "blocked",
+                    reason = reason, retry_count = 0, retry_after = 0, metadata_retained = true }
+                request.captured = copy(captured.target)
+                state.requests[key] = request
+                outcomes[key] = copy(request)
+            end
+        else
+            local target = copy(captured.target)
+            if archive and not archive.retired and archive.path == target.path and archive.root == target.root
+                and Identity.same(archive.evidence, target.evidence) then
+                target.generation = archive.generation
+            else
+                target.generation = allocate(state)
+                state.archives[key] = copy(target)
+            end
+            stamp(doc, target)
+            if validRequest(previous, key) and pending(previous) and sameTarget(previous.target, target) then
+                outcomes[key] = copy(previous)
+            else
+                local request = { version = 1, key = key, revision = allocate(state), target = target,
+                    state = "pending", retry_count = 0, retry_after = 0,
+                    archive_removed = false, bookkeeping_complete = false, metadata_retained = true }
+                state.requests[key] = request
+                outcomes[key] = copy(request)
+            end
         end
     end
-    if self.queue.refill then
-        self.queue.refill:wake()
-        if enrolled then self.queue.refill.onChanged() end
-    end
-    return true, nil, outcomes
+    return outcomes
 end
 
 function ManualDeletion:admitDownloads(doc, jobs, provenance)
