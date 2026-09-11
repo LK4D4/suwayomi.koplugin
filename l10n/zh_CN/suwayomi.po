@@ -63,7 +63,7 @@ msgstr[0] "%1 部漫画"
 msgid "%1 more chapter is available. Run this action again to download it."
 msgid_plural ""
 "%1 more chapters are available. Run this action again to download them."
-msgstr[0] "还有 %1 章可下载。请再次执行此操作以下载这些章节。"
+msgstr[0] "还有 %1 个章节可供下载。再次执行此操作即可下载。"
 
 msgid "%1 result"
 msgid_plural "%1 results"
@@ -92,6 +92,8 @@ msgid ""
 "downloaded file still counts toward the keep limit, but a file downloaded "
 "later is not deleted for that earlier finish."
 msgstr ""
+"在您或 KOReader 将章节标记为读完并关闭章节后，或您在插件中手动将章节标为已读后，该章节才算读完。仅翻到最后一页不算，除非 KOReader "
+"将章节标记为读完。仅有旧的已读状态不会触发删除。没有下载文件的读完章节仍计入保留数量，但之后下载的文件不会因之前的读完记录而被删除。"
 
 msgid "Actions"
 msgstr "操作"
@@ -111,17 +113,15 @@ msgstr "所有汉化组"
 msgid "Always ask"
 msgstr "总是询问"
 
-#, fuzzy
 msgid ""
 "An unread chapter could not be downloaded. Use its Retry or Redownload "
 "action."
-msgstr "缓冲区中的一个章节下载失败。请对此章节使用“重试”或“重新下载”操作。"
+msgstr "某个未读章节无法下载。请对此章节使用“重试”或“重新下载”操作。"
 
-#, fuzzy
 msgid ""
 "An unread chapter is waiting for manual deletion. Auto-download will not "
 "replace it."
-msgstr "缓冲区中的一个章节有待执行的手动删除操作。自动补充下载无法替换此章节。"
+msgstr "某个未读章节正等待手动删除。自动下载不会重新下载它。"
 
 msgid "Another download is being verified."
 msgstr "正在校验另一个下载。"
@@ -175,13 +175,11 @@ msgstr "身份验证：%1"
 msgid "Author"
 msgstr "作者"
 
-#, fuzzy
 msgid "Auto-download"
-msgstr "重新下载"
+msgstr "自动下载"
 
-#, fuzzy
 msgid "Auto-download blocked"
-msgstr "停止提前下载"
+msgstr "自动下载受阻"
 
 msgid ""
 "Auto-download checks for missing chapters after you finish and close a "
@@ -194,30 +192,23 @@ msgstr ""
 "时。阅读状态更改后、打开或刷新章节列表或返回列表后，以及更改自动下载或汉化组"
 "筛选条件后，也会执行检查。待执行的检查在离线使用和重启后仍会保留。"
 
-#, fuzzy
 msgid "Auto-download pending"
-msgstr "停止提前下载"
+msgstr "自动下载待检查"
 
-#, fuzzy
 msgid "Auto-download waiting"
-msgstr "提前下载等待中"
+msgstr "自动下载等待中"
 
-#, fuzzy
 msgid ""
 "Auto-download works with manual read marking. For automatic marking, open a "
 "document, then use Cogwheel > Document > End of document action > Always "
 "mark as finished."
-msgstr ""
-"提前下载也支持手动标记已读。要自动标记，请打开文档，然后选择：齿轮 > 文档 > "
-"到达文件末尾时的操作 > 始终标记为读完。"
+msgstr "自动下载支持手动标记已读。要自动标记，请打开文档，然后选择：齿轮 > 文档 > 文档末尾操作 > 始终标记为读完。"
 
-#, fuzzy
 msgid "Auto-download: %1"
-msgstr "正在下载 %1"
+msgstr "自动下载：%1"
 
-#, fuzzy
 msgid "Auto-download: Off"
-msgstr "提前下载：关"
+msgstr "自动下载：关闭"
 
 msgid "Automatic"
 msgstr "自动"
@@ -233,12 +224,10 @@ msgstr "已暂停自动清理 %1 个无法安全处理的章节文件。"
 msgid "Automatic finish marking"
 msgstr "自动标记为读完"
 
-#, fuzzy
 msgid ""
 "Automatically download the first 50 unread chapters matching the saved "
 "scanlator filter? Downloaded and queued chapters count toward the 50."
-msgstr ""
-"保持筛选后的前 50 个未读章节可供阅读？已下载和排队中的章节都计入此缓冲区。"
+msgstr "自动下载符合已保存汉化组筛选条件的前 50 个未读章节？已下载和已排队的章节都计入这 50 章。"
 
 msgid ""
 "Automatically mark all KOReader documents finished at their end-of-document "
@@ -338,7 +327,6 @@ msgstr "章节正在加载。"
 msgid "Check again"
 msgstr "重新检查"
 
-#, fuzzy
 msgid ""
 "Check again checks which unread chapters need downloading. It does not retry "
 "failed chapters or cancel pending deletion. Turn off auto-download prevents "
@@ -347,18 +335,13 @@ msgid ""
 "checks. Auto-download stays enabled after cancellation and can run again "
 "after reading or chapter actions."
 msgstr ""
-"重试补充下载会重新评估缓冲区，不会重试失败的章节或覆盖待执行的删除操作。“停止"
-"提前下载”会关闭此策略，但保留已接受的下载任务。“取消”会终止此漫画当前的补充下"
-"载任务；“取消所有下载”会终止所有补充下载任务。取消后，提前下载仍保持启用，之"
-"后的阅读或章节操作仍可触发补充下载。"
+"“重新检查”会检查哪些未读章节需要下载。它不会重试下载失败的章节，也不会取消待执行的删除。“关闭自动下载”阻止之后自动添加下载；已排队和正在进行的下载会"
+"继续。“取消”停止该漫画的当前检查，“全部取消”停止所有当前检查。取消后自动下载仍保持启用，可以在阅读或章节操作后再次运行。"
 
-#, fuzzy
 msgid ""
 "Check again checks which unread chapters need downloading. It does not retry "
 "failed chapters or cancel pending manual deletion."
-msgstr ""
-"重试补充下载会重新评估当前未读章节的位置，不会重试失败的章节或覆盖待执行的手"
-"动删除操作。"
+msgstr "“重新检查”会检查哪些未读章节需要下载。它不会重试下载失败的章节，也不会取消待执行的手动删除。"
 
 msgid "Check the connection and download folder in Settings."
 msgstr "请在设置中检查连接和下载文件夹。"
@@ -416,11 +399,10 @@ msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] "无法确认 %1 个章节下载。"
 
-#, fuzzy
 msgid ""
 "Could not confirm that the auto-download request was saved. No new downloads "
 "are confirmed."
-msgstr "无法确认已保存的补充下载任务。尚未确认任何新增下载。"
+msgstr "无法确认自动下载请求是否已保存。尚未确认任何新下载。"
 
 msgid ""
 "Could not confirm the read state was saved. No deletion was started. Reopen "
@@ -466,9 +448,8 @@ msgstr "无法加载 Suwayomi 书架。"
 msgid "Could not load chapters."
 msgstr "无法加载章节。"
 
-#, fuzzy
 msgid "Could not load chapters. Auto-download will try again automatically."
-msgstr "无法加载章节。补充下载将自动重试。"
+msgstr "无法加载章节列表。自动下载稍后会自动重试。"
 
 msgid "Could not load library categories."
 msgstr "无法加载书架分类。"
@@ -533,9 +514,8 @@ msgstr "无法开始加载源：%1"
 msgid "Could not start source loading: unknown error"
 msgstr "无法开始加载源：未知错误"
 
-#, fuzzy
 msgid "Could not update auto-download: %1"
-msgstr "无法更新提前下载设置：%1"
+msgstr "无法更新自动下载：%1"
 
 msgid "Could not update library."
 msgstr "无法更新书架。"
@@ -548,19 +528,17 @@ msgstr "删除"
 
 msgid "Delete %1 read download from device?"
 msgid_plural "Delete %1 read downloads from device?"
-msgstr[0] "从设备删除 %1 个已读下载？"
+msgstr[0] "从设备删除 %1 个已读章节的文件？"
 
 msgid "Delete %1 selected download from device?"
 msgid_plural "Delete %1 selected downloads from device?"
 msgstr[0] "从设备删除 %1 个选中的下载？"
 
-#, fuzzy
 msgid "Delete after reading"
-msgstr "手动标记已读后删除：%1"
+msgstr "读完后删除"
 
-#, fuzzy
 msgid "Delete after reading: %1"
-msgstr "手动标记已读后删除：%1"
+msgstr "读完后删除：%1"
 
 msgid "Delete chapter settings are unavailable."
 msgstr "章节删除设置不可用。"
@@ -575,7 +553,7 @@ msgid "Delete from device"
 msgstr "从设备删除"
 
 msgid "Delete read downloads"
-msgstr "删除已读下载"
+msgstr "删除已读章节文件"
 
 msgid "Delete saved filter"
 msgstr "删除已保存的筛选器"
@@ -583,9 +561,8 @@ msgstr "删除已保存的筛选器"
 msgid "Delete saved filter \"%1\"?"
 msgstr "要删除已保存的筛选器“%1”吗？"
 
-#, fuzzy
 msgid "Delete when marked read: %1"
-msgstr "手动标记已读后删除：%1"
+msgstr "标为已读后删除：%1"
 
 msgid "Deletion not accepted: download busy; request again"
 msgstr "删除请求未被接受：下载正在进行中；请稍后重新请求"
@@ -655,7 +632,6 @@ msgstr "下载接下来 5 章"
 msgid "Download next 50"
 msgstr "下载接下来 50 章"
 
-#, fuzzy
 msgid ""
 "Download next adds up to the chosen number of new unread downloads once. "
 "Auto-download fills the first unread chapters up to its limit; downloaded "
@@ -663,26 +639,23 @@ msgid ""
 "filter, not your current chapter. Auto-download does not delete other "
 "downloads. Bulk actions add at most 50 new downloads."
 msgstr ""
-"“下载接下来”会新增符合条件的未读章节下载。“提前下载”则补齐最前面的未读章节位"
-"置；已下载和排队中的章节也占用位置。两者都使用源顺序，并严格按已保存的汉化组"
-"筛选器筛选，绝不会自动改用“所有汉化组”。"
+"“下载接下来”一次性添加未读章节的新下载，数量不超过所选值。自动下载补齐最前面的未读章节，直到达到上限；已下载和已排队的章节都计入数量。两者都使用源中的"
+"顺序和已保存的汉化组筛选条件，而不从当前章节开始。自动下载不会删除其他已下载文件。批量操作最多新增 50 个下载。"
 
-#, fuzzy
 msgid "Download next and auto-download"
-msgstr "下载文件已损坏；请重新下载"
+msgstr "“下载接下来”与自动下载"
 
 msgid "Download selected"
 msgstr "下载选中的"
 
 msgid "Download selected (up to 50 new)"
-msgstr "下载选中的章节（最多新增 50 章）"
+msgstr "下载选中章节（最多新增 50 章）"
 
 msgid "Download the chapter first."
 msgstr "请先下载此章节。"
 
-#, fuzzy
 msgid "Download unread (up to 50)"
-msgstr "下载全部未读章节（最多新增 50 章）"
+msgstr "下载未读章节（最多 50 章）"
 
 msgid "Downloaded"
 msgstr "已下载"
@@ -715,9 +688,8 @@ msgstr "编辑搜索"
 msgid "Enable"
 msgstr "启用"
 
-#, fuzzy
 msgid "Enable auto-download"
-msgstr "启用提前下载"
+msgstr "启用自动下载"
 
 msgid "Enter a search query."
 msgstr "请输入搜索内容。"
@@ -791,21 +763,17 @@ msgstr "筛选"
 msgid "Filter name"
 msgstr "筛选器名称"
 
-#, fuzzy
 msgid "Finishing and deletion"
-msgstr "读完后保留：%1"
+msgstr "读完与删除"
 
-#, fuzzy
 msgid "First 10 unread"
-msgstr "第一个未读章节"
+msgstr "前 10 个未读章节"
 
-#, fuzzy
 msgid "First 5 unread"
-msgstr "第一个未读章节"
+msgstr "前 5 个未读章节"
 
-#, fuzzy
 msgid "First 50 unread"
-msgstr "第一个未读章节"
+msgstr "前 50 个未读章节"
 
 msgid "First unread"
 msgstr "第一个未读章节"
@@ -819,10 +787,9 @@ msgstr "全局搜索"
 msgid "Go to Suwayomi"
 msgstr "前往 Suwayomi"
 
-#, fuzzy
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
-msgstr "有助于提前下载在章节关闭后补充下载。仍可手动标记已读。"
+msgstr "有助于自动下载在章节关闭后补充下载。仍可手动标记已读。"
 
 msgid "Hide in-library results: %1"
 msgstr "隐藏书架中的结果：%1"
@@ -857,13 +824,11 @@ msgstr[0] "保留 %1 章"
 msgid "Keep disabled"
 msgstr "保持禁用"
 
-#, fuzzy
 msgid "Keep downloading"
-msgstr "保留下载"
+msgstr "继续下载"
 
-#, fuzzy
 msgid "Keep none"
-msgstr "保留下载"
+msgstr "不保留"
 
 msgid ""
 "Keeps the chapters finished most recently in each manga, not the highest "
@@ -871,6 +836,8 @@ msgid ""
 "you close it, or you manually mark it read in the plugin. Open chapters are "
 "not deleted. Off disables only this setting."
 msgstr ""
+"保留每部漫画中最近读完的章节，而不是编号最大的章节。您或 KOReader "
+"将章节标记为读完并关闭章节，或您在插件中手动将章节标为已读后，该章节才会计入。已打开的章节不会被删除。“关闭”只停用此设置。"
 
 msgctxt "source mode"
 msgid "Latest"
@@ -934,9 +901,8 @@ msgstr "漫画信息"
 msgid "Manga or source details are unavailable. Refresh the chapter list."
 msgstr "漫画或源的详细信息不可用。请刷新章节列表。"
 
-#, fuzzy
 msgid "Manual deletion"
-msgstr "已接受手动删除请求"
+msgstr "手动删除"
 
 msgid "Mark as read"
 msgstr "标记为已读"
@@ -1051,7 +1017,7 @@ msgid "Obsolete"
 msgstr "过时"
 
 msgid "Off"
-msgstr "关"
+msgstr "关闭"
 
 msgctxt "source filter state"
 msgid "Off"
@@ -1110,7 +1076,7 @@ msgstr "队列"
 
 msgid "Queue up to %1 new chapter download?"
 msgid_plural "Queue up to %1 new chapter downloads?"
-msgstr[0] "将最多 %1 个新增章节下载加入队列？"
+msgstr[0] "最多将 %1 个新的章节下载加入队列？"
 
 msgid "Queued"
 msgstr "排队中"
@@ -1128,11 +1094,10 @@ msgstr "阅读状态已同步。"
 msgid "Read state sync is already running."
 msgstr "阅读状态同步已在运行。"
 
-#, fuzzy
 msgid ""
 "Reading or download choices changed. Auto-download will use the current "
 "choices."
-msgstr "阅读或下载选项已更改。补充下载将使用当前选项。"
+msgstr "阅读或下载选项已更改。自动下载会使用当前选项。"
 
 msgid "Redownload"
 msgstr "重新下载"
@@ -1185,9 +1150,8 @@ msgstr "保存当前筛选器"
 msgid "Save filter"
 msgstr "保存筛选器"
 
-#, fuzzy
 msgid "Saved auto-download data is unsupported. Existing data is preserved."
-msgstr "不支持已保存的补充下载状态。现有数据已保留。"
+msgstr "不支持已保存的自动下载数据。现有数据已保留。"
 
 msgid "Saved filter deleted."
 msgstr "筛选器已删除。"
@@ -1255,18 +1219,15 @@ msgstr "全选"
 msgid "Server URL"
 msgstr "服务器 URL"
 
-#, fuzzy
 msgid ""
 "Server association unknown. Open this manga on the current server and choose "
 "Auto-download again."
-msgstr ""
-"无法确定关联的服务器。请在当前服务器上打开此漫画，并再次选择“提前下载”。"
+msgstr "无法确定此漫画关联的服务器。请在当前服务器上打开此漫画，然后再次选择“自动下载”。"
 
-#, fuzzy
 msgid ""
 "Server changed. Open this manga on the current server and choose Auto-"
 "download again."
-msgstr "服务器已更改。请在当前服务器上打开此漫画，并再次选择“提前下载”。"
+msgstr "服务器已更改。请在当前服务器上打开此漫画，然后再次选择“自动下载”。"
 
 msgid "Set a download folder in Settings > Downloads."
 msgstr "请在“设置 > 下载”中设置下载文件夹。"
@@ -1393,11 +1354,10 @@ msgstr "文本"
 msgid "Text filter"
 msgstr "文本筛选器"
 
-#, fuzzy
 msgid ""
 "The server rejected the chapter request. Check connection settings, then "
 "choose Check again."
-msgstr "服务器拒绝了章节请求。请检查连接设置，然后选择“重试补充下载”。"
+msgstr "服务器拒绝了章节请求。请检查连接设置，然后选择“重新检查”。"
 
 msgid ""
 "This KOReader setting affects all documents. Your end action and removal "
@@ -1498,17 +1458,13 @@ msgstr "正在校验下载"
 msgid "Waiting to check which unread chapters need downloading."
 msgstr "等待检查哪些未读章节需要下载。"
 
-#, fuzzy
 msgid "When auto-download runs"
-msgstr "提前下载的触发时机"
+msgstr "自动下载的运行时机"
 
-#, fuzzy
 msgid ""
 "With Keep 2, finishing A, then B, then C in one manga makes A eligible for "
 "deletion. B and C stay downloaded. Open chapters are not deleted."
-msgstr ""
-"保留最近读完的 2 章：依次读完同一部漫画的 A、B、C 章后，A 章便可被删除，B 和 "
-"C 章仍会保留。正在阅读的章节仍受保护。"
+msgstr "选择“保留 2 章”时，在同一漫画中依次读完 A、B、C 后，A 就可以删除。B 和 C 的下载文件会保留。已打开的章节不会被删除。"
 
 msgid ""
 "With auto-download set to 5, if 2 of the first 5 unread chapters are already "

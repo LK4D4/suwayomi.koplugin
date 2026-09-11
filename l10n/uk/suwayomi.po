@@ -77,12 +77,9 @@ msgstr[2] "%1 манґ"
 msgid "%1 more chapter is available. Run this action again to download it."
 msgid_plural ""
 "%1 more chapters are available. Run this action again to download them."
-msgstr[0] ""
-"Доступний ще %1 розділ. Виконайте цю дію ще раз, щоб завантажити його."
-msgstr[1] ""
-"Доступні ще %1 розділи. Виконайте цю дію ще раз, щоб завантажити їх."
-msgstr[2] ""
-"Доступно ще %1 розділів. Виконайте цю дію ще раз, щоб завантажити їх."
+msgstr[0] "Доступний ще %1 розділ. Повторіть цю дію, щоб завантажити його."
+msgstr[1] "Доступні ще %1 розділи. Повторіть цю дію, щоб завантажити їх."
+msgstr[2] "Доступні ще %1 розділів. Повторіть цю дію, щоб завантажити їх."
 
 msgid "%1 result"
 msgid_plural "%1 results"
@@ -119,6 +116,13 @@ msgid ""
 "downloaded file still counts toward the keep limit, but a file downloaded "
 "later is not deleted for that earlier finish."
 msgstr ""
+"Розділ вважається завершеним, коли ви або KOReader позначите його завершеним "
+"і ви закриєте його, або коли ви вручну позначите його прочитаним у плагіні. "
+"Самого переходу до останньої сторінки недостатньо, якщо KOReader не позначив "
+"розділ завершеним. Сам лише попередній статус прочитання не запускає "
+"видалення. Завершений розділ без завантаженого файлу все одно враховується в "
+"ліміті зберігання, але файл, завантажений пізніше, не видаляється через те "
+"попереднє завершення."
 
 msgid "Actions"
 msgstr "Дії"
@@ -138,21 +142,19 @@ msgstr "Усі сканлейтори"
 msgid "Always ask"
 msgstr "Завжди питати"
 
-#, fuzzy
 msgid ""
 "An unread chapter could not be downloaded. Use its Retry or Redownload "
 "action."
 msgstr ""
-"Не вдалося завантажити розділ із буфера. Скористайтеся дією «Повторити» або "
-"«Завантажити заново» для цього розділу."
+"Не вдалося завантажити непрочитаний розділ. Скористайтеся дією «Повторити» "
+"або «Завантажити повторно» для цього розділу."
 
-#, fuzzy
 msgid ""
 "An unread chapter is waiting for manual deletion. Auto-download will not "
 "replace it."
 msgstr ""
-"Розділ із буфера очікує ручного видалення. Автоматичне поповнення не може "
-"замінити його."
+"Непрочитаний розділ очікує ручного видалення. Автозавантаження не "
+"завантажить його натомість."
 
 msgid "Another download is being verified."
 msgstr "Зараз перевіряється інше завантаження."
@@ -210,13 +212,11 @@ msgstr "Автентифікація: %1"
 msgid "Author"
 msgstr "Автор"
 
-#, fuzzy
 msgid "Auto-download"
-msgstr "Завантажити заново"
+msgstr "Автозавантаження"
 
-#, fuzzy
 msgid "Auto-download blocked"
-msgstr "Зупинити завантаження наперед"
+msgstr "Автозавантаження заблоковано"
 
 msgid ""
 "Auto-download checks for missing chapters after you finish and close a "
@@ -232,31 +232,26 @@ msgstr ""
 "автозавантаження чи фільтра сканлейтора. Очікувані перевірки зберігаються "
 "під час роботи без мережі та після перезапусків."
 
-#, fuzzy
 msgid "Auto-download pending"
-msgstr "Зупинити завантаження наперед"
+msgstr "Автозавантаження очікує перевірки"
 
-#, fuzzy
 msgid "Auto-download waiting"
-msgstr "Завантаження наперед очікує"
+msgstr "Автозавантаження очікує"
 
-#, fuzzy
 msgid ""
 "Auto-download works with manual read marking. For automatic marking, open a "
 "document, then use Cogwheel > Document > End of document action > Always "
 "mark as finished."
 msgstr ""
-"«Завантажувати наперед» працює й із ручним позначенням прочитаного. Для "
-"автопозначення відкрийте документ: шестерня > Документ > Дія в кінці "
-"документа > Завжди позначати прочитаним."
+"Автозавантаження працює й із ручним позначенням прочитаного. Для "
+"автоматичного позначення відкрийте документ, потім виберіть: Шестерня > "
+"Документ > Дія в кінці документа > Завжди позначати завершеним."
 
-#, fuzzy
 msgid "Auto-download: %1"
-msgstr "Завантаження %1"
+msgstr "Автозавантаження: %1"
 
-#, fuzzy
 msgid "Auto-download: Off"
-msgstr "Завантажувати наперед: вимкнено"
+msgstr "Автозавантаження: вимкнено"
 
 msgid "Automatic"
 msgstr "Автоматично"
@@ -276,13 +271,13 @@ msgstr ""
 msgid "Automatic finish marking"
 msgstr "Автопозначення прочитаним"
 
-#, fuzzy
 msgid ""
 "Automatically download the first 50 unread chapters matching the saved "
 "scanlator filter? Downloaded and queued chapters count toward the 50."
 msgstr ""
-"Підтримувати доступність перших 50 непрочитаних розділів, що відповідають "
-"фільтру? Наявні завантаження та розділи в черзі враховуються в цьому буфері."
+"Автоматично завантажувати перші 50 непрочитаних розділів, що відповідають "
+"збереженому фільтру сканлейтора? Завантажені розділи й розділи в черзі "
+"враховуються в цих 50."
 
 msgid ""
 "Automatically mark all KOReader documents finished at their end-of-document "
@@ -384,7 +379,6 @@ msgstr "Розділи завантажуються."
 msgid "Check again"
 msgstr "Перевірити знову"
 
-#, fuzzy
 msgid ""
 "Check again checks which unread chapters need downloading. It does not retry "
 "failed chapters or cancel pending deletion. Turn off auto-download prevents "
@@ -393,21 +387,22 @@ msgid ""
 "checks. Auto-download stays enabled after cancellation and can run again "
 "after reading or chapter actions."
 msgstr ""
-"«Повторити поповнення» повторно оцінює буфер; ця дія не повторює невдалі "
-"завантаження розділів і не скасовує заплановане видалення. «Зупинити "
-"завантаження наперед» вимикає цю функцію, але зберігає прийняті завдання. "
-"«Скасувати» припиняє поточне поповнення для цієї манґи; «Скасувати всі "
-"завантаження» припиняє всі поповнення. Після скасування завантаження наперед "
-"залишається увімкненим для подальшого читання або дій із розділами."
+"Дія «Перевірити знову» перевіряє, які непрочитані розділи потрібно "
+"завантажити. Вона не повторює невдалі завантаження розділів і не скасовує "
+"очікуване видалення. Дія «Вимкнути автозавантаження» запобігає подальшому "
+"автоматичному додаванню; завантаження в черзі та поточні завантаження "
+"продовжуються. «Скасувати» зупиняє поточну перевірку цієї манґи, а "
+"«Скасувати все» — усі поточні перевірки. Після скасування автозавантаження "
+"залишається ввімкненим і може запуститися знову після читання або дій із "
+"розділами."
 
-#, fuzzy
 msgid ""
 "Check again checks which unread chapters need downloading. It does not retry "
 "failed chapters or cancel pending manual deletion."
 msgstr ""
-"«Повторити поповнення» повторно оцінює поточні непрочитані позиції. Ця дія "
-"не повторює невдале завантаження розділу й не скасовує заплановане ручне "
-"видалення."
+"Дія «Перевірити знову» перевіряє, які непрочитані розділи потрібно "
+"завантажити. Вона не повторює невдалі завантаження розділів і не скасовує "
+"очікуване ручне видалення."
 
 msgid "Check the connection and download folder in Settings."
 msgstr "Перевірте з’єднання та теку завантажень у налаштуваннях."
@@ -467,13 +462,12 @@ msgstr[0] "Не вдалося підтвердити %1 завантаженн�
 msgstr[1] "Не вдалося підтвердити %1 завантаження розділів."
 msgstr[2] "Не вдалося підтвердити %1 завантажень розділів."
 
-#, fuzzy
 msgid ""
 "Could not confirm that the auto-download request was saved. No new downloads "
 "are confirmed."
 msgstr ""
-"Не вдалося підтвердити збережені завдання поповнення. Жодного нового "
-"завантаження не підтверджено."
+"Не вдалося підтвердити збереження запиту автозавантаження. Нові завантаження "
+"не підтверджено."
 
 msgid ""
 "Could not confirm the read state was saved. No deletion was started. Reopen "
@@ -537,10 +531,10 @@ msgstr "Не вдалося завантажити бібліотеку Suwayomi
 msgid "Could not load chapters."
 msgstr "Не вдалося завантажити розділи."
 
-#, fuzzy
 msgid "Could not load chapters. Auto-download will try again automatically."
 msgstr ""
-"Не вдалося завантажити розділи. Спроба поповнення повториться автоматично."
+"Не вдалося завантажити список розділів. Автозавантаження спробує ще раз "
+"автоматично."
 
 msgid "Could not load library categories."
 msgstr "Не вдалося завантажити категорії бібліотеки."
@@ -607,9 +601,8 @@ msgstr "Не вдалося почати завантаження джерела
 msgid "Could not start source loading: unknown error"
 msgstr "Не вдалося почати завантаження джерела: невідома помилка"
 
-#, fuzzy
 msgid "Could not update auto-download: %1"
-msgstr "Не вдалося оновити завантаження наперед: %1"
+msgstr "Не вдалося оновити автозавантаження: %1"
 
 msgid "Could not update library."
 msgstr "Не вдалося оновити бібліотеку."
@@ -622,9 +615,9 @@ msgstr "Видалити"
 
 msgid "Delete %1 read download from device?"
 msgid_plural "Delete %1 read downloads from device?"
-msgstr[0] "Видалити %1 прочитане завантаження з пристрою?"
-msgstr[1] "Видалити %1 прочитані завантаження з пристрою?"
-msgstr[2] "Видалити %1 прочитаних завантажень з пристрою?"
+msgstr[0] "Видалити з пристрою файл %1 прочитаного розділу?"
+msgstr[1] "Видалити з пристрою файли %1 прочитаних розділів?"
+msgstr[2] "Видалити з пристрою файли %1 прочитаних розділів?"
 
 msgid "Delete %1 selected download from device?"
 msgid_plural "Delete %1 selected downloads from device?"
@@ -632,13 +625,11 @@ msgstr[0] "Видалити %1 вибране завантаження з при
 msgstr[1] "Видалити %1 вибрані завантаження з пристрою?"
 msgstr[2] "Видалити %1 вибраних завантажень з пристрою?"
 
-#, fuzzy
 msgid "Delete after reading"
-msgstr "Видаляти після ручного позначення як прочитаного: %1"
+msgstr "Видаляти після прочитання"
 
-#, fuzzy
 msgid "Delete after reading: %1"
-msgstr "Видаляти після ручного позначення як прочитаного: %1"
+msgstr "Видаляти після прочитання: %1"
 
 msgid "Delete chapter settings are unavailable."
 msgstr "Налаштування видалення розділів недоступні."
@@ -653,7 +644,7 @@ msgid "Delete from device"
 msgstr "Видалити з пристрою"
 
 msgid "Delete read downloads"
-msgstr "Видалити прочитані завантаження"
+msgstr "Видалити файли прочитаних розділів"
 
 msgid "Delete saved filter"
 msgstr "Видалити збережений фільтр"
@@ -661,9 +652,8 @@ msgstr "Видалити збережений фільтр"
 msgid "Delete saved filter \"%1\"?"
 msgstr "Видалити збережений фільтр \"%1\"?"
 
-#, fuzzy
 msgid "Delete when marked read: %1"
-msgstr "Видаляти після ручного позначення як прочитаного: %1"
+msgstr "Видаляти після позначення «Прочитано»: %1"
 
 msgid "Deletion not accepted: download busy; request again"
 msgstr ""
@@ -708,7 +698,7 @@ msgid "Download folder"
 msgstr "Тека завантажень"
 
 msgid "Download help"
-msgstr "Довідка із завантаження"
+msgstr "Довідка щодо завантажень"
 
 msgid "Download is already downloading."
 msgstr "Завантаження вже виконується."
@@ -734,7 +724,6 @@ msgstr "Завантажити наступні 5"
 msgid "Download next 50"
 msgstr "Завантажити наступні 50"
 
-#, fuzzy
 msgid ""
 "Download next adds up to the chosen number of new unread downloads once. "
 "Auto-download fills the first unread chapters up to its limit; downloaded "
@@ -742,15 +731,15 @@ msgid ""
 "filter, not your current chapter. Auto-download does not delete other "
 "downloads. Bulk actions add at most 50 new downloads."
 msgstr ""
-"«Завантажити наступні» додає придатні до завантаження непрочитані розділи. "
-"«Завантажувати наперед» заповнює перші непрочитані позиції; наявні "
-"завантаження та завдання в черзі враховуються. Обидві дії використовують "
-"порядок джерела й точний збережений фільтр сканлейтора, без непомітного "
-"переходу до всіх сканлейторів."
+"Дія «Завантажити наступні» одноразово додає не більше вибраної кількості "
+"нових завантажень непрочитаних розділів. Автозавантаження заповнює перші "
+"непрочитані розділи до свого ліміту; завантажені розділи й розділи в черзі "
+"враховуються. Обидві дії використовують порядок джерела та збережений фільтр "
+"сканлейтора, а не поточний розділ. Автозавантаження не видаляє інші "
+"завантаження. Масові дії додають щонайбільше 50 нових завантажень."
 
-#, fuzzy
 msgid "Download next and auto-download"
-msgstr "Завантажений файл пошкоджено; завантажте заново"
+msgstr "Завантаження наступних розділів та автозавантаження"
 
 msgid "Download selected"
 msgstr "Завантажити вибране"
@@ -761,9 +750,8 @@ msgstr "Завантажити вибране (до 50 нових)"
 msgid "Download the chapter first."
 msgstr "Спочатку завантажте розділ."
 
-#, fuzzy
 msgid "Download unread (up to 50)"
-msgstr "Завантажити всі непрочитані (до 50 нових)"
+msgstr "Завантажити непрочитані (до 50)"
 
 msgid "Downloaded"
 msgstr "Завантажено"
@@ -798,9 +786,8 @@ msgstr "Редагувати пошук"
 msgid "Enable"
 msgstr "Увімкнути"
 
-#, fuzzy
 msgid "Enable auto-download"
-msgstr "Увімкнути завантаження наперед"
+msgstr "Увімкнути автозавантаження"
 
 msgid "Enter a search query."
 msgstr "Введіть пошуковий запит."
@@ -876,21 +863,17 @@ msgstr "Фільтр"
 msgid "Filter name"
 msgstr "Назва фільтра"
 
-#, fuzzy
 msgid "Finishing and deletion"
-msgstr "Зберігання завершених розділів: %1"
+msgstr "Завершення читання та видалення"
 
-#, fuzzy
 msgid "First 10 unread"
-msgstr "Перший непрочитаний"
+msgstr "Перші 10 непрочитаних розділів"
 
-#, fuzzy
 msgid "First 5 unread"
-msgstr "Перший непрочитаний"
+msgstr "Перші 5 непрочитаних розділів"
 
-#, fuzzy
 msgid "First 50 unread"
-msgstr "Перший непрочитаний"
+msgstr "Перші 50 непрочитаних розділів"
 
 msgid "First unread"
 msgstr "Перший непрочитаний"
@@ -904,12 +887,11 @@ msgstr "Глобальний пошук"
 msgid "Go to Suwayomi"
 msgstr "Перейти до Suwayomi"
 
-#, fuzzy
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
 msgstr ""
-"Допомагає функції «Завантажувати наперед» поповнювати запас після закриття "
-"глав. Ручне позначення й далі доступне."
+"Допомагає автозавантаженню поповнювати запас після закриття розділів. Ручне "
+"позначення й далі працює."
 
 msgid "Hide in-library results: %1"
 msgstr "Приховувати результати з бібліотеки: %1"
@@ -939,20 +921,18 @@ msgstr "KOReader не може відкрити цей розділ зараз."
 
 msgid "Keep %1"
 msgid_plural "Keep %1"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Зберігати %1 розділ"
+msgstr[1] "Зберігати %1 розділи"
+msgstr[2] "Зберігати %1 розділів"
 
 msgid "Keep disabled"
 msgstr "Не вмикати"
 
-#, fuzzy
 msgid "Keep downloading"
-msgstr "Зберігати завантаження"
+msgstr "Не скасовувати завантаження"
 
-#, fuzzy
 msgid "Keep none"
-msgstr "Зберігати завантаження"
+msgstr "Не зберігати"
 
 msgid ""
 "Keeps the chapters finished most recently in each manga, not the highest "
@@ -960,6 +940,11 @@ msgid ""
 "you close it, or you manually mark it read in the plugin. Open chapters are "
 "not deleted. Off disables only this setting."
 msgstr ""
+"Зберігає в кожній манзі розділи, завершені найостаннішими, а не розділи з "
+"найбільшими номерами. Розділ враховується, коли ви або KOReader позначите "
+"його завершеним і ви закриєте його, або коли ви вручну позначите його "
+"прочитаним у плагіні. Відкриті розділи не видаляються. «Вимкнено» вимикає "
+"лише це налаштування."
 
 msgctxt "source mode"
 msgid "Latest"
@@ -1025,9 +1010,8 @@ msgstr "Інформація про манґу"
 msgid "Manga or source details are unavailable. Refresh the chapter list."
 msgstr "Відомості про манґу або джерело недоступні. Оновіть список розділів."
 
-#, fuzzy
 msgid "Manual deletion"
-msgstr "Запит на ручне видалення прийнято"
+msgstr "Ручне видалення"
 
 msgid "Mark as read"
 msgstr "Позначити як прочитане"
@@ -1234,13 +1218,12 @@ msgstr "Стан прочитання вже синхронізовано."
 msgid "Read state sync is already running."
 msgstr "Синхронізація стану прочитання вже виконується."
 
-#, fuzzy
 msgid ""
 "Reading or download choices changed. Auto-download will use the current "
 "choices."
 msgstr ""
-"Вибір щодо читання або завантаження змінився. Поповнення використає поточний "
-"вибір."
+"Параметри читання або завантаження змінилися. Автозавантаження використає "
+"поточні параметри."
 
 msgid "Redownload"
 msgstr "Завантажити заново"
@@ -1293,9 +1276,8 @@ msgstr "Зберегти поточний фільтр"
 msgid "Save filter"
 msgstr "Зберегти фільтр"
 
-#, fuzzy
 msgid "Saved auto-download data is unsupported. Existing data is preserved."
-msgstr "Збережений стан поповнення не підтримується. Наявні дані збережено."
+msgstr "Збережені дані автозавантаження не підтримуються. Наявні дані збережено."
 
 msgid "Saved filter deleted."
 msgstr "Фільтр видалено."
@@ -1363,21 +1345,19 @@ msgstr "Вибрати все"
 msgid "Server URL"
 msgstr "URL сервера"
 
-#, fuzzy
 msgid ""
 "Server association unknown. Open this manga on the current server and choose "
 "Auto-download again."
 msgstr ""
-"Зв’язок із сервером невідомий. Відкрийте цю манґу на поточному сервері та "
-"знову виберіть «Завантажувати наперед»."
+"Невідомо, з яким сервером пов'язана ця манґа. Відкрийте її на поточному "
+"сервері та знову виберіть «Автозавантаження»."
 
-#, fuzzy
 msgid ""
 "Server changed. Open this manga on the current server and choose Auto-"
 "download again."
 msgstr ""
 "Сервер змінився. Відкрийте цю манґу на поточному сервері та знову виберіть "
-"«Завантажувати наперед»."
+"«Автозавантаження»."
 
 msgid "Set a download folder in Settings > Downloads."
 msgstr "Задайте теку завантажень у Налаштування > Завантаження."
@@ -1507,13 +1487,12 @@ msgstr "Текст"
 msgid "Text filter"
 msgstr "Текстовий фільтр"
 
-#, fuzzy
 msgid ""
 "The server rejected the chapter request. Check connection settings, then "
 "choose Check again."
 msgstr ""
-"Сервер відхилив запит розділів. Перевірте налаштування з’єднання, а потім "
-"виберіть «Повторити поповнення»."
+"Сервер відхилив запит розділів. Перевірте налаштування з'єднання, а потім "
+"виберіть «Перевірити знову»."
 
 msgid ""
 "This KOReader setting affects all documents. Your end action and removal "
@@ -1616,18 +1595,16 @@ msgstr "Перевірка завантаження"
 msgid "Waiting to check which unread chapters need downloading."
 msgstr "Очікування перевірки, які непрочитані розділи потрібно завантажити."
 
-#, fuzzy
 msgid "When auto-download runs"
-msgstr "Коли виконується завантаження наперед"
+msgstr "Коли виконується автозавантаження"
 
-#, fuzzy
 msgid ""
 "With Keep 2, finishing A, then B, then C in one manga makes A eligible for "
 "deletion. B and C stay downloaded. Open chapters are not deleted."
 msgstr ""
-"Зберігати 2 останні завершені розділи: після завершення A, B, а потім C в "
-"одній манзі розділ A можна буде видалити. B і C залишаться. Відкриті в "
-"читачі розділи залишаються захищеними."
+"Якщо вибрано «Зберігати 2 розділи», після завершення A, потім B, а потім C в "
+"одній манзі розділ A можна видалити. B і C залишаються завантаженими. "
+"Відкриті розділи не видаляються."
 
 msgid ""
 "With auto-download set to 5, if 2 of the first 5 unread chapters are already "
