@@ -13,11 +13,11 @@ A particular published or explicitly adopted local chapter archive. A later publ
 _Avoid_: Chapter ID, archive path, content hash when referring to archive identity.
 
 **Download-ahead buffer**:
-The earliest configured number of unread chapters for a manga after its saved scanlator filter, in source order. Existing downloaded or queued chapters occupy positions in this buffer.
+The earliest configured number of unread chapters for a manga after its saved scanlator filter, in source order. Existing downloaded or queued chapters occupy positions in this buffer. Auto-download is the user-facing setting that maintains this buffer.
 _Avoid_: Next N additional downloads, chapters after the current reader page.
 
 **Automatic finish marking**:
-KOReader's optional, global “Always mark as finished” behavior, which marks a document finished when its end-of-document action is triggered. It applies to all documents and is not a prerequisite for Download ahead, which also supports manual read marking.
+KOReader's optional, global “Always mark as finished” behavior, which marks a document finished when its end-of-document action is triggered. It applies to all documents and is not a prerequisite for Auto-download, which also supports manual read marking.
 _Avoid_: Last-page completion, Suwayomi-only auto-marking.
 
 **Refill request**:
