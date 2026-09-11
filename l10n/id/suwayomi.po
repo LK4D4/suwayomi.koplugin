@@ -197,14 +197,13 @@ msgstr ""
 msgid "Auto-download waiting"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Auto-download works with manual read marking. For automatic marking, open a "
 "document, then use Cogwheel > Document > End of document action > Always "
 "mark as finished."
 msgstr ""
-"Unduh lebih awal berfungsi dengan penandaan sudah dibaca secara manual. "
-"Untuk penandaan otomatis, buka dokumen, lalu pilih Ikon roda gigi > Dokumen "
+"Auto-download berfungsi dengan penandaan sudah dibaca secara manual. Untuk "
+"penandaan otomatis, buka dokumen, lalu pilih Ikon roda gigi > Dokumen "
 "> Tindakan pada akhir dokumen > Selalu tandai sebagai selesai."
 
 msgid "Auto-download: %1"
@@ -788,12 +787,11 @@ msgstr ""
 msgid "Go to Suwayomi"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
 msgstr ""
-"Membantu Unduh lebih awal mengisi ulang unduhan setelah bab ditutup. "
-"Penandaan manual tetap berfungsi."
+"Membantu Auto-download mengisi ulang unduhan setelah bab ditutup. Penandaan "
+"manual tetap berfungsi."
 
 msgid "Hide in-library results: %1"
 msgstr ""

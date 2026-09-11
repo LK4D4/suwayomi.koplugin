@@ -191,13 +191,12 @@ msgstr ""
 msgid "Auto-download waiting"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Auto-download works with manual read marking. For automatic marking, open a "
 "document, then use Cogwheel > Document > End of document action > Always "
 "mark as finished."
 msgstr ""
-"先行ダウンロードは手動の既読マークでも機能します。自動でマークするには文書を"
+"Auto-downloadは手動の既読マークでも機能します。自動でマークするには文書を"
 "開き、歯車アイコン > 文書 > 文書末尾での動作 > 常に読了マークを付ける を選択"
 "してください。"
 
@@ -780,11 +779,10 @@ msgstr ""
 msgid "Go to Suwayomi"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
 msgstr ""
-"章を閉じた後の先行ダウンロードによる補充に役立ちます。手動のマークも引き続き"
+"章を閉じた後のAuto-downloadによる補充に役立ちます。手動のマークも引き続き"
 "使えます。"
 
 msgid "Hide in-library results: %1"

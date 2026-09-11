@@ -197,13 +197,12 @@ msgstr ""
 msgid "Auto-download waiting"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Auto-download works with manual read marking. For automatic marking, open a "
 "document, then use Cogwheel > Document > End of document action > Always "
 "mark as finished."
 msgstr ""
-"بارگیری پیشاپیش با علامت‌گذاری دستیِ خوانده‌شده کار می‌کند. برای علامت‌گذاری "
+"Auto-download با علامت‌گذاری دستیِ خوانده‌شده کار می‌کند. برای علامت‌گذاری "
 "خودکار، سندی باز کنید و به نماد چرخ‌دنده > سند > عملکرد پایان سند > همیشه به "
 "عنوان پایان یافته علامت‌گذاری شود بروید."
 
@@ -788,11 +787,10 @@ msgstr ""
 msgid "Go to Suwayomi"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
 msgstr ""
-"به بارگیری پیشاپیش کمک می‌کند پس از بستن فصل‌ها، فصل‌های تازه بارگیری کند. "
+"به Auto-download کمک می‌کند پس از بستن فصل‌ها، فصل‌های تازه بارگیری کند. "
 "علامت‌گذاری دستی همچنان کار می‌کند."
 
 msgid "Hide in-library results: %1"

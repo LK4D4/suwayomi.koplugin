@@ -200,15 +200,14 @@ msgstr ""
 msgid "Auto-download waiting"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Auto-download works with manual read marking. For automatic marking, open a "
 "document, then use Cogwheel > Document > End of document action > Always "
 "mark as finished."
 msgstr ""
-"Il download anticipato funziona anche segnando manualmente come letto. Per "
-"farlo in automatico, apri un documento, poi usa l’icona a ingranaggio > "
-"Documento > Azione a fine documento > Segna sempre come finito."
+"Auto-download funziona anche segnando manualmente come letto. Per farlo in "
+"automatico, apri un documento, poi usa l’icona a ingranaggio > Documento > "
+"Azione a fine documento > Segna sempre come finito."
 
 msgid "Auto-download: %1"
 msgstr ""
@@ -796,12 +795,11 @@ msgstr ""
 msgid "Go to Suwayomi"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
 msgstr ""
-"Aiuta il download anticipato a caricare altri capitoli dopo aver chiuso un "
-"capitolo. Puoi ancora segnare manualmente come letto."
+"Aiuta Auto-download a caricare altri capitoli dopo aver chiuso un capitolo. "
+"Puoi ancora segnare manualmente come letto."
 
 msgid "Hide in-library results: %1"
 msgstr ""

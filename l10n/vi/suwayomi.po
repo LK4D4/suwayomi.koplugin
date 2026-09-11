@@ -191,13 +191,12 @@ msgstr ""
 msgid "Auto-download waiting"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Auto-download works with manual read marking. For automatic marking, open a "
 "document, then use Cogwheel > Document > End of document action > Always "
 "mark as finished."
 msgstr ""
-"Tải trước hoạt động khi đánh dấu đã đọc thủ công. Để đánh dấu tự động, hãy "
+"Auto-download hoạt động khi đánh dấu đã đọc thủ công. Để đánh dấu tự động, hãy "
 "mở tài liệu, rồi chọn Biểu tượng bánh răng > Tài liệu > Kết thúc hành động "
 "văn bản > Luôn đánh dấu là đã hoàn thành."
 
@@ -780,11 +779,10 @@ msgstr ""
 msgid "Go to Suwayomi"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
 msgstr ""
-"Giúp Tải trước tải bổ sung sau khi đóng chương. Vẫn có thể đánh dấu thủ công."
+"Giúp Auto-download tải bổ sung sau khi đóng chương. Vẫn có thể đánh dấu thủ công."
 
 msgid "Hide in-library results: %1"
 msgstr ""

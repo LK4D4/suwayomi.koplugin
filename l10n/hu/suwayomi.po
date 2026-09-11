@@ -200,13 +200,12 @@ msgstr ""
 msgid "Auto-download waiting"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Auto-download works with manual read marking. For automatic marking, open a "
 "document, then use Cogwheel > Document > End of document action > Always "
 "mark as finished."
 msgstr ""
-"Az előre letöltés kézi olvasottnak jelöléssel is működik. Az automatikus "
+"Az Auto-download kézi olvasottnak jelöléssel is működik. Az automatikus "
 "jelöléshez nyisson meg egy dokumentumot, majd válassza: fogaskerék ikon > "
 "Dokumentum > Teendő a könyv végén > Mindig befejezettnek jelölés."
 
@@ -796,12 +795,11 @@ msgstr ""
 msgid "Go to Suwayomi"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
 msgstr ""
-"A fejezetek bezárása után segíti az előre letöltött készlet pótlását. A kézi "
-"jelölés továbbra is működik."
+"Az Auto-download a fejezetek bezárása után segíti további fejezetek letöltését. "
+"A kézi jelölés továbbra is működik."
 
 msgid "Hide in-library results: %1"
 msgstr ""
