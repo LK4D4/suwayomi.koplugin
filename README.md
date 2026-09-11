@@ -43,15 +43,17 @@ Use HTTPS when connecting over a network. HTTP remains supported but exposes pas
 - **Downloads** shows progress and lets you cancel or retry downloads.
 - **Sync** sends pending read/unread changes to your server.
 
-Choose a manga, open its chapters, then tap a chapter to download or read it. Use **Download next** for a batch, or **Download ahead** to keep a small reading buffer. Each download action adds at most 50 new chapters.
+Choose a manga, open its chapters, then tap a chapter to download or read it. Use **Download next** for a one-time batch, or **Auto-download** to keep the first unread chapters available automatically. Each download action adds at most 50 new chapters.
 
-The **Download ahead** menu shows **Off** or the saved buffer size for that manga. A checkmark identifies the current choice.
+The **Auto-download** menu shows **Off** or the saved chapter limit for that manga. Downloaded and queued chapters count toward the limit. A checkmark identifies the current choice. This setting does not delete other downloads.
 
-Selecting a Download-ahead buffer may offer KOReader's **Always mark as finished** setting. This optional setting applies to **all KOReader documents** at their end-of-document action. Download ahead also works with manual read marking. **Keep disabled** leaves Download ahead active; check **Don't ask again** to stop reminders. **Enable** also stops future reminders.
+Selecting an Auto-download limit may offer KOReader's **Always mark as finished** setting. This optional setting applies to **all KOReader documents** at their end-of-document action. Auto-download also works with manual read marking. **Keep disabled** leaves Auto-download active; check **Don't ask again** to stop reminders. **Enable** also stops future reminders.
 
-To change automatic finish marking later, open a document and use **Cogwheel > Document > End of document action > Always mark as finished**. The plugin leaves your end action and automatic removal settings unchanged; finished chapters remain subject to those removal settings. Stopping Download ahead does not turn automatic finish marking off.
+To change automatic finish marking later, open a document and use **Cogwheel > Document > End of document action > Always mark as finished**. The plugin leaves your end action and automatic removal settings unchanged; finished chapters remain subject to those removal settings. Turning off Auto-download does not turn automatic finish marking off.
 
 Downloads continue while you read. Network failures retry in the background, and unfinished downloads resume after a KOReader restart. Files are organized by source and manga in your chosen download folder.
+
+Under **Settings > Downloads**, **Delete after reading** keeps the chapters finished most recently in each manga, not the highest chapter numbers. **Delete when marked read** separately requests file removal when you manually mark chapters read in the plugin. See **Download help** for completion rules and deletion details.
 
 ### Faster downloads with server predownloads
 
@@ -61,7 +63,7 @@ Use Suwayomi's WebUI to queue chapters in advance, or configure its automatic do
 
 A CBZ in Suwayomi's **Local source** is not the same as a server download. Local source chapters can still transfer page by page, so a predownloaded remote chapter can be faster.
 
-Your device still needs to connect to copy chapters for offline reading. The plugin does not queue or delete server downloads; its **Download ahead** and removal settings affect only device-local copies.
+Your device still needs to connect to copy chapters for offline reading. The plugin does not queue or delete server downloads; its **Auto-download** and removal settings affect only device-local copies.
 
 ## Need help?
 

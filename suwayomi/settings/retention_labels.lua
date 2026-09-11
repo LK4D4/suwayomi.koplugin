@@ -9,7 +9,10 @@ function RetentionLabels.format(value)
     if value < 1 or value > 5 or value % 1 ~= 0 then
         return I18n.t("Off")
     end
-    return I18n.count(value - 1, "Keep %1 newest completion", "Keep %1 newest completions")
+    if value == 1 then
+        return I18n.t("Keep none")
+    end
+    return I18n.count(value - 1, "Keep %1", "Keep %1")
 end
 
 return RetentionLabels

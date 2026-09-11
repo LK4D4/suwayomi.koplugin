@@ -97,7 +97,7 @@ function Methods:performDownloadsTitleAction(action, menu)
                 text = I18n.t("Cancel all downloads?"),
                 ok_text = I18n.t("Cancel downloads"),
                 ok_callback = callback,
-                cancel_text = I18n.t("Keep downloads"),
+                cancel_text = I18n.t("Keep downloading"),
             })
         else
             callback()
@@ -460,7 +460,7 @@ function Methods:performRefillAction(action, request)
     elseif action == "stop" then
         ok, err = refill:stop(request.manga_id, request.revision)
     end
-    if not ok and err then self:showMessage(I18n.f("Could not update download ahead: %1", err)) end
+    if not ok and err then self:showMessage(I18n.f("Could not update auto-download: %1", err)) end
     self:refreshDownloadsMenu()
     if self.refreshChapterMenu then self:refreshChapterMenu({ quick = true }) end
     return ok, err
@@ -475,7 +475,7 @@ end
 function Methods:requestMangaRefill(manga)
     if self.suwayomi_host_retired then return false end
     local ok, err = self:getDownloadQueue().refill:request(manga)
-    if not ok and err then self:showMessage(I18n.f("Could not update download ahead: %1", err)) end
+    if not ok and err then self:showMessage(I18n.f("Could not update auto-download: %1", err)) end
     return ok, err
 end
 

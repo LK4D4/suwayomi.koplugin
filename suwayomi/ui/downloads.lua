@@ -21,7 +21,7 @@ function DownloadsUI.showAutoMarkPrompt(options)
     local checkbox
     local dialog = ConfirmBox:new{
         text = I18n.t("Automatically mark all KOReader documents finished at their end-of-document action?")
-            .. "\n\n" .. I18n.t("Helps Download ahead refill after chapters close. Manual marking still works.")
+            .. "\n\n" .. I18n.t("Helps Auto-download refill after chapters close. Manual marking still works.")
             .. "\n\n" .. I18n.t("Your end action stays unchanged. Finished chapters follow your automatic removal settings."),
         ok_text = I18n.t("Enable"),
         cancel_text = I18n.t("Keep disabled"),
@@ -128,42 +128,42 @@ end
 
 local function formatRefillReason(reason)
     if reason == "endpoint_changed" then
-        return I18n.t("Server changed. Open this manga on the current server and choose Download ahead again.")
+        return I18n.t("Server changed. Open this manga on the current server and choose Auto-download again.")
     elseif reason == "origin_unknown" then
-        return I18n.t("Server association unknown. Open this manga on the current server and choose Download ahead again.")
+        return I18n.t("Server association unknown. Open this manga on the current server and choose Auto-download again.")
     elseif reason == "configuration_missing" then
         return I18n.t("Check the connection and download folder in Settings.")
     elseif reason == "metadata_missing" then
         return I18n.t("Manga or source details are unavailable. Refresh the chapter list.")
     elseif reason == "unsupported_state" then
-        return I18n.t("Saved refill state is unsupported. Existing data is preserved.")
+        return I18n.t("Saved auto-download data is unsupported. Existing data is preserved.")
     elseif reason == "scanlator_missing" then
         return I18n.t("No chapters match the saved scanlator filter. Other scanlators are not selected.")
     elseif reason == "terminal_failure" then
-        return I18n.t("A chapter in the buffer failed. Use that chapter's Retry or Redownload action.")
+        return I18n.t("An unread chapter could not be downloaded. Use its Retry or Redownload action.")
     elseif reason == "manual_delete_pending" then
-        return I18n.t("A chapter in the buffer has pending manual deletion. Automatic refill cannot replace it.")
+        return I18n.t("An unread chapter is waiting for manual deletion. Auto-download will not replace it.")
     elseif reason == "ownership_unproved" then
         return I18n.t("Archive or download ownership is not verified. Existing files and work are preserved.")
     elseif reason == "fetch_failed" then
-        return I18n.t("Could not load chapters. Refill will retry automatically.")
+        return I18n.t("Could not load chapters. Auto-download will try again automatically.")
     elseif reason == "fetch_rejected" then
-        return I18n.t("The server rejected the chapter request. Check connection settings, then choose Retry refill.")
+        return I18n.t("The server rejected the chapter request. Check connection settings, then choose Check again.")
     elseif reason == "persistence_failed" then
-        return I18n.t("Could not confirm saved refill work. No new downloads are confirmed.")
+        return I18n.t("Could not confirm that the auto-download request was saved. No new downloads are confirmed.")
     elseif reason == "choices_changed" then
-        return I18n.t("Reading or download choices changed. Refill will use the current choices.")
+        return I18n.t("Reading or download choices changed. Auto-download will use the current choices.")
     end
-    return I18n.t("Waiting to evaluate the unread buffer.")
+    return I18n.t("Waiting to check which unread chapters need downloading.")
 end
 
 local function formatRefillState(state)
     if state == "blocked" then
-        return I18n.t("Ahead blocked")
+        return I18n.t("Auto-download blocked")
     elseif state == "waiting" then
-        return I18n.t("Ahead waiting")
+        return I18n.t("Auto-download waiting")
     end
-    return I18n.t("Ahead pending")
+    return I18n.t("Auto-download pending")
 end
 
 function DownloadsUI.formatRefillStatus(request)
@@ -179,17 +179,17 @@ local function showRefillDetails(request, callbacks)
     local TextViewer = require("ui/widget/textviewer")
     local UIManager = require("ui/uimanager")
     local text = DownloadsUI.formatRefillStatus(request)
-    text = text .. "\n\n" .. I18n.t("Refill Retry reevaluates current unread positions. It does not retry a failed chapter or override pending manual deletion.")
-        .. "\n\n" .. I18n.t("Stop download ahead turns this manga's policy Off and stops pending refill. Already accepted chapter downloads remain.")
+    text = text .. "\n\n" .. I18n.t("Check again checks which unread chapters need downloading. It does not retry failed chapters or cancel pending manual deletion.")
+        .. "\n\n" .. I18n.t("Turn off auto-download stops future automatic additions for this manga. Queued and running downloads continue.")
     local viewer
     viewer = TextViewer:new{
-        title = I18n.f("Download ahead: %1", request.manga_title or tostring(request.manga_id or "")),
+        title = I18n.f("Auto-download: %1", request.manga_title or tostring(request.manga_id or "")),
         text = text,
         buttons_table = {
             {
                 {
                     id = "retry_refill",
-                    text = I18n.t("Retry refill"),
+                    text = I18n.t("Check again"),
                     enabled = callbacks.retry_refill ~= nil,
                     callback = function()
                         if callbacks.refill_is_current and not callbacks.refill_is_current(request) then return end
@@ -201,7 +201,7 @@ local function showRefillDetails(request, callbacks)
                 },
                 {
                     id = "stop_refill",
-                    text = I18n.t("Stop download ahead"),
+                    text = I18n.t("Turn off auto-download"),
                     enabled = callbacks.stop_refill ~= nil,
                     callback = function()
                         if callbacks.refill_is_current and not callbacks.refill_is_current(request) then return end

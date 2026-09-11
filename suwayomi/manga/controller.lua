@@ -646,7 +646,7 @@ function Methods:showKeepDownloadedMangaActions(manga, options)
         return false
     end
     local menu = SuwayomiUI.showMangaActionsMenu({
-        title = I18n.t("Download ahead"),
+        title = I18n.t("Auto-download"),
         actions = MangaActionMenu.buildKeepDownloadedActions(self, manga),
         on_back = guardMangaCallback(self, manga, function()
             self:showMangaActions(manga, options)
@@ -788,7 +788,7 @@ function Methods:confirmDownloadAllUnreadChaptersForManga(manga)
         end
 
         return self:confirmChapterDownloadBatch(manga, chapters, download_directory, {
-            scope = I18n.t("Download all unread (up to 50 new)"), unread = true,
+            scope = I18n.t("Download unread (up to 50)"), unread = true,
         })
     end
 
@@ -843,8 +843,8 @@ function Methods:keepNextUnreadChaptersForManga(manga, limit)
         local current_manga = context.manga
         if requested_limit == 50 then
             return self:showBulkActionConfirmation(
-                I18n.t("Keep the first 50 filtered unread chapters available? Existing downloads and queued chapters count toward this buffer."),
-                I18n.t("Enable download ahead"),
+                I18n.t("Automatically download the first 50 unread chapters matching the saved scanlator filter? Downloaded and queued chapters count toward the 50."),
+                I18n.t("Enable auto-download"),
                 function() return self:setMangaDownloadAhead(current_manga, requested_limit) end)
         end
         return self:setMangaDownloadAhead(current_manga, requested_limit)

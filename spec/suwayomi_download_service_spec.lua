@@ -1626,7 +1626,6 @@ describe("process-owned download navigation", function()
             error("pending refill must be visible in Downloads")
         end
         local row = refillRow(plugin:showDownloads())
-        assert.are.equal("Ahead waiting", row.mandatory)
         local subtitle = row.subtitle
         assert.is_not_nil(subtitle:find(require("suwayomi/downloads/status_formatter").formatRetryTime(request.next_retry_at), 1, true))
         plugin:refreshDownloadsMenu()

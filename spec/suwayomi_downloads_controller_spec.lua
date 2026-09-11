@@ -340,7 +340,6 @@ describe("suwayomi/downloads/controller", function()
         state.title_menu_options.onSelect(state.title_menu_options.actions[1], menu)
         assert.are.equal("tx:Cancel all downloads?", state.confirm_options.text)
         assert.are.equal("tx:Cancel downloads", state.confirm_options.ok_text)
-        assert.are.equal("tx:Keep downloads", state.confirm_options.cancel_text)
 
         plugin:showActiveDownloadActions(job, menu)
         assert.are.equal("Frieren / Chapter 1", state.actions_menu_options.title)

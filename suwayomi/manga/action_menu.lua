@@ -96,7 +96,7 @@ function MangaActionMenu.buildMainActions(owner, manga, options)
         -- Chapter title menus retain actions; read the saved policy when opened.
         text_func = function()
             local limit = getDownloadAheadLimit(owner, manga)
-            return limit > 0 and I18n.f("Download ahead: %1", limit) or I18n.t("Download ahead: Off")
+            return limit > 0 and I18n.f("Auto-download: %1", limit) or I18n.t("Auto-download: Off")
         end,
     })
     table.insert(actions, { id = "delete_read_downloaded", text = I18n.t("Delete read downloads"), destructive = true })
@@ -113,7 +113,7 @@ function MangaActionMenu.buildBulkDownloadActions()
         { id = "download_next_5_unread", text = I18n.t("Download next 5") },
         { id = "download_next_10_unread", text = I18n.t("Download next 10") },
         { id = "download_next_50_unread", text = I18n.t("Download next 50") },
-        { id = "download_all_unread", text = I18n.t("Download all unread (up to 50 new)") },
+        { id = "download_all_unread", text = I18n.t("Download unread (up to 50)") },
         { id = "download_all_chapters", text = I18n.t("Download all chapters (up to 50 new)") },
     }
 end
@@ -121,10 +121,10 @@ end
 function MangaActionMenu.buildKeepDownloadedActions(owner, manga)
     local limit = getDownloadAheadLimit(owner, manga)
     return {
-        { id = "keep_next_5_unread", text = I18n.t("Keep first 5 unread"), checked = limit == 5 },
-        { id = "keep_next_10_unread", text = I18n.t("Keep first 10 unread"), checked = limit == 10 },
-        { id = "keep_next_50_unread", text = I18n.t("Keep first 50 unread"), checked = limit == 50 },
-        { id = "keep_next_0_unread", text = I18n.t("Stop download ahead"), checked = limit == 0 },
+        { id = "keep_next_5_unread", text = I18n.t("First 5 unread"), checked = limit == 5 },
+        { id = "keep_next_10_unread", text = I18n.t("First 10 unread"), checked = limit == 10 },
+        { id = "keep_next_50_unread", text = I18n.t("First 50 unread"), checked = limit == 50 },
+        { id = "keep_next_0_unread", text = I18n.t("Turn off auto-download"), checked = limit == 0 },
     }
 end
 

@@ -632,11 +632,11 @@ function Methods:buildSettingsMenu()
                 {
                     text_func = function()
                         return I18n.f(
-                            "Delete after manual mark-read: %1",
+                            "Delete when marked read: %1",
                             self:getDeleteChaptersSettingSummary("delete_after_mark_read")
                         )
                     end,
-                    help_text = I18n.t("New manual mark-read actions may remove only the local archive. Busy downloads keep running; request deletion again after they finish. Accepted removal continues with this setting Off."),
+                    help_text = I18n.t("Applies when you manually mark chapters read in the plugin. Removes the downloaded file but keeps reading data. If a chapter is still downloading, request deletion again after it finishes. Turning this off does not cancel deletion requests already accepted."),
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:toggleDeleteAfterMarkRead(touchmenu_instance)
@@ -645,11 +645,11 @@ function Methods:buildSettingsMenu()
                 {
                     text_func = function()
                         return I18n.f(
-                            "Finish retention: %1",
+                            "Delete after reading: %1",
                             self:getDeleteChaptersSettingSummary("delete_finished_while_reading")
                         )
                     end,
-                    help_text = I18n.t("Keep the newest recorded completions per manga, not chapter-list positions. Completion requires completed status and close, or a plugin manual mark-read action. Live readers remain protected."),
+                    help_text = I18n.t("Keeps the chapters finished most recently in each manga, not the highest chapter numbers. A chapter counts after you or KOReader mark it finished and you close it, or you manually mark it read in the plugin. Open chapters are not deleted. Off disables only this setting."),
                     keep_menu_open = true,
                     callback = function(touchmenu_instance)
                         self:showDeleteFinishedWhileReadingDialog(touchmenu_instance)
@@ -660,42 +660,42 @@ function Methods:buildSettingsMenu()
                     keep_menu_open = true,
                     sub_item_table = {
                         {
-                            text = I18n.t("Next downloads and download ahead"),
+                            text = I18n.t("Download next and auto-download"),
                             callback = function()
-                                self:showMessage(I18n.t("Download next adds eligible unread downloads. Download ahead fills the earliest unread positions; existing downloads and queue work count. Both use source order and the exact saved scanlator filter, never a silent fallback to All.")
-                                    .. "\n\n" .. I18n.t("Ahead five with two existing positions needs only three downloads. Next five can add five more. Neither starts at the current reader page."))
+                                self:showMessage(I18n.t("Download next adds up to the chosen number of new unread downloads once. Auto-download fills the first unread chapters up to its limit; downloaded and queued chapters count. Both use source order and your saved scanlator filter, not your current chapter. Auto-download does not delete other downloads. Bulk actions add at most 50 new downloads.")
+                                    .. "\n\n" .. I18n.t("With auto-download set to 5, if 2 of the first 5 unread chapters are already downloaded, only 3 are added. Download next 5 can add 5 more."))
                             end,
                         },
                         {
-                            text = I18n.t("When download ahead runs"),
+                            text = I18n.t("When auto-download runs"),
                             callback = function()
-                                self:showMessage(I18n.t("Refill follows completed close, including native next-file reading; manual read/unread; actual read reconciliation; successful chapter load/return/refresh; and ahead or scanlator changes. Repaint, progress, and cancellation do not create refill requests. Pending work survives offline operation and restart."))
+                                self:showMessage(I18n.t("Auto-download checks for missing chapters after you finish and close a chapter, including when you open the next file in KOReader. It also checks after read status changes, after you open or refresh the chapter list or return to it, and after you change auto-download or the scanlator filter. Pending checks survive offline use and restarts."))
                             end,
                         },
                         {
                             text = I18n.t("Automatic finish marking"),
                             callback = function()
-                                self:showMessage(I18n.t("Download ahead works with manual read marking. For automatic marking, open a document, then use Cogwheel > Document > End of document action > Always mark as finished.")
+                                self:showMessage(I18n.t("Auto-download works with manual read marking. For automatic marking, open a document, then use Cogwheel > Document > End of document action > Always mark as finished.")
                                     .. "\n\n" .. I18n.t("This KOReader setting affects all documents. Your end action and removal settings stay unchanged. You can change it there at any time."))
                             end,
                         },
                         {
-                            text = I18n.t("Retry, Stop, and Cancel"),
+                            text = I18n.t("Check, turn off, or cancel"),
                             callback = function()
-                                self:showMessage(I18n.t("Refill Retry reevaluates the buffer; it does not retry failed chapters or override pending deletion. Stop download ahead turns the policy Off but keeps accepted jobs. Cancel retires the current refill for that manga; Cancel all retires every refill. Cancellation keeps ahead enabled for later reading or chapter actions."))
+                                self:showMessage(I18n.t("Check again checks which unread chapters need downloading. It does not retry failed chapters or cancel pending deletion. Turn off auto-download prevents future automatic additions; queued and running downloads continue. Cancel stops the current check for that manga, and Cancel all stops all current checks. Auto-download stays enabled after cancellation and can run again after reading or chapter actions."))
                             end,
                         },
                         {
-                            text = I18n.t("Completion and archive removal"),
+                            text = I18n.t("Finishing and deletion"),
                             callback = function()
-                                self:showMessage(I18n.t("Completed status plus close counts; reaching the last page alone does not. Manual completions also count for retention. Historical read flags do not authorize deletion. A completion without an archive occupies a position but cannot authorize deleting a later download.")
-                                    .. "\n\n" .. I18n.t("Keep 2 newest completions: after completing A, B, then C in one manga, A becomes eligible for removal. B and C remain. Live readers stay protected."))
+                                self:showMessage(I18n.t("A chapter counts as finished after you or KOReader mark it finished and you close it, or you manually mark it read in the plugin. Reaching the last page alone does not count unless KOReader marks the chapter finished. Old read status alone does not trigger deletion. A finished chapter without a downloaded file still counts toward the keep limit, but a file downloaded later is not deleted for that earlier finish.")
+                                    .. "\n\n" .. I18n.t("With Keep 2, finishing A, then B, then C in one manga makes A eligible for deletion. B and C stay downloaded. Open chapters are not deleted."))
                             end,
                         },
                         {
-                            text = I18n.t("Accepted manual deletion"),
+                            text = I18n.t("Manual deletion"),
                             callback = function()
-                                self:showMessage(I18n.t("Mark-read can succeed even when deletion is busy or blocked. Accepted removal keeps sidecars, backups, and reading metadata. Unread or a later accepted deliberate Download/Retry revokes remaining removal; failed, uncertain, duplicate, or automatic downloads do not. See the README for examples and safety details."))
+                                self:showMessage(I18n.t("Marking a chapter read can succeed even if its file cannot be deleted. Manual mark-read deletion preserves reading data and backups. Marking the chapter unread cancels pending deletion. A new Download or Retry action also cancels it once accepted; failed requests and automatic downloads do not."))
                             end,
                         },
                     },

@@ -915,9 +915,9 @@ describe("complete stored chapter loading", function()
     end
 
     for _, route in ipairs({
-        { method = "showBulkDownloadActions", text = "Download first unread" },
-        { method = "showKeepDownloadedActions", text = "Stop download ahead" },
-        { method = "showScanlatorFilterActions", text = "All scanlators" },
+        { method = "showBulkDownloadActions", id = "download_first_unread" },
+        { method = "showKeepDownloadedActions", id = "keep_next_0_unread" },
+        { method = "showScanlatorFilterActions", id = "scanlator_filter_all" },
     }) do
         for _, back in ipairs({ false, true }) do
             it("does not retarget a delayed " .. route.method .. (back and " Back" or " action"), function()
@@ -934,7 +934,7 @@ describe("complete stored chapter loading", function()
                 plugin[route.method](plugin)
                 for _, row in ipairs(loading.buttons) do
                     for _, button in ipairs(row) do
-                        if button.text == (back and "< Back" or route.text) then button.callback() end
+                        if button.id == (back and "back" or route.id) then button.callback() end
                     end
                 end
                 local dispatch = table.remove(scheduled)
@@ -1059,7 +1059,7 @@ describe("complete stored chapter loading", function()
         assert.are.same({}, messages)
     end)
 
-    it("explains an absent filter after a fresh Download ahead load without running its action", function()
+    it("explains an absent filter after a fresh Auto-download load without running its action", function()
         saved_filter = "Absent group"
         respond = function() return page(nodes(201, 205), 5, false) end
         plugin:keepNextUnreadChaptersForManga(manga, 5)
@@ -1366,7 +1366,7 @@ describe("complete stored chapter loading", function()
         assert.are.same({}, messages)
     end)
 
-    it("loads all stored pages before admitting a fresh Download ahead action", function()
+    it("loads all stored pages before admitting a fresh Auto-download action", function()
         prepareRefill()
         respond = function(request)
             local offset = request.variables.offset
