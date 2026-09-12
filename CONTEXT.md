@@ -4,6 +4,18 @@ This context describes reading and managing chapter downloads on a KOReader devi
 
 ## Language
 
+**On-device chapter**:
+A chapter whose archive is stored on this KOReader device. Server downloads and chapters merely listed by the server do not establish on-device availability; local presence alone does not establish archive integrity.
+_Avoid_: Server download, cached chapter metadata.
+
+**On-device library**:
+The manga with plugin-known on-device chapters, regardless of whether those manga belong to the Suwayomi server library. This collection is distinct from the server library and from the queue of download jobs.
+_Avoid_: Download queue, offline mirror of the server library.
+
+**Full library**:
+The combined view of the configured Suwayomi server's library manga and the on-device library. A locally stored manga's inclusion does not make it a member of the server library; manga from different server origins remain distinct.
+_Avoid_: Server library when referring to the combined collection.
+
 **Manual-delete intent**:
 An accepted request from a plugin manual mark-read action to remove only the chapter's captured local archive, preserving metadata; download work owning the chapter prevents acceptance. Its lifetime is independent of finish retention, and its authority never transfers to a replacement archive.
 _Avoid_: Finished-chapter record, retention candidate.
