@@ -52,6 +52,7 @@ SuwayomiUI.showExtensionActionMenu = BrowseUI.showExtensionActionMenu
 SuwayomiUI.showMangaMenu = BrowseUI.showMangaMenu
 SuwayomiUI.updateMangaMenu = BrowseUI.updateMangaMenu
 SuwayomiUI.showLibraryCategoryMenu = BrowseUI.showLibraryCategoryMenu
+SuwayomiUI.updateLibraryCategoryMenu = BrowseUI.updateLibraryCategoryMenu
 SuwayomiUI.showLibraryMangaMenu = BrowseUI.showLibraryMangaMenu
 SuwayomiUI.updateLibraryMangaMenu = BrowseUI.updateLibraryMangaMenu
 

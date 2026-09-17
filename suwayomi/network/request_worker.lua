@@ -155,12 +155,6 @@ function RequestWorker:run(credentials, request, result_path)
         if request.action == "update_manga_library_state" then
             return SuwayomiAPI.updateMangaLibraryState(credentials, request.manga_id, request.in_library == true)
         end
-        if request.action == "fetch_library_categories" then
-            return SuwayomiAPI.fetchCategories(credentials)
-        end
-        if request.action == "fetch_library_manga_pages" then
-            return fetchLibraryMangaPages(credentials)
-        end
         if request.action == "fetch_library_snapshot" then
             return fetchLibrarySnapshot(credentials)
         end

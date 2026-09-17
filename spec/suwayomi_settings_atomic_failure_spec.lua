@@ -176,6 +176,51 @@ describe("suwayomi settings atomic failure handling", function()
         require("ffi/util").joinPath = saved_join_path
     end)
 
+    it("keeps the committed Library after rejected replacement and distinguishes empty after restart", function()
+        local credentials = SuwayomiSettings:load()
+        assert.is_nil(SuwayomiSettings:loadLibraryCache(credentials))
+        assert(SuwayomiSettings:saveLibraryCache(credentials, {
+            categories = { { id = 1, name = "Saved" } },
+            manga = { { id = 7, title = "Kept", thumbnail_url = "/cover/7" } },
+        }))
+        io_adapter.fail_rename = true
+        assert.is_nil(SuwayomiSettings:saveLibraryCache(credentials, { categories = {}, manga = {} }))
+        SuwayomiSettings:setStore(SettingsStore:new({
+            path = settings_path, io = io_adapter, luasettings = SuwayomiSettings:open(),
+        }))
+        assert.are.equal("Kept", SuwayomiSettings:loadLibraryCache(credentials).manga[1].title)
+        assert.is_nil(SuwayomiSettings:loadLibraryCache({ server_url = "http://other.test" }))
+        io_adapter.fail_rename = false
+        assert(SuwayomiSettings:saveLibraryCache(credentials, { categories = {}, manga = {} }))
+        SuwayomiSettings:setStore(SettingsStore:new({
+            path = settings_path, io = io_adapter, luasettings = SuwayomiSettings:open(),
+        }))
+        assert.same({}, SuwayomiSettings:loadLibraryCache(credentials).manga)
+    end)
+
+    it("does not persist uncommitted Library row edits through an unrelated settings save", function()
+        local credentials = SuwayomiSettings:load()
+        local response = { categories = {}, manga = { { id = 7, title = "Committed", source = { name = "Original" } } } }
+        assert(SuwayomiSettings:saveLibraryCache(credentials, response))
+        response.manga[1].title = "Unsaved response"
+        local displayed = SuwayomiSettings:loadLibraryCache(credentials)
+        displayed.manga[1].source.name = "Unsaved display"
+        assert(SuwayomiSettings:saveMaxParallelChapterDownloads(3))
+        SuwayomiSettings:setStore(SettingsStore:new({
+            path = settings_path, io = io_adapter, luasettings = SuwayomiSettings:open(),
+        }))
+        local restarted = SuwayomiSettings:loadLibraryCache(credentials)
+        assert.are.equal("Committed", restarted.manga[1].title)
+        assert.are.equal("Original", restarted.manga[1].source.name)
+    end)
+
+    it("rejects unusable saved Library category metadata instead of exposing broken navigation", function()
+        local credentials = SuwayomiSettings:load()
+        local malformed = { categories = {}, manga = { { id = 7, title = "Broken", categories = "invalid" } } }
+        assert.is_nil(SuwayomiSettings:saveLibraryCache(credentials, malformed))
+        assert.is_nil(SuwayomiSettings:loadLibraryCache(credentials))
+    end)
+
     it("restores failed chapter status alongside Downloads after a cold restart", function()
         local manga = { id = "m1", title = "Example" }
         local chapter = { id = "c1", name = "One" }

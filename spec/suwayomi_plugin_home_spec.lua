@@ -143,12 +143,11 @@ describe("suwayomi/plugin/home", function()
             "suwayomi/ui",
             "suwayomi/i18n",
             "suwayomi/plugin/home",
-            "suwayomi/client/library",
         }
         local saved_modules
         local screen_width, screen_height, text_height
         local measurements, shown, freed, scheduled
-        local plugin, client
+        local plugin
 
         before_each(function()
             saved_modules = {}
@@ -202,9 +201,6 @@ describe("suwayomi/plugin/home", function()
                 return { t = function(text) return "tx:" .. text end }
             end
             plugin = require("suwayomi/plugin/home").methods
-            local Client = {}
-            require("suwayomi/client/library").install(Client)
-            client = setmetatable({ plugin = plugin }, { __index = Client })
         end)
 
         after_each(function()
@@ -214,15 +210,13 @@ describe("suwayomi/plugin/home", function()
             end
         end)
 
-        it("shows complete category and manga errors in a persistent scrollable viewer", function()
+        it("shows a long diagnostic in a persistent scrollable viewer", function()
             local message = "Server diagnostic\n" .. string.rep("Long diagnostic line\n", 120) .. "Final detail"
             text_height = 3200
 
-            client:showLibraryCategoriesResult({}, { ok = false, error = message })
-            client:showLibraryMangaResult(nil, {}, { ok = false, error = message })
             plugin:showMessage(message, { timeout = 3 })
 
-            assert.are.equal(3, #shown)
+            assert.are.equal(1, #shown)
             for _, widget in ipairs(shown) do
                 assert.are.equal("scrollable viewer", widget.kind)
                 assert.are.equal(message, widget.text)
@@ -233,7 +227,7 @@ describe("suwayomi/plugin/home", function()
                 assert.is_nil(widget.width)
             end
             assert.are.equal(0, scheduled)
-            assert.are.equal(3, freed)
+            assert.are.equal(1, freed)
         end)
 
         it("bounds the measurement viewport before constructing a huge diagnostic", function()

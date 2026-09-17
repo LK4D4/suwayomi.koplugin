@@ -188,6 +188,11 @@ end
 
 function Methods:showMessage(message, options)
     options = options or {}
+    if options.toast then
+        local Notification = require("ui/widget/notification")
+        UIManager:show(Notification:new{ text = message, timeout = options.timeout })
+        return
+    end
     local Screen = require("device").screen
     local Font = require("ui/font")
     local TextBoxWidget = require("ui/widget/textboxwidget")

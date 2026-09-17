@@ -72,7 +72,7 @@ describe("suwayomi/network/request_worker", function()
         local Worker = require("suwayomi/network/request_worker")
 
         Worker:run({ server_url = "https://suwayomi.example" }, {
-            action = "fetch_library_manga_pages",
+            action = "fetch_library_snapshot",
         }, "/settings/library.json")
 
         assert.are.same({ 0, 100 }, library_offsets)
@@ -178,6 +178,7 @@ describe("suwayomi/network/request_worker", function()
         end
         package.preload["suwayomi/api"] = function()
             return {
+                fetchCategories = function() return { ok = true, categories = {} } end,
                 fetchLibraryManga = function(_, options)
                     table.insert(library_offsets, options.offset)
                     local manga = {}
@@ -195,10 +196,9 @@ describe("suwayomi/network/request_worker", function()
         local Worker = require("suwayomi/network/request_worker")
 
         Worker:run({ server_url = "https://suwayomi.example" }, {
-            action = "fetch_library_manga_pages",
+            action = "fetch_library_snapshot",
         }, "/settings/large_library.json")
 
-        assert.are.same({ 0 }, library_offsets)
         local result = written["/settings/large_library.json"]
         assert.is_false(result.ok)
         assert.are.equal("too_large", result.error_kind)

@@ -1120,25 +1120,46 @@ function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
     })
 end
 
+local function buildLibraryCategoryRows(categories, onSelectCallback)
+    local rows = ListRows.buildLibraryCategoryMenuTable(categories, { on_select = onSelectCallback })
+    -- Native Menu invokes close_callback after selection too; only Back/Close
+    -- retires a Library screen, not opening one of its rows.
+    for _, row in ipairs(rows) do row.keep_menu_open = true end
+    return rows
+end
+
 function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
     options = options or {}
     return getListMenu().show{
         title = I18n.t("Suwayomi Library"),
         title_bar_left_icon = options.title_bar_left_icon,
-        item_table = ListRows.buildLibraryCategoryMenuTable(categories, {
-            on_select = onSelectCallback,
-        }),
+        item_table = buildLibraryCategoryRows(categories, onSelectCallback),
         close_callback = options.close_callback,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
         on_title_bar_left_hold = options.on_title_bar_left_hold,
     }
 end
 
-local function buildLibraryMangaMenuTable(manga_list, onSelectCallback)
-    return ListRows.buildMangaMenuTable(manga_list, {
+function BrowseUI.updateLibraryCategoryMenu(menu, categories, onSelectCallback, options)
+    options = options or {}
+    return getListMenu().update(menu, {
+        item_table = buildLibraryCategoryRows(categories, onSelectCallback),
+        title_bar_left_icon = options.title_bar_left_icon,
+        on_title_bar_left_tap = options.on_title_bar_left_tap,
+        on_title_bar_left_hold = options.on_title_bar_left_hold,
+    })
+end
+
+local function buildLibraryMangaMenuTable(manga_list, onSelectCallback, options)
+    local rows = ListRows.buildMangaMenuTable(manga_list, {
         show_in_library = false,
         on_select = onSelectCallback,
     })
+    for _, row in ipairs(rows) do row.keep_menu_open = true end
+    if #rows == 0 and options.empty_text then
+        rows[1] = { text = options.empty_text, select_enabled = false }
+    end
+    return rows
 end
 
 function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
@@ -1146,7 +1167,7 @@ function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
     return getListMenu().show{
         title = I18n.t("Suwayomi Library"),
         title_bar_left_icon = options.title_bar_left_icon,
-        item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
+        item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback, options),
         close_callback = options.close_callback,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
         on_title_bar_left_hold = options.on_title_bar_left_hold,
@@ -1163,7 +1184,7 @@ function BrowseUI.updateLibraryMangaMenu(menu, manga_list, onSelectCallback, opt
     return getListMenu().update(menu, {
         title = I18n.t("Suwayomi Library"),
         title_bar_left_icon = options.title_bar_left_icon,
-        item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback),
+        item_table = buildLibraryMangaMenuTable(manga_list, onSelectCallback, options),
         close_callback = options.close_callback,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
         on_title_bar_left_hold = options.on_title_bar_left_hold,

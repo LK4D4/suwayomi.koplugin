@@ -528,9 +528,6 @@ msgstr "Не вдалося завантажити \"%1\"%2: %3"
 msgid "Could not load Suwayomi extensions."
 msgstr "Не вдалося завантажити розширення Suwayomi."
 
-msgid "Could not load Suwayomi library."
-msgstr "Не вдалося завантажити бібліотеку Suwayomi."
-
 msgid "Could not load chapters."
 msgstr "Не вдалося завантажити розділи."
 
@@ -538,9 +535,6 @@ msgid "Could not load chapters. Auto-download will try again automatically."
 msgstr ""
 "Не вдалося завантажити список розділів. Автозавантаження спробує ще раз "
 "автоматично."
-
-msgid "Could not load library categories."
-msgstr "Не вдалося завантажити категорії бібліотеки."
 
 msgid "Could not load manga."
 msgstr "Не вдалося завантажити манґу."
@@ -562,6 +556,9 @@ msgstr ""
 msgid "Could not redownload chapter."
 msgstr "Не вдалося завантажити розділ заново."
 
+msgid "Could not refresh Library. Showing saved information."
+msgstr ""
+
 msgid "Could not retry download."
 msgstr "Не вдалося повторити завантаження."
 
@@ -582,9 +579,6 @@ msgstr "Не вдалося почати завдання розширення: 
 
 msgid "Could not start extension task: unknown error"
 msgstr "Не вдалося почати завдання розширення: невідома помилка"
-
-msgid "Could not start library loading: %1"
-msgstr "Не вдалося почати завантаження бібліотеки: %1"
 
 msgid "Could not start manga loading."
 msgstr "Не вдалося почати завантаження манґи."
@@ -965,26 +959,17 @@ msgstr "Вибір категорії бібліотеки"
 msgid "Library category picker settings are unavailable."
 msgstr "Налаштування вибору категорії бібліотеки недоступні."
 
-msgid ""
-"Library loading timed out. Check your connection, then open Library again."
+msgid "Library loaded, but could not be saved for next time."
 msgstr ""
-"Час очікування завантаження бібліотеки минув. Перевірте з'єднання, потім "
-"знову відкрийте бібліотеку."
 
 msgid "Loading canceled."
 msgstr "Завантаження скасовано."
-
-msgid "Loading categories..."
-msgstr "Завантаження категорій..."
 
 msgid "Loading chapters..."
 msgstr "Завантаження розділів..."
 
 msgid "Loading extensions..."
 msgstr "Завантаження розширень..."
-
-msgid "Loading library..."
-msgstr "Завантаження бібліотеки..."
 
 msgid "Loading manga..."
 msgstr "Завантаження манґи..."
@@ -1002,6 +987,10 @@ msgid "Login information"
 msgstr "Дані входу"
 
 msgid "Manga"
+msgstr "Манґа"
+
+#, fuzzy
+msgid "Manga %1"
 msgstr "Манґа"
 
 msgid "Manga actions"
@@ -1124,6 +1113,10 @@ msgstr "Немає завантажених прочитаних розділі�
 msgid "No results"
 msgstr "Немає результатів"
 
+#, fuzzy
+msgid "No saved Library information is available."
+msgstr "Опис недоступний."
+
 msgid "No saved filters."
 msgstr "Немає збережених фільтрів."
 
@@ -1230,6 +1223,10 @@ msgstr ""
 
 msgid "Redownload"
 msgstr "Завантажити заново"
+
+#, fuzzy
+msgid "Refresh"
+msgstr "Оновити розділи"
 
 msgid "Refresh chapters"
 msgstr "Оновити розділи"

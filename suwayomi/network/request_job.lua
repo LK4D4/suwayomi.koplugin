@@ -23,7 +23,7 @@ local function closeLoading(owner, loading_message)
 end
 
 local function showLoading(owner, message, cancel)
-    if owner and owner.showLoadingMessage then
+    if message and owner and owner.showLoadingMessage then
         return owner:showLoadingMessage(message, cancel)
     end
     return nil

@@ -1,689 +1,215 @@
 package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/suwayomi_client_spec_helper")
-local Marker = require("spec/support/i18n_marker")
 
-describe("suwayomi/client library flows", function()
-    after_each(function()
-        Marker.uninstall()
-        helper.clearClientModules()
-    end)
+describe("saved-first Library browsing", function()
+    after_each(function() helper.clearClientModules() end)
 
-    local newClient = helper.newClient
-
-    it("shows an empty library message", function()
-        local client, state = newClient({
-            api = {
-                fetchCategories = function()
-                    return { ok = true, categories = {} }
-                end,
-                fetchLibraryManga = function()
-                    return { ok = true, manga = {}, total_count = 0 }
-                end,
+    local function fixture(saved)
+        local requests, views, messages = {}, {}, {}
+        local credentials = { server_url = "http://library.test" }
+        local actions, title_options
+        local client = helper.newClient({
+            credentials = credentials,
+            ui_manager = { close = function(menu) menu.closed = true end },
+            capture_title_options = function(options) title_options = options end,
+            network_request_job = {
+                start = function(options) requests[#requests + 1] = options; return {} end,
+                cancel = function() end,
             },
             ui = {
-                showLibraryCategoryMenu = function()
-                    error("unexpected category menu")
+                showLibraryMangaMenu = function(rows, select, options)
+                    local menu = { rows = rows, select = select, options = options }
+                    views[#views + 1] = menu
+                    return menu
                 end,
-                showLibraryMangaMenu = function()
-                    error("unexpected manga menu")
+                updateLibraryMangaMenu = function(menu, rows, select, options)
+                    menu.rows, menu.select, menu.options = rows, select, options
                 end,
-            },
-        })
-
-        client:showLibrary()
-
-        assert.are.same({}, state.loading_messages)
-        assert.are.same({ "fetch_library_categories", "fetch_library_manga_pages" }, {
-            state.network_requests[1].request.action,
-            state.network_requests[2].request.action,
-        })
-        assert.are.equal("Your Suwayomi library is empty.", state.shown_messages[#state.shown_messages])
-        assert.are.equal("https://suwayomi.example", state.scheduled_sync_credentials().server_url)
-    end)
-
-    it("asks for setup when library credentials are missing", function()
-        local client, state = newClient({
-            credentials = { server_url = "" },
-            api = {
-                fetchCategories = function()
-                    error("unexpected category fetch")
+                showLibraryCategoryMenu = function(rows, select, options)
+                    local menu = { rows = rows, select = select, options = options, categories = true }
+                    views[#views + 1] = menu
+                    return menu
                 end,
-            },
-            ui = {},
-        })
-
-        client:showLibrary()
-
-        assert.are.equal("Set up your Suwayomi server login first.", state.shown_messages[#state.shown_messages])
-        assert.is_true(state.shown_onboarding_setup().first_run)
-        assert.is_nil(state.scheduled_sync_credentials())
-    end)
-
-    it("skips the category picker for a single category and routes row taps to manga information", function()
-        local shown_manga
-        local shown_menu_options
-        local tracked = {}
-        local client, state = newClient({
-            title_menu_options = { title_bar_left_icon = "appbar.menu" },
-            api = {
-                fetchCategories = function()
-                    return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
-                end,
-                fetchLibraryManga = function(_, options)
-                    assert.are.same({ first = 100, offset = 0 }, options)
-                    return {
-                        ok = true,
-                        manga = {
-                            {
-                                id = "m1",
-                                title = "Sousou no Frieren",
-                                unread_count = 12,
-                                source = { displayName = "MangaDex EN" },
-                                categories = { { id = "1", name = "Default" } },
-                            },
-                        },
-                        total_count = 1,
-                    }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function()
-                    error("unexpected category menu")
-                end,
-                showLibraryMangaMenu = function(manga, onSelect, menu_options)
-                    shown_manga = manga
-                    shown_menu_options = menu_options
-                    onSelect(manga[1])
-                    return { name = "library-menu" }
-                end,
-            },
-            trackSuwayomiScreen = function(route_id, widget)
-                table.insert(tracked, { route_id = route_id, widget = widget })
-            end,
-        })
-
-        client:showLibrary()
-
-        assert.are.equal("Sousou no Frieren", shown_manga[1].title)
-        assert.are.equal(12, shown_manga[1].unread_count)
-        assert.is_nil(shown_manga[1].menu_text)
-        assert.are.equal("appbar.menu", shown_menu_options.title_bar_left_icon)
-        assert.are.equal("https://suwayomi.example", shown_menu_options.thumbnail_credentials.server_url)
-        assert.are.equal("m1", state.shown_manga_actions().id)
-        assert.is_function(state.shown_manga_action_options().onMangaUpdated)
-        assert.are.equal("library_manga_loaded", state.log_events[#state.log_events].event)
-        assert.are.equal("library", tracked[1].route_id)
-        assert.are.equal("library-menu", tracked[1].widget.name)
-    end)
-
-    it("lets manga actions refresh the visible library row after membership changes", function()
-        local updated_manga
-        local updated_menu
-        local client = newClient({
-            api = {
-                fetchCategories = function()
-                    return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
-                end,
-                fetchLibraryManga = function()
-                    return {
-                        ok = true,
-                        manga = {
-                            {
-                                id = "m1",
-                                title = "Sousou no Frieren",
-                                in_library = true,
-                                unread_count = 12,
-                                source = { displayName = "MangaDex EN" },
-                                categories = { { id = "1", name = "Default" } },
-                            },
-                        },
-                    }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function()
-                    error("unexpected category menu")
-                end,
-                showLibraryMangaMenu = function(manga, onSelect)
-                    onSelect(manga[1])
-                    return { name = "library-menu" }
-                end,
-                updateLibraryMangaMenu = function(menu, manga)
-                    updated_menu = menu
-                    updated_manga = manga
+                updateLibraryCategoryMenu = function(menu, rows, select)
+                    menu.rows, menu.select = rows, select
                 end,
             },
         })
-
-        client.plugin.showMangaActions = function(_, manga, options)
-            manga.unread_count = 0
-            options.onMangaUpdated(manga)
+        client.plugin.showMangaActions = function(_, manga, options) actions = { manga = manga, options = options } end
+        local scope = credentials.server_url
+        client.settings.normalizeEndpointScope = function(_, url) return url end
+        client.settings.loadLibraryCache = function(_, current)
+            return current.server_url == scope and saved or nil
         end
-
-        client:showLibrary()
-
-        assert.are.equal("library-menu", updated_menu.name)
-        assert.are.equal("Sousou no Frieren", updated_manga[1].title)
-        assert.are.equal(0, updated_manga[1].unread_count)
-        assert.is_nil(updated_manga[1].menu_text)
-    end)
-
-    it("removes a manga from the visible library list after library removal", function()
-        local updated_manga
-        local client = newClient({
-            api = {
-                fetchCategories = function()
-                    return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
-                end,
-                fetchLibraryManga = function()
-                    return {
-                        ok = true,
-                        manga = {
-                            {
-                                id = "m1",
-                                title = "Sousou no Frieren",
-                                in_library = true,
-                                unread_count = 12,
-                                source = { displayName = "MangaDex EN" },
-                                categories = { { id = "1", name = "Default" } },
-                            },
-                        },
-                    }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function()
-                    error("unexpected category menu")
-                end,
-                showLibraryMangaMenu = function(manga, onSelect)
-                    onSelect(manga[1])
-                    return { name = "library-menu" }
-                end,
-                updateLibraryMangaMenu = function(_, manga)
-                    updated_manga = manga
-                end,
-            },
-        })
-
-        client.plugin.showMangaActions = function(_, manga, options)
-            manga.in_library = false
-            options.onMangaUpdated(manga)
+        client.settings.saveLibraryCache = function(_, current, listing)
+            scope, saved = current.server_url, listing
+            return listing
         end
+        client.settings.loadChapterLedger = function() return {} end
+        client.settings.loadReaderReturnContexts = function() return {} end
+        client.plugin.showMessage = function(_, message, options)
+            messages[#messages + 1] = { text = message, options = options }
+        end
+        return client, requests, views, messages, credentials,
+            function() return actions end, function() return title_options end
+    end
 
+    it("allows saved row selection before the server completes without a loading modal", function()
+        local client, requests, views, messages, _, actions = fixture({
+            categories = {}, manga = { { id = 7, title = "Saved" } },
+        })
         client:showLibrary()
-
-        assert.are.equal(0, #updated_manga)
+        assert.are.equal("Saved", views[1].rows[1].title)
+        views[1].select(views[1].rows[1])
+        assert.are.equal(7, actions().manga.id)
+        assert.is_nil(requests[1].loading_message)
+        requests[1].on_finish({ ok = false, error = "timeout" })
+        assert.are.equal("Saved", views[1].rows[1].title)
+        assert.are.equal(1, #views)
+        assert.is_true(messages[1].options.toast)
     end)
 
-    it("shows categories when multiple categories are present and filters selected category manga", function()
-        local shown_categories
-        local shown_category_menu_options
-        local shown_manga
-        local client = newClient({
-            title_menu_options = { title_bar_left_icon = "appbar.menu" },
-            api = {
-                fetchCategories = function()
-                    return {
-                        ok = true,
-                        categories = {
-                            { id = "1", name = "Default", manga_count = 1 },
-                            { id = "2", name = "Reading", manga_count = 1 },
-                        },
-                    }
-                end,
-                fetchLibraryManga = function()
-                    return {
-                        ok = true,
-                        manga = {
-                            {
-                                id = "m1",
-                                title = "Default Manga",
-                                categories = { { id = "1", name = "Default" } },
-                            },
-                            {
-                                id = "m2",
-                                title = "Reading Manga",
-                                unread_count = 3,
-                                categories = { { id = "2", name = "Reading" } },
-                            },
-                        },
-                    }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function(categories, onSelect, menu_options)
-                    shown_categories = categories
-                    shown_category_menu_options = menu_options
-                    onSelect(categories[3])
-                end,
-                showLibraryMangaMenu = function(manga)
-                    shown_manga = manga
-                end,
+    it("reconstructs only recorded existing downloads without modifying their data", function()
+        local path = os.tmpname()
+        local file = assert(io.open(path, "wb")); file:write("preserve archive bytes"); file:close()
+        local client, requests, views = fixture()
+        local ledger = {
+            one = { manga_id = 7, manga_title = "Recovered", chapter_id = 9, path = path,
+                read = true, pending_read_sync = true },
+            other = { manga_id = 8, manga_title = "Other server", path = path, endpoint_scope = "http://other.test" },
+            absent = { manga_id = 10, manga_title = "Absent", path = path .. "-absent" },
+        }
+        client.settings.loadChapterLedger = function() return ledger end
+        client:showLibrary()
+        assert.are.equal(1, #views[1].rows)
+        assert.are.equal("Recovered", views[1].rows[1].title)
+        assert.is_nil(views[1].rows[1].endpoint_scope)
+        requests[1].on_finish({ ok = false })
+        assert.is_true(ledger.one.read)
+        assert.is_true(ledger.one.pending_read_sync)
+        file = assert(io.open(path, "rb")); local bytes = file:read("*a"); file:close()
+        os.remove(path)
+        assert.are.equal("preserve archive bytes", bytes)
+    end)
+
+    it("shows uncategorized manga in Suwayomi's implicit Default category", function()
+        local client, _, views = fixture({
+            categories = { { id = 0, name = "Default" }, { id = 1, name = "Reading" } },
+            manga = {
+                { id = 7, title = "Default row", categories = {} },
+                { id = 8, title = "Categorized", categories = { { id = 1 } } },
             },
         })
-
         client:showLibrary()
-
-        assert.are.equal("All manga", shown_categories[1].name)
-        assert.are.equal("Default", shown_categories[2].name)
-        assert.are.equal("Reading", shown_categories[3].name)
-        assert.are.equal("appbar.menu", shown_category_menu_options.title_bar_left_icon)
-        assert.are.equal("Reading Manga", shown_manga[1].title)
-        assert.are.equal(3, shown_manga[1].unread_count)
-        assert.is_nil(shown_manga[1].menu_text)
+        views[1].select(views[1].rows[2])
+        assert.are.equal(1, #views[2].rows)
+        assert.are.equal(7, views[2].rows[1].id)
     end)
 
-    it("translates library screen chrome while keeping category names raw", function()
-        Marker.install()
-        package.loaded["suwayomi/client/library"] = nil
-        package.loaded["suwayomi/i18n"] = nil
+    it("keeps category selection usable during loading and applies a fresh snapshot to that selection", function()
+        local categories = { { id = 1, name = "First" }, { id = 2, name = "Second" } }
+        local client, requests, views = fixture({ categories = categories, manga = {
+            { id = 7, title = "First row", categories = { categories[1] } },
+            { id = 8, title = "Second row", categories = { categories[2] } },
+        } })
+        client:showLibrary()
+        views[1].select(views[1].rows[3])
+        assert.are.equal(8, views[2].rows[1].id)
+        requests[1].on_finish({ ok = true, categories = categories, manga = {
+            { id = 9, title = "New second row", categories = { categories[2] } },
+        } })
+        assert.are.equal(9, views[2].rows[1].id)
+        assert.are.equal(2, #views)
+        views[2].options.close_callback = nil
+        views[1].select(views[1].rows[2])
+        assert.same({}, views[2].rows)
+    end)
 
-        local shown_categories
-        local captured_title_options
-        local client, state = helper.newClient({
-            title_menu_options = { title_bar_left_icon = "appbar.menu" },
-            capture_title_options = function(menu_options)
-                captured_title_options = menu_options
-            end,
-            api = {
-                fetchCategories = function()
-                    return {
-                        ok = true,
-                        categories = {
-                            { id = "default", name = "Default" },
-                            { id = "reading", name = "Reading" },
-                        },
-                    }
-                end,
-                fetchLibraryManga = function()
-                    return { ok = true, manga = {} }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function(categories)
-                    shown_categories = categories
-                end,
-                showLibraryMangaMenu = function()
-                    error("unexpected manga menu")
-                end,
-            },
+    it("retries through ordinary Refresh and keeps successful empty results on reopening", function()
+        local client, requests, views, _, _, _, title = fixture({
+            categories = {}, manga = { { id = 7, title = "Old" } },
         })
-
         client:showLibrary()
-
-        assert.are.equal("tx:Suwayomi Library", captured_title_options.title)
-        assert.are.equal("tx:All manga", shown_categories[1].name)
-        assert.are.equal("Default", shown_categories[2].name)
-        assert.are.equal("Reading", shown_categories[3].name)
-        assert.are.equal("https://suwayomi.example", state.scheduled_sync_credentials().server_url)
+        requests[1].on_finish({ ok = false })
+        title().onSelect({ id = "refresh" })
+        requests[2].on_finish({ ok = true, categories = {}, manga = {} })
+        assert.same({}, views[1].rows)
+        client:showLibrary()
+        assert.same({}, views[2].rows)
     end)
 
-    it("can always show the category picker even for a single category", function()
-        local shown_categories
-        local client = newClient({
-            picker_behavior = "always",
-            api = {
-                fetchCategories = function()
-                    return { ok = true, categories = { { id = "1", name = "Default", manga_count = 1 } } }
-                end,
-                fetchLibraryManga = function()
-                    return {
-                        ok = true,
-                        manga = {
-                            { id = "m1", title = "Default Manga", categories = { { id = "1", name = "Default" } } },
-                        },
-                    }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function(categories, onSelect)
-                    shown_categories = categories
-                    onSelect(categories[2])
-                end,
-                showLibraryMangaMenu = function() end,
-            },
+    it("uses a successful response now but retains saved rows after rejected persistence", function()
+        local client, requests, views, messages = fixture({
+            categories = {}, manga = { { id = 7, title = "Committed" } },
         })
-
+        client.settings.saveLibraryCache = function() return nil, "rejected" end
         client:showLibrary()
-
-        assert.are.equal("All manga", shown_categories[1].name)
-        assert.are.equal("Default", shown_categories[2].name)
+        requests[1].on_finish({ ok = true, categories = {}, manga = { { id = 8, title = "Current" } } })
+        assert.are.equal(8, views[1].rows[1].id)
+        assert.is_truthy(messages[1])
+        client:showLibrary()
+        assert.are.equal(7, views[2].rows[1].id)
     end)
 
-    it("can skip the category picker even when multiple categories exist", function()
-        local shown_manga
-        local client = newClient({
-            picker_behavior = "never",
-            api = {
-                fetchCategories = function()
-                    return {
-                        ok = true,
-                        categories = {
-                            { id = "1", name = "Default", manga_count = 1 },
-                            { id = "2", name = "Reading", manga_count = 1 },
-                        },
-                    }
-                end,
-                fetchLibraryManga = function()
-                    return {
-                        ok = true,
-                        manga = {
-                            { id = "m1", title = "Default Manga", categories = { { id = "1", name = "Default" } } },
-                            { id = "m2", title = "Reading Manga", categories = { { id = "2", name = "Reading" } } },
-                        },
-                    }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function()
-                    error("unexpected category menu")
-                end,
-                showLibraryMangaMenu = function(manga)
-                    shown_manga = manga
-                end,
-            },
-        })
-
-        client:showLibrary()
-
-        assert.are.equal(2, #shown_manga)
-    end)
-
-    it("paginates library manga before filtering a selected category", function()
-        local fetch_offsets = {}
-        local first_page = {}
-        for index = 1, 100 do
-            table.insert(first_page, {
-                id = "default-" .. tostring(index),
-                title = "Default " .. tostring(index),
-                categories = { { id = "1", name = "Default" } },
+    for _, failure in ipairs({ "throw", "start", "timeout", "incomplete" }) do
+        it("preserves saved navigation after " .. failure .. " failure", function()
+            local client, requests, views, messages, _, actions = fixture({
+                categories = {}, manga = { { id = 7, title = "Saved" } },
             })
-        end
+            if failure == "throw" then
+                client.network_request_job.start = function() error("start failure") end
+            elseif failure == "start" then
+                client.network_request_job.start = function() return nil end
+            end
+            client:showLibrary()
+            if requests[1] then requests[1].on_finish({ ok = false, error = failure, manga = {} }) end
+            views[1].select(views[1].rows[1])
+            assert.are.equal(7, actions().manga.id)
+            assert.is_truthy(messages[1])
+            client:showLibrary()
+            assert.are.equal(7, views[2].rows[1].id)
+        end)
+    end
 
-        local shown_manga
-        local client = newClient({
-            api = {
-                fetchCategories = function()
-                    return {
-                        ok = true,
-                        categories = {
-                            { id = "1", name = "Default", manga_count = 100 },
-                            { id = "2", name = "Reading", manga_count = 1 },
-                        },
-                    }
-                end,
-                fetchLibraryManga = function(_, options)
-                    table.insert(fetch_offsets, options.offset)
-                    if options.offset == 0 then
-                        return { ok = true, manga = first_page, total_count = 101 }
-                    end
-                    return {
-                        ok = true,
-                        manga = {
-                            {
-                                id = "reading-1",
-                                title = "Reading Manga",
-                                categories = { { id = "2", name = "Reading" } },
-                            },
-                        },
-                        total_count = 101,
-                    }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function(categories, onSelect)
-                    onSelect(categories[3])
-                end,
-                showLibraryMangaMenu = function(manga)
-                    shown_manga = manga
-                end,
-            },
+    for _, invalidation in ipairs({ "server", "retired", "closed", "cancel", "newer" }) do
+        it("rejects obsolete results after " .. invalidation, function()
+            local client, requests, views, messages, credentials = fixture({
+                categories = {}, manga = { { id = 7, title = "Original" } },
+            })
+            client:showLibrary()
+            if invalidation == "server" then credentials.server_url = "http://other.test"
+            elseif invalidation == "retired" then client.plugin.suwayomi_host_retired = true
+            elseif invalidation == "closed" then views[1].options.close_callback()
+            elseif invalidation == "cancel" then client:cancelLibraryNetworkRequests()
+            else client:showLibrary() end
+            requests[1].on_finish({ ok = true, categories = {}, manga = { { id = 7, title = "Obsolete" } } })
+            assert.are.equal("Original", views[1].rows[1].title)
+            assert.same({}, messages)
+            client.plugin.suwayomi_host_retired = nil
+            client:showLibrary()
+            if invalidation == "server" then assert.same({}, views[#views].rows)
+            else assert.are.equal("Original", views[#views].rows[1].title) end
+        end)
+    end
+
+    it("retains the established explicit membership action on a saved row", function()
+        local client, _, views, _, _, actions = fixture({
+            categories = {}, manga = { { id = 7, title = "Saved", in_library = true } },
         })
-
         client:showLibrary()
-
-        assert.are.same({ 0, 100 }, fetch_offsets)
-        assert.are.equal("Reading Manga", shown_manga[1].title)
-        assert.is_nil(shown_manga[1].menu_text)
+        views[1].select(views[1].rows[1])
+        actions().manga.in_library = false
+        actions().options.onMangaUpdated()
+        assert.same({}, views[1].rows)
     end)
 
-    it("shows a selected-category empty message", function()
-        local client, state = newClient({
-            api = {
-                fetchCategories = function()
-                    return {
-                        ok = true,
-                        categories = {
-                            { id = "1", name = "Default", manga_count = 1 },
-                            { id = "2", name = "Reading", manga_count = 0 },
-                        },
-                    }
-                end,
-                fetchLibraryManga = function()
-                    return {
-                        ok = true,
-                        manga = {
-                            {
-                                id = "m1",
-                                title = "Default Manga",
-                                categories = { { id = "1", name = "Default" } },
-                            },
-                        },
-                    }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function(categories, onSelect)
-                    onSelect(categories[3])
-                end,
-                showLibraryMangaMenu = function()
-                    error("unexpected manga menu")
-                end,
-            },
-        })
-
-        client:showLibrary()
-
-        assert.are.equal("No manga in this library category.", state.shown_messages[#state.shown_messages])
-    end)
-
-    it("translates library fallback messages but keeps raw API errors", function()
-        Marker.install()
-        package.loaded["suwayomi/client/library"] = nil
-        package.loaded["suwayomi/i18n"] = nil
-
-        local client, state = newClient({
-            api = {
-                fetchCategories = function()
-                    return { ok = true, categories = {} }
-                end,
-                fetchLibraryManga = function()
-                    return { ok = true, manga = {} }
-                end,
-            },
-            ui = {
-                showLibraryCategoryMenu = function()
-                    error("unexpected category menu")
-                end,
-                showLibraryMangaMenu = function()
-                    error("unexpected manga menu")
-                end,
-            },
-        })
-
-        client:showLibraryMangaResult(nil, {}, { ok = false, error = "HTTP 500 from Suwayomi" })
-        assert.are.equal("HTTP 500 from Suwayomi", state.shown_messages[#state.shown_messages])
-
-        client:showLibraryCategoriesResult({}, { ok = false, error = "HTTP 503 category API" })
-        assert.are.equal("HTTP 503 category API", state.shown_messages[#state.shown_messages])
-
-        client:showLibraryMangaResult({ id = "reading", name = "Reading" }, {}, { ok = true, manga = {} })
-        assert.are.equal("tx:No manga in this library category.", state.shown_messages[#state.shown_messages])
-
-        client:showLibraryCategoriesResult({}, nil)
-        assert.are.equal("tx:Could not load Suwayomi library.", state.shown_messages[#state.shown_messages])
-    end)
-
-    it("uses action-aware timeout feedback for library loads", function()
-        local requests = {}
-        local client = newClient({
-            network_request_job = {
-                start = function(options)
-                    table.insert(requests, options)
-                    return { pid = #requests }
-                end,
-                cancel = function() end,
-            },
-            ui = {},
-        })
-
-        assert.is_true(client:showLibrary())
-
-        assert.are.equal(
-            "Library loading timed out. Check your connection, then open Library again.",
-            requests[1].timeout_message
-        )
-    end)
-
-    it("surfaces thrown library startup errors inside translated fallback message", function()
-        Marker.install()
-        package.loaded["suwayomi/client/library"] = nil
-        package.loaded["suwayomi/i18n"] = nil
-
-        local client, state = newClient({
-            network_request_job = {
-                start = function()
-                    error("worker boom", 0)
-                end,
-                cancel = function() end,
-            },
-            ui = {},
-        })
-
-        assert.is_false(client:showLibraryManga(nil))
-        assert.are.equal(
-            "tx:Could not start library loading: worker boom",
-            state.shown_messages[#state.shown_messages]
-        )
-    end)
-
-    it("surfaces soft library startup errors inside translated fallback message", function()
-        Marker.install()
-        package.loaded["suwayomi/client/library"] = nil
-        package.loaded["suwayomi/i18n"] = nil
-
-        local client, state = newClient({
-            network_request_job = {
-                start = function()
-                    return nil, "soft boom"
-                end,
-                cancel = function() end,
-            },
-            ui = {},
-        })
-
-        assert.is_false(client:showLibrary())
-        assert.are.equal(
-            "tx:Could not start library loading: soft boom",
-            state.shown_messages[#state.shown_messages]
-        )
-    end)
-
-    it("ignores stale library manga loads when a newer category wins", function()
-        local requests = {}
-        local canceled = {}
-        local shown_manga
-        local client = newClient({
-            api = {},
-            network_request_job = {
-                start = function(options)
-                    table.insert(requests, options)
-                    return {
-                        pid = #requests,
-                        on_cancel = options.on_cancel,
-                    }
-                end,
-                cancel = function(active)
-                    table.insert(canceled, active)
-                    if active.on_cancel then
-                        active.on_cancel()
-                    end
-                end,
-            },
-            ui = {
-                showLibraryMangaMenu = function(manga)
-                    shown_manga = manga
-                    return { name = "library-menu" }
-                end,
-            },
-        })
-
-        assert.is_true(client:showLibraryManga({ id = "1", name = "First" }))
-        assert.is_true(client:showLibraryManga({ id = "2", name = "Second" }))
-        assert.are.equal(1, #canceled)
-
-        requests[1].on_finish({
-            ok = true,
-            manga = {
-                { id = "old", title = "Old Manga", categories = { { id = "1" } } },
-            },
-        })
-        assert.is_nil(shown_manga)
-
-        requests[2].on_finish({
-            ok = true,
-            manga = {
-                { id = "new", title = "New Manga", categories = { { id = "2" } } },
-            },
-        })
-
-        assert.are.equal("New Manga", shown_manga[1].title)
-    end)
-
-    it("cancels active library requests and ignores late completions", function()
-        local requests = {}
-        local canceled = {}
-        local shown_manga
-        local client = newClient({
-            network_request_job = {
-                start = function(options)
-                    table.insert(requests, options)
-                    return {
-                        pid = #requests,
-                        on_cancel = options.on_cancel,
-                    }
-                end,
-                cancel = function(active)
-                    table.insert(canceled, active)
-                    if active.on_cancel then
-                        active.on_cancel()
-                    end
-                end,
-            },
-            ui = {
-                showLibraryMangaMenu = function(manga)
-                    shown_manga = manga
-                    return { name = "library-menu" }
-                end,
-            },
-        })
-
-        assert.is_true(client:showLibraryManga(nil))
-        assert.are.equal(1, #requests)
-
-        client:cancelLibraryNetworkRequests()
-
-        assert.are.equal(1, #canceled)
-        assert.is_nil(client.active_library_network_requests)
-
-        requests[1].on_finish({
-            ok = true,
-            manga = {
-                { id = "late", title = "Late Manga" },
-            },
-        })
-
-        assert.is_nil(shown_manga)
-    end)
+    for _, preference in ipairs({ "always", "never" }) do
+        it("honors the " .. preference .. " category picker preference offline", function()
+            local client, _, views = fixture({ categories = { { id = 1, name = "Single" } }, manga = {} })
+            client.settings.loadLibraryCategoryPickerBehavior = function() return preference end
+            client:showLibrary()
+            assert.are.equal(preference == "always", views[1].categories == true)
+        end)
+    end
 end)

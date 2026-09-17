@@ -102,6 +102,18 @@ Ordinary Delete and finish retention (Delete after reading in the UI) retain the
 
 KOReader's history touch can change archive timestamps without replacing it. `ReadSettings` captures strictly verified pre-touch evidence; `ReaderReady` completes a bounded ctime-only refresh. The checked update touches only matching archive, manual-request, and retention targets; after success, matching pending completion snapshots receive the same evidence. Generation, path, completion order, and deletion authority do not change.
 
+## Library cache
+
+`client/library.lua` renders the normal Library from saved information before launching a nonmodal `fetch_library_snapshot` request. The worker combines complete categories and every Library page; the API's `require_complete` option validates connection totals, continuation, and identities before normalization. Duplicate IDs, changing totals, truncated pages, or an oversized complete envelope fail the whole load. Offset pagination still assumes a stable server dataset.
+
+`settings.lua:loadLibraryCache` and `saveLibraryCache` own a single versioned `library_cache` entry in the existing checked document store. Scope uses the existing `normalizeEndpointScope` convention, not credentials or a multi-server registry. Missing, unsupported, or unusable data returns nil; a complete empty snapshot is usable and suppresses reconstruction. Save/read boundaries copy mutable listing metadata so display edits cannot leak into unrelated commits. Rejected writes retain committed information; ambiguous replacement follows the existing store fence. A successful server response still controls the live screen when persistence fails.
+
+Reconstruction reads only recorded existing paths in reader-return contexts and the chapter ledger, excluding known foreign endpoints. Unscoped legacy records may supply display information, never a new origin association. For known scoped numeric manga IDs, the standard relative thumbnail route reuses pre-cache covers. Reconstruction neither persists authoritative membership nor edits archives, progress, read state, download jobs, or deletion records. The next complete server result replaces it, including removals and emptiness.
+
+The client session captures endpoint, selection, widgets, and request identity; canceled, superseded, closed, or retired contexts cannot publish. Ordinary Refresh retries; failures use KOReader's nonblocking notification. Category and manga rows stay open on selection so the native Menu selection callback does not retire the Library. Category 0 includes manga with no explicit category membership. Raw and decoded thumbnails retain their existing keys; raw images decode locally and failed requests do not erase them.
+
+This is the handoff boundary for the chapter-cache ticket: reuse endpoint normalization and checked storage semantics, but retain chapter loading and reader return in their existing owners. No chapter-cache API, offline chapter loading, or offline reader return is implemented by the Library slice.
+
 ## Chapter loading and actions
 
 ### Complete data and live contexts
@@ -172,6 +184,7 @@ Credentials, inspector access files, settings, archives, and raw evidence remain
 | Host lifecycle, setup, service subscriptions | `spec/main_spec.lua` and plugin controller/connection-worker specs |
 | API pagination, chapter context, stale actions | API/manga/chapter specs; `spec/complete_chapter_loading_spec.lua` composes API, workers, menus, ledger, and queue across complete-load/failure boundaries. |
 | Browse, Library, source search, extensions | Matching `spec/suwayomi_client_*`, `suwayomi_browse_*`, source-filter and worker specs |
+| Saved-first Library | `spec/suwayomi_client_library_spec.lua`, API/request-worker specs, thumbnail specs, and checked-settings failure specs cover immediate selection, replacement, emptiness, reconstruction, scoped stale-result suppression, and rejected writes. Real sandbox/device controls establish native menu lifetime and rendered thumbnails. |
 | Source cancellation and host retirement | `spec/issue_45_spec.lua` composes the real shared subprocess helper with host lifecycle and confirmed-exit artifact cleanup. |
 | Menus, images, reader return | Matching UI specs and `spec/suwayomi_reader_return_spec.lua`; widgets are stubbed, not device-layout evidence. |
 | Queue ownership, recovery, persistence | `spec/suwayomi_download_service_spec.lua`, queue/lifecycle specs, `spec/suwayomi_settings_atomic_failure_spec.lua`, and `spec/suwayomi_settings_store_spec.lua`; composed checks cover read-only completion input and rejected/uncertain saves. |

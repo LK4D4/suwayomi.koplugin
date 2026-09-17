@@ -12,6 +12,9 @@ describe("suwayomi/ui/manga_menu", function()
         for _, name in ipairs({
             "suwayomi/ui/manga_menu",
             "suwayomi/ui/list_menu",
+            "suwayomi/ui/browse",
+            "suwayomi/ui/list_rows",
+            "ui/widget/multiinputdialog",
             "ui/bidi",
             "ffi/blitbuffer",
             "ui/renderimage",
@@ -285,6 +288,7 @@ describe("suwayomi/ui/manga_menu", function()
                 end,
             }
         end
+        package.preload["ui/widget/multiinputdialog"] = function() return {} end
         package.preload["ui/widget/menu"] = function()
             local Menu = {}
             function Menu:new(options)
@@ -326,6 +330,13 @@ describe("suwayomi/ui/manga_menu", function()
                 options.font_size = 18
                 options.line_color = "line"
                 options.show_parent = options
+                function options:onMenuChoice(item) if item.callback then item.callback() end end
+                function options:onMenuSelect(item)
+                    if item.select_enabled == false then return true end
+                    self:onMenuChoice(item)
+                    if self.close_callback then self.close_callback() end
+                    return true
+                end
                 function options:_recalculateDimen()
                     self.recalculated = true
                 end
@@ -386,6 +397,22 @@ describe("suwayomi/ui/manga_menu", function()
         end
         return widgets
     end
+
+    it("keeps Library navigation alive when native Menu selects categories and manga", function()
+        local browse = require("suwayomi/ui/browse")
+        local retired, selected, manga_menu = false
+        local categories = browse.showLibraryCategoryMenu({ { id = 1, name = "Reading" } }, function()
+            manga_menu = browse.showLibraryMangaMenu({ { id = 7, title = "Saved" } }, function(manga)
+                if not retired then selected = manga.id end
+            end, { close_callback = function() retired = true end })
+        end, { close_callback = function() retired = true end })
+        categories:onMenuSelect(categories.item_table[1])
+        manga_menu:onMenuSelect(manga_menu.item_table[1])
+        assert.are.equal(7, selected)
+        assert.is_false(retired)
+        manga_menu.close_callback()
+        assert.is_true(retired)
+    end)
 
     it("uses KOReader detailed-list sizing and cfont row text", function()
         local manga_menu = require("suwayomi/ui/manga_menu")

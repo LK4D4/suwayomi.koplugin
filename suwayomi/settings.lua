@@ -460,6 +460,57 @@ function SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
     return normalized
 end
 
+local function usableLibraryRows(rows)
+    if type(rows) ~= "table" then return false end
+    local count, seen = 0, {}
+    for index, row in pairs(rows) do
+        if type(index) ~= "number" or index < 1 or index % 1 ~= 0
+            or type(row) ~= "table" or (type(row.id) ~= "string" and type(row.id) ~= "number")
+            or tostring(row.id) == "" or seen[tostring(row.id)] then return false end
+        if row.title ~= nil and type(row.title) ~= "string" then return false end
+        if row.name ~= nil and type(row.name) ~= "string" then return false end
+        if row.thumbnail_url ~= nil and type(row.thumbnail_url) ~= "string" then return false end
+        if row.categories ~= nil and not usableLibraryRows(row.categories) then return false end
+        if row.source ~= nil and type(row.source) ~= "table" then return false end
+        seen[tostring(row.id)] = true
+        count = count + 1
+    end
+    return count == #rows
+end
+
+local function usableLibraryCache(cache)
+    return type(cache) == "table" and cache.version == 1
+        and usableLibraryRows(cache.manga) and usableLibraryRows(cache.categories)
+end
+
+local function copyLibraryValue(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for key, item in pairs(value) do result[key] = copyLibraryValue(item) end
+    return result
+end
+
+function SuwayomiSettings:loadLibraryCache(credentials)
+    local scope = self:normalizeEndpointScope(credentials and credentials.server_url)
+    local cache = self:getStore():readKey("library_cache")
+    if not scope or not usableLibraryCache(cache) or cache.endpoint_scope ~= scope then return nil end
+    return copyLibraryValue(cache)
+end
+
+function SuwayomiSettings:saveLibraryCache(credentials, listing)
+    local scope = self:normalizeEndpointScope(credentials and credentials.server_url)
+    local cache = {
+        version = 1,
+        endpoint_scope = scope,
+        manga = listing and listing.manga,
+        categories = listing and listing.categories,
+    }
+    if not scope or not usableLibraryCache(cache) then return nil, "invalid_library_cache" end
+    local ok, err = self:getStore():saveKey("library_cache", copyLibraryValue(cache))
+    if not ok then return nil, err end
+    return cache
+end
+
 function SuwayomiSettings:loadSourceCache(credentials_or_url)
     local server_url, auth_identity = self:getSourceCacheScope(credentials_or_url)
     local cache = self:getStore():readKey("source_cache", nil)

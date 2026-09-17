@@ -1,264 +1,247 @@
 -- Boundary: library flow.
 --
--- Responsibility: load library pages, apply category filtering, and route selected library manga actions.
--- Owned state: installed methods only; runtime state remains on SuwayomiClient instances.
--- Dependencies: SuwayomiClient core helpers and injected runtime services.
--- External data: validated by the moved methods before UI rendering or worker use.
+-- Responsibility: render saved Library information and replace it after a complete server load.
+-- Owned state: one Library session and its cancellable request on the client.
+-- Dependencies: checked settings, normal Library widgets, and the request worker.
+-- External data: only complete scoped snapshots are persisted; reconstruction is display-only.
 
 local M = {}
 local I18n = require("suwayomi/i18n")
 
 function M.install(SuwayomiClient)
 function SuwayomiClient:mangaBelongsToCategory(manga, category)
-    if not category or not category.id then
-        return true
-    end
-    for _index, candidate in ipairs(manga.categories or {}) do
-        if tostring(candidate.id) == tostring(category.id) then
-            return true
-        end
+    if not category or not category.id then return true end
+    if tostring(category.id) == "0" and #(manga.categories or {}) == 0 then return true end
+    for _, candidate in ipairs(manga.categories or {}) do
+        if tostring(candidate.id) == tostring(category.id) then return true end
     end
     return false
 end
 
 function SuwayomiClient:filterLibraryMangaByCategory(manga_list, category)
-    if not category or not category.id then
-        return manga_list or {}
+    local rows = {}
+    for _, manga in ipairs(manga_list or {}) do
+        if self:mangaBelongsToCategory(manga, category) then rows[#rows + 1] = manga end
     end
-
-    local filtered = {}
-    for _index, manga in ipairs(manga_list or {}) do
-        if self:mangaBelongsToCategory(manga, category) then
-            table.insert(filtered, manga)
-        end
-    end
-    return filtered
+    return rows
 end
 
 function SuwayomiClient:buildLibraryCategoryChoices(categories)
-    local choices = {
-        {
-            id = nil,
-            name = I18n.t("All manga"),
-        },
-    }
-    for _index, category in ipairs(categories or {}) do
-        table.insert(choices, category)
-    end
+    local choices = { { name = I18n.t("All manga") } }
+    for _, category in ipairs(categories or {}) do choices[#choices + 1] = category end
     return choices
 end
 
-local function libraryTimeoutMessage()
-    return I18n.t("Library loading timed out. Check your connection, then open Library again.")
+local function live(self, session)
+    if self.library_session ~= session or session.closed or self.plugin.suwayomi_host_retired then return false end
+    if session.scope ~= self.settings:normalizeEndpointScope(self.settings:load().server_url) then return false end
+    local widget = session.manga_menu or session.category_menu
+    return not widget or not self.plugin.isSuwayomiScreenActive or self.plugin:isSuwayomiScreenActive(widget)
 end
 
-function SuwayomiClient:startLibraryNetworkRequest(credentials, request, loading_message, on_finish)
-    local active_requests = self.active_library_network_requests or {}
-    self.active_library_network_requests = active_requests
-    local slot_key = tostring(request and request.action or "library_request")
-    local previous = active_requests[slot_key]
-    local request_job = self:getNetworkRequestJob()
-    if previous and previous.active and request_job.cancel then
-        request_job.cancel(previous.active)
-    end
-
-    local request_token = {}
-    active_requests[slot_key] = request_token
-    local ok, active, start_err = pcall(request_job.start, {
-        owner = self.plugin,
-        credentials = credentials,
-        request = request,
-        loading_message = loading_message,
-        result_prefix = "library_request",
-        timeout_seconds = self:getNetworkRequestTimeoutSeconds(),
-        timeout_message = libraryTimeoutMessage(),
-        on_cancel = function()
-            if active_requests[slot_key] == request_token then
-                active_requests[slot_key] = nil
-            end
-        end,
-        on_finish = function(result)
-            if active_requests[slot_key] ~= request_token then
-                return
-            end
-            active_requests[slot_key] = nil
-            if on_finish then
-                on_finish(result)
-            end
-        end,
-    })
-    if not ok then
-        start_err = active
-        active = nil
-    end
-    if not active then
-        if active_requests[slot_key] == request_token then
-            active_requests[slot_key] = nil
-        end
-        return false, start_err
-    end
-    if active_requests[slot_key] == request_token then
-        request_token.active = active
-    end
-    return true
+local function notify(self, message)
+    self.plugin:showMessage(message, { timeout = 3, toast = true })
 end
 
 function SuwayomiClient:cancelLibraryNetworkRequests()
-    local active_requests = self.active_library_network_requests
-    if not active_requests then
-        return
-    end
-
-    local request_job = self:getNetworkRequestJob()
-    for slot_key, request_token in pairs(active_requests) do
-        active_requests[slot_key] = nil
-        if request_token.active and request_job.cancel then
-            request_job.cancel(request_token.active)
-        end
-    end
-    self.active_library_network_requests = nil
+    local session = self.library_session
+    if not session then return end
+    session.request = nil
+    if session.active then self:getNetworkRequestJob().cancel(session.active) end
+    session.active = nil
 end
 
-function SuwayomiClient:showLibraryMangaResult(category, credentials, result)
-    if not result then
-        self.plugin:showMessage(I18n.t("Could not load Suwayomi library."))
-        return
-    end
-    if not result.ok then
-        self.plugin:showMessage(result.error or I18n.t("Could not load Suwayomi library."))
-        return
-    end
-
-    local manga = self:filterLibraryMangaByCategory(result.manga or {}, category)
-    self:log({
-        operation = "showLibrary",
-        event = "library_manga_loaded",
-        category_id = category and category.id,
-        manga_count = #manga,
-        total_count = result.total_count,
+local renderLibrary
+local function refreshLibrary(self, session)
+    if not live(self, session) then return false end
+    self:cancelLibraryNetworkRequests()
+    local token = {}
+    session.request = token
+    local ok, active = pcall(self:getNetworkRequestJob().start, {
+        owner = self.plugin,
+        credentials = session.credentials,
+        request = { action = "fetch_library_snapshot" },
+        result_prefix = "library_request",
+        timeout_seconds = self:getNetworkRequestTimeoutSeconds(),
+        on_cancel = function()
+            if session.request == token then session.request = nil end
+        end,
+        on_finish = function(result)
+            if not live(self, session) or session.request ~= token then return end
+            session.request, session.active = nil, nil
+            if not result or not result.ok then
+                notify(self, I18n.t("Could not refresh Library. Showing saved information."))
+                return
+            end
+            session.listing = result
+            session.saved = true
+            local saved = self.settings:saveLibraryCache(session.credentials, result)
+            renderLibrary(self, session)
+            if not saved then
+                notify(self, I18n.t("Library loaded, but could not be saved for next time."))
+            end
+        end,
     })
-
-    if #manga == 0 then
-        if category and category.id then
-            self.plugin:showMessage(I18n.t("No manga in this library category."))
-        else
-            self.plugin:showMessage(I18n.t("Your Suwayomi library is empty."))
+    if not ok or not active then
+        if session.request == token then
+            session.request = nil
+            notify(self, I18n.t("Could not refresh Library. Showing saved information."))
         end
-        return
+        return false
     end
+    if session.request == token then session.active = active end
+    return true
+end
 
-    local library_manga = manga
-    local menu_options = self:getTitleBarMenuOptions({
+local function menuOptions(self, session)
+    local options = self:getTitleBarMenuOptions({
         title = I18n.t("Suwayomi Library"),
+        actions = { { id = "refresh", text = I18n.t("Refresh") } },
+        captureActionGuard = function() return function() return live(self, session) end end,
+        onSelect = function(action)
+            if action.id == "refresh" then return refreshLibrary(self, session) end
+        end,
     }) or {}
-    menu_options.thumbnail_credentials = credentials
-    local library_menu
-    local pending_library_menu_refresh = false
-    local function refreshLibraryMangaMenu()
-        for index = #library_manga, 1, -1 do
-            if type(library_manga[index]) == "table" and library_manga[index].in_library == false then
-                table.remove(library_manga, index)
+    options.thumbnail_credentials = session.credentials
+    return options
+end
+
+local function renderManga(self, session)
+    local rows = self:filterLibraryMangaByCategory(session.listing.manga, session.category)
+    local options = menuOptions(self, session)
+    if not session.saved and #rows == 0 then
+        options.empty_text = I18n.t("No saved Library information is available.")
+    elseif session.category and session.category.id then
+        options.empty_text = I18n.t("No manga in this library category.")
+    else
+        options.empty_text = I18n.t("Your Suwayomi library is empty.")
+    end
+    local function select(manga)
+        if not live(self, session) then return end
+        local function updated()
+            if not live(self, session) then return end
+            for index = #session.listing.manga, 1, -1 do
+                if session.listing.manga[index].in_library == false then table.remove(session.listing.manga, index) end
+            end
+            renderManga(self, session)
+        end
+        if self.plugin.showMangaActions then
+            self.plugin:showMangaActions(manga, { onMangaUpdated = updated })
+        else
+            self.plugin:showChaptersForManga(manga)
+        end
+    end
+    if session.manga_menu then
+        self.ui.updateLibraryMangaMenu(session.manga_menu, rows, select, options)
+    else
+        options.close_callback = function()
+            session.manga_menu = nil
+            if not session.category_menu then
+                session.closed = true
+                self:cancelLibraryNetworkRequests()
             end
         end
-        if not library_menu then
-            pending_library_menu_refresh = true
-            return
-        end
-        if self.ui.updateLibraryMangaMenu then
-            self.ui.updateLibraryMangaMenu(library_menu, library_manga, function(selected_manga)
-                if self.plugin.showMangaActions then
-                    self.plugin:showMangaActions(selected_manga, {
-                        onMangaUpdated = refreshLibraryMangaMenu,
-                    })
-                else
-                    self.plugin:showChaptersForManga(selected_manga)
-                end
-            end, menu_options)
-        end
+        session.manga_menu = self.ui.showLibraryMangaMenu(rows, select, options)
+        self:trackScreen("library", session.manga_menu)
     end
+end
 
-    library_menu = self.ui.showLibraryMangaMenu(library_manga, function(selected_manga)
-        if self.plugin.showMangaActions then
-            self.plugin:showMangaActions(selected_manga, {
-                onMangaUpdated = refreshLibraryMangaMenu,
-            })
+renderLibrary = function(self, session)
+    local categories = session.listing.categories
+    local behavior = self.settings:loadLibraryCategoryPickerBehavior()
+    local picker = #categories > 0 and (behavior == "always" or (behavior == "automatic" and #categories > 1))
+    if session.category_menu or (picker and not session.category_selected) then
+        local options = menuOptions(self, session)
+        local function select(category)
+            if not live(self, session) then return end
+            session.category, session.category_selected = category, true
+            renderManga(self, session)
+        end
+        local choices = self:buildLibraryCategoryChoices(categories)
+        if session.category_menu then
+            self.ui.updateLibraryCategoryMenu(session.category_menu, choices, select, options)
         else
-            self.plugin:showChaptersForManga(selected_manga)
+            if session.manga_menu then
+                local menu = session.manga_menu
+                session.manga_menu = nil
+                menu.close_callback = nil
+                self:getUIManager():close(menu)
+                if self.plugin.getNavigation then self.plugin:getNavigation():pop(menu) end
+            end
+            options.close_callback = function()
+                session.closed = true
+                self:cancelLibraryNetworkRequests()
+            end
+            session.category_menu = self.ui.showLibraryCategoryMenu(choices, select, options)
+            self:trackScreen("library-categories", session.category_menu)
         end
-    end, menu_options)
-    self:trackScreen("library", library_menu)
-    if pending_library_menu_refresh then
-        refreshLibraryMangaMenu()
+        if session.manga_menu then renderManga(self, session) end
+    else
+        renderManga(self, session)
     end
 end
 
-function SuwayomiClient:showLibraryManga(category, credentials)
-    credentials = credentials or self.settings:load()
-    local started, err = self:startLibraryNetworkRequest(credentials, {
-        action = "fetch_library_manga_pages",
-    }, I18n.t("Loading library..."), function(result)
-        self:showLibraryMangaResult(category, credentials, result)
+local function reconstructLibrary(self, scope)
+    local lfs = require("suwayomi/fs")
+    local by_id, categories = {}, {}
+    local function add(entry)
+        if type(entry) ~= "table" or type(entry.path) ~= "string"
+            or not entry.manga_id or tostring(entry.manga_id) == ""
+            or (entry.endpoint_scope and entry.endpoint_scope ~= scope)
+            or lfs.attributes(entry.path, "mode") ~= "file" then return end
+        local key = tostring(entry.manga_id)
+        local manga = by_id[key] or { id = entry.manga_id, categories = {} }
+        by_id[key] = manga
+        manga.title = manga.title or entry.manga_title
+        manga.source = manga.source or entry.source
+        manga.thumbnail_url = manga.thumbnail_url or entry.thumbnail_url
+        -- Pre-cache releases saved identities but not cover URLs. Suwayomi's
+        -- standard relative cover route also addresses those existing thumbnails.
+        if not manga.thumbnail_url and entry.endpoint_scope == scope and scope and key:match("^%d+$") then
+            manga.thumbnail_url = "/api/v1/manga/" .. key .. "/thumbnail"
+        end
+        for _, category in ipairs(entry.categories or {}) do
+            if category.id and not categories[tostring(category.id)] then categories[tostring(category.id)] = category end
+            if category.id and not self:mangaBelongsToCategory(manga, category) then
+                manga.categories[#manga.categories + 1] = category
+            end
+        end
+    end
+    for _, entry in pairs(self.settings:loadReaderReturnContexts()) do add(entry) end
+    for _, entry in pairs(self.settings:loadChapterLedger()) do add(entry) end
+    local listing = { manga = {}, categories = {} }
+    for _, manga in pairs(by_id) do
+        manga.title = manga.title or I18n.f("Manga %1", manga.id)
+        listing.manga[#listing.manga + 1] = manga
+    end
+    table.sort(listing.manga, function(a, b)
+        if a.title == b.title then return tostring(a.id) < tostring(b.id) end
+        return a.title < b.title
     end)
-    if not started then
-        self.plugin:showMessage(I18n.f("Could not start library loading: %1", err or I18n.t("unknown error")))
-    end
-    return started
-end
-
-function SuwayomiClient:showLibraryCategoriesResult(credentials, result)
-    if not result then
-        self.plugin:showMessage(I18n.t("Could not load Suwayomi library."))
-        return
-    end
-    if not result.ok then
-        self.plugin:showMessage(result.error or I18n.t("Could not load library categories."))
-        return
-    end
-
-    local categories = result.categories or {}
-    local picker_behavior = self.settings.loadLibraryCategoryPickerBehavior
-        and self.settings:loadLibraryCategoryPickerBehavior()
-        or "automatic"
-    local should_show_category_picker = picker_behavior == "always"
-        or (picker_behavior == "automatic" and #categories > 1)
-
-    if should_show_category_picker and #categories > 0 then
-        local category_menu = self.ui.showLibraryCategoryMenu(self:buildLibraryCategoryChoices(categories), function(category)
-            self:showLibraryManga(category, credentials)
-        end, self:getTitleBarMenuOptions({
-            title = I18n.t("Suwayomi Library"),
-        }))
-        self:trackScreen("library-categories", category_menu)
-        return
-    end
-
-    self:showLibraryManga(nil, credentials)
+    for _, category in pairs(categories) do listing.categories[#listing.categories + 1] = category end
+    table.sort(listing.categories, function(a, b) return tostring(a.id) < tostring(b.id) end)
+    return listing
 end
 
 function SuwayomiClient:showLibrary()
-    return self:time("showLibrary", {}, function()
-        local credentials = self.settings:load()
-        if not credentials.server_url or credentials.server_url == "" then
-            self.plugin:showMessage(I18n.t("Set up your Suwayomi server login first."))
-            if self.plugin.showOnboardingSetup then
-                self.plugin:showOnboardingSetup({ first_run = true })
-            end
-            return
-        end
-        if self.plugin.schedulePendingReadSync then
-            self.plugin:schedulePendingReadSync(credentials)
-        end
-
-        local started, err = self:startLibraryNetworkRequest(credentials, {
-            action = "fetch_library_categories",
-        }, I18n.t("Loading categories..."), function(result)
-            self:showLibraryCategoriesResult(credentials, result)
-        end)
-        if not started then
-            self.plugin:showMessage(I18n.f("Could not start library loading: %1", err or I18n.t("unknown error")))
-        end
-        return started
-    end)
+    if self.plugin.suwayomi_host_retired then return end
+    self:cancelLibraryNetworkRequests()
+    local credentials = self.settings:load()
+    local scope = self.settings:normalizeEndpointScope(credentials.server_url)
+    local listing = self.settings:loadLibraryCache(credentials)
+    local session = {
+        credentials = credentials,
+        scope = scope,
+        listing = listing or reconstructLibrary(self, scope),
+        saved = listing ~= nil,
+    }
+    self.library_session = session
+    renderLibrary(self, session)
+    if session.scope then
+        if self.plugin.schedulePendingReadSync then self.plugin:schedulePendingReadSync(credentials) end
+        refreshLibrary(self, session)
+    end
+    return session.category_menu or session.manga_menu
 end
 end
 

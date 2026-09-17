@@ -1,5 +1,5 @@
 -- Boundary: sandbox-only authenticated observation and visible widget controls.
--- Adapts KOReader v2026.07.1's inspector; never exposes field values or logs requests.
+-- Adapts KOReader's inspector on desktop and touch-only Android; never exposes field values or logs requests.
 local DataStorage = require("datastorage")
 local UIManager = require("ui/uimanager")
 local PluginLoader = require("pluginloader")
@@ -32,7 +32,9 @@ userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
         end
         local function nestedLayout(widget, path, depth)
             if type(widget) ~= "table" or depth == 0 then return end
-            if type(widget.layout) == "table" then return widget.layout, path .. "layout/" end
+            if type(widget.layout) == "table" and next(widget.layout) then return widget.layout, path .. "layout/" end
+            -- Touch-only KOReader builds keep buttons outside the D-pad focus layout.
+            if type(widget.buttons_layout) == "table" then return widget.buttons_layout, path .. "buttons_layout/" end
             -- ConfirmBox keeps its buttons inside visual containers, not a named field.
             for index, child in ipairs(widget) do
                 local layout, child_path = nestedLayout(child, path .. index .. "/", depth - 1)
@@ -122,6 +124,7 @@ userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
                 }
             end
             local layout, layout_path = widget.layout, path .. "layout/"
+            if type(layout) == "table" and not next(layout) then layout = nil end
             if not layout and widget.button_table then
                 layout, layout_path = widget.button_table.layout, path .. "button_table/layout/"
             end

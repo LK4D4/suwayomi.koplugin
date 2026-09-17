@@ -452,17 +452,11 @@ msgstr "无法下载“%1”%2：%3"
 msgid "Could not load Suwayomi extensions."
 msgstr "无法加载 Suwayomi 扩展。"
 
-msgid "Could not load Suwayomi library."
-msgstr "无法加载 Suwayomi 书架。"
-
 msgid "Could not load chapters."
 msgstr "无法加载章节。"
 
 msgid "Could not load chapters. Auto-download will try again automatically."
 msgstr "无法加载章节列表。自动下载稍后会自动重试。"
-
-msgid "Could not load library categories."
-msgstr "无法加载书架分类。"
 
 msgid "Could not load manga."
 msgstr "无法加载漫画。"
@@ -481,6 +475,9 @@ msgstr "无法将下载加入队列。请重新打开章节列表并重试。"
 
 msgid "Could not redownload chapter."
 msgstr "无法重新下载章节。"
+
+msgid "Could not refresh Library. Showing saved information."
+msgstr ""
 
 msgid "Could not retry download."
 msgstr "无法重试下载。"
@@ -502,9 +499,6 @@ msgstr "无法开始扩展任务：%1"
 
 msgid "Could not start extension task: unknown error"
 msgstr "无法开始扩展任务：未知错误"
-
-msgid "Could not start library loading: %1"
-msgstr "无法开始加载书架：%1"
 
 msgid "Could not start manga loading."
 msgstr "无法开始加载漫画。"
@@ -868,24 +862,17 @@ msgstr "书架分类选择器"
 msgid "Library category picker settings are unavailable."
 msgstr "书架分类选择器设置不可用。"
 
-msgid ""
-"Library loading timed out. Check your connection, then open Library again."
-msgstr "书架加载超时。请检查连接，然后重新打开书架。"
+msgid "Library loaded, but could not be saved for next time."
+msgstr ""
 
 msgid "Loading canceled."
 msgstr "加载已取消。"
-
-msgid "Loading categories..."
-msgstr "正在加载分类..."
 
 msgid "Loading chapters..."
 msgstr "正在加载章节..."
 
 msgid "Loading extensions..."
 msgstr "正在加载扩展..."
-
-msgid "Loading library..."
-msgstr "正在加载书架..."
 
 msgid "Loading manga..."
 msgstr "正在加载漫画..."
@@ -903,6 +890,10 @@ msgid "Login information"
 msgstr "登录信息"
 
 msgid "Manga"
+msgstr "漫画"
+
+#, fuzzy
+msgid "Manga %1"
 msgstr "漫画"
 
 msgid "Manga actions"
@@ -1014,6 +1005,10 @@ msgstr "没有可删除的已读下载。"
 msgid "No results"
 msgstr "没有结果"
 
+#, fuzzy
+msgid "No saved Library information is available."
+msgstr "无可用描述。"
+
 msgid "No saved filters."
 msgstr "没有已保存的筛选器。"
 
@@ -1114,6 +1109,10 @@ msgstr "阅读或下载选项已更改。自动下载会使用当前选项。"
 
 msgid "Redownload"
 msgstr "重新下载"
+
+#, fuzzy
+msgid "Refresh"
+msgstr "刷新章节"
 
 msgid "Refresh chapters"
 msgstr "刷新章节"

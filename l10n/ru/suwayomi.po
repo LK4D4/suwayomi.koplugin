@@ -519,18 +519,12 @@ msgstr "Не удалось скачать «%1»%2: %3"
 msgid "Could not load Suwayomi extensions."
 msgstr "Не удалось загрузить расширения Suwayomi."
 
-msgid "Could not load Suwayomi library."
-msgstr "Не удалось загрузить библиотеку Suwayomi."
-
 msgid "Could not load chapters."
 msgstr "Не удалось загрузить главы."
 
 msgid "Could not load chapters. Auto-download will try again automatically."
 msgstr ""
 "Не удалось загрузить главы. Автозагрузка повторит попытку автоматически."
-
-msgid "Could not load library categories."
-msgstr "Не удалось загрузить категории библиотеки."
 
 msgid "Could not load manga."
 msgstr "Не удалось загрузить мангу."
@@ -552,6 +546,9 @@ msgstr ""
 msgid "Could not redownload chapter."
 msgstr "Не удалось скачать главу заново."
 
+msgid "Could not refresh Library. Showing saved information."
+msgstr ""
+
 msgid "Could not retry download."
 msgstr "Не удалось повторить загрузку."
 
@@ -572,9 +569,6 @@ msgstr "Не удалось запустить задачу расширения
 
 msgid "Could not start extension task: unknown error"
 msgstr "Не удалось запустить задачу расширения: неизвестная ошибка"
-
-msgid "Could not start library loading: %1"
-msgstr "Не удалось начать загрузку библиотеки: %1"
 
 msgid "Could not start manga loading."
 msgstr "Не удалось начать загрузку манги."
@@ -953,26 +947,17 @@ msgstr "Выбор категории библиотеки"
 msgid "Library category picker settings are unavailable."
 msgstr "Настройки выбора категории библиотеки недоступны."
 
-msgid ""
-"Library loading timed out. Check your connection, then open Library again."
+msgid "Library loaded, but could not be saved for next time."
 msgstr ""
-"Истекло время ожидания загрузки библиотеки. Проверьте подключение и снова "
-"откройте библиотеку."
 
 msgid "Loading canceled."
 msgstr "Загрузка отменена."
-
-msgid "Loading categories..."
-msgstr "Загрузка категорий..."
 
 msgid "Loading chapters..."
 msgstr "Загрузка глав..."
 
 msgid "Loading extensions..."
 msgstr "Загрузка расширений..."
-
-msgid "Loading library..."
-msgstr "Загрузка библиотеки..."
 
 msgid "Loading manga..."
 msgstr "Загрузка манги..."
@@ -990,6 +975,10 @@ msgid "Login information"
 msgstr "Данные входа"
 
 msgid "Manga"
+msgstr "Манга"
+
+#, fuzzy
+msgid "Manga %1"
 msgstr "Манга"
 
 msgid "Manga actions"
@@ -1110,6 +1099,10 @@ msgstr "Нет прочитанных загрузок для удаления."
 msgid "No results"
 msgstr "Нет результатов"
 
+#, fuzzy
+msgid "No saved Library information is available."
+msgstr "Описание недоступно."
+
 msgid "No saved filters."
 msgstr "Нет сохранённых фильтров."
 
@@ -1216,6 +1209,10 @@ msgstr ""
 
 msgid "Redownload"
 msgstr "Скачать заново"
+
+#, fuzzy
+msgid "Refresh"
+msgstr "Обновить главы"
 
 msgid "Refresh chapters"
 msgstr "Обновить главы"
