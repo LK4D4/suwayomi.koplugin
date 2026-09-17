@@ -544,14 +544,58 @@ function Parsers.parseMangaResponse(response_body)
     return manga, source_manga.hasNextPage == true
 end
 
-function Parsers.parseLibraryMangaResponse(response_body)
-    local payload, _, err = json.decode(response_body, 1, nil)
-    if err then
+local function removeJSONNulls(value)
+    for key, child in pairs(value) do
+        if child == json.null then value[key] = nil
+        elseif type(child) == "table" then removeJSONNulls(child) end
+    end
+end
+
+local function validLibraryNodes(nodes)
+    if type(nodes) ~= "table" or nodes == json.null
+        or (getmetatable(nodes) or {}).__jsontype ~= "array" then
+        return false
+    end
+    local seen = {}
+    for _, entry in ipairs(nodes) do
+        local id = type(entry) == "table" and entry.id
+        if not ((type(id) == "string" and id ~= "")
+            or (type(id) == "number" and id >= 0 and id <= 9007199254740991 and id == math.floor(id)))
+            or seen[tostring(id)] then
+            return false
+        end
+        seen[tostring(id)] = true
+    end
+    return true
+end
+
+local function completeLibraryConnection(payload, field)
+    if payload.errors ~= nil and payload.errors ~= json.null
+        and (type(payload.errors) ~= "table" or next(payload.errors) ~= nil) then
+        return nil
+    end
+    local connection = type(payload.data) == "table" and payload.data[field]
+    local total = type(connection) == "table" and connection.totalCount
+    local page_info = type(connection) == "table" and connection.pageInfo
+    if type(total) ~= "number" or total < 0 or total > 9007199254740991 or total ~= math.floor(total)
+        or type(page_info) ~= "table" or type(page_info.hasNextPage) ~= "boolean"
+        or not validLibraryNodes(connection.nodes) then
+        return nil
+    end
+    return connection
+end
+
+function Parsers.parseLibraryMangaResponse(response_body, require_complete)
+    local payload, _, err = json.decode(response_body, 1, json.null)
+    if err or type(payload) ~= "table" then
         return nil, "Invalid response from Suwayomi server."
     end
 
-    local mangas = payload and payload.data and payload.data.mangas
-    local manga_nodes = mangas and mangas.nodes
+    local mangas = type(payload.data) == "table" and payload.data.mangas
+    if require_complete and not completeLibraryConnection(payload, "mangas") then
+        return nil, "Suwayomi server returned incomplete library metadata."
+    end
+    local manga_nodes = type(mangas) == "table" and mangas.nodes
     if type(manga_nodes) ~= "table" then
         local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
         return nil, graph_error or "Suwayomi server did not return a library manga list."
@@ -559,15 +603,23 @@ function Parsers.parseLibraryMangaResponse(response_body)
 
     local parsed = {}
     for _, entry in ipairs(manga_nodes) do
+        if require_complete and type(entry.categories) == "table" and entry.categories ~= json.null
+            and not validLibraryNodes(entry.categories.nodes) then
+            return nil, "Suwayomi server returned invalid manga categories."
+        end
+        if type(entry) == "table" then removeJSONNulls(entry) end
         local manga = parseMangaNode(entry)
         if not manga then
             return nil, "Suwayomi server returned invalid manga data."
         end
         table.insert(parsed, manga)
     end
+    local has_next_page
+    if type(mangas.pageInfo) == "table" then has_next_page = mangas.pageInfo.hasNextPage end
     return {
         total_count = tonumber(mangas.totalCount) or #parsed,
         manga = parsed,
+        has_next_page = has_next_page,
     }
 end
 
@@ -582,8 +634,8 @@ function Parsers.parseMangaByIdResponse(response_body)
     return parsed.manga[1]
 end
 
-function Parsers.parseCategoryResponse(response_body)
-    local payload, _, err = json.decode(response_body, 1, nil)
+function Parsers.parseCategoryResponse(response_body, require_complete)
+    local payload, _, err = json.decode(response_body, 1, json.null)
     if err or type(payload) ~= "table" then
         return nil, "Invalid response from Suwayomi server."
     end
@@ -601,8 +653,15 @@ function Parsers.parseCategoryResponse(response_body)
         return nil, "Suwayomi server did not return categories."
     end
 
+    if require_complete then
+        local connection = completeLibraryConnection(payload, "categories")
+        if not connection or connection.pageInfo.hasNextPage or connection.totalCount ~= #category_nodes then
+            return nil, "Suwayomi server returned incomplete categories."
+        end
+    end
     local categories = {}
     for _, category in ipairs(category_nodes) do
+        if type(category) == "table" then removeJSONNulls(category) end
         if type(category) ~= "table" or category.id == nil then
             return nil, "Suwayomi server returned invalid category data."
         end
@@ -684,13 +743,6 @@ local function parseCompleteChapterNodes(chapter_nodes, sort)
         end)
     end
     return chapters
-end
-
-local function removeJSONNulls(value)
-    for key, child in pairs(value) do
-        if child == json.null then value[key] = nil
-        elseif type(child) == "table" then removeJSONNulls(child) end
-    end
 end
 
 function Parsers.parseRefreshMangaResponse(response_body)

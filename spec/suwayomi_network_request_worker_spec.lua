@@ -187,7 +187,7 @@ describe("suwayomi/network/request_worker", function()
                             title = string.rep("x", 32),
                         }
                     end
-                    return { ok = true, manga = manga, total_count = 300 }
+                    return { ok = true, manga = manga, total_count = 300, has_next_page = true }
                 end,
             }
         end
@@ -199,10 +199,10 @@ describe("suwayomi/network/request_worker", function()
         }, "/settings/large_library.json")
 
         assert.are.same({ 0 }, library_offsets)
-        assert.are.same({
-            ok = false,
-            error = "Suwayomi library is too large to load at once.",
-        }, written["/settings/large_library.json"])
+        local result = written["/settings/large_library.json"]
+        assert.is_false(result.ok)
+        assert.are.equal("too_large", result.error_kind)
+        assert.is_nil(result.manga)
     end)
 
     it("updates manga library state inside the worker process", function()

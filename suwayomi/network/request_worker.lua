@@ -5,7 +5,7 @@
 -- Owned state: none.
 -- Dependencies: dkjson, Suwayomi API facade, and shared subprocess result IO.
 -- External data: request tables and API results are normalized before writing;
--- complete chapter results must fit the shared result-file byte budget.
+-- complete Library snapshots and chapter results must fit the result-file budget.
 
 local json = require("dkjson")
 local SuwayomiAPI = require("suwayomi/api")
@@ -14,58 +14,74 @@ local SubprocessJob = require("suwayomi/subprocess/job")
 local RequestWorker = {}
 local LIBRARY_TOO_LARGE_ERROR = "Suwayomi library is too large to load at once."
 
-local function libraryResultExceedsLimit(manga, total_count)
-    local limit = tonumber(SubprocessJob.max_result_bytes)
-    if not limit or limit <= 0 then
-        return false
-    end
-    local encoded = json.encode({
-        ok = true,
-        manga = manga,
-        total_count = total_count,
-    })
-    return type(encoded) == "string" and #encoded > limit
+local function incompleteLibraryLoad(reason)
+    return {
+        ok = false,
+        error_kind = "incomplete",
+        error = reason or "Suwayomi server returned an incomplete library.",
+    }
 end
 
-local function fetchLibraryMangaPages(credentials)
+local function fetchLibraryMangaPages(credentials, categories)
     local page_size = 100
-    local offset = 0
-    local all_manga = {}
+    local all_manga, seen = {}, {}
+    local snapshot = { ok = true, categories = categories, manga = all_manga }
     local total_count
+    local result_bytes
+    local limit = tonumber(SubprocessJob.max_result_bytes) or 4 * 1024 * 1024
 
     while true do
         local result = SuwayomiAPI.fetchLibraryManga(credentials, {
             first = page_size,
-            offset = offset,
+            offset = #all_manga,
+            require_complete = true,
         })
-        if not result.ok then
-            return result
+        if type(result) ~= "table" or result.ok ~= true then
+            return incompleteLibraryLoad(type(result) == "table" and result.error or nil)
         end
-
-        local page_manga = result.manga or {}
+        local page_manga = result.manga
+        local total = result.total_count
+        if type(page_manga) ~= "table" or type(total) ~= "number"
+            or total < 0 or total > 9007199254740991 or total ~= math.floor(total)
+            or type(result.has_next_page) ~= "boolean"
+            or (total_count ~= nil and total_count ~= total) then
+            return incompleteLibraryLoad()
+        end
+        total_count = total
+        snapshot.total_count = total_count
+        if not result_bytes then result_bytes = #json.encode(snapshot) end
+        if #page_manga > page_size or #all_manga + #page_manga > total_count then
+            return incompleteLibraryLoad()
+        end
         for _, manga in ipairs(page_manga) do
-            table.insert(all_manga, manga)
+            if type(manga) ~= "table" or manga.id == nil or seen[tostring(manga.id)] then
+                return incompleteLibraryLoad()
+            end
+            seen[tostring(manga.id)] = true
+            result_bytes = result_bytes + #json.encode(manga) + (#all_manga > 0 and 1 or 0)
+            if result_bytes > limit then
+                return { ok = false, error_kind = "too_large", error = LIBRARY_TOO_LARGE_ERROR }
+            end
+            all_manga[#all_manga + 1] = manga
         end
-        total_count = tonumber(result.total_count) or #all_manga
-
-        if libraryResultExceedsLimit(all_manga, total_count) then
-            return {
-                ok = false,
-                error = LIBRARY_TOO_LARGE_ERROR,
-            }
+        if result_bytes > limit then
+            return { ok = false, error_kind = "too_large", error = LIBRARY_TOO_LARGE_ERROR }
         end
-
-        if #page_manga == 0 or #page_manga < page_size or #all_manga >= total_count then
-            break
+        if #all_manga == total_count and result.has_next_page == false then
+            return snapshot
         end
-        offset = offset + page_size
+        if #page_manga < page_size or #all_manga == total_count or result.has_next_page == false then
+            return incompleteLibraryLoad()
+        end
     end
+end
 
-    return {
-        ok = true,
-        manga = all_manga,
-        total_count = total_count,
-    }
+local function fetchLibrarySnapshot(credentials)
+    local result = SuwayomiAPI.fetchCategories(credentials, { require_complete = true })
+    if type(result) ~= "table" or result.ok ~= true or type(result.categories) ~= "table" then
+        return incompleteLibraryLoad(type(result) == "table" and result.error or nil)
+    end
+    return fetchLibraryMangaPages(credentials, result.categories)
 end
 
 local function fetchReaderReturnChapters(credentials, manga_id)
@@ -144,6 +160,9 @@ function RequestWorker:run(credentials, request, result_path)
         end
         if request.action == "fetch_library_manga_pages" then
             return fetchLibraryMangaPages(credentials)
+        end
+        if request.action == "fetch_library_snapshot" then
+            return fetchLibrarySnapshot(credentials)
         end
         return {
             ok = false,

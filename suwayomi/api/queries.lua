@@ -191,7 +191,8 @@ local function buildLibraryMangaQuery(options, fields)
     end
 
     return json.encode({
-        query = "query GET_LIBRARY_MANGAS($filter: MangaFilterInput, $first: Int, $offset: Int, $order: [MangaOrderInput!]) { mangas(filter: $filter, first: $first, offset: $offset, order: $order) { totalCount nodes { "
+        query = "query GET_LIBRARY_MANGAS($filter: MangaFilterInput, $first: Int, $offset: Int, $order: [MangaOrderInput!]) { mangas(filter: $filter, first: $first, offset: $offset, order: $order) { totalCount "
+            .. (options.require_complete and "pageInfo { hasNextPage } " or "") .. "nodes { "
             .. fields
             .. " unreadCount downloadCount source { id displayName name lang } categories { nodes { id name order } } firstUnreadChapter { id name chapterNumber sourceOrder scanlator isRead } } } }",
         variables = variables,
@@ -230,9 +231,11 @@ function Queries._buildLegacyMangaByIdQuery(manga_id)
     return buildMangaByIdQuery(manga_id, LEGACY_MANGA_FIELDS)
 end
 
-function Queries._buildCategoryQuery()
+function Queries._buildCategoryQuery(options)
     return json.encode({
-        query = "query GET_LIBRARY_CATEGORIES { categories { nodes { id name order mangas { totalCount } } } }",
+        query = "query GET_LIBRARY_CATEGORIES { categories { "
+            .. (options and options.require_complete and "totalCount pageInfo { hasNextPage } " or "")
+            .. "nodes { id name order mangas { totalCount } } } }",
     })
 end
 

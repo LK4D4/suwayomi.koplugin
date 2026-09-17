@@ -343,7 +343,7 @@ function SuwayomiAPI.fetchLibraryManga(credentials, options)
         end
     end
 
-    local parsed, parse_error = SuwayomiAPI.parseLibraryMangaResponse(result.response_body)
+    local parsed, parse_error = SuwayomiAPI.parseLibraryMangaResponse(result.response_body, options and options.require_complete)
     if not parsed then
         logDebugEvent({ operation = "fetchLibraryManga", event = "parse_error", error = parse_error })
         return {
@@ -356,6 +356,7 @@ function SuwayomiAPI.fetchLibraryManga(credentials, options)
         ok = true,
         manga = parsed.manga,
         total_count = parsed.total_count,
+        has_next_page = parsed.has_next_page,
     }
 end
 
@@ -387,13 +388,13 @@ function SuwayomiAPI.fetchMangaById(credentials, manga_id)
     }
 end
 
-function SuwayomiAPI.fetchCategories(credentials)
-    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildCategoryQuery(), "fetchCategories")
+function SuwayomiAPI.fetchCategories(credentials, options)
+    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildCategoryQuery(options), "fetchCategories")
     if not result.ok then
         return result
     end
 
-    local categories, parse_error = SuwayomiAPI.parseCategoryResponse(result.response_body)
+    local categories, parse_error = SuwayomiAPI.parseCategoryResponse(result.response_body, options and options.require_complete)
     if not categories then
         logDebugEvent({ operation = "fetchCategories", event = "parse_error", error = parse_error })
         return {
