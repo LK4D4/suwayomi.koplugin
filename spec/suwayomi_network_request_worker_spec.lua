@@ -39,6 +39,9 @@ describe("suwayomi/network/request_worker", function()
         end
         package.preload["suwayomi/api"] = function()
             return {
+                fetchCategories = function()
+                    return { ok = true, categories = { { id = "reading", name = "Reading" } } }
+                end,
                 fetchLibraryManga = function(_, options)
                     table.insert(library_offsets, options.offset)
                     if options.offset == 0 then
@@ -75,6 +78,19 @@ describe("suwayomi/network/request_worker", function()
         assert.are.same({ 0, 100 }, library_offsets)
         assert.is_true(written["/settings/library.json"].ok)
         assert.are.equal(101, #written["/settings/library.json"].manga)
+    end)
+
+    it("publishes categories and the complete Library together", function()
+        local Worker = require("suwayomi/network/request_worker")
+        local result = Worker:run({}, { action = "fetch_library_snapshot" }, "/settings/snapshot.json")
+
+        assert.is_true(result.ok)
+        assert.are.same({ { id = "reading", name = "Reading" } }, result.categories)
+        assert.are.equal(101, result.total_count)
+        assert.are.equal(101, #result.manga)
+        assert.are.equal("m1", result.manga[1].id)
+        assert.are.equal("m101", result.manga[101].id)
+        assert.are.same(result, written["/settings/snapshot.json"])
     end)
 
     it("fails clearly before library worker results exceed the subprocess cap", function()
