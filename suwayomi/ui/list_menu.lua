@@ -4,8 +4,8 @@
 -- thumbnails while preserving KOReader Menu navigation, title bars, paging
 -- rows, and callbacks.
 -- Owned state: visible thumbnail download jobs for the menu instance.
--- Dependencies: KOReader Menu/widget primitives, thumbnail cache/worker, and
--- shared menu utilities.
+-- Dependencies: KOReader Menu/widget primitives and image decoder, thumbnail
+-- cache/worker, and shared menu utilities.
 -- External data: titles, status labels, and thumbnail URLs are displayed or
 -- fetched only after nil-safe normalization by upstream row builders.
 
@@ -306,6 +306,12 @@ function ListMenuItem:buildThumbnail(slot_width, slot_height)
         if is_decoded_path and ThumbnailCache.loadDecoded then
             local ok
             ok, decoded_image = pcall(ThumbnailCache.loadDecoded, self.entry.thumbnail_path)
+            decoded_image = ok and decoded_image or nil
+        elseif not is_decoded_path then
+            local ok
+            ok, decoded_image = pcall(function()
+                return require("ui/renderimage"):renderImageFile(self.entry.thumbnail_path, false)
+            end)
             decoded_image = ok and decoded_image or nil
         end
         if decoded_image then

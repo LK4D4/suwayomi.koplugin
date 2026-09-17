@@ -749,6 +749,27 @@ describe("suwayomi/ui/manga_menu", function()
         assert.are.equal(1, #started_jobs)
     end)
 
+    it("keeps raw decode failures on placeholders without blocking other rows", function()
+        cache_paths["/invalid.jpg"] = "/settings/invalid.jpg"
+        image_errors["/settings/invalid.jpg"] = "invalid image"
+        cache_paths["/unavailable.png"] = "/settings/unavailable.png"
+        local manga_menu = require("suwayomi/ui/manga_menu")
+        local menu = manga_menu.show{
+            title = "Results",
+            thumbnail_credentials = { server_url = "https://suwayomi.example" },
+            item_table = {
+                { text = "Invalid", thumbnail_url = "/invalid.jpg" },
+                { text = "Unavailable", thumbnail_url = "/unavailable.png" },
+            },
+        }
+
+        assert.is_nil(findWidgetByKind(menu.item_group[1], "image"))
+        assert.is_nil(findWidgetByKind(menu.item_group[2], "image"))
+        assert.is_not_nil(findWidgetByKind(menu.item_group[1], "text"))
+        assert.is_not_nil(findWidgetByKind(menu.item_group[2], "text"))
+        assert.are.equal(2, #menu.item_group)
+    end)
+
     it("cancels active thumbnail jobs when menu contents are replaced", function()
         local manga_menu = require("suwayomi/ui/manga_menu")
         local menu = manga_menu.show{

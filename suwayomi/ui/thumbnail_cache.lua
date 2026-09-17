@@ -157,7 +157,10 @@ function ThumbnailCache.find(credentials, thumbnail_url, options)
     for _, extension in ipairs(RAW_IMAGE_EXTENSIONS) do
         local path = FFIUtil.joinPath(cache_dir, key .. "." .. extension)
         if lfs.attributes(path, "mode") == "file" then
-            os.remove(path)
+            local size = tonumber(lfs.attributes(path, "size"))
+            if size and size > 0 and size <= ThumbnailCache.MAX_THUMBNAIL_BYTES then
+                return path
+            end
         end
     end
     return nil

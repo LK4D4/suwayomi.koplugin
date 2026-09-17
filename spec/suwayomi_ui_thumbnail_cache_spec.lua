@@ -205,6 +205,22 @@ describe("suwayomi/ui/thumbnail_cache", function()
         assert.is_nil(cache.find(credentials, "/missing.jpg"))
     end)
 
+    it("preserves unavailable raw files while finding a usable cached format", function()
+        local cache = require("suwayomi/ui/thumbnail_cache")
+        local credentials = { server_url = "https://suwayomi.example" }
+        local key = "/settings/suwayomi_thumbnails/" .. cache.getKey(credentials, "/cover")
+        written_files[key .. ".webp"] = { body = "" }
+        written_files[key .. ".jpg"] = { body = "OVERSIZED", size = cache.MAX_THUMBNAIL_BYTES + 1 }
+        written_files[key .. ".png"] = { body = "PNGDATA" }
+
+        assert.are.equal(key .. ".png", cache.find(credentials, "/cover"))
+        written_files[key .. ".png"] = nil
+        assert.is_nil(cache.find(credentials, "/cover"))
+        assert.are.equal("", written_files[key .. ".webp"].body)
+        assert.are.equal("OVERSIZED", written_files[key .. ".jpg"].body)
+        assert.are.same({}, removed_files)
+    end)
+
     it("removes oversized decoded thumbnails instead of returning them to the UI", function()
         local cache = require("suwayomi/ui/thumbnail_cache")
         local credentials = { server_url = "https://suwayomi.example" }
@@ -217,6 +233,30 @@ describe("suwayomi/ui/thumbnail_cache", function()
 
         assert.is_nil(cache.find(credentials, "/cover.webp"))
         assert.are.same({ path }, removed_files)
+    end)
+
+    it("reopens pre-existing decoded thumbnails ahead of raw files without changing variants", function()
+        package.preload["ffi/blitbuffer"] = function()
+            return {
+                fromstring = function(_, _, _, data)
+                    return { pixels = data }
+                end,
+            }
+        end
+        local cache = require("suwayomi/ui/thumbnail_cache")
+        local credentials = { server_url = "https://suwayomi.example" }
+        local options = { variant = "poster", width = 240, height = 360 }
+        local row_path = cache.getPath(credentials, "/cover", "image/webp")
+        local poster_path = cache.getPath(credentials, "/cover", "image/webp", options)
+        written_files[row_path] = { body = "SWTHUMB1\n1\n1\n0\n1\n0\n0\nR" }
+        written_files[poster_path] = { body = "SWTHUMB1\n1\n1\n0\n1\n0\n0\nP" }
+        written_files[cache.getPath(credentials, "/cover", "image/png", options)] = { body = "PNGDATA" }
+
+        package.loaded["suwayomi/ui/thumbnail_cache"] = nil
+        cache = require("suwayomi/ui/thumbnail_cache")
+        assert.are.equal("R", cache.loadDecoded(cache.find(credentials, "/cover")).pixels)
+        assert.are.equal("P", cache.loadDecoded(cache.find(credentials, "/cover", options)).pixels)
+        assert.are.same({}, removed_files)
     end)
 
     it("writes and loads decoded WebP bitmap thumbnails", function()
