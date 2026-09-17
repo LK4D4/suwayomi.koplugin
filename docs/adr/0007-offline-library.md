@@ -2,56 +2,55 @@
 status: accepted
 ---
 
-# One Library with independent on-device availability
+# Offline Library is a cache of the server
 
-Offline reading will use the same Library entry point as server browsing, rather than a separate top-level shelf. On-device membership depends on plugin-known local chapters, not server-library membership: removing a manga from the server library must not make its retained local chapters inaccessible. The offline view is not a complete mirror of the server library.
+Use the normal Library and chapter screens with or without Internet access. Cache server information so those screens and downloaded chapters remain usable when requests fail. The server is authoritative; the cache is not a second library to maintain or reconcile.
 
-The consolidated design was accepted on 2026-09-12 after the design interview. Acceptance records the intended behavior, not implementation or authorization to commit, push, or merge.
+This revision was accepted on 2026-09-17 and replaces the design accepted on 2026-09-12. It incorporates the simplification requested on 2026-09-16, not the behavior of the `offline-library` implementation. Acceptance records the intended behavior, not a completed implementation.
 
-## Agreed behavior
+## Behavior
 
-- After first-run setup, opening the plugin goes directly to Library; Browse, Downloads, Sync, and Settings remain accessible from its menu.
-- Library initially presents on-device content without waiting for the server. Server loading does not block local navigation. When the server result changes the ordered row identities, offer Show full library rather than replacing the list automatically; distinguish the current local and full views. Unchanged row identities and order update silently while preserving selection, scroll position, and row layout. An initially empty list may populate automatically.
-- Preserve explicit chapter selection and the existing first/next-unread action rather than adding a new Continue reading selection system.
-- First/next-unread must not silently skip a known unread chapter merely because its archive is not on device. Explain the unavailable chapter clearly; later downloaded chapters remain manually selectable.
-- Full library includes both server-library manga and plugin-known downloaded manga, including manga not in the server library. Inclusion does not mutate server membership. An On device filter restricts the view to locally stored manga.
-- Library opens the manga list directly instead of the category picker. Categories remain available as a filter when server data is available; offline category caching is outside this feature.
-- Chapter lists follow the same local-first publication rule: show downloaded chapters immediately, load server information without blocking, and offer Show all chapters when it changes the rows. Unchanged rows update silently. Explicit refresh supports retries and newer information.
-- Plugin reader return restores an existing manga chapter view without waiting for the server; without a retained view, it opens downloaded chapters first and follows the same nonblocking refresh rule. This includes plugin-known archives reopened through KOReader History or File browser; ordinary KOReader navigation is unchanged.
-- Local open, verify, read/unread, delete, and applicable existing bulk actions remain usable offline. Existing pending read synchronization and deletion/retention policies still apply. Server mutations require connectivity; this feature adds no mutation queue. Existing download jobs retain their retry behavior.
-- Existing plugin-known downloads remain manually browsable and readable when saved chapter information is incomplete. First/next-unread explains that a refresh is required if ordering or gap information is insufficient; filenames do not establish complete chapter order.
-- Downloads from former or unknown server origins remain locally accessible. Different origins remain separate; no refresh, merge, or synchronization may target the wrong configured server. Unknown origins are not silently assigned to the current server. This is not multi-server account management.
-- Back and reader-return navigation preserve an existing view's local/full choice, filters, selection, and scroll position. Failed background requests do not collapse a displayed full list. A fresh plugin opening or KOReader restart starts local-first; preserving navigation does not require persisting the full server library.
-- Mark previous read targets all known preceding chapters under the saved scanlator filter, including undownloaded chapters hidden by the on-device view. Confirm the scope, explicitly including the undownloaded count. Incomplete chapter information requires a refresh rather than a guessed subset. Mark selected read affects only the explicit selection.
+1. **Load normally, keep a cache.** Opening Library or a chapter list shows saved information immediately and attempts the normal server load without blocking local use. A successful response replaces that list and its cache. There is no confirmation or separate set of results to apply.
+2. **Use the cache when the request fails.** Keep the same screen, rows, and controls. Do not turn a failed request into an empty list or a connection dialog that blocks reading. The ordinary refresh action retries; no new reconnect watcher or retry timer is needed.
+3. **The server wins.** A successful server listing replaces cached membership and order, even if it removes manga or chapters. An empty successful listing is also authoritative. Do not union in downloaded manga, retain extra chapter rows, repair membership, or upload reconstructed entries. Replacing listing metadata does not delete chapter files or reading progress.
+4. **Keep the same presentation.** Categories, sorting, chapter rows, and thumbnails use the same screens and saved information. No On device filter, local/full views, offline-specific navigation, or expansion buttons are introduced by this feature. Cached content should look the same as it did with Internet access; a brief request-failure indication is sufficient.
+5. **Keep reading behavior.** Open downloaded chapters from their files and preserve KOReader reading progress. Existing Sync, read/unread actions, downloads, and deletion settings keep their behavior. Server authority over listings does not replace the existing read-synchronization rules. This ADR adds no reconciliation or read-state policy.
 
-## Consequences
+## What is cached
 
-Server membership and device-local availability cannot share one inclusion rule. Rendering only downloaded chapters must not erase the information needed to recognize a known unread gap or to mark preceding chapters read. Origin isolation must cover local actions and reader lifecycle as well as background refresh. Persisting enough chapter information for these operations is distinct from persisting the entire server library; legacy records without that information retain manual access.
+Persist the library listing and the metadata its normal display needs, including categories and thumbnail references. Persist chapter listings when loaded. Reuse the existing thumbnail cache offline, including thumbnails cached before the upgrade; a thumbnail must not disappear merely because a server request failed. Use the normal placeholder only when its image is actually unavailable.
 
-## Implementation constraints identified during design
+Successful online use builds and updates this cache automatically, not through a separate setup or “prepare for offline” action. The baseline caches lists and thumbnails obtained through normal use; it does not fetch every manga's chapters or download chapter contents in advance. Do not add cache-limit settings or eviction machinery without a demonstrated storage need.
 
-- Existing completed-download records do not establish a complete ordered chapter list, including undownloaded gaps. Archive validation metadata does not supply that missing catalog.
-- The current download queue key is only manga ID/title plus chapter ID/name (`suwayomi/downloads/queue.lua`, `getKey`); existing ledger identities likewise do not establish server separation. Retaining former-server downloads requires checking identity collisions and every action/reader/sync path, not merely filtering Library network requests. A UI-only origin check cannot satisfy this contract.
-- Existing scanlator filtering precedes unread selection and bulk actions. Preserve that restriction independently of on-device visibility; the explicit Mark previous read scope above must not become a downloaded-only subset.
-- Existing Refresh chapters performs a source refresh, while ordinary chapter loading reads stored server chapters first. Local-first background loading must not silently become an automatic source refresh.
+A manga's chapter list that has never been loaded may be unavailable offline. Reconstruct it from existing chapter information where possible; otherwise explain that no chapter information is saved. Do not claim the server has no chapters. A downloaded file's availability is determined locally, not inferred from connectivity or server-library membership.
 
-## Scope exclusions
+Keep the last usable cache if a load is incomplete or fails. Report a failed cache write rather than claiming the new information will survive restart. Cache entries belong to the configured server; do not substitute another server's cache.
 
-No new Continue reading selection system, full offline server-library mirror, offline category cache, arbitrary CBZ discovery, multi-server account manager, or new server-mutation queue. Existing archives, saved reading state, credentials, and download/retention contracts remain protected.
+## First use of the new version
 
-## Verification obligations
+**With Internet access:** load the server library and save its display information. Use existing cached thumbnails and fetch missing ones through the normal thumbnail path. Cache chapter lists as they are loaded. Existing files and reading state are preserved. The server result takes precedence over any reconstructed information.
 
-These are required implementation outcomes, not checks performed during this documentation-only interview:
+**Without Internet access and without a usable cache:** make a best-effort library and chapter listing from existing downloaded chapters and their saved metadata. Reuse available titles, order, and cached thumbnails; missing information is not a reason to hide a readable chapter. Reconstruction is a fallback, not a migration or association workflow. Do not scan unrelated folders, invent server identities, or rewrite archives. If nothing can be recovered, show an empty screen explaining that no saved library information is available.
 
-| Scenario | Required observation |
+Once a server listing succeeds, it replaces the reconstructed listing. Do not add reconstructed rows back afterward. In particular, a successfully cached empty server library must remain empty rather than trigger reconstruction on the next offline opening.
+
+## Scenarios
+
+| Scenario | Expected behavior |
 | --- | --- |
-| Download manga, partially read a chapter, restart with the server unavailable | Library and chapter navigation remain usable; manual opening resumes through KOReader's saved reading state. |
-| Background server results arrive while a local list is open | Unchanged ordered identities update without moving selection; changed rows wait for expansion; an empty list may populate. |
-| Expand Library and chapter views, read, and return with the server unavailable | View choice, filters, selection, and scroll position remain; a fresh opening still starts local-first. |
-| A known next-unread chapter is not downloaded, or legacy chapter information is incomplete | No silent skip or guessed ordering; explain the gap or required refresh while retaining manual access. |
-| Mark previous read with hidden undownloaded predecessors | Confirmation includes hidden scope; accepted changes include all known predecessors under the scanlator filter; explicit selection remains separate. |
-| Perform local read/unread, verify, and delete actions offline | Existing local safety and persistence outcomes hold; no server success is claimed, and pending synchronization remains origin-bound. |
-| Retain downloads absent from server-library membership | Local access survives full-library expansion without mutating server membership. |
-| Switch between servers with colliding IDs, and include unknown-origin records | Local files remain accessible without merging identities, overwriting unrelated reading state, or sending requests/read updates to the wrong server. |
+| First use of the new version, connected | Show the server library and build its cache, using existing thumbnails. Normal chapter browsing builds the chapter cache. |
+| First use of the new version, disconnected | Rebuild what can be shown from existing chapters, saved metadata, and thumbnails. Allow reading without requiring setup, linking, or a server response. |
+| Read connected, then disconnect | Keep the same lists and cached thumbnails. Downloaded chapters still open, and reading progress still saves. |
+| Open Library or chapters while disconnected | Show the cache, or reconstruct missing information from existing chapters. A failed server load leaves that usable screen in place. |
+| Reconnect | No mode switch or special recovery action. The next normal list opening or refresh obtains server information and replaces the relevant cache. |
+| Server library or chapter list has changed | Show the server result, including removals. Do not preserve extra rows just because files exist. Files and reading progress are not deleted. |
+| Return from reading | Restore the normal chapter screen using available information without waiting for a server response. Existing read/unread and Sync behavior applies. |
+| Restart without Internet access | Saved lists and cached thumbnails remain available; this is not a reset to a different library view. |
 
-Use focused LuaJIT coverage for identity, ordering, and publication boundaries, and the local KOReader sandbox for real navigation, reader return, and restart evidence. Device-only observations must be reported separately, following [the testing workflow](../agents/testing.md).
+## Scope
+
+This feature adds cached browsing and best-effort reconstruction when no cache exists. It does not change what opening Suwayomi opens: automatically opening Library is a separate change and is not required here.
+
+No second library, download-association UI, multi-server management, new synchronization rules, new download/retention policies, or new reading controls. Reuse the existing screens and behavior rather than redesigning them for offline use.
+
+Acceptance means exercising the scenarios above in the normal UI, including a new-version start with existing downloads, reuse of already-cached thumbnails, and the connected → disconnected → reconnected reading sequence. Check actual chapter opening and saved progress, not just row labels. These are requirements, not claimed test results; follow the [testing workflow](../agents/testing.md).
