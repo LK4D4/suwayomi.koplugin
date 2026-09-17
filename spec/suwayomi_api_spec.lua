@@ -410,6 +410,66 @@ describe("suwayomi/api facade", function()
         assert.are.equal("Saved filters are not supported by this server.", update_unsupported.error)
     end)
 
+    it("returns explicit Library completion metadata for snapshot loading", function()
+        install_graphql_stub([[{"data":{"mangas":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}]])
+        local result = api.fetchLibraryManga(valid_credentials(), { require_complete = true })
+        assert.is_true(result.ok)
+        assert.are.equal(0, result.total_count)
+        assert.is_false(result.has_next_page)
+        assert.are.same({}, result.manga)
+    end)
+
+    it("retains legacy metadata compatibility during complete Library loading", function()
+        install_graphql_sequence_stub({
+            { body = [[{"errors":[{"message":"FieldUndefined: description"}]}]] },
+            { body = [[{"data":{"mangas":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"id":17,"title":"Harbor Notes","thumbnailUrl":null,"firstUnreadChapter":null}]}}}]] },
+        })
+        local result = api.fetchLibraryManga(valid_credentials(), { require_complete = true })
+        assert.is_true(result.ok)
+        assert.are.equal("Harbor Notes", result.manga[1].title)
+        assert.is_false(result.has_next_page)
+    end)
+
+    for name, body in pairs({
+        ["missing total"] = [[{"data":{"mangas":{"pageInfo":{"hasNextPage":false},"nodes":[]}}}]],
+        ["invalid total"] = [[{"data":{"mangas":{"totalCount":-1,"pageInfo":{"hasNextPage":false},"nodes":[]}}}]],
+        ["missing continuation"] = [[{"data":{"mangas":{"totalCount":0,"nodes":[]}}}]],
+        ["object instead of list"] = [[{"data":{"mangas":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":{}}}}]],
+        ["null list entry"] = [[{"data":{"mangas":{"totalCount":2,"pageInfo":{"hasNextPage":false},"nodes":[{"id":17},null]}}}]],
+        ["invalid identity"] = [[{"data":{"mangas":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"id":false}]}}}]],
+        ["partial GraphQL result"] = [[{"errors":[{"message":"Unavailable"}],"data":{"mangas":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}]],
+    }) do
+        it("rejects incomplete Library data with " .. name, function()
+            install_graphql_stub(body)
+            local result = api.fetchLibraryManga(valid_credentials(), { require_complete = true })
+            assert.is_false(result.ok)
+            assert.is_nil(result.manga)
+        end)
+    end
+
+    it("accepts a proven complete category list for a Library snapshot", function()
+        install_graphql_stub([[{"data":{"categories":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"id":2,"name":"Reading","order":1}]}}}]])
+        local result = api.fetchCategories(valid_credentials(), { require_complete = true })
+        assert.is_true(result.ok)
+        assert.are.equal("Reading", result.categories[1].name)
+    end)
+
+    for name, body in pairs({
+        ["missing metadata"] = [[{"data":{"categories":{"nodes":[]}}}]],
+        ["truncated categories"] = [[{"data":{"categories":{"totalCount":2,"pageInfo":{"hasNextPage":true},"nodes":[{"id":2}]}}}]],
+        ["contradictory count"] = [[{"data":{"categories":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[]}}}]],
+        ["object instead of list"] = [[{"data":{"categories":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":{}}}}]],
+        ["null category"] = [[{"data":{"categories":{"totalCount":2,"pageInfo":{"hasNextPage":false},"nodes":[{"id":2},null]}}}]],
+        ["duplicate categories"] = [[{"data":{"categories":{"totalCount":2,"pageInfo":{"hasNextPage":false},"nodes":[{"id":2},{"id":2}]}}}]],
+    }) do
+        it("rejects incomplete categories with " .. name, function()
+            install_graphql_stub(body)
+            local result = api.fetchCategories(valid_credentials(), { require_complete = true })
+            assert.is_false(result.ok)
+            assert.is_nil(result.categories)
+        end)
+    end
+
     it("fetches manga, library manga, categories, updates library state, and refreshes manga", function()
         install_graphql_stub([[{"data":{"fetchSourceManga":{"hasNextPage":true,"mangas":[{"id":1,"title":"One Piece"}]}}}]])
         local manga = api.fetchMangaForSource(valid_credentials(), { source_id = "local", page = 1 })

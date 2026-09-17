@@ -49,9 +49,9 @@ describe("suwayomi/network/request_worker", function()
                         for index = 1, 100 do
                             manga[#manga + 1] = { id = "m" .. tostring(index) }
                         end
-                        return { ok = true, manga = manga, total_count = 101 }
+                        return { ok = true, manga = manga, total_count = 101, has_next_page = true }
                     end
-                    return { ok = true, manga = { { id = "m101" } }, total_count = 101 }
+                    return { ok = true, manga = { { id = "m101" } }, total_count = 101, has_next_page = false }
                 end,
                 updateMangaLibraryState = function(_, manga_id, in_library)
                     return {
@@ -91,6 +91,69 @@ describe("suwayomi/network/request_worker", function()
         assert.are.equal("m1", result.manga[1].id)
         assert.are.equal("m101", result.manga[101].id)
         assert.are.same(result, written["/settings/snapshot.json"])
+    end)
+
+    local function snapshotWithPages(pages, categories)
+        local api = require("suwayomi/api")
+        local index = 0
+        api.fetchCategories = function()
+            return categories or { ok = true, categories = {} }
+        end
+        api.fetchLibraryManga = function()
+            index = index + 1
+            return pages[index]
+        end
+        return require("suwayomi/network/request_worker"):run(
+            {}, { action = "fetch_library_snapshot" }, "/settings/snapshot.json")
+    end
+
+    local function libraryPage(first, last, total, has_next)
+        local manga = {}
+        for id = first, last do manga[#manga + 1] = { id = tostring(id) } end
+        return { ok = true, manga = manga, total_count = total, has_next_page = has_next }
+    end
+
+    it("publishes an authoritative empty Library snapshot", function()
+        assert.are.same({ ok = true, categories = {}, manga = {}, total_count = 0 },
+            snapshotWithPages({ libraryPage(1, 0, 0, false) }))
+    end)
+
+    for name, later_page in pairs({
+        ["a failed later page"] = { ok = false, error = "Unavailable" },
+        ["a missing later page"] = {},
+        ["an early end"] = libraryPage(101, 101, 102, false),
+        ["an empty continuation"] = libraryPage(101, 100, 102, true),
+        ["a short continuing page"] = libraryPage(101, 101, 102, true),
+        ["a changed total"] = libraryPage(101, 101, 101, false),
+        ["duplicate identities"] = libraryPage(100, 101, 102, false),
+        ["a contradictory continuation"] = libraryPage(101, 102, 102, true),
+        ["too many records"] = libraryPage(101, 103, 102, false),
+        ["missing completion metadata"] = { ok = true, manga = { { id = "101" }, { id = "102" } } },
+    }) do
+        it("does not publish a partial snapshot after " .. name, function()
+            local result = snapshotWithPages({ libraryPage(1, 100, 102, true), later_page })
+            assert.is_false(result.ok)
+            assert.is_nil(result.manga)
+            assert.is_nil(result.categories)
+            assert.is_nil(written["/settings/snapshot.json"].manga)
+        end)
+    end
+
+    it("does not publish a snapshot when categories fail", function()
+        local result = snapshotWithPages({ libraryPage(1, 0, 0, false) },
+            { ok = false, error = "Unavailable", categories = { { id = "partial" } } })
+        assert.is_false(result.ok)
+        assert.is_nil(result.categories)
+        assert.is_nil(result.manga)
+    end)
+
+    it("bounds the full snapshot envelope including categories", function()
+        require("suwayomi/subprocess/job").max_result_bytes = 256
+        local result = snapshotWithPages({ libraryPage(1, 1, 1, false) },
+            { ok = true, categories = { { id = "1", name = string.rep("x", 256) } } })
+        assert.is_false(result.ok)
+        assert.is_nil(result.categories)
+        assert.is_nil(result.manga)
     end)
 
     it("fails clearly before library worker results exceed the subprocess cap", function()
