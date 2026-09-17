@@ -359,7 +359,7 @@ describe("suwayomi/ui/manga_menu", function()
         if widget.kind == kind then
             return widget
         end
-        for _, child in pairs(widget) do
+        for _, child in ipairs(widget) do
             local found = findWidgetByKind(child, kind, seen)
             if found then
                 return found
