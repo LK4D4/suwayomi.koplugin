@@ -5,6 +5,7 @@ describe("suwayomi/ui/manga_menu", function()
     local canceled_jobs
     local cache_paths
     local decoded_images
+    local raw_images
     local image_errors
 
     local function clearModules()
@@ -13,6 +14,7 @@ describe("suwayomi/ui/manga_menu", function()
             "suwayomi/ui/list_menu",
             "ui/bidi",
             "ffi/blitbuffer",
+            "ui/renderimage",
             "ui/widget/container/centercontainer",
             "device",
             "ui/font",
@@ -73,6 +75,7 @@ describe("suwayomi/ui/manga_menu", function()
         canceled_jobs = {}
         cache_paths = {}
         decoded_images = {}
+        raw_images = {}
         image_errors = {}
 
         package.preload["ui/bidi"] = function()
@@ -82,6 +85,16 @@ describe("suwayomi/ui/manga_menu", function()
             return {
                 COLOR_BLACK = "black",
                 COLOR_DARK_GRAY = "dark_gray",
+            }
+        end
+        package.preload["ui/renderimage"] = function()
+            return {
+                renderImageFile = function(_, path)
+                    if image_errors[path] then
+                        error(image_errors[path])
+                    end
+                    return raw_images[path]
+                end,
             }
         end
         package.preload.device = function()
@@ -712,8 +725,10 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_not_nil(findWidgetByKind(menu.item_group[1], "text"))
     end)
 
-    it("uses the placeholder instead of rendering raw cached thumbnail files", function()
+    it("renders cached raw thumbnails without a request even when another thumbnail fails", function()
+        local raw_image = { kind = "raw_bitmap" }
         cache_paths["/cached.jpg"] = "/settings/cached.jpg"
+        raw_images["/settings/cached.jpg"] = raw_image
         local manga_menu = require("suwayomi/ui/manga_menu")
 
         local menu = manga_menu.show{
@@ -721,11 +736,17 @@ describe("suwayomi/ui/manga_menu", function()
             thumbnail_credentials = { server_url = "https://suwayomi.example" },
             item_table = {
                 { text = "Cached", manga = { id = "cached" }, thumbnail_url = "/cached.jpg" },
+                { text = "Missing", manga = { id = "missing" }, thumbnail_url = "/missing.jpg" },
             },
         }
 
-        assert.is_nil(findWidgetByKind(menu.item_group[1], "image"))
-        assert.is_not_nil(findWidgetByKind(menu.item_group[1], "text"))
+        assert.are.same(raw_image, findWidgetByKind(menu.item_group[1], "image").image)
+        assert.is_nil(findWidgetByKind(menu.item_group[2], "image"))
+        assert.are.equal(1, #started_jobs)
+        assert.are.equal("/missing.jpg", started_jobs[1].thumbnail_url)
+        started_jobs[1].on_finish(started_jobs[1], { ok = false })
+        assert.are.same(raw_image, findWidgetByKind(menu.item_group[1], "image").image)
+        assert.are.equal(1, #started_jobs)
     end)
 
     it("cancels active thumbnail jobs when menu contents are replaced", function()

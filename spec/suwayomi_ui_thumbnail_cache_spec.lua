@@ -189,17 +189,20 @@ describe("suwayomi/ui/thumbnail_cache", function()
         assert.is_true(directories["/settings/suwayomi_thumbnails"])
     end)
 
-    it("removes stale raw image thumbnails instead of returning them to the UI", function()
+    it("reuses pre-existing raw thumbnails without changing them across restart", function()
         local cache = require("suwayomi/ui/thumbnail_cache")
         local credentials = { server_url = "https://suwayomi.example" }
         local raw_path = "/settings/suwayomi_thumbnails/" .. cache.getKey(credentials, "/cover.jpg") .. ".jpg"
-        written_files[raw_path] = {
-            mode = "wb",
-            body = "JPGDATA",
-        }
+        written_files[raw_path] = { body = "JPGDATA" }
 
-        assert.is_nil(cache.find(credentials, "/cover.jpg"))
-        assert.are.same({ raw_path }, removed_files)
+        assert.are.equal(raw_path, cache.find(credentials, "/cover.jpg"))
+        package.loaded["suwayomi/ui/thumbnail_cache"] = nil
+        cache = require("suwayomi/ui/thumbnail_cache")
+        assert.are.equal(raw_path, cache.find(credentials, "/cover.jpg"))
+        assert.are.equal("JPGDATA", written_files[raw_path].body)
+        assert.are.same({}, removed_files)
+        assert.is_nil(cache.find({ server_url = "https://other.example" }, "/cover.jpg"))
+        assert.is_nil(cache.find(credentials, "/missing.jpg"))
     end)
 
     it("removes oversized decoded thumbnails instead of returning them to the UI", function()
