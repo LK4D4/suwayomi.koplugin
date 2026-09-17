@@ -118,10 +118,22 @@ local function renderManga(self, session)
     end
     local function select(manga)
         if not live(self, session) then return end
-        local function updated()
+        session.category_selected = true
+        if not session.saved and (not session.scope or manga.endpoint_scope ~= session.scope) then
+            notify(self, I18n.t("This recovered manga has no saved server association. Refresh Library before opening it."))
+            return
+        end
+        local function updated(updated_manga)
             if not live(self, session) then return end
+            updated_manga = updated_manga or manga
             for index = #session.listing.manga, 1, -1 do
-                if session.listing.manga[index].in_library == false then table.remove(session.listing.manga, index) end
+                if tostring(session.listing.manga[index].id) == tostring(updated_manga.id) then
+                    if updated_manga.in_library == false then
+                        table.remove(session.listing.manga, index)
+                    else
+                        session.listing.manga[index] = updated_manga
+                    end
+                end
             end
             renderManga(self, session)
         end
@@ -190,7 +202,13 @@ local function reconstructLibrary(self, scope)
             or (entry.endpoint_scope and entry.endpoint_scope ~= scope)
             or lfs.attributes(entry.path, "mode") ~= "file" then return end
         local key = tostring(entry.manga_id)
-        local manga = by_id[key] or { id = entry.manga_id, categories = {} }
+        local manga = by_id[key]
+        if manga and manga.endpoint_scope ~= entry.endpoint_scope then
+            -- Scoped metadata wins as a unit; matching IDs do not associate legacy rows.
+            if manga.endpoint_scope then return end
+            manga = nil
+        end
+        manga = manga or { id = entry.manga_id, endpoint_scope = entry.endpoint_scope, categories = {} }
         by_id[key] = manga
         manga.title = manga.title or entry.manga_title
         manga.source = manga.source or entry.source
@@ -201,7 +219,6 @@ local function reconstructLibrary(self, scope)
             manga.thumbnail_url = "/api/v1/manga/" .. key .. "/thumbnail"
         end
         for _, category in ipairs(entry.categories or {}) do
-            if category.id and not categories[tostring(category.id)] then categories[tostring(category.id)] = category end
             if category.id and not self:mangaBelongsToCategory(manga, category) then
                 manga.categories[#manga.categories + 1] = category
             end
@@ -213,6 +230,9 @@ local function reconstructLibrary(self, scope)
     for _, manga in pairs(by_id) do
         manga.title = manga.title or I18n.f("Manga %1", manga.id)
         listing.manga[#listing.manga + 1] = manga
+        for _, category in ipairs(manga.categories) do
+            if not categories[tostring(category.id)] then categories[tostring(category.id)] = category end
+        end
     end
     table.sort(listing.manga, function(a, b)
         if a.title == b.title then return tostring(a.id) < tostring(b.id) end
@@ -226,6 +246,7 @@ end
 function SuwayomiClient:showLibrary()
     if self.plugin.suwayomi_host_retired then return end
     self:cancelLibraryNetworkRequests()
+    if self.plugin.getNavigation then self.plugin:getNavigation():closeAll() end
     local credentials = self.settings:load()
     local scope = self.settings:normalizeEndpointScope(credentials.server_url)
     local listing = self.settings:loadLibraryCache(credentials)

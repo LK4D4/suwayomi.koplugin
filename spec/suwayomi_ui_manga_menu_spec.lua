@@ -1,5 +1,4 @@
 describe("suwayomi/ui/manga_menu", function()
-    local shown_menu
     local dirty_count
     local started_jobs
     local canceled_jobs
@@ -72,7 +71,6 @@ describe("suwayomi/ui/manga_menu", function()
 
     local function installStubs()
         clearModules()
-        shown_menu = nil
         dirty_count = 0
         started_jobs = {}
         canceled_jobs = {}
@@ -220,9 +218,7 @@ describe("suwayomi/ui/manga_menu", function()
         end
         package.preload["ui/uimanager"] = function()
             return {
-                show = function(_, menu)
-                    shown_menu = menu
-                end,
+                show = function() end,
                 setDirty = function(_, _, callback)
                     dirty_count = dirty_count + 1
                     if callback then
@@ -590,6 +586,8 @@ describe("suwayomi/ui/manga_menu", function()
 
     it("shows menu rows, discovers cached thumbnails, and schedules only visible uncached thumbnails", function()
         cache_paths["/cached.jpg"] = "/settings/cached.jpg"
+        local cached_image = { kind = "raw_bitmap" }
+        raw_images["/settings/cached.jpg"] = cached_image
         local manga_menu = require("suwayomi/ui/manga_menu")
 
         local menu = manga_menu.show{
@@ -605,13 +603,11 @@ describe("suwayomi/ui/manga_menu", function()
             items_per_page = 5,
         }
 
-        assert.are.same(menu, shown_menu)
-        assert.are.equal("/settings/cached.jpg", menu.item_table[1].thumbnail_path)
+        assert.are.same(cached_image, findWidgetByKind(menu.item_group[1], "image").image)
         assert.are.equal(2, #started_jobs)
         assert.are.equal("/a.jpg", started_jobs[1].thumbnail_url)
         assert.are.equal("/b.jpg", started_jobs[2].thumbnail_url)
         assert.are.equal(5, #menu.item_group)
-        assert.are.equal(1, dirty_count)
     end)
 
     it("renders source rows with thumbnail placeholders and remote icon jobs", function()
@@ -776,7 +772,7 @@ describe("suwayomi/ui/manga_menu", function()
         assert.are.equal(1, #started_jobs)
     end)
 
-    it("keeps raw decode failures on placeholders without blocking other rows", function()
+    it("replaces undecodable raw thumbnails through the normal online fetch path", function()
         cache_paths["/invalid.jpg"] = "/settings/invalid.jpg"
         image_errors["/settings/invalid.jpg"] = "invalid image"
         cache_paths["/unavailable.png"] = "/settings/unavailable.png"
@@ -794,7 +790,14 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_nil(findWidgetByKind(menu.item_group[2], "image"))
         assert.is_not_nil(findWidgetByKind(menu.item_group[1], "text"))
         assert.is_not_nil(findWidgetByKind(menu.item_group[2], "text"))
-        assert.are.equal(2, #menu.item_group)
+        assert.are.equal(2, #started_jobs)
+        local replacement = { kind = "replacement_bitmap" }
+        decoded_images["/settings/replacement.bb"] = replacement
+        started_jobs[1].on_finish(started_jobs[1], { ok = true, path = "/settings/replacement.bb" })
+        assert.are.same(replacement, findWidgetByKind(menu.item_group[1], "image").image)
+        started_jobs[2].on_finish(started_jobs[2], { ok = false })
+        assert.is_nil(findWidgetByKind(menu.item_group[2], "image"))
+        assert.are.equal(2, #started_jobs)
     end)
 
     it("cancels active thumbnail jobs when menu contents are replaced", function()

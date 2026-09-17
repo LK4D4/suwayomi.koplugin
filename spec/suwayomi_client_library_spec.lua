@@ -11,7 +11,7 @@ describe("saved-first Library browsing", function()
         local actions, title_options
         local client = helper.newClient({
             credentials = credentials,
-            ui_manager = { close = function(menu) menu.closed = true end },
+            ui_manager = { close = function(_, menu) menu.closed = true end },
             capture_title_options = function(options) title_options = options end,
             network_request_job = {
                 start = function(options) requests[#requests + 1] = options; return {} end,
@@ -19,7 +19,7 @@ describe("saved-first Library browsing", function()
             },
             ui = {
                 showLibraryMangaMenu = function(rows, select, options)
-                    local menu = { rows = rows, select = select, options = options }
+                    local menu = { rows = rows, select = select, options = options, close_callback = options.close_callback }
                     views[#views + 1] = menu
                     return menu
                 end,
@@ -27,7 +27,8 @@ describe("saved-first Library browsing", function()
                     menu.rows, menu.select, menu.options = rows, select, options
                 end,
                 showLibraryCategoryMenu = function(rows, select, options)
-                    local menu = { rows = rows, select = select, options = options, categories = true }
+                    local menu = { rows = rows, select = select, options = options, categories = true,
+                        close_callback = options.close_callback }
                     views[#views + 1] = menu
                     return menu
                 end,
@@ -37,6 +38,10 @@ describe("saved-first Library browsing", function()
             },
         })
         client.plugin.showMangaActions = function(_, manga, options) actions = { manga = manga, options = options } end
+        local navigation = require("suwayomi/navigation").new(client:getUIManager())
+        client.plugin.getNavigation = function() return navigation end
+        client.plugin.trackSuwayomiScreen = function(_, route, menu) navigation:push(route, menu) end
+        client.plugin.isSuwayomiScreenActive = function(_, menu) return navigation:contains(menu) end
         local scope = credentials.server_url
         client.settings.normalizeEndpointScope = function(_, url) return url end
         client.settings.loadLibraryCache = function(_, current)
@@ -73,7 +78,7 @@ describe("saved-first Library browsing", function()
     it("reconstructs only recorded existing downloads without modifying their data", function()
         local path = os.tmpname()
         local file = assert(io.open(path, "wb")); file:write("preserve archive bytes"); file:close()
-        local client, requests, views = fixture()
+        local client, requests, views, messages, _, actions, title = fixture()
         local ledger = {
             one = { manga_id = 7, manga_title = "Recovered", chapter_id = 9, path = path,
                 read = true, pending_read_sync = true },
@@ -85,12 +90,43 @@ describe("saved-first Library browsing", function()
         assert.are.equal(1, #views[1].rows)
         assert.are.equal("Recovered", views[1].rows[1].title)
         assert.is_nil(views[1].rows[1].endpoint_scope)
+        views[1].select(views[1].rows[1])
+        assert.is_nil(actions())
+        assert.is_truthy(messages[1])
         requests[1].on_finish({ ok = false })
         assert.is_true(ledger.one.read)
         assert.is_true(ledger.one.pending_read_sync)
+        title().onSelect({ id = "refresh" })
+        requests[2].on_finish({ ok = true, categories = {}, manga = { { id = 7, title = "Authoritative" } } })
+        views[1].select(views[1].rows[1])
+        assert.are.equal("Authoritative", actions().manga.title)
         file = assert(io.open(path, "rb")); local bytes = file:read("*a"); file:close()
         os.remove(path)
         assert.are.equal("preserve archive bytes", bytes)
+    end)
+
+    it("never combines unscoped identity metadata with a scoped record sharing its ID", function()
+        local path = os.tmpname()
+        local client, _, views, _, _, actions = fixture()
+        local legacy = { manga_id = 7, manga_title = "Unassociated", path = path,
+            source = { name = "Foreign" }, categories = { { id = 1, name = "Legacy" } } }
+        local scoped = { manga_id = 7, manga_title = "Associated", path = path,
+            endpoint_scope = "http://library.test" }
+        client.settings.loadReaderReturnContexts = function() return { legacy } end
+        client.settings.loadChapterLedger = function() return { scoped } end
+        client:showLibrary()
+        views[1].select(views[1].rows[1])
+        assert.are.equal("Associated", actions().manga.title)
+        assert.is_nil(actions().manga.source)
+        assert.same({}, actions().manga.categories)
+        client.settings.loadReaderReturnContexts = function() return { scoped } end
+        client.settings.loadChapterLedger = function() return { legacy } end
+        client:showLibrary()
+        views[2].select(views[2].rows[1])
+        assert.are.equal("Associated", actions().manga.title)
+        assert.is_nil(actions().manga.source)
+        assert.same({}, actions().manga.categories)
+        os.remove(path)
     end)
 
     it("shows uncategorized manga in Suwayomi's implicit Default category", function()
@@ -121,7 +157,6 @@ describe("saved-first Library browsing", function()
         } })
         assert.are.equal(9, views[2].rows[1].id)
         assert.are.equal(2, #views)
-        views[2].options.close_callback = nil
         views[1].select(views[1].rows[2])
         assert.same({}, views[2].rows)
     end)
@@ -202,6 +237,52 @@ describe("saved-first Library browsing", function()
         actions().manga.in_library = false
         actions().options.onMangaUpdated()
         assert.same({}, views[1].rows)
+    end)
+
+    it("retires superseded Library widgets instead of revealing inert rows on Back", function()
+        local client, _, views, _, _, actions = fixture({
+            categories = { { id = 1, name = "First" }, { id = 2, name = "Second" } },
+            manga = { { id = 7, title = "Saved" } },
+        })
+        client:showLibrary()
+        views[1].select(views[1].rows[1])
+        client:showLibrary()
+        assert.is_true(views[1].closed)
+        assert.is_true(views[2].closed)
+        assert.is_false(client.plugin:getNavigation():contains(views[1]))
+        views[3].select(views[3].rows[1])
+        views[4].select(views[4].rows[1])
+        assert.are.equal(7, actions().manga.id)
+    end)
+
+    it("does not push a category picker over a manga selected while refreshing", function()
+        local client, requests, views, _, _, actions = fixture({
+            categories = {}, manga = { { id = 7, title = "Saved" } },
+        })
+        client:showLibrary()
+        views[1].select(views[1].rows[1])
+        requests[1].on_finish({ ok = true,
+            categories = { { id = 1, name = "First" }, { id = 2, name = "Second" } },
+            manga = { { id = 8, title = "Current" } },
+        })
+        assert.are.equal(1, #views)
+        assert.are.equal(7, actions().manga.id)
+        assert.are.equal(8, views[1].rows[1].id)
+    end)
+
+    it("applies a successful membership action after the selected row was replaced", function()
+        local client, requests, views, _, _, actions = fixture({
+            categories = {}, manga = { { id = 7, title = "Saved", in_library = true } },
+        })
+        client:showLibrary()
+        views[1].select(views[1].rows[1])
+        requests[1].on_finish({ ok = true, categories = {}, manga = {
+            { id = 7, title = "Refreshed", in_library = true }, { id = 8, title = "Other", in_library = true },
+        } })
+        actions().manga.in_library = false
+        actions().options.onMangaUpdated(actions().manga)
+        assert.are.equal(1, #views[1].rows)
+        assert.are.equal(8, views[1].rows[1].id)
     end)
 
     for _, preference in ipairs({ "always", "never" }) do

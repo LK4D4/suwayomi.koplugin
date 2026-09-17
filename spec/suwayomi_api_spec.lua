@@ -278,6 +278,13 @@ describe("suwayomi/api facade", function()
         assert.is_false(api.testConnection(valid_credentials()).ok)
     end)
 
+    it("rejects null Library lists at ordinary API boundaries", function()
+        install_graphql_stub([[{"data":{"categories":{"nodes":null}}}]])
+        assert.is_false(api.testConnection(valid_credentials()).ok)
+        install_graphql_stub([[{"data":{"mangas":{"nodes":null}}}]])
+        assert.is_false(api.fetchLibraryManga(valid_credentials()).ok)
+    end)
+
     it("fetches extensions and updates extension install state", function()
         local request = install_graphql_stub([[{"data":{"fetchExtensions":{"extensions":[{"pkgName":"pkg.mangadex","name":"MangaDex","lang":"all","versionName":"1.4.0","versionCode":140,"isNsfw":true,"isInstalled":false,"hasUpdate":false,"isObsolete":false,"iconUrl":"/icons/md.png","apkName":"mangadex.apk","repo":"https://repo.example"}]}}}]])
 

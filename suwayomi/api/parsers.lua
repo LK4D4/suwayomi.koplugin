@@ -596,7 +596,7 @@ function Parsers.parseLibraryMangaResponse(response_body, require_complete)
         return nil, "Suwayomi server returned incomplete library metadata."
     end
     local manga_nodes = type(mangas) == "table" and mangas.nodes
-    if type(manga_nodes) ~= "table" then
+    if type(manga_nodes) ~= "table" or manga_nodes == json.null then
         local graph_error = payload and payload.errors and payload.errors[1] and payload.errors[1].message
         return nil, graph_error or "Suwayomi server did not return a library manga list."
     end
@@ -649,7 +649,7 @@ function Parsers.parseCategoryResponse(response_body, require_complete)
     local category_nodes = type(payload.data) == "table"
         and type(payload.data.categories) == "table"
         and payload.data.categories.nodes
-    if type(category_nodes) ~= "table" then
+    if type(category_nodes) ~= "table" or category_nodes == json.null then
         return nil, "Suwayomi server did not return categories."
     end
 

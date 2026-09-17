@@ -1515,6 +1515,11 @@ msgstr "Для этой манги главы ещё не загружены."
 msgid "This manga has no chapters."
 msgstr "У этой манги нет глав."
 
+msgid ""
+"This recovered manga has no saved server association. Refresh Library before "
+"opening it."
+msgstr ""
+
 msgid "This source has no filters."
 msgstr "У этого источника нет фильтров."
 

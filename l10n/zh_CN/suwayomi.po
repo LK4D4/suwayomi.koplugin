@@ -1404,6 +1404,11 @@ msgstr "此漫画没有已加载章节。"
 msgid "This manga has no chapters."
 msgstr "此漫画没有章节。"
 
+msgid ""
+"This recovered manga has no saved server association. Refresh Library before "
+"opening it."
+msgstr ""
+
 msgid "This source has no filters."
 msgstr "此源没有筛选器。"
 

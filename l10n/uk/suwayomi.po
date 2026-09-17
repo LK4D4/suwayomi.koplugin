@@ -1527,6 +1527,11 @@ msgstr "Для цієї манґи не завантажено розділів.
 msgid "This manga has no chapters."
 msgstr "У цієї манґи немає розділів."
 
+msgid ""
+"This recovered manga has no saved server association. Refresh Library before "
+"opening it."
+msgstr ""
+
 msgid "This source has no filters."
 msgstr "Це джерело не має фільтрів."
 

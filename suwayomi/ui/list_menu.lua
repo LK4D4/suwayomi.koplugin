@@ -321,6 +321,9 @@ function ListMenuItem:buildThumbnail(slot_width, slot_height)
                 height = image_height,
                 scale_factor = 0,
             }
+        else
+            self.entry.thumbnail_rejected_path = self.entry.thumbnail_path
+            self.entry.thumbnail_path = nil
         end
     end
     if not image then
@@ -762,8 +765,9 @@ function ListMenu.prepareThumbnail(menu, item)
         return
     end
     local thumbnail_options = thumbnailOptionsForItem(item)
-    item.thumbnail_path = item.thumbnail_path
+    local path = item.thumbnail_path
         or ThumbnailCache.find(menu._suwayomi_thumbnail_credentials, item.thumbnail_url, thumbnail_options)
+    item.thumbnail_path = path ~= item.thumbnail_rejected_path and path or nil
     if item.thumbnail_path then
         item.thumbnail_failed = nil
     end
@@ -785,6 +789,7 @@ local function markThumbnailResult(menu, thumbnail_key, path)
             item.thumbnail_loading = nil
             if path then
                 item.thumbnail_path = path
+                item.thumbnail_rejected_path = nil
                 item.thumbnail_failed = nil
             else
                 item.thumbnail_failed = true

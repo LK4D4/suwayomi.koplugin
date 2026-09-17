@@ -1385,6 +1385,11 @@ msgstr ""
 msgid "This manga has no chapters."
 msgstr ""
 
+msgid ""
+"This recovered manga has no saved server association. Refresh Library before "
+"opening it."
+msgstr ""
+
 msgid "This source has no filters."
 msgstr ""
 
