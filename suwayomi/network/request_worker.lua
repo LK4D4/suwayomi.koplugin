@@ -84,22 +84,6 @@ local function fetchLibrarySnapshot(credentials)
     return fetchLibraryMangaPages(credentials, result.categories)
 end
 
-local function fetchReaderReturnChapters(credentials, manga_id)
-    local result = SuwayomiAPI.fetchChaptersForManga(credentials, manga_id, {
-        max_result_bytes = SubprocessJob.max_result_bytes,
-    })
-    if not result.ok then
-        return result
-    end
-
-    if SuwayomiAPI.fetchMangaById then
-        local manga_result = SuwayomiAPI.fetchMangaById(credentials, manga_id)
-        if manga_result and manga_result.ok and type(manga_result.manga) == "table" then
-            result.manga = manga_result.manga
-        end
-    end
-    return result
-end
 
 local function normalizeResult(result)
     if type(result) ~= "table" then
@@ -145,9 +129,6 @@ function RequestWorker:run(credentials, request, result_path)
             end
             chapters.manga = manga
             return chapters
-        end
-        if request.action == "fetch_reader_return_chapters_for_manga" then
-            return fetchReaderReturnChapters(credentials, request.manga_id)
         end
         if request.action == "refresh_manga" then
             return SuwayomiAPI.refreshManga(credentials, request.manga_id)

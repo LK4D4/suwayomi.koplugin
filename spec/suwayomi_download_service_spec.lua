@@ -1455,6 +1455,105 @@ describe("process-owned download navigation", function()
         assert.is_nil(read(path))
     end)
 
+    it("opens recovered local archives without adopting a foreign same-ID ledger or queue job", function()
+        local plugin = manualHost(0)
+        assert(settings:save({ server_url = "https://example.invalid" }))
+        local path = directory .. "/legacy.cbz"
+        local native = require("spec/support/native_archiver")
+        local writer = native.Writer:new()
+        files[path] = true
+        assert(writer:open(path, "zip"))
+        assert(writer:addFileFromMemory("1.png", "local page"))
+        assert(writer:close())
+        local queue = plugin:getDownloadQueue()
+        local foreign_manga = { id = "m1", title = "Foreign", endpoint_scope = "https://foreign.example" }
+        assert(settings:saveChapterLedger{ ["m1:c1"] = {
+            manga_id = "m1", chapter_id = "c1", path = directory .. "/foreign.cbz",
+            endpoint_scope = foreign_manga.endpoint_scope, read = true, pending_read_sync = true,
+        } })
+        assert(settings:saveReaderReturnContexts{ [path] = {
+            manga_id = "m1", chapter_id = "c1", path = path,
+        } })
+        assert(queue:upsertPersistentJob(queue:buildPersistentJob(foreign_manga, chapters[1], directory, "failed")))
+        local before_ledger = settings:loadChapterLedger()
+        local before_jobs = settings:loadDownloadQueue()
+        local before_authority = settings.store:readKey("manual_archive_state")
+        local before_refill = settings.store:readKey("download_refill")
+        local before_contexts = settings:loadReaderReturnContexts()
+        local local_manga = { id = "m1", title = "Recovered", endpoint_scope = "https://example.invalid" }
+        local recovered = plugin:getRecoveredChapters(local_manga)
+        plugin:setCurrentMangaChapterContext(local_manga, recovered)
+        local rows = plugin:buildChapterMenuItems(local_manga, recovered)
+        assert.are.equal("legacy.cbz", rows[1].name)
+        local actions = plugin:getChapterActions(local_manga, rows[1])
+        assert.are.equal("open", actions[1].id)
+        assert.are.equal(2, #actions)
+        assert(plugin:performChapterAction(local_manga, rows[1], "open"))
+        local worker = workers[#workers]
+        local previous_archiver, previous_headers = package.loaded["ffi/archiver"], package.loaded["ffi/libarchive_h"]
+        local restore = native.install()
+        local ran, err = pcall(worker.callback)
+        restore()
+        package.loaded["ffi/archiver"], package.loaded["ffi/libarchive_h"] = previous_archiver, previous_headers
+        assert.is_true(ran, err)
+        worker.alive = false
+        advance(0)
+        assert.are.equal(path, runtime.reader_ui.instance.document.file)
+        assert.are.same(before_ledger, settings:loadChapterLedger())
+        assert.are.same(before_jobs, settings:loadDownloadQueue())
+        assert.are.same(before_authority, settings.store:readKey("manual_archive_state"))
+        assert.are.same(before_refill, settings.store:readKey("download_refill"))
+        assert.are.same(before_contexts, settings:loadReaderReturnContexts())
+    end)
+
+    it("renders saved scoped chapters without changing ledger, return metadata, or reading sidecars", function()
+        local plugin = manualHost(0)
+        assert(settings:save({ server_url = "https://example.invalid" }))
+        local scoped = { id = "m1", title = "Example", endpoint_scope = "https://example.invalid" }
+        local path = directory .. "/saved-name.cbz"
+        write(path, "archive bytes")
+        assert(require("lfs").mkdir(path .. ".sdr"))
+        write(path .. ".sdr/metadata.lua", "return { custom = 'preserve reading progress', percent_finished = 0.25 }")
+        assert(settings:saveChapterLedger{ ["m1:c1"] = {
+            manga_id = "m1", chapter_id = "c1", path = path, endpoint_scope = scoped.endpoint_scope, read = true,
+        } })
+        local before_settings = read(settings.store.path)
+        local before_metadata = read(path .. ".sdr/metadata.lua")
+        plugin.current_chapter_context = { manga = scoped, chapters = { { id = "c1", name = "New name", is_read = true } },
+            saved = true }
+        plugin:refreshChapterMenu()
+        assert.matches("Downloaded", plugin.current_chapter_options.chapters[1].menu_status)
+        assert.are.equal(before_settings, read(settings.store.path))
+        assert.are.equal(before_metadata, read(path .. ".sdr/metadata.lua"))
+        assert.are.equal("archive bytes", read(path))
+    end)
+
+    it("reports damaged recovered archives without creating repair or deletion authority", function()
+        local plugin = manualHost(0)
+        local path = directory .. "/legacy.cbz"
+        write(path, "PK\003\004damaged")
+        assert(settings:saveReaderReturnContexts{ [path] = { manga_id = "m1", chapter_id = "c1", path = path } })
+        local local_manga = { id = "m1", title = "Recovered", local_only = true }
+        local recovered = plugin:getRecoveredChapters(local_manga)
+        plugin:setCurrentMangaChapterContext(local_manga, recovered)
+        local before_settings = read(settings.store.path)
+        assert(plugin:performChapterAction(local_manga, recovered[1], "open"))
+        local worker = workers[#workers]
+        local native = require("spec/support/native_archiver")
+        local previous_archiver, previous_headers = package.loaded["ffi/archiver"], package.loaded["ffi/libarchive_h"]
+        local restore = native.install()
+        local ran, err = pcall(worker.callback)
+        restore()
+        package.loaded["ffi/archiver"], package.loaded["ffi/libarchive_h"] = previous_archiver, previous_headers
+        assert.is_true(ran, err)
+        worker.alive = false
+        advance(0)
+        assert.is_nil(runtime.reader_ui.instance)
+        assert.are.equal(before_settings, read(settings.store.path))
+        assert.are.equal("PK\003\004damaged", read(path))
+        assert.are.equal(1, #plugin.manual_messages)
+    end)
+
     it("keeps explicit repair authority through cancellation and late publication", function()
         local plugin, owner = manualHost(0, true)
         local queue = plugin:getDownloadQueue()

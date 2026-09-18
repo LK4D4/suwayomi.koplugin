@@ -38,6 +38,7 @@ describe("saved-first Library browsing", function()
             },
         })
         client.plugin.showMangaActions = function(_, manga, options) actions = { manga = manga, options = options } end
+        client.plugin.showChaptersForManga = function(_, manga) actions = { manga = manga, chapters = true } end
         local navigation = require("suwayomi/navigation").new(client:getUIManager())
         client.plugin.getNavigation = function() return navigation end
         client.plugin.trackSuwayomiScreen = function(_, route, menu) navigation:push(route, menu) end
@@ -78,7 +79,7 @@ describe("saved-first Library browsing", function()
     it("reconstructs only recorded existing downloads without modifying their data", function()
         local path = os.tmpname()
         local file = assert(io.open(path, "wb")); file:write("preserve archive bytes"); file:close()
-        local client, requests, views, messages, _, actions, title = fixture()
+        local client, requests, views, _, _, actions, title = fixture()
         local ledger = {
             one = { manga_id = 7, manga_title = "Recovered", chapter_id = 9, path = path,
                 read = true, pending_read_sync = true },
@@ -91,8 +92,8 @@ describe("saved-first Library browsing", function()
         assert.are.equal("Recovered", views[1].rows[1].title)
         assert.is_nil(views[1].rows[1].endpoint_scope)
         views[1].select(views[1].rows[1])
-        assert.is_nil(actions())
-        assert.is_truthy(messages[1])
+        assert.is_true(actions().chapters)
+        assert.is_true(actions().manga.local_only)
         requests[1].on_finish({ ok = false })
         assert.is_true(ledger.one.read)
         assert.is_true(ledger.one.pending_read_sync)
@@ -126,6 +127,20 @@ describe("saved-first Library browsing", function()
         assert.are.equal("Associated", actions().manga.title)
         assert.is_nil(actions().manga.source)
         assert.same({}, actions().manga.categories)
+        os.remove(path)
+    end)
+
+    it("opens a recorded file's manga without descriptions or invented server identifiers", function()
+        local path = os.tmpname()
+        local client, _, views, _, _, actions = fixture()
+        client.settings.loadReaderReturnContexts = function() return { { path = path } } end
+        client:showLibrary()
+        assert.are.equal(1, #views[1].rows)
+        views[1].select(views[1].rows[1])
+        assert.is_true(actions().chapters)
+        assert.is_true(actions().manga.local_only)
+        assert.is_nil(actions().manga.id)
+        assert.are.equal(path:match("^(.*)[/\\][^/\\]+$"), actions().manga.local_manga_path)
         os.remove(path)
     end)
 

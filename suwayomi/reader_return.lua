@@ -1,12 +1,11 @@
 -- Boundary: ReaderReturn.
 --
--- Responsibility: Persist chapter return context and restore Suwayomi chapter menus from KOReader reader mode.
--- Owned state: Settings-backed reader return context table keyed by local chapter path.
--- Dependencies: KOReader reader/filemanager UI modules, Suwayomi settings/API, plugin i18n facade, and plugin chapter menu methods.
--- External data: Document paths, persisted contexts, and API responses are treated as optional and checked before use.
+-- Responsibility: Persist chapter return context and hand reader return to the live FileManager chapter flow.
+-- Owned state: Settings-backed return contexts keyed by local chapter path and a cancellable deferred handoff.
+-- Dependencies: KOReader reader/filemanager UI modules, Suwayomi settings, plugin i18n facade, and chapter menu methods.
+-- External data: Document paths and persisted contexts are optional; scope and freshness gate reader teardown/publication.
 
 local SuwayomiSettings = require("suwayomi/settings")
-local NetworkRequestJob = require("suwayomi/network/request_job")
 local UIManager = require("ui/uimanager")
 local I18n = require("suwayomi/i18n")
 
@@ -61,6 +60,10 @@ local function buildContext(manga, chapter, chapter_path, endpoint_scope)
         in_library = manga.in_library,
         chapter_id = present(chapter.id),
         chapter_name = chapter.name,
+        source_order = chapter.source_order,
+        chapter_number = chapter.chapter_number,
+        scanlator = chapter.scanlator,
+        thumbnail_url = manga.thumbnail_url,
         source = copyTable(manga.source),
         endpoint_scope = endpoint_scope,
     }
@@ -96,6 +99,10 @@ local function contextMatches(left, right)
         and left.in_library == right.in_library
         and left.chapter_id == right.chapter_id
         and left.chapter_name == right.chapter_name
+        and left.source_order == right.source_order
+        and left.chapter_number == right.chapter_number
+        and left.scanlator == right.scanlator
+        and left.thumbnail_url == right.thumbnail_url
         and left.endpoint_scope == right.endpoint_scope
         and sourceMatches(left.source, right.source)
 end
@@ -111,6 +118,11 @@ local function candidateFromLedgerEntry(entry)
         in_library = entry.in_library,
         chapter_id = present(entry.chapter_id),
         chapter_name = entry.chapter_name,
+        source_order = entry.source_order,
+        chapter_number = entry.chapter_number,
+        scanlator = entry.scanlator,
+        thumbnail_url = entry.thumbnail_url,
+        source = copyTable(entry.source),
         endpoint_scope = entry.endpoint_scope,
     }
 end
@@ -125,6 +137,8 @@ local function inferSiblingContext(path, contexts, ledger)
     local inferred_manga_title
     local inferred_in_library
     local inferred_source
+    local inferred_endpoint_scope
+    local inferred_thumbnail_url
     local function consider(candidate)
         if type(candidate) ~= "table" or parentDirectory(candidate.path) ~= current_dir then
             return true
@@ -133,10 +147,14 @@ local function inferSiblingContext(path, contexts, ledger)
         if not manga_id then
             return true
         end
-        if inferred_manga_id and inferred_manga_id ~= manga_id then
+        if inferred_manga_id and (inferred_manga_id ~= manga_id
+            or inferred_endpoint_scope ~= candidate.endpoint_scope)
+        then
             return false
         end
         inferred_manga_id = manga_id
+        inferred_endpoint_scope = candidate.endpoint_scope
+        inferred_thumbnail_url = inferred_thumbnail_url or candidate.thumbnail_url
         if not inferred_source and candidate.source then
             inferred_source = candidate.source
         end
@@ -169,28 +187,22 @@ local function inferSiblingContext(path, contexts, ledger)
         manga_title = inferred_manga_title,
         in_library = inferred_in_library,
         source = copyTable(inferred_source),
+        endpoint_scope = inferred_endpoint_scope,
+        thumbnail_url = inferred_thumbnail_url,
     }
 end
 
-local function buildReturnedManga(context, refreshed_manga)
-    local manga = {
+local function buildReturnedManga(context)
+    return {
         id = context.manga_id,
         title = context.manga_title or context.manga_id,
         in_library = context.in_library,
         source = copyTable(context.source),
+        thumbnail_url = context.thumbnail_url,
+        endpoint_scope = context.endpoint_scope,
+        local_only = not present(context.endpoint_scope) or not present(context.manga_id) or nil,
+        local_manga_path = not present(context.manga_id) and parentDirectory(context.path) or nil,
     }
-    if type(refreshed_manga) == "table" then
-        for key, value in pairs(refreshed_manga) do
-            manga[key] = value
-        end
-        if manga.in_library == nil then
-            manga.in_library = context.in_library
-        end
-        if not manga.source then
-            manga.source = copyTable(context.source)
-        end
-    end
-    return manga
 end
 
 local function normalizeContextStore(contexts)
@@ -288,117 +300,6 @@ function Methods:getCurrentReaderReturnContext()
     return self:getReaderReturnContextForPath(self:getCurrentReaderDocumentPath())
 end
 
-function Methods:fetchReaderReturnChapters(context)
-    if not context or not context.manga_id then
-        self:showMessage(I18n.t("This book is not linked to Suwayomi chapters."))
-        return nil
-    end
-
-    self:showMessage(I18n.t("Chapters are loading."))
-    return nil
-end
-
-function Methods:startReaderReturnChapterRequest(context)
-    if self.suwayomi_host_retired then return false end
-    if not context or not context.manga_id then
-        self:showMessage(I18n.t("This book is not linked to Suwayomi chapters."))
-        return false
-    end
-
-    if self.cancelMangaNetworkRequests then self:cancelMangaNetworkRequests() end
-    local previous = self.active_reader_return_request
-    if previous and previous.active and NetworkRequestJob.cancel then
-        NetworkRequestJob.cancel(previous.active)
-    end
-
-    local request_token = {
-        path = context.path,
-    }
-    self.active_reader_return_request = request_token
-
-    local credentials = SuwayomiSettings:load()
-    local endpoint_scope = SuwayomiSettings:normalizeEndpointScope(credentials.server_url)
-    local active = NetworkRequestJob.start({
-        owner = self,
-        credentials = credentials,
-        request = {
-            action = "fetch_reader_return_chapters_for_manga",
-            manga_id = context.manga_id,
-        },
-        loading_message = I18n.t("Loading chapters..."),
-        result_prefix = "reader_return_chapters",
-        timeout_seconds = self.reader_return_timeout_seconds or 30,
-        timeout_message = I18n.t("Could not load chapters."),
-        on_cancel = function()
-            if self.active_reader_return_request == request_token then
-                self.active_reader_return_request = nil
-            end
-        end,
-        on_finish = function(result)
-            if self.suwayomi_host_retired or self.active_reader_return_request ~= request_token then
-                return
-            end
-            if not contextMatches(self:getCurrentReaderReturnContext(), context) then
-                self.active_reader_return_request = nil
-                return
-            end
-            if not result then
-                self.active_reader_return_request = nil
-                return
-            end
-            if not result.ok then
-                self.active_reader_return_request = nil
-                self:showMessage(result.error)
-                return
-            end
-            if type(result.chapters) ~= "table" then
-                self.active_reader_return_request = nil
-                self:showMessage(I18n.t("Could not load chapters."))
-                return
-            end
-            if endpoint_scope ~= SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url) then
-                self.active_reader_return_request = nil
-                return
-            end
-
-            local manga = buildReturnedManga(context, result.manga)
-            manga.endpoint_scope = endpoint_scope
-            self:closeReaderToFileManager(function(destination)
-                if not destination or destination.suwayomi_host_retired then return end
-                if endpoint_scope ~= SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url) then return end
-                if destination.cancelMangaNetworkRequests then destination:cancelMangaNetworkRequests() end
-                destination:showChapterResultForManga(manga, result, {
-                    return_context = context,
-                    reader_return_close_target = self.buildReaderReturnCloseTarget
-                        and self:buildReaderReturnCloseTarget(context, manga)
-                        or nil,
-                })
-            end, function()
-                if self.suwayomi_host_retired or self.active_reader_return_request ~= request_token then
-                    return false
-                end
-                if not contextMatches(self:getCurrentReaderReturnContext(), context) then
-                    self.active_reader_return_request = nil
-                    return false
-                end
-                -- Consume the result before intentional teardown retires this host.
-                self.active_reader_return_request = nil
-                return true
-            end)
-        end,
-    })
-    if not active then
-        if self.active_reader_return_request == request_token then
-            self.active_reader_return_request = nil
-        end
-        return false
-    end
-    if self.active_reader_return_request == request_token then
-        request_token.active = active
-    end
-    return true
-end
-
 function Methods:cancelReaderReturnRequest()
     local request = self.active_reader_return_request
     if not request then
@@ -406,9 +307,6 @@ function Methods:cancelReaderReturnRequest()
     end
 
     self.active_reader_return_request = nil
-    if request.active and NetworkRequestJob.cancel then
-        NetworkRequestJob.cancel(request.active)
-    end
     return true
 end
 
@@ -434,7 +332,7 @@ function Methods:closeReaderToFileManager(callback, should_continue)
 
         local destination = ok_filemanager and FileManager.instance and FileManager.instance.suwayomi
         if callback and destination and destination.ui == FileManager.instance
-            and not destination.suwayomi_host_retired and destination.showChapterResultForManga
+            and not destination.suwayomi_host_retired and destination.showChaptersForManga
         then
             callback(destination)
         end
@@ -442,16 +340,57 @@ function Methods:closeReaderToFileManager(callback, should_continue)
 end
 
 function Methods:returnToSuwayomiChapters(context)
-    context = context or self:getCurrentReaderReturnContext()
-    if not context then
+    if self.suwayomi_host_retired then return false end
+    context = copyTable(context or self:getCurrentReaderReturnContext())
+    if not context or not context.path then
         self:showMessage(I18n.t("This book is not linked to Suwayomi chapters."))
         return false
     end
 
+    local endpoint_scope = SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
+    if present(context.endpoint_scope) and context.endpoint_scope ~= endpoint_scope then
+        return false
+    end
+    if not contextMatches(self:getCurrentReaderReturnContext(), context) then return false end
+    local ok_reader, ReaderUI = pcall(require, "apps/reader/readerui")
+    local reader = ok_reader and ReaderUI.instance
+    if not reader or reader ~= self.ui or not reader.onClose then return false end
+
+    if self.cancelMangaNetworkRequests then self:cancelMangaNetworkRequests() end
+    local request_token = {}
+    self.active_reader_return_request = request_token
+    local manga = buildReturnedManga(context)
+    local options = {
+        return_context = context,
+        reader_return_close_target = self.buildReaderReturnCloseTarget
+            and self:buildReaderReturnCloseTarget(context, manga)
+            or nil,
+    }
     if self.scheduleFinishedChapterCleanup then
         self:scheduleFinishedChapterCleanup(0)
     end
-    return self:startReaderReturnChapterRequest(context)
+    self:closeReaderToFileManager(function(destination)
+        if endpoint_scope ~= SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url) then return end
+        if ReaderUI.instance or not contextMatches(self:getReaderReturnContextForPath(context.path), context) then
+            return
+        end
+        destination:showChaptersForManga(manga, options)
+    end, function()
+        if self.suwayomi_host_retired or self.active_reader_return_request ~= request_token then
+            return false
+        end
+        if endpoint_scope ~= SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
+            or ReaderUI.instance ~= reader
+            or not contextMatches(self:getCurrentReaderReturnContext(), context)
+        then
+            self.active_reader_return_request = nil
+            return false
+        end
+        -- Intentional native close saves progress and retires the reader host.
+        self.active_reader_return_request = nil
+        return true
+    end)
+    return true
 end
 
 ReaderReturn.methods = Methods

@@ -9,7 +9,7 @@ describe("manual read completion integration", function()
     local directory, runtime, settings, service, plugin, chapters, timers, messages
     local original_time = os.time
     local clock
-    local manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" } }
+    local manga
     local extra_modules = {
         "suwayomi/settings/store", "suwayomi/chapters/manual_deletion",
         "suwayomi/chapters/archive_identity", "docsettings",
@@ -104,6 +104,7 @@ describe("manual read completion integration", function()
     end
     before_each(function()
         clear()
+        manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" } }
         runtime = runtime_helper.install()
         timers, messages, clock = {}, {}, 100
         os.time = function() return clock end

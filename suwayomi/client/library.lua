@@ -3,7 +3,7 @@
 -- Responsibility: render saved Library information and replace it after a complete server load.
 -- Owned state: one Library session and its cancellable request on the client.
 -- Dependencies: checked settings, normal Library widgets, and the request worker.
--- External data: only complete scoped snapshots are persisted; reconstruction is display-only.
+-- External data: only complete scoped snapshots are persisted; unassociated reconstruction permits local reading only.
 
 local M = {}
 local I18n = require("suwayomi/i18n")
@@ -119,8 +119,9 @@ local function renderManga(self, session)
     local function select(manga)
         if not live(self, session) then return end
         session.category_selected = true
-        if not session.saved and (not session.scope or manga.endpoint_scope ~= session.scope) then
-            notify(self, I18n.t("This recovered manga has no saved server association. Refresh Library before opening it."))
+        if session.saved then manga.endpoint_scope = session.scope end
+        if manga.local_only then
+            self.plugin:showChaptersForManga(manga)
             return
         end
         local function updated(updated_manga)
@@ -198,17 +199,20 @@ local function reconstructLibrary(self, scope)
     local by_id, categories = {}, {}
     local function add(entry)
         if type(entry) ~= "table" or type(entry.path) ~= "string"
-            or not entry.manga_id or tostring(entry.manga_id) == ""
+            or (not entry.manga_id and not entry.path:match("^(.*)[/\\][^/\\]+$"))
             or (entry.endpoint_scope and entry.endpoint_scope ~= scope)
             or lfs.attributes(entry.path, "mode") ~= "file" then return end
-        local key = tostring(entry.manga_id)
+        local local_manga_path = not entry.manga_id and entry.path:match("^(.*)[/\\][^/\\]+$")
+        local key = entry.manga_id and tostring(entry.manga_id) or local_manga_path
         local manga = by_id[key]
         if manga and manga.endpoint_scope ~= entry.endpoint_scope then
             -- Scoped metadata wins as a unit; matching IDs do not associate legacy rows.
             if manga.endpoint_scope then return end
             manga = nil
         end
-        manga = manga or { id = entry.manga_id, endpoint_scope = entry.endpoint_scope, categories = {} }
+        manga = manga or { id = entry.manga_id, endpoint_scope = entry.endpoint_scope, categories = {},
+            local_only = entry.endpoint_scope == nil or entry.manga_id == nil,
+            local_manga_path = local_manga_path }
         by_id[key] = manga
         manga.title = manga.title or entry.manga_title
         manga.source = manga.source or entry.source
@@ -228,7 +232,8 @@ local function reconstructLibrary(self, scope)
     for _, entry in pairs(self.settings:loadChapterLedger()) do add(entry) end
     local listing = { manga = {}, categories = {} }
     for _, manga in pairs(by_id) do
-        manga.title = manga.title or I18n.f("Manga %1", manga.id)
+        manga.title = manga.title or (manga.local_manga_path and manga.local_manga_path:match("[^/\\]+$"))
+            or I18n.f("Manga %1", manga.id)
         listing.manga[#listing.manga + 1] = manga
         for _, category in ipairs(manga.categories) do
             if not categories[tostring(category.id)] then categories[tostring(category.id)] = category end

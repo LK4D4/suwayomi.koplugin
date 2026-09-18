@@ -2,7 +2,7 @@
 --
 -- Responsibility: checked download commands, pending jobs, attempts, status and
 -- recovery. Lifecycle methods run on this same owner; JobStore owns persistence.
--- Explicit inspection has a distinct lifecycle and never publishes a generation.
+-- Explicit inspection never publishes a generation; read-only inspection never adopts identities or writes queue state.
 -- Owned state: pending/active/stopping jobs, completion retries, statuses and timers.
 -- Dependencies: settings, downloader, UI manager, subprocess helpers, progress
 -- files, status formatter, clock, credentials callback, and optional callbacks.
@@ -851,7 +851,9 @@ function DownloadQueue:pollVerification()
             local result = active.result
             result.path = active.path
             local ok
-            if result.state == "valid" then
+            if active.read_only then
+                ok = true
+            elseif result.state == "valid" then
                 ok = self:commitChapterCompletion(active, active.path)
             else
                 local failed = self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
@@ -865,11 +867,13 @@ function DownloadQueue:pollVerification()
             end
             if ok then
                 active.delivered = true
-                self.statuses[active.key] = result.state == "valid"
-                    and { state = "downloaded", path = active.path }
-                    or { state = "failed", archive_state = result.state, identity = result.identity,
-                        path = active.path, error = result.error }
-                self.onStatusChanged()
+                if not active.read_only then
+                    self.statuses[active.key] = result.state == "valid"
+                        and { state = "downloaded", path = active.path }
+                        or { state = "failed", archive_state = result.state, identity = result.identity,
+                            path = active.path, error = result.error }
+                    self.onStatusChanged()
+                end
                 local current = self:verificationIsCurrent(active)
                 if active.worker_done then
                     if not active.retain_files then SubprocessJob.cleanup(active) end
@@ -882,7 +886,7 @@ function DownloadQueue:pollVerification()
     if active.worker_done and (active.canceled or active.delivered) then
         if not active.retain_files then SubprocessJob.cleanup(active) end
         if self.verification == active then self.verification = nil end
-        if active.canceled then self.onStatusChanged() end
+        if active.canceled and not active.read_only then self.onStatusChanged() end
     elseif self.verification == active then
         self.ui_manager:scheduleIn(self.POLL_INTERVAL_SECONDS, function() self:pollVerification() end)
     end
@@ -891,14 +895,15 @@ end
 function DownloadQueue:verifyArchive(manga, chapter, path, callback, options)
     if not self:checkStoreFence() then return false, "store_blocked" end
     if self.verification then return false, "verification_busy" end
+    local read_only = options and options.read_only == true
     local key = self:getKey(manga, chapter)
     local status = self.statuses[key]
-    if self:isChapterBusy(key) or status and (status.state == "queued" or status.state == "downloading") then
+    if not read_only and (self:isChapterBusy(key) or status and (status.state == "queued" or status.state == "downloading")) then
         return false, "downloading"
     end
     local attempt_id, err = Archive.newAttemptId()
     if not attempt_id then return false, err end
-    local stored = self:findPersistentJob(key)
+    local stored = not read_only and self:findPersistentJob(key)
     local directory = stored and stored.download_directory
         or self.settings and self.settings.loadDownloadDirectory and self.settings:loadDownloadDirectory()
     local active = {
@@ -908,6 +913,7 @@ function DownloadQueue:verifyArchive(manga, chapter, path, callback, options)
         provenance = stored and stored.provenance,
         identity = Archive.identity(path), callback = callback,
         is_current = options and options.is_current, started_at = self.now(),
+        read_only = read_only,
         result_path = SubprocessJob.buildResultPath("verify_" .. attempt_id),
     }
     self.verification = active
@@ -925,7 +931,7 @@ function DownloadQueue:verifyArchive(manga, chapter, path, callback, options)
         active.retain_files = not ok
         active.result = { state = "unverified", identity = active.identity, error = tostring(ok and launch_error or pid) }
     end
-    self.onStatusChanged()
+    if not read_only then self.onStatusChanged() end
     self.ui_manager:scheduleIn(0, function() self:pollVerification() end)
     return true
 end

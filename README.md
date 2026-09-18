@@ -45,9 +45,9 @@ Use HTTPS when connecting over a network. HTTP remains supported but exposes pas
 
 Library saves its rows, categories, and thumbnail references automatically. Opening it shows saved information immediately while the server refresh runs; **Refresh** in the Library menu retries a failed load. A complete server response replaces the saved list, including removals or an empty Library, without deleting downloaded chapters or reading progress. If no usable Library cache exists, existing download metadata supplies a best-effort listing. Cache-save failures are reported.
 
-Recovered rows without a known server association remain display-only until a successful Library refresh establishes their identity.
+Chapter lists are saved automatically when you browse them. Saved rows appear immediately; opening a manga or choosing **Refresh chapters** tries the server again without an offline-mode switch. Failed loads retain the saved list. A successful complete list replaces it, including an empty result. If no chapter list was saved, recorded downloads supply the available rows; otherwise the screen explains that chapter information is missing.
 
-This cache currently covers the Library screen only. Chapter-list loading and **Go to Suwayomi** still require the server; offline chapter browsing and reader return are separate work. Downloaded CBZs remain accessible through KOReader's file browser.
+Downloaded chapters open locally without waiting for the server. KOReader saves and resumes reading progress normally, and **Go to Suwayomi** returns to the normal chapter screen even offline. Recovered files without a known server association allow **Open** and **Verify download**, but cannot acquire server read-sync, download, or deletion authority merely by being opened. Downloaded CBZs also remain accessible through KOReader's file browser.
 
 Choose a manga, open its chapters, then tap a chapter to download or read it. Use **Download next** for a one-time batch, or **Auto-download** to keep the first unread chapters available automatically. Each download action adds at most 50 new chapters.
 

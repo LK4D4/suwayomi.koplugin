@@ -598,8 +598,9 @@ def main():
     commands.add_parser("smoke", help="Download and open one unused fixture chapter through the real UI")
     commands.add_parser("auth-smoke", help="Fill and test the real setup connection dialog, then download a fixture")
     ui = commands.add_parser("ui").add_subparsers(dest="action", required=True)
-    for name in ("observe", "home", "close-reader"):
+    for name in ("observe", "home"):
         ui.add_parser(name)
+    ui.add_parser("close-reader").add_argument("--title", help="Expected chapter screen title for a non-baseline fixture")
     ui.add_parser("tap").add_argument("label")
     fill = ui.add_parser("fill", help="Fill a visible field without putting secrets in arguments or output")
     fill.add_argument("field", help="Observed field hint or 1-based index")
@@ -647,6 +648,8 @@ def main():
             result = client.fill(args.field, value)
         elif args.action == "tap":
             result = client.tap(args.label)
+        elif args.action == "close-reader":
+            result = client.close_reader(args.title)
         elif args.action == "wait":
             result = client.wait(args.title, args.timeout)
         elif args.action == "screenshot":

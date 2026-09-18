@@ -610,6 +610,93 @@ describe("suwayomi/chapters/actions", function()
         assert.are.same({}, plugin.ledger)
     end)
 
+    it("recovers only scoped recorded chapters in saved order without inventing missing identifiers", function()
+        local first, second, foreign = "/recorded/a.cbz", "/recorded/b.cbz", "/other/a.cbz"
+        local plugin = build_plugin({ existing = { [first] = true, [second] = true, [foreign] = true } })
+        local contexts = {
+            [first] = { manga_id = "m1", chapter_id = "c1", path = first, source_order = 2,
+                endpoint_scope = manga.endpoint_scope, thumbnail_url = "/saved-cover" },
+            [second] = { manga_id = "m1", path = second, source_order = 1, endpoint_scope = manga.endpoint_scope },
+            [foreign] = { manga_id = "m1", chapter_id = "c1", path = foreign, endpoint_scope = "https://other.example" },
+            absent = { manga_id = "m1", path = "/absent.cbz", endpoint_scope = manga.endpoint_scope },
+        }
+        assert(settings:saveReaderReturnContexts(contexts))
+        local chapters = plugin:getRecoveredChapters(manga)
+        assert.are.equal(2, #chapters)
+        assert.are.equal(second, chapters[1].local_path)
+        assert.is_nil(chapters[1].id)
+        assert.are.equal("b.cbz", chapters[1].name)
+        assert.are.equal("c1", chapters[2].id)
+        assert.are.equal("/saved-cover", chapters[2].thumbnail_url)
+        settings.download_directory = ""
+        assert.are.equal(first, plugin:getChapterPath(manga, chapters[2]))
+        assert.are.same(contexts, settings:loadReaderReturnContexts())
+        assert.are.same({}, settings:loadChapterLedger())
+        assert(settings:save({ server_url = "https://other.example" }))
+        assert.is_nil(plugin:getRecoveredChapters(manga))
+        assert.is_false(plugin:isChapterDownloaded(manga, chapters[2]))
+    end)
+
+    it("never substitutes an unrecorded or foreign-server path for a recovered selection", function()
+        local path = "/downloads/Manga/Chapter 1.cbz"
+        local plugin = build_plugin({
+            existing = { [path] = true, ["/unrecorded.cbz"] = true },
+            ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path,
+                endpoint_scope = "https://other.example" } },
+        })
+        assert.is_false(plugin:isChapterDownloaded(manga, chapter))
+        assert.is_false(plugin:isChapterDownloaded(manga, { id = "c1", local_path = "/unrecorded.cbz" }))
+        assert.is_nil(plugin:getRecoveredChapters(manga))
+        assert(settings:saveReaderReturnContexts({ old = { manga_id = "m1", chapter_id = "c1", path = path } }))
+        assert.is_nil(plugin:getRecoveredChapters({ id = "m1", local_only = true }))
+        assert.are.equal("https://other.example", settings:loadChapterLedger()["m1:c1"].endpoint_scope)
+    end)
+
+    it("opens unassociated recorded chapters without adopting colliding server identities", function()
+        local path, opened, complete = "/legacy/unnamed.cbz"
+        package.preload["apps/reader/readerui"] = function()
+            return { showReader = function(_, selected) opened = selected end }
+        end
+        local foreign = { manga_id = "m1", chapter_id = "c1", path = "/foreign/file.cbz",
+            endpoint_scope = "https://other.example", read = true, pending_read_sync = true }
+        local plugin = build_plugin({ existing = { [path] = true }, ledger = { ["m1:c1"] = foreign },
+            queue = { verifyArchive = function(_, _, _, _, callback) complete = callback; return true end } })
+        assert(settings:saveReaderReturnContexts({ [path] = { manga_id = "m1", chapter_id = "c1", path = path } }))
+        local local_manga = { id = "m1", title = "Recovered", local_only = true }
+        local recovered = plugin:getRecoveredChapters(local_manga)[1]
+        plugin.current_chapter_context = { manga = local_manga, chapters = { recovered } }
+        assert.is_true(plugin:performChapterAction(local_manga, recovered, "open"))
+        assert.is_nil(opened)
+        complete({ state = "valid" })
+        assert.are.equal(path, opened)
+        assert.are.same(foreign, settings:loadChapterLedger()["m1:c1"])
+        for _, action in ipairs({ "download", "delete", "mark_read", "mark_unread", "redownload", "cancel_download" }) do
+            assert.is_false(plugin:performChapterAction(local_manga, recovered, action))
+        end
+        assert.is_false(plugin:performBulkChapterAction("mark_read_selected"))
+        assert.is_false(plugin:performBulkChapterAction("delete_selected"))
+        assert.are.same({}, removed_paths)
+        assert.are.same({}, plugin.metadata_updates)
+        assert.is_nil(settings:getStore():readKey("download_refill"))
+    end)
+
+    it("opens a recorded file without server IDs using only its recorded directory identity", function()
+        local path, opened, complete = "/legacy/unnamed.cbz"
+        package.preload["apps/reader/readerui"] = function()
+            return { showReader = function(_, selected) opened = selected end }
+        end
+        local plugin = build_plugin({ existing = { [path] = true },
+            queue = { verifyArchive = function(_, _, _, _, callback) complete = callback; return true end } })
+        assert(settings:saveReaderReturnContexts({ [path] = { path = path } }))
+        local local_manga = { title = "legacy", local_only = true, local_manga_path = "/legacy" }
+        local recovered = plugin:getRecoveredChapters(local_manga)[1]
+        assert.is_nil(recovered.id)
+        assert.is_true(plugin:openChapter(local_manga, recovered))
+        complete({ state = "valid" })
+        assert.are.equal(path, opened)
+        assert.are.same({}, settings:loadChapterLedger())
+    end)
+
     it("translates chapter action refusal and confirmation messages", function()
         Marker.install()
         reset_modules()

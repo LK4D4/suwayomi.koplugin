@@ -322,9 +322,6 @@ msgstr ""
 msgid "Chapters"
 msgstr ""
 
-msgid "Chapters are loading."
-msgstr ""
-
 msgid "Check again"
 msgstr ""
 
@@ -467,6 +464,10 @@ msgid "Could not refresh Library. Showing saved information."
 msgstr ""
 
 msgid "Could not retry download."
+msgstr ""
+
+msgid ""
+"Could not save chapter information. It may not be available after restarting."
 msgstr ""
 
 msgid "Could not save saved filter."
@@ -986,6 +987,9 @@ msgstr ""
 msgid "No saved Library information is available."
 msgstr ""
 
+msgid "No saved chapter information is available."
+msgstr ""
+
 msgid "No saved filters."
 msgstr ""
 
@@ -1376,11 +1380,6 @@ msgid "This manga has no chapters loaded."
 msgstr ""
 
 msgid "This manga has no chapters."
-msgstr ""
-
-msgid ""
-"This recovered manga has no saved server association. Refresh Library before "
-"opening it."
 msgstr ""
 
 msgid "This source has no filters."

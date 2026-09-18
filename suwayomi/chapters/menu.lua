@@ -97,10 +97,9 @@ function Methods:getChapterTitleBarMenuOptions(manga)
     })
 end
 
-function Methods:buildChapterMenuItems(manga, chapters, ledger)
+function Methods:buildChapterMenuItems(manga, chapters, ledger, options)
     local started_at = SuwayomiDebug.now()
-    local SuwayomiDownloader = require("suwayomi/downloads/downloader")
-    local download_directory = SuwayomiSettings:loadDownloadDirectory()
+    local saved = manga.local_only or (options and options.saved)
     local items = {}
     local downloaded_count = 0
     local metadata_finished_count = 0
@@ -117,9 +116,13 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
         for key, value in pairs(chapter) do
             item[key] = value
         end
-        item._suwayomi_manual_deletion = manual_snapshot[self:getChapterDownloadKey(manga, item)]
-            or (manual_error and { state = "blocked", reason = manual_error } or nil)
-        local read_entry = read_ledger[self:getChapterLedgerKey(manga, item)]
+        local local_only = manga.local_only or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, item))
+        item._suwayomi_manual_deletion = not local_only and (manual_snapshot[self:getChapterDownloadKey(manga, item)]
+            or (manual_error and { state = "blocked", reason = manual_error } or nil)) or nil
+        local read_entry = not local_only and read_ledger[self:getChapterLedgerKey(manga, item)]
+        if read_entry and read_entry.endpoint_scope and read_entry.endpoint_scope ~= manga.endpoint_scope then
+            read_entry = nil
+        end
         local explicit_unread = type(read_entry) == "table"
             and read_entry.pending_read_sync == true and read_entry.pending_read_state == false
         if explicit_unread then
@@ -127,14 +130,8 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
             item.is_read, chapter.is_read = false, false
         end
 
-        local chapter_exists = false
-        local chapter_path
-        if download_directory and download_directory ~= "" then
-            chapter_path = select(2, SuwayomiDownloader:getTargetPath(download_directory, manga, item))
-            if SuwayomiDownloader.findExistingChapterPath then
-                chapter_path = SuwayomiDownloader:findExistingChapterPath(download_directory, manga, item) or chapter_path
-            end
-            chapter_exists = SuwayomiDownloader:chapterExists(chapter_path)
+        local chapter_exists, chapter_path = self:isChapterDownloaded(manga, item)
+        if chapter_exists then
             local metadata_finished = chapter_exists and self:isChapterPathFinishedInKoreader(chapter_path)
             if chapter_exists then
                 downloaded_count = downloaded_count + 1
@@ -147,18 +144,18 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
                 if chapter.is_read ~= true then
                     chapter.is_read = true
                 end
-                if item._suwayomi_is_read ~= true then
+                if not local_only and item._suwayomi_is_read ~= true then
                     item.pending_read_sync = true
                     chapter.pending_read_sync = true
                 end
             end
-            if chapter_exists and item.is_read == true and not metadata_finished then
+            if not saved and not local_only and chapter_exists and item.is_read == true and not metadata_finished then
                 self:setKoreaderChapterReadState(chapter_path, true)
                 metadata_write_count = metadata_write_count + 1
             end
         end
 
-        if chapter_exists then
+        if chapter_exists and not saved and not local_only then
             local updates = {
                 path = chapter_path,
                 read = item.is_read == true,
@@ -173,7 +170,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
             ledger_upsert_count = ledger_upsert_count + 1
         end
 
-        local status = self:getChapterDownloadStatus(manga, item)
+        local status = not local_only and self:getChapterDownloadStatus(manga, item) or nil
 
         if not status then
             if chapter_exists then
@@ -195,8 +192,8 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
     end
 
     if not ledger and ledger_changed then
-        local saved, err = self:saveChapterLedger(read_ledger)
-        if not saved then
+        local persisted, err = self:saveChapterLedger(read_ledger)
+        if not persisted then
             self:showMessage(err or I18n.t("Failed to save settings."))
             local committed = self:loadChapterLedger()
             for _, chapter in ipairs(chapters or {}) do
@@ -208,7 +205,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
             return nil, err
         end
     end
-    if not ledger and self.saveReaderReturnContextsForChapters then
+    if not saved and not ledger and self.saveReaderReturnContextsForChapters then
         self:saveReaderReturnContextsForChapters(manga, reader_return_entries)
     end
 
@@ -227,9 +224,9 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger)
 end
 
 
-function Methods:buildChapterMenuOptions(manga, chapters, ledger)
+function Methods:buildChapterMenuOptions(manga, chapters, ledger, options)
     local visible_chapters = self:getVisibleChapters(chapters)
-    local items, err = self:buildChapterMenuItems(manga, visible_chapters, ledger)
+    local items, err = self:buildChapterMenuItems(manga, visible_chapters, ledger, options)
     if not items then return nil, err end
 
     return copyTitleBarOptions({
@@ -252,6 +249,14 @@ end
 
 
 function Methods:buildQuickChapterMenuItems(manga, chapters)
+    if manga.local_only then return self:buildChapterMenuItems(manga, chapters, nil, { saved = true }) end
+    if self.isLocalOnlyChapter then
+        for _, chapter in ipairs(chapters or {}) do
+            if self:isLocalOnlyChapter(manga, chapter) then
+                return self:buildChapterMenuItems(manga, chapters, nil, { saved = true })
+            end
+        end
+    end
     local cached_items = self:buildCachedChapterMenuMap()
     local items = {}
     local snapshot = self:getDownloadQueue():getSnapshot()
@@ -313,6 +318,13 @@ end
 
 
 function Methods:getChapterActions(manga, chapter)
+    if manga.local_only or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, chapter)) then
+        if not self:isChapterDownloaded(manga, chapter) then return {} end
+        return {
+            { id = "open", text = I18n.c("chapter action", "Open") },
+            { id = "verify_download", text = I18n.t("Verify download") },
+        }
+    end
     local status = self.getChapterDownloadStatus and self:getChapterDownloadStatus(manga, chapter) or nil
     local downloaded = self:isChapterDownloaded(manga, chapter)
     local actions = {}
@@ -360,6 +372,23 @@ end
 function Methods:getBulkChapterActions()
     local actions = {}
     local context = self.current_chapter_context
+    local local_only = context and context.manga and context.manga.local_only
+    if context and context.manga and self.isLocalOnlyChapter then
+        for _, chapter in ipairs(context.chapters or {}) do
+            if self:isLocalOnlyChapter(context.manga, chapter) then local_only = true; break end
+        end
+    end
+    local show_scanlator_filter = self.current_scanlator_filter ~= nil
+        or #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0
+    if local_only then
+        table.insert(actions, self:getSelectedChapterCount() > 0
+            and { id = "clear_selection", text = I18n.t("Clear selection") }
+            or { id = "select_all", text = I18n.t("Select all") })
+        if show_scanlator_filter then
+            table.insert(actions, { id = "scanlator_filter", text = I18n.t("Scanlator filter"), submenu = true })
+        end
+        return actions
+    end
     local refill = context and self:getMangaRefillRequest(context.manga)
     if refill and refill.manga_id ~= nil and refill.revision ~= nil then
         table.insert(actions, {
@@ -372,8 +401,6 @@ function Methods:getBulkChapterActions()
     elseif refill then
         table.insert(actions, { id = "refill_status", text = SuwayomiUI.formatRefillStatus(refill), enabled = false })
     end
-    local show_scanlator_filter = self.current_scanlator_filter ~= nil
-        or #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0
 
     if self:getSelectedChapterCount() > 0 then
         table.insert(actions, { id = "download_selected", text = self:getSelectedChapterCount() > (self.max_batch_queue_chapters or 50)
@@ -544,6 +571,7 @@ function Methods:refreshChapterMenu(options)
     if not self.current_chapter_context then
         return
     end
+    if options.saved == nil then options.saved = self.current_chapter_context.saved end
     self.pending_chapter_menu_refresh = false
 
     local menu_options_builder = options.quick
@@ -553,9 +581,11 @@ function Methods:refreshChapterMenu(options)
         self,
         self.current_chapter_context.manga,
         self.current_chapter_context.chapters,
-        options.ledger
+        options.ledger,
+        options
     )
     if not menu_options then return false end
+    menu_options.empty_text = self.current_chapter_options and self.current_chapter_options.empty_text
     self.current_chapter_options = self.current_chapter_options or {}
     self.current_chapter_options.title = menu_options.title
     self.current_chapter_options.chapters = menu_options.chapters

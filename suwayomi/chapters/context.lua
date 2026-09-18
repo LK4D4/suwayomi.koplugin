@@ -96,8 +96,10 @@ function Methods:isCurrentChapterContextForManga(manga)
     if not self.current_chapter_context or not manga then
         return false
     end
-    return self:getChapterSelectionKey(self.current_chapter_context.manga, {})
-        == self:getChapterSelectionKey(manga, {})
+    local current = self.current_chapter_context.manga
+    return current.endpoint_scope == manga.endpoint_scope
+        and current.local_only == manga.local_only
+        and self:getChapterSelectionKey(current, {}) == self:getChapterSelectionKey(manga, {})
 end
 
 
@@ -139,10 +141,12 @@ end
 
 function Methods:isChapterInCurrentContext(manga, chapter)
     if self.suwayomi_host_retired then return false end
+    if manga and manga.endpoint_scope
+        and manga.endpoint_scope ~= SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url) then return false end
     if not self.current_chapter_context then return true end
     if not self:isCurrentChapterContextForManga(manga) then return false end
     for _, current in ipairs(self:getVisibleChapters(self.current_chapter_context.chapters)) do
-        if tostring(current.id) == tostring(chapter and chapter.id) then return true end
+        if self:getChapterSelectionKey(manga, current) == self:getChapterSelectionKey(manga, chapter or {}) then return true end
     end
     return false
 end
@@ -153,6 +157,7 @@ function Methods:captureChapterActionGuard()
     local manga_id = manga and tostring(manga.id or manga.title)
     local revision = self.chapter_request_revision
     local scanlator_filter = self.current_scanlator_filter
+    local endpoint_scope = SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
     return function()
         return not self.suwayomi_host_retired
             and self.current_chapter_context == context
@@ -160,6 +165,7 @@ function Methods:captureChapterActionGuard()
             and (not manga or tostring(manga.id or manga.title) == manga_id)
             and self.chapter_request_revision == revision
             and self.current_scanlator_filter == scanlator_filter
+            and endpoint_scope == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
     end
 end
 
@@ -244,13 +250,14 @@ end
 
 
 function Methods:getChapterSelectionKey(manga, chapter)
-    return tostring(manga.id or manga.title or "") .. ":" .. tostring(chapter.id or chapter.name or "")
+    return tostring(manga.local_manga_path or manga.id or manga.title or "")
+        .. ":" .. tostring(chapter.local_path or chapter.id or chapter.name or "")
 end
 
 
 function Methods:isChapterSelected(manga, chapter)
-    local manga_id = type(manga) == "table" and (manga.id or manga.title) or manga
-    local chapter_id = type(chapter) == "table" and (chapter.id or chapter.name) or chapter
+    local manga_id = type(manga) == "table" and (manga.local_manga_path or manga.id or manga.title) or manga
+    local chapter_id = type(chapter) == "table" and (chapter.local_path or chapter.id or chapter.name) or chapter
     local key = tostring(manga_id or "") .. ":" .. tostring(chapter_id or "")
     return self.selected_chapters and self.selected_chapters[key] == true
 end
@@ -556,6 +563,20 @@ end
 
 function Methods:setScanlatorFilter(scanlator)
     if self.suwayomi_host_retired or not self.current_chapter_context then return false end
+    local context = self.current_chapter_context
+    local local_only = context.manga.local_only
+    if self.isLocalOnlyChapter then
+        for _, chapter in ipairs(context.chapters or {}) do
+            if self:isLocalOnlyChapter(context.manga, chapter) then local_only = true; break end
+        end
+    end
+    if local_only then
+        -- Recovered IDs may collide with another server's saved filter or refill policy.
+        self.current_scanlator_filter = SuwayomiSettings:normalizeMangaScanlatorFilter(scanlator)
+        self:clearChapterSelection(true)
+        self:refreshChapterMenu({ quick = true })
+        return true
+    end
     local saved_filter, err = self:saveMangaScanlatorFilter(
         self.current_chapter_context and self.current_chapter_context.manga,
         scanlator

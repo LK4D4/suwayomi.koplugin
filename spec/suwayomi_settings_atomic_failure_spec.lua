@@ -221,6 +221,187 @@ describe("suwayomi settings atomic failure handling", function()
         assert.is_nil(SuwayomiSettings:loadLibraryCache(credentials))
     end)
 
+    it("replaces one manga's chapters with authoritative emptiness without losing another after restart", function()
+        local credentials = SuwayomiSettings:load()
+        local first = { id = 7, title = "First" }
+        local second = { id = 8, title = "Second" }
+        assert.is_nil(SuwayomiSettings:loadChapterCache(credentials, first))
+        assert(SuwayomiSettings:saveChapterCache(credentials, first, { { id = 71, name = "Old" } }))
+        assert(SuwayomiSettings:saveChapterCache(credentials, second, {
+            { id = 82, name = "Second" }, { id = 81, name = "First" },
+        }))
+        assert(SuwayomiSettings:saveChapterCache(credentials, first, {}))
+
+        -- Discard both in-memory settings owners; load only the committed document.
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        local empty = SuwayomiSettings:loadChapterCache(credentials, first)
+        assert.same({}, empty.chapters)
+        assert.are.equal("First", empty.manga.title)
+        local other = SuwayomiSettings:loadChapterCache(credentials, second)
+        assert.same({ { id = 82, name = "Second" }, { id = 81, name = "First" } }, other.chapters)
+    end)
+
+    it("isolates colliding chapter identities when changing configured servers", function()
+        local first_server = { server_url = "http://first.test/" }
+        local second_server = { server_url = "http://second.test" }
+        local manga = { id = 7, title = "First server", endpoint_scope = "http://first.test" }
+        assert(SuwayomiSettings:saveChapterCache(first_server, manga, { { id = 71, name = "Original" } }))
+        assert.is_nil(SuwayomiSettings:loadChapterCache(second_server, { id = 7 }))
+        local rejected, err = SuwayomiSettings:saveChapterCache(second_server, manga, {})
+        assert.is_nil(rejected)
+        assert.is_string(err)
+        assert.are.equal("Original", SuwayomiSettings:loadChapterCache(first_server, manga).chapters[1].name)
+
+        assert(SuwayomiSettings:saveChapterCache(second_server, { id = 7, title = "Second server" }, {
+            { id = 71, name = "Different chapter" },
+        }))
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        assert.is_nil(SuwayomiSettings:loadChapterCache(first_server, { id = 7 }))
+        assert.is_nil(SuwayomiSettings:loadChapterCache(second_server, manga))
+        assert.are.equal("Different chapter",
+            SuwayomiSettings:loadChapterCache(second_server, { id = 7 }).chapters[1].name)
+    end)
+
+    it("keeps chapter metadata independent of input, save results, and displayed row edits", function()
+        local credentials = SuwayomiSettings:load()
+        local manga = { id = 7, title = "Committed", source = { id = "source", name = "Original" } }
+        local chapters = { { id = 71, name = "One", source_order = 2 } }
+        local saved = assert(SuwayomiSettings:saveChapterCache(credentials, manga, chapters))
+        manga.source.name = "Unsaved input"
+        chapters[1].name = "Unsaved input"
+        assert.are.equal("Original", saved.manga.source.name)
+        assert.are.equal("One", saved.chapters[1].name)
+        saved.manga.title = "Unsaved save result"
+        saved.chapters[1].source_order = 900
+        local displayed = SuwayomiSettings:loadChapterCache(credentials, { id = 7 })
+        displayed.manga.source.name = "Unsaved display"
+        displayed.chapters[1].name = "Unsaved display"
+        assert(SuwayomiSettings:saveMaxParallelChapterDownloads(3))
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        local restarted = SuwayomiSettings:loadChapterCache(credentials, { id = 7 })
+        assert.are.equal("Committed", restarted.manga.title)
+        assert.are.equal("Original", restarted.manga.source.name)
+        assert.same({ { id = 71, name = "One", source_order = 2 } }, restarted.chapters)
+    end)
+
+    it("rejects malformed chapter metadata without replacing a usable listing", function()
+        local credentials = SuwayomiSettings:load()
+        local manga = { id = 7, title = "Kept" }
+        local old = { { id = 71, name = "Original" } }
+        assert(SuwayomiSettings:saveChapterCache(credentials, manga, old))
+        local cycle = { id = 71 }
+        cycle.extra = cycle
+        local invalid = {
+            { manga = manga, chapters = { { id = 71 }, { id = "71" } } },
+            { manga = manga, chapters = { [2] = { id = 71 } } },
+            { manga = manga, chapters = { { id = 71, source_order = "first" } } },
+            { manga = manga, chapters = { { id = 71, scanlator = {} } } },
+            { manga = manga, chapters = { { id = 71, is_read = "yes" } } },
+            { manga = manga, chapters = { { id = 71, chapter_number = math.huge } } },
+            { manga = manga, chapters = { { id = 71, extra = function() end } } },
+            { manga = manga, chapters = { cycle } },
+            { manga = { id = 7, source = { name = {} } }, chapters = {} },
+            { manga = { id = 7, title = {} }, chapters = {} },
+            { manga = { id = 7, local_only = true }, chapters = {} },
+            { manga = manga, chapters = { { id = 71, endpoint_scope = "http://other.test" } } },
+        }
+        for _, value in ipairs(invalid) do
+            local saved, err = SuwayomiSettings:saveChapterCache(credentials, value.manga, value.chapters)
+            assert.is_nil(saved)
+            assert.is_string(err)
+            assert.same(old, SuwayomiSettings:loadChapterCache(credentials, manga).chapters)
+        end
+        assert(SuwayomiSettings:saveMaxParallelChapterDownloads(3))
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        assert.same(old, SuwayomiSettings:loadChapterCache(credentials, manga).chapters)
+    end)
+
+    it("treats unsupported and unusable persisted chapter listings as missing", function()
+        local credentials = SuwayomiSettings:load()
+        local manga = { id = 7 }
+        local invalid = {
+            { version = 2, endpoint_scope = credentials.server_url, mangas = {} },
+            { version = 1, endpoint_scope = credentials.server_url, mangas = {
+                ["7"] = { manga = { id = 8 }, chapters = {} },
+            } },
+            { version = 1, endpoint_scope = credentials.server_url, mangas = {
+                ["7"] = { manga = manga, chapters = { { id = 71, name = {} } } },
+            } },
+        }
+        for _, cache in ipairs(invalid) do
+            assert(SuwayomiSettings:getStore():saveKey("chapter_cache", cache))
+            SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+            assert.is_nil(SuwayomiSettings:loadChapterCache(credentials, manga))
+        end
+        assert(SuwayomiSettings:saveChapterCache(credentials, manga, {}))
+        assert.same({}, SuwayomiSettings:loadChapterCache(credentials, manga).chapters)
+    end)
+
+    it("preserves committed chapters and unrelated state after a rejected replacement", function()
+        local credentials = {
+            server_url = "http://suwayomi.test", auth_method = "basic_auth",
+            username = "reader", password = "private-value",
+        }
+        assert(SuwayomiSettings:save(credentials))
+        local expected_credentials = SuwayomiSettings:load()
+        local ledger = { ["7:71"] = { read = false, pending_read_sync = true, path = "/saved/one.cbz" } }
+        local contexts = { ["/saved/one.cbz"] = { manga = { id = 7 }, chapter = { id = 71 } } }
+        assert(SuwayomiSettings:saveChapterLedger(ledger))
+        assert(SuwayomiSettings:saveReaderReturnContexts(contexts))
+        assert(SuwayomiSettings:saveDownloadDirectory("/saved"))
+        local manga = { id = 7, title = "Kept" }
+        local old = { { id = 71, name = "Original" } }
+        assert(SuwayomiSettings:saveChapterCache(credentials, manga, old))
+        assert(SuwayomiSettings:saveChapterCache(credentials, { id = 8 }, { { id = 81 } }))
+        io_adapter.fail_rename = true
+        local saved, err = SuwayomiSettings:saveChapterCache(credentials, manga, {})
+        assert.is_nil(saved)
+        assert.is_string(err)
+        assert.same(old, SuwayomiSettings:loadChapterCache(credentials, manga).chapters)
+        io_adapter.fail_rename = false
+        assert(SuwayomiSettings:saveMaxParallelChapterDownloads(3))
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        assert.same(old, SuwayomiSettings:loadChapterCache(credentials, manga).chapters)
+        assert.same({ { id = 81 } }, SuwayomiSettings:loadChapterCache(credentials, { id = 8 }).chapters)
+        assert.same(expected_credentials, SuwayomiSettings:load())
+        assert.same(ledger, SuwayomiSettings:loadChapterLedger())
+        assert.same(contexts, SuwayomiSettings:loadReaderReturnContexts())
+        assert.are.equal("/saved", SuwayomiSettings:loadDownloadDirectory())
+    end)
+
+    it("keeps uncertain chapter replacement fenced until checked-store reconciliation", function()
+        local credentials = SuwayomiSettings:load()
+        local manga = { id = 7 }
+        assert(SuwayomiSettings:saveChapterCache(credentials, manga, { { id = 71 } }))
+        io_adapter.fail_sync_dir = true
+        local saved, err = SuwayomiSettings:saveChapterCache(credentials, manga, {})
+        assert.is_nil(saved)
+        assert.is_string(err)
+        assert.is_true(SuwayomiSettings:isBlocked())
+        assert.same({ { id = 71 } }, SuwayomiSettings:loadChapterCache(credentials, manga).chapters)
+        io_adapter.fail_sync_dir = false
+        assert.is_nil(SuwayomiSettings:saveChapterCache(credentials, { id = 8 }, { { id = 81 } }))
+        assert.is_nil(SuwayomiSettings:loadChapterCache(credentials, { id = 8 }))
+        assert(SuwayomiSettings:reconcile())
+        assert.same({}, SuwayomiSettings:loadChapterCache(credentials, manga).chapters)
+        assert(SuwayomiSettings:saveChapterCache(credentials, { id = 8 }, { { id = 81 } }))
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        assert.same({}, SuwayomiSettings:loadChapterCache(credentials, manga).chapters)
+        assert.same({ { id = 81 } }, SuwayomiSettings:loadChapterCache(credentials, { id = 8 }).chapters)
+    end)
+
+    it("persists only endpoint scope from cache credentials", function()
+        local credentials = {
+            server_url = "http://suwayomi.test/", username = "cache-only-user", password = "cache-only-secret",
+        }
+        assert(SuwayomiSettings:saveChapterCache(credentials, { id = 7 }, {}))
+        assert.is_nil(io_adapter.files[settings_path]:find("cache-only-user", 1, true))
+        assert.is_nil(io_adapter.files[settings_path]:find("cache-only-secret", 1, true))
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        assert.same({}, SuwayomiSettings:loadChapterCache({ server_url = "http://suwayomi.test" }, { id = 7 }).chapters)
+        assert.is_nil(SuwayomiSettings:saveChapterCache({ server_url = "http://user:secret@suwayomi.test" }, { id = 7 }, {}))
+    end)
+
     it("restores failed chapter status alongside Downloads after a cold restart", function()
         local manga = { id = "m1", title = "Example" }
         local chapter = { id = "c1", name = "One" }

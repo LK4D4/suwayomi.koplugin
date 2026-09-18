@@ -340,7 +340,7 @@ class Inspector:
             raise SandboxUIError("Could not save screenshot") from None
         return {"screenshot_sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), **dimensions}
 
-    def close_reader(self):
+    def close_reader(self, expected_title=None):
         state = self._observe()
         _require(state.get("document_file"), "No open reader document")
         if state.get("screen") != "reader-menu":
@@ -354,8 +354,9 @@ class Inspector:
                                       for item in current["controls"]), "reader return action")
         self._tap("Go to Suwayomi")
         returned = self._wait(lambda current: not current.get("document_file")
-                              and any(re.fullmatch(r"Chapter 00[123]", item.get("label", ""))
-                                      for item in current["controls"]), "Suwayomi chapter return")
+                              and (current.get("title") == expected_title if expected_title else
+                                   any(re.fullmatch(r"Chapter 00[123]", item.get("label", ""))
+                                       for item in current["controls"])), "Suwayomi chapter return")
         return self._public(returned)
 
     def quit(self):

@@ -327,9 +327,6 @@ msgstr "章节视图已更改。请再次执行此下载操作。"
 msgid "Chapters"
 msgstr "章节"
 
-msgid "Chapters are loading."
-msgstr "章节正在加载。"
-
 msgid "Check again"
 msgstr "重新检查"
 
@@ -481,6 +478,10 @@ msgstr ""
 
 msgid "Could not retry download."
 msgstr "无法重试下载。"
+
+msgid ""
+"Could not save chapter information. It may not be available after restarting."
+msgstr ""
 
 msgid "Could not save saved filter."
 msgstr "无法保存筛选器。"
@@ -1009,6 +1010,10 @@ msgstr "没有结果"
 msgid "No saved Library information is available."
 msgstr "无可用描述。"
 
+#, fuzzy
+msgid "No saved chapter information is available."
+msgstr "无可用描述。"
+
 msgid "No saved filters."
 msgstr "没有已保存的筛选器。"
 
@@ -1403,11 +1408,6 @@ msgstr "此漫画没有已加载章节。"
 
 msgid "This manga has no chapters."
 msgstr "此漫画没有章节。"
-
-msgid ""
-"This recovered manga has no saved server association. Refresh Library before "
-"opening it."
-msgstr ""
 
 msgid "This source has no filters."
 msgstr "此源没有筛选器。"

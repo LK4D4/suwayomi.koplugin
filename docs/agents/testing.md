@@ -129,7 +129,7 @@ python3 scripts/sandbox.py --root "$ROOT" stop server
 python3 scripts/sandbox.py --root "$ROOT" status
 ```
 
-`ui close-reader` is a reader transition, not process shutdown. It expects a return to the bundled `Chapter 001`–`003` list; it is not a general document-close helper. For custom fixtures, use observed reader-menu controls to return and verify the intended screen before `stop reader`, which also uses this helper if a document is open. Keep a failed sandbox for diagnosis; starting fresh does not require deleting it.
+`ui close-reader` is a reader transition, not process shutdown. By default it expects the bundled `Chapter 001`–`003` list. For custom fixtures, pass `--title "Expected chapter screen title"`; the helper still uses the normal **Go to Suwayomi** action and requires that exact destination without an open document. Close custom documents before `stop reader`, whose automatic close uses the default fixture check. Keep a failed sandbox for diagnosis; starting fresh does not require deleting it.
 
 ### Exercise authentication through the actual setup UI
 
@@ -221,6 +221,40 @@ Use the setup, deployment, service, and inspector commands above. Record the bas
 5. Remove only the extra series from server Library and choose **Refresh**; require its row to disappear without changing existing archives. For authoritative emptiness, temporarily remove every Library member, refresh to empty, stop the server, and cold-restart only the reader. It must stay empty despite known downloads. Do not restart the launcher server before this assertion: startup reseeds `Sandbox Alpha`. Restore controlled membership afterward.
 6. Repeat **Library → menu → Suwayomi home → Library**, then close the new Library branch. It must return to the underlying KOReader screen, not reveal inert old Library rows. Compare archive/sidecar hashes and preserved credentials/read/download state independently of screenshots.
 7. Retain redacted observations, screenshots, exact payload/inspector hashes, versions, fault descriptions, and expected/actual outcomes. Restore faults and stop owned services. Checked-write rejection, incomplete responses, stale/cross-server publication, and unassociated-ID collisions also have deterministic regressions in the Library, API/worker, and checked-settings specs; report their evidence separately from device observations.
+
+### Chapter-cache acceptance
+
+Keep the Library and chapter controls in the same disposable profile; separate page-progress, server-membership, and unknown-association controls so one cannot mask another.
+
+1. Run the baseline smoke before deploying the candidate (`1425ec6` for issue #51). Save its deployment manifest and private settings; hash the downloaded archive. Add independent Local source series through supported server APIs: a three-chapter removal fixture, a never-opened fixture, and a category containing the removal fixture. Browse Library/categories online, but leave the never-opened manga's chapters unopened.
+2. Browse and download a removal-fixture chapter through the normal UI. Open it, select native **View Mode: page**, advance to page 2, and return through **Go to Suwayomi**. Record the native sidecar and archive hashes. Stop the server, then follow **Library → manga → Open chapters → downloaded chapter → Open**. Require a visible page and immediate reader return, not merely a successful tap acknowledgment. Cold-restart the reader offline and verify native page-2 resume. Repeat at the last page without marking finished; native status, server/plugin read state, and archive presence must remain consistent with unfinished reading.
+3. Open the never-loaded fixture offline: require missing-information feedback, distinct from a successful empty list. For first-upgrade recovery, stop the reader, retain private settings, and remove only `chapter_cache` through the checked store. Strip association/title fields from recorded fixture metadata as a separately labeled legacy-data injection. Keep Library cache for the first run, then omit it for a second run. Existing files must remain reachable, Open/Verify must work without setup, and opening/return must not manufacture endpoint scope or pending synchronization. Restore the saved settings afterward.
+4. For pending-response behavior, verify the sandbox server PID/start time, suspend only that process group, and immediately open cached Library, chapters, and a downloaded archive. Require a visible reader before resuming the server; finally resume it even if the check fails. The sandbox inspector transfers its listener across UI hosts because forked workers retain inherited sockets. Rebinding a new listener during this control is a harness defect, not evidence of a product connection failure.
+5. Remove one source archive from the independent fixture into private evidence, then use **Refresh chapters**. Confirm the real server and chapter screen omit that row while the device archive and sidecar hashes remain unchanged. Restore source files after the control. On Suwayomi v2.3.2243, removing every source chapter returns **No chapters found**, not a successful empty list; expect the previous complete list to survive that failure.
+6. Test successful emptiness separately. With the real server stopped, a disposable authenticated HTTP responder at the same endpoint may inject, for only the controlled manga, `GET_CHAPTERS_MANGA` → `{"data":{"chapters":{"nodes":[],"totalCount":0,"pageInfo":{"hasNextPage":false}}}}`, then `GET_MANGA_CHAPTERS_FETCH` → `{"data":{"fetchChapters":{"chapters":[]}}}`. Reject other requests and never log headers. Open chapters normally, require the explicit empty state, stop the responder, and cold-restart the reader offline. The empty cache must win over retained downloads. Label this **injected successful response**, not a real-server successful empty refresh. Restore the real server and require ordinary opening/refresh to replace the empty cache.
+7. Exercise the existing controls: mark a known chapter read offline, verify a durable pending choice, reconnect and use **Sync**, then independently check server read state. After the chapter refresh settles, mark it unread and verify the reverse transition. Download and explicitly delete a spare chapter through its confirmation, proving the control archive disappears while unrelated archive/progress hashes stay unchanged. A stale action captured before context replacement must be retried from the current menu.
+8. Compare the final deployment manifest with source bytes, retain redacted framebuffers/observations and independent state evidence, restore fixture faults, and stop owned services. Report checked-write rejection, incomplete/oversized responses, scope collisions, and retired-host guards from the composed regression suite separately from desktop observations.
+
+Additional recovery controls, with a private settings backup restored between cases:
+
+- Keep a saved scanlator restriction while removing scanlator/scope metadata from a recorded download. Clear the restriction through the existing menu, then require the file to become visible and open. This is a current-view choice: shared filter settings remain unchanged and the restriction may reappear after reader return. The composed regression also supplies an enabled same-ID Auto-download association and requires no refill enrollment.
+- Retain a recorded file's current endpoint but omit both manga/chapter IDs and descriptive fields; remove other same-path identity records. Reconstruct without Library/chapter caches, Open, and **Go to Suwayomi**. Require the normal directory-identified list, unchanged endpoint, and still-absent IDs.
+- Inject an older title and `in_library=false` into chapter-cache manga metadata while retaining the newer Library snapshot. Open chapters offline; the current Library title and **Remove from library** action must win over those old fields.
+
+#### Issue #51 desktop evidence — 2026-09-18
+
+The disposable WSLg run used KOReader v2026.07.1, Suwayomi v2.3.2243, Basic Auth, baseline `1425ec6`, and the `feat/offline-chapter-cache` candidate. Raw settings, source fixtures, deployment manifests, screenshots, and observations stay outside the checkout. This is desktop evidence, not Android acceptance.
+
+| Control | Observed outcome |
+| --- | --- |
+| Baseline download/Open/return | All three downloaded PNGs matched the generated source pages. |
+| Offline reading and restart | Native page 2 resumed after cold restart; page 3 remained `reading` at 100%, with the archive retained. |
+| Legacy reconstruction | With and without Library cache, incomplete unassociated metadata exposed the recorded file; Open/return left its scope unknown and created no pending sync. |
+| Delayed server | Cached Library/chapter selection reached the visible local page while the owned server was suspended. The initial inspector rebind crash was repaired by listener handoff and the same reproduction then passed. |
+| Real chapter removal | One removed source chapter disappeared from the normal list; its device archive and progress hashes were unchanged. Real source-empty failure retained the last complete list. |
+| Injected complete empty | Both successful empty response envelopes reached the real reader/worker/storage path. The explicit empty screen survived offline cold restart despite retained downloads; ordinary reconnection restored current server membership. |
+| Existing actions | Offline read choice persisted, Sync changed server read state, unread restored it, and confirmed deletion removed only the spare device archive. |
+| Review-repair controls | Existing scanlator controls exposed an unassociated file without changing its saved filter; current-scoped missing-ID Open/return preserved scope without inventing IDs; newer Library title/membership won over injected stale chapter-cache metadata. |
 
 ## Hardware and human gaps
 

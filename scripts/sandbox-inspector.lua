@@ -18,6 +18,7 @@ assert(type(token) == "string" and #token == 64 and token:match("^%x+$"), "Inval
 local port = tonumber(readLine("inspector.port"))
 assert(port and port % 1 == 0 and port >= 1024 and port <= 65535, "Invalid sandbox inspector port")
 local prefix = "/koreader/ui/httpinspector/"
+local current_inspector
 
 userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
     if not Inspector.sandbox_secured then
@@ -188,6 +189,9 @@ userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
             if headers ~= 1 or not authorized then
                 return self:sendResponse(info, 401, "text/plain", "Unauthorized")
             end
+            if self._sandbox_closed then
+                return self:sendResponse(info, 503, "text/plain", "Reader transition in progress")
+            end
             local method, uri = data:match("^(%u+) ([^\r\n ]+) HTTP/%d%.%d")
             if method == "POST" and uri == prefix .. "fill/" then
                 local ok, value = pcall(json.decode, body or "")
@@ -258,8 +262,23 @@ userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
             return self:sendResponse(info, 200, "application/json", "[true]")
         end
 
+        function Inspector:onCloseWidget()
+            -- Forked network workers inherit this listener. Hand it to the next
+            -- UI host instead of closing/rebinding while those workers live.
+            self._sandbox_closed = true
+            self._sandbox_controls, self._sandbox_fields = nil, nil
+        end
+
         function Inspector:start()
             if self:isRunning() then return end
+            self._sandbox_closed = nil
+            if current_inspector and current_inspector:isRunning() then
+                self.http_socket, current_inspector.http_socket = current_inspector.http_socket, nil
+                self.http_messagequeue, current_inspector.http_messagequeue = current_inspector.http_messagequeue, nil
+                self.http_socket.receiveCallback = function(data, id) return self:onRequest(data, id) end
+                current_inspector = self
+                return
+            end
             local server = Server:new{
                 host = "127.0.0.1", port = port,
                 receiveCallback = function(data, id) return self:onRequest(data, id) end,
@@ -299,6 +318,7 @@ userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
             assert(server:start(), "Sandbox inspector failed to listen")
             self.http_socket = server
             self.http_messagequeue = UIManager:insertZMQ(server)
+            current_inspector = self
         end
         Inspector.sandbox_secured = true
     end

@@ -67,10 +67,14 @@ SuwayomiUI.showMangaInformation = MangaInfoUI.show
 SuwayomiUI.showChoiceDialog = ChoiceDialogs.showChoiceDialog
 SuwayomiUI.showChecklistDialog = ChoiceDialogs.showChecklistDialog
 
-function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback)
-    return ListRows.buildChapterMenuTable(chapter_list, {
+function SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback, empty_text)
+    local rows = ListRows.buildChapterMenuTable(chapter_list, {
         on_select = onSelectCallback,
     })
+    if #rows == 0 and empty_text then
+        rows[1] = { text = empty_text, select_enabled = false }
+    end
+    return rows
 end
 
 function SuwayomiUI.showSettingsMenu(items, options)
@@ -106,7 +110,7 @@ function SuwayomiUI.showChapterMenu(chapter_list, onSelectCallback, onHoldCallba
     local menu_options = {
         title = options.title or I18n.t("Suwayomi Chapters"),
         title_bar_left_icon = options.title_bar_left_icon,
-        item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback),
+        item_table = SuwayomiUI.buildChapterMenuTable(chapter_list, onSelectCallback, options.empty_text),
         fixed_item_heights = true,
         items_max_lines = 3,
         itemnumber = options.itemnumber,
@@ -355,7 +359,7 @@ function SuwayomiUI.updateChapterMenu(menu, options, onSelectCallback, onHoldCal
         return
     end
 
-    local item_table = SuwayomiUI.buildChapterMenuTable(options.chapters or {}, onSelectCallback)
+    local item_table = SuwayomiUI.buildChapterMenuTable(options.chapters or {}, onSelectCallback, options.empty_text)
     if options.on_title_bar_left_tap then
         menu.onLeftButtonTap = function(...)
             return options.on_title_bar_left_tap(menu, ...)

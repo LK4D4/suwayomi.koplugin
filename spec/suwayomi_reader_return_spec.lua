@@ -29,9 +29,7 @@ describe("suwayomi/reader_return", function()
             contexts = options.contexts or {},
             ledger = options.ledger or {},
             events = {},
-            fetched_manga_ids = {},
-            network_requests = {},
-            canceled_requests = {},
+            server_url = "https://suwayomi.example",
             messages = {},
         }
 
@@ -43,7 +41,7 @@ describe("suwayomi/reader_return", function()
         package.preload["suwayomi/settings"] = function()
             return {
                 load = function()
-                    return { server_url = "https://suwayomi.example" }
+                    return { server_url = state.server_url }
                 end,
                 normalizeEndpointScope = function(_, url) return url end,
                 loadReaderReturnContexts = function()
@@ -59,48 +57,10 @@ describe("suwayomi/reader_return", function()
                 end,
             }
         end
-        package.preload["suwayomi/api"] = function()
-            return {
-                fetchChaptersForManga = function(_, manga_id)
-                    table.insert(state.events, "fetch")
-                    table.insert(state.fetched_manga_ids, manga_id)
-                    return options.fetch_result or {
-                        ok = true,
-                        chapters = {
-                            { id = "c1", name = "Chapter 1" },
-                        },
-                    }
-                end,
-            }
-        end
         package.preload["suwayomi/network/request_job"] = function()
             return {
-                cancel = function(active)
-                    table.insert(state.canceled_requests, active)
-                    active.canceled = true
-                    if active.on_cancel then
-                        active.on_cancel()
-                    end
-                end,
-                start = function(request_options)
-                    table.insert(state.network_requests, request_options)
-                    table.insert(state.events, "network-request")
-                    local active = {
-                        pid = 2468,
-                        on_cancel = request_options.on_cancel,
-                    }
-                    if options.defer_network_finish then
-                        return active
-                    end
-                    if request_options.on_finish then
-                        request_options.on_finish(options.fetch_result or {
-                            ok = true,
-                            chapters = {
-                                { id = "c1", name = "Chapter 1" },
-                            },
-                        })
-                    end
-                    return active
+                start = function()
+                    error("reader return must not wait for a network request")
                 end,
             }
         end
@@ -120,6 +80,9 @@ describe("suwayomi/reader_return", function()
                 instance = {
                     onClose = function()
                         table.insert(state.events, "close-reader")
+                        state.reader_plugin.suwayomi_host_retired = true
+                        state.reader_plugin:cancelReaderReturnRequest()
+                        require("apps/reader/readerui").instance = nil
                     end,
                 },
             }
@@ -149,25 +112,11 @@ describe("suwayomi/reader_return", function()
                 },
             },
             messages = state.messages,
-            withLoadingMessage = function()
-                error("reader return should not block the UI thread")
-            end,
-            showLoadingMessage = function(_, message)
-                table.insert(state.events, "loading:" .. message)
-                return { message = message }
-            end,
-            closeLoadingMessage = function(_, loading_message)
-                table.insert(state.events, "close-loading:" .. tostring(loading_message and loading_message.message))
+            showChaptersForManga = function()
+                error("reader return must publish through the live FileManager host")
             end,
             showMessage = function(self, message)
                 table.insert(self.messages, message)
-            end,
-            showChapterResultForManga = function(_, manga, result, show_options)
-                table.insert(state.events, "show-chapters")
-                state.shown_manga = manga
-                state.shown_result = result
-                state.shown_options = show_options
-                return true
             end,
             buildReaderReturnCloseTarget = function(_, _, manga)
                 if manga and manga.in_library == true then
@@ -182,10 +131,20 @@ describe("suwayomi/reader_return", function()
         for name, method in pairs(ReaderReturn.methods) do
             plugin[name] = method
         end
+        local reader = require("apps/reader/readerui").instance
+        reader.document = plugin.ui.document
+        plugin.ui = reader
+        state.reader_plugin = plugin
         local filemanager = require("apps/filemanager/filemanager").instance
         filemanager.suwayomi = {
             ui = filemanager,
-            showChapterResultForManga = plugin.showChapterResultForManga,
+            showChaptersForManga = function(destination, manga, show_options)
+                table.insert(state.events, "show-chapters")
+                state.shown_destination = destination
+                state.shown_manga = manga
+                state.shown_options = show_options
+                return true
+            end,
         }
         return plugin
     end
@@ -419,216 +378,302 @@ describe("suwayomi/reader_return", function()
         assert.is_nil(plugin:getCurrentReaderReturnContext())
     end)
 
-    it("fetches chapters asynchronously before closing reader and restores the chapter list", function()
+    it("retains recorded order and descriptive metadata across saved-context refresh", function()
+        local path = "/downloads/Local/Manga/Chapter 1.cbz"
+        local plugin = build_plugin()
+        plugin:saveReaderReturnContext({
+            id = "m1", title = "Manga", thumbnail_url = "/cover",
+            endpoint_scope = "https://suwayomi.example",
+        }, {
+            id = "c1", name = "Chapter 1", source_order = 4, chapter_number = 1, scanlator = "Group",
+        }, path)
+        plugin:saveReaderReturnContextsForChapters({
+            id = "m1", title = "Manga", thumbnail_url = "/cover",
+        }, {
+            { path = path, chapter = {
+                id = "c1", name = "Chapter 1", source_order = 5, chapter_number = 1, scanlator = "Group",
+            } },
+        })
+
+        local context = plugin:getCurrentReaderReturnContext()
+        assert.are.equal(5, context.source_order)
+        assert.are.equal(1, context.chapter_number)
+        assert.are.equal("Group", context.scanlator)
+        assert.are.equal("/cover", context.thumbnail_url)
+        assert.are.equal("https://suwayomi.example", context.endpoint_scope)
+    end)
+
+    it("preserves a sibling's recorded server scope without inventing chapter identity", function()
         local plugin = build_plugin({
+            document_path = "/downloads/Local/Manga/Chapter 2.cbz",
             contexts = {
                 ["/downloads/Local/Manga/Chapter 1.cbz"] = {
                     path = "/downloads/Local/Manga/Chapter 1.cbz",
-                    manga_id = "m1",
-                    manga_title = "Manga",
-                    in_library = true,
-                    chapter_id = "c1",
-                    chapter_name = "Chapter 1",
-                    source = { id = "local", name = "Local source" },
+                    manga_id = "m1", manga_title = "Manga",
+                    endpoint_scope = "https://other.example",
                 },
             },
         })
+
+        local context = plugin:getCurrentReaderReturnContext()
+        assert.are.equal("https://other.example", context.endpoint_scope)
+        assert.is_nil(context.chapter_id)
+        assert.is_false(plugin:returnToSuwayomiChapters())
+        assert.are.same({}, state.events)
+    end)
+
+    it("does not infer identity from same-ID siblings recorded on different servers", function()
+        local plugin = build_plugin({
+            document_path = "/downloads/Local/Manga/Chapter 3.cbz",
+            contexts = {
+                first = {
+                    path = "/downloads/Local/Manga/Chapter 1.cbz",
+                    manga_id = "m1", endpoint_scope = "https://suwayomi.example",
+                },
+                second = {
+                    path = "/downloads/Local/Manga/Chapter 2.cbz",
+                    manga_id = "m1", endpoint_scope = "https://other.example",
+                },
+            },
+        })
+
+        assert.is_nil(plugin:getCurrentReaderReturnContext())
+    end)
+
+    local function linked_reader(options)
+        options = options or {}
+        local path = "/downloads/Local/Manga/Chapter 1.cbz"
+        options.contexts = {
+            [path] = {
+                path = path,
+                manga_id = "m1",
+                manga_title = "Manga",
+                in_library = true,
+                chapter_id = "c1",
+                chapter_name = "Chapter 1",
+                source = { id = "local", name = "Local source" },
+                endpoint_scope = "https://suwayomi.example",
+            },
+        }
+        return build_plugin(options)
+    end
+
+    it("closes normally and immediately restores chapters on the live FileManager host", function()
+        local plugin = linked_reader()
 
         assert.is_true(plugin:returnToSuwayomiChapters())
 
-        assert.are.same({
-            "network-request",
-            "close-reader",
-            "reinit-filemanager",
-            "show-chapters",
-        }, state.events)
-        assert.are.equal("fetch_reader_return_chapters_for_manga", state.network_requests[1].request.action)
-        assert.are.equal("m1", state.network_requests[1].request.manga_id)
-        assert.are.same({}, state.fetched_manga_ids)
+        assert.are.same({ "close-reader", "reinit-filemanager", "show-chapters" }, state.events)
+        assert.is_true(plugin.suwayomi_host_retired)
+        assert.are.equal(require("apps/filemanager/filemanager").instance.suwayomi, state.shown_destination)
         assert.are.equal("m1", state.shown_manga.id)
         assert.are.equal("Manga", state.shown_manga.title)
-        assert.is_true(state.shown_manga.in_library)
-        assert.are.same({ id = "local", name = "Local source" }, state.shown_manga.source)
+        assert.are.equal("https://suwayomi.example", state.shown_manga.endpoint_scope)
+        assert.is_nil(state.shown_manga.local_only)
         assert.are.equal("c1", state.shown_options.return_context.chapter_id)
         assert.are.equal("Chapter 1", state.shown_options.return_context.chapter_name)
-        assert.is_table(state.shown_options.reader_return_close_target)
         assert.are.equal("library", state.shown_options.reader_return_close_target.kind)
     end)
 
-    it("schedules finished cleanup before starting the reader-return request", function()
-        local plugin = build_plugin({
-            contexts = {
-                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
-                    path = "/downloads/Local/Manga/Chapter 1.cbz",
-                    manga_id = "m1",
-                    manga_title = "Manga",
-                },
-            },
-        })
+    it("preserves the existing cleanup schedule before normal reader close", function()
+        local plugin = linked_reader()
         plugin.scheduleFinishedChapterCleanup = function(_, delay_seconds)
             table.insert(state.events, "cleanup-schedule:" .. tostring(delay_seconds))
         end
 
         assert.is_true(plugin:returnToSuwayomiChapters())
 
-        assert.are.equal("cleanup-schedule:0", state.events[1])
-        assert.are.equal("network-request", state.events[2])
+        assert.are.same({
+            "cleanup-schedule:0", "close-reader", "reinit-filemanager", "show-chapters",
+        }, state.events)
     end)
 
-    it("uses fresh manga library state when returning to the chapter list", function()
-        local plugin = build_plugin({
-            contexts = {
-                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
-                    path = "/downloads/Local/Manga/Chapter 1.cbz",
-                    manga_id = "m1",
-                    manga_title = "Paper Comet",
-                    in_library = false,
-                    chapter_id = "c1",
-                    chapter_name = "Chapter 1",
-                    source = { id = "local", name = "Local source" },
-                },
-            },
-            fetch_result = {
-                ok = true,
-                manga = {
-                    id = "m1",
-                    title = "Paper Comet",
-                    in_library = true,
-                    source = { id = "local", name = "Local source" },
-                },
-                chapters = {
-                    { id = "c1", name = "Chapter 1" },
-                },
-            },
-        })
+    it("returns legacy context for local reconstruction without assigning a server", function()
+        local plugin = linked_reader()
+        local context = plugin:getCurrentReaderReturnContext()
+        context.endpoint_scope = nil
+        context.in_library = false
 
         assert.is_true(plugin:returnToSuwayomiChapters())
 
-        assert.are.equal("fetch_reader_return_chapters_for_manga", state.network_requests[1].request.action)
-        assert.is_true(state.shown_manga.in_library)
-        assert.are.equal("library", state.shown_options.reader_return_close_target.kind)
+        assert.is_true(state.shown_manga.local_only)
+        assert.is_nil(state.shown_manga.endpoint_scope)
+        assert.is_nil(state.shown_options.return_context.endpoint_scope)
+        assert.are.equal("c1", state.shown_options.return_context.chapter_id)
     end)
 
-    it("keeps reader open when chapter lookup fails", function()
-        local plugin = build_plugin({
-            contexts = {
-                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
-                    path = "/downloads/Local/Manga/Chapter 1.cbz",
-                    manga_id = "m1",
-                    manga_title = "Manga",
-                },
-            },
-            fetch_result = {
-                ok = false,
-                error = "Network unavailable.",
-            },
-        })
+    it("returns an unassociated recorded path even without manga or chapter IDs", function()
+        local plugin = linked_reader()
+        local context = plugin:getCurrentReaderReturnContext()
+        context.endpoint_scope = nil
+        context.manga_id = nil
+        context.chapter_id = nil
 
         assert.is_true(plugin:returnToSuwayomiChapters())
 
-        assert.are.same({ "network-request" }, state.events)
-        assert.are.equal("fetch_reader_return_chapters_for_manga", state.network_requests[1].request.action)
-        assert.are.same({}, state.fetched_manga_ids)
-        assert.are.same({ "Network unavailable." }, plugin.messages)
+        assert.is_true(state.shown_manga.local_only)
+        assert.is_nil(state.shown_manga.id)
+        assert.are.equal("/downloads/Local/Manga", state.shown_manga.local_manga_path)
+        assert.are.equal(context.path, state.shown_options.return_context.path)
     end)
 
-    it("ignores stale reader-return results after the reader document changes", function()
-        local plugin = build_plugin({
-            defer_network_finish = true,
-            contexts = {
-                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
-                    path = "/downloads/Local/Manga/Chapter 1.cbz",
-                    manga_id = "m1",
-                    manga_title = "Manga",
-                    chapter_id = "c1",
-                    chapter_name = "Chapter 1",
-                },
-                ["/downloads/Local/Manga/Chapter 2.cbz"] = {
-                    path = "/downloads/Local/Manga/Chapter 2.cbz",
-                    manga_id = "m2",
-                    manga_title = "Other Manga",
-                    chapter_id = "c2",
-                    chapter_name = "Chapter 2",
-                },
-            },
-        })
+    it("returns a current-scoped recorded file without manga IDs as local-only", function()
+        local plugin = linked_reader()
+        local context = plugin:getCurrentReaderReturnContext()
+        context.manga_id, context.chapter_id = nil, nil
 
         assert.is_true(plugin:returnToSuwayomiChapters())
-        plugin.ui.document.file = "/downloads/Local/Manga/Chapter 2.cbz"
-        state.network_requests[1].on_finish({
-            ok = true,
-            chapters = {
-                { id = "c1", name = "Chapter 1" },
-            },
-        })
 
-        assert.are.same({ "network-request" }, state.events)
+        assert.is_true(state.shown_manga.local_only)
+        assert.is_nil(state.shown_manga.id)
+        assert.are.equal("/downloads/Local/Manga", state.shown_manga.local_manga_path)
+        assert.are.equal(context.endpoint_scope, state.shown_manga.endpoint_scope)
+        assert.are.same({ "close-reader", "reinit-filemanager", "show-chapters" }, state.events)
+    end)
+
+    it("does not return a known foreign manga through a colliding configured-server ID", function()
+        local plugin = linked_reader()
+        plugin:getCurrentReaderReturnContext().endpoint_scope = "https://other.example"
+
+        assert.is_false(plugin:returnToSuwayomiChapters())
+
+        assert.are.same({}, state.events)
         assert.is_nil(state.shown_manga)
     end)
 
-    it("ignores stale reader-return results when context changes before deferred close", function()
-        local plugin = build_plugin({
-            defer_network_finish = true,
-            defer_next_tick = true,
-            contexts = {
-                ["/downloads/Local/Manga/Chapter 1.cbz"] = {
-                    path = "/downloads/Local/Manga/Chapter 1.cbz",
-                    manga_id = "m1",
-                    manga_title = "Manga",
-                    chapter_id = "c1",
-                    chapter_name = "Chapter 1",
-                },
-                ["/downloads/Local/Manga/Chapter 2.cbz"] = {
-                    path = "/downloads/Local/Manga/Chapter 2.cbz",
-                    manga_id = "m2",
-                    manga_title = "Other Manga",
-                    chapter_id = "c2",
-                    chapter_name = "Chapter 2",
-                },
-            },
-        })
-
+    it("ignores a deferred return after the reader document changes", function()
+        local plugin = linked_reader({ defer_next_tick = true })
         assert.is_true(plugin:returnToSuwayomiChapters())
-        state.network_requests[1].on_finish({
-            ok = true,
-            chapters = {
-                { id = "c1", name = "Chapter 1" },
-            },
-        })
+
         plugin.ui.document.file = "/downloads/Local/Manga/Chapter 2.cbz"
         state.next_tick_callback()
 
-        assert.are.same({ "network-request" }, state.events)
+        assert.are.same({}, state.events)
         assert.is_nil(state.shown_manga)
     end)
 
-    it("cancels active reader-return request and ignores its eventual result", function()
-        local plugin = build_plugin({
-            defer_network_finish = true,
-            document_path = "/tmp/books/ember-lane/part-one.cbz",
-            contexts = {
-                ["/tmp/books/ember-lane/part-one.cbz"] = {
-                    path = "/tmp/books/ember-lane/part-one.cbz",
-                    manga_id = "ember-1",
-                    manga_title = "Ember Lane",
-                    chapter_id = "part-1",
-                    chapter_name = "Part One",
-                },
-            },
-        })
+    it("does not close a replacement reader even when it opens the same path", function()
+        local plugin = linked_reader({ defer_next_tick = true })
+        assert.is_true(plugin:returnToSuwayomiChapters())
+        require("apps/reader/readerui").instance = {
+            document = { file = plugin.ui.document.file },
+            onClose = function() error("must not close the replacement reader") end,
+        }
+        state.next_tick_callback()
 
+        assert.are.same({}, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("ignores a deferred return after its saved context changes in place", function()
+        local plugin = linked_reader({ defer_next_tick = true })
+        assert.is_true(plugin:returnToSuwayomiChapters())
+
+        plugin:getCurrentReaderReturnContext().manga_id = "m2"
+        state.next_tick_callback()
+
+        assert.are.same({}, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("cancels deferred return without closing the reader", function()
+        local plugin = linked_reader({ defer_next_tick = true })
         assert.is_true(plugin:returnToSuwayomiChapters())
         assert.is_true(plugin:cancelReaderReturnRequest())
-        state.network_requests[1].on_finish({
-            ok = true,
-            chapters = {
-                { id = "part-1", name = "Part One" },
-            },
-        })
+        state.next_tick_callback()
 
-        assert.are.equal(1, #state.canceled_requests)
-        assert.are.same({ "network-request" }, state.events)
-        assert.is_nil(plugin.active_reader_return_request)
+        assert.are.same({}, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("ignores deferred return after reader host retirement", function()
+        local plugin = linked_reader({ defer_next_tick = true })
+        assert.is_true(plugin:returnToSuwayomiChapters())
+        plugin.suwayomi_host_retired = true
+        state.next_tick_callback()
+
+        assert.are.same({}, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("rejects return from an already retired reader host", function()
+        local plugin = linked_reader()
+        plugin.suwayomi_host_retired = true
+
+        assert.is_false(plugin:returnToSuwayomiChapters())
+        assert.are.same({}, state.events)
+    end)
+
+    it("keeps the reader open if configured server changes before deferred close", function()
+        local plugin = linked_reader({ defer_next_tick = true })
+        assert.is_true(plugin:returnToSuwayomiChapters())
+        state.server_url = "https://other.example"
+        state.next_tick_callback()
+
+        assert.are.same({}, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("does not publish if the configured server changes during reader teardown", function()
+        local plugin = linked_reader()
+        require("apps/filemanager/filemanager").instance.reinit = function()
+            state.server_url = "https://other.example"
+        end
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+
+        assert.are.same({ "close-reader" }, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("does not publish if saved identity changes during reader teardown", function()
+        local plugin = linked_reader()
+        local context = plugin:getCurrentReaderReturnContext()
+        require("apps/filemanager/filemanager").instance.reinit = function()
+            context.endpoint_scope = "https://other.example"
+        end
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+
+        assert.are.same({ "close-reader" }, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("publishes through the replacement FileManager plugin created by reinit", function()
+        local plugin = linked_reader()
+        local filemanager = require("apps/filemanager/filemanager").instance
+        local old_destination = filemanager.suwayomi
+        local replacement = {
+            ui = filemanager,
+            showChaptersForManga = old_destination.showChaptersForManga,
+        }
+        filemanager.reinit = function()
+            old_destination.suwayomi_host_retired = true
+            filemanager.suwayomi = replacement
+        end
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+
+        assert.are.equal(replacement, state.shown_destination)
+    end)
+
+    it("does not publish through a retired FileManager destination", function()
+        local plugin = linked_reader()
+        require("apps/filemanager/filemanager").instance.suwayomi.suwayomi_host_retired = true
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+
+        assert.are.same({ "close-reader", "reinit-filemanager" }, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("does not publish through a plugin attached to a different FileManager", function()
+        local plugin = linked_reader()
+        require("apps/filemanager/filemanager").instance.suwayomi.ui = {}
+
+        assert.is_true(plugin:returnToSuwayomiChapters())
+
+        assert.are.same({ "close-reader", "reinit-filemanager" }, state.events)
         assert.is_nil(state.shown_manga)
     end)
 end)

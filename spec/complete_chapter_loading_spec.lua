@@ -33,6 +33,7 @@ describe("complete stored chapter loading", function()
         "suwayomi/ui/menu_utils", "suwayomi/ui/browse", "suwayomi/ui/choice_dialogs", "suwayomi/ui/directory",
         "suwayomi/ui/downloads", "suwayomi/ui/list_rows", "suwayomi/ui/manga_info",
         "suwayomi/settings/retention_labels",
+        "suwayomi/ui/list_menu",
     }
 
     local function clearModules()
@@ -248,13 +249,125 @@ describe("complete stored chapter loading", function()
         clearModules()
     end)
 
+    it("shows a successful replacement despite rejected cache writes without acknowledging pending reads", function()
+        respond = function() return page(nodes(201, 201), 1, false) end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        assert(settings:saveChapterLedger({ ["17:202"] = {
+            manga_id = "17", chapter_id = "202", read = true, pending_read_sync = true, pending_read_state = true,
+        } }))
+        local before = settings:loadChapterLedger()
+        settings:getStore().io.write = function() return false, "injected write failure" end
+        respond = function()
+            local replacement = nodes(202, 202)
+            replacement[1].isRead = true
+            return page(replacement, 1, false)
+        end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        assert.are.same({ "202" }, chapterIds(plugin.current_chapter_menu.chapters))
+        assert.are.same({ "201" }, chapterIds(settings:loadChapterCache(settings:load(), manga).chapters))
+        assert.are.same(before, settings:loadChapterLedger())
+        assert.is_true(#messages > 0)
+    end)
+
+    it("keeps newer manga metadata while filling absent information from cached chapters", function()
+        manga.in_library = false
+        manga.thumbnail_url = "/api/v1/manga/17/thumbnail"
+        respond = function() return page(nodes(201, 201), 1, false) end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        plugin.current_chapter_context, plugin.current_chapter_menu = nil, nil
+        manga = { id = "17", title = "Renamed manga", in_library = true }
+        respond = function() return nil, 503 end
+
+        plugin:showChaptersForManga(manga)
+
+        assert.are.equal("Renamed manga", manga.title)
+        assert.is_true(manga.in_library)
+        assert.are.equal("/api/v1/manga/17/thumbnail", manga.thumbnail_url)
+        assert.are.same({ "201" }, chapterIds(plugin.current_chapter_menu.chapters))
+        finishRequest()
+        assert.is_true(manga.in_library)
+    end)
+
+    it("recovers an unassociated download beneath an authoritative manga without granting read authority", function()
+        archive_path = os.tmpname()
+        local file = assert(io.open(archive_path, "wb"))
+        file:write("readable archive candidate")
+        file:close()
+        manga.endpoint_scope = "https://suwayomi.example"
+        assert(settings:saveReaderReturnContexts({
+            [archive_path] = { path = archive_path, manga_id = "17", chapter_id = "201" },
+        }))
+        local before = settings:loadChapterLedger()
+        plugin:showChaptersForManga(manga)
+        assert.are.equal(1, #plugin.current_chapter_menu.chapters)
+        local recovered = plugin.current_chapter_menu.chapters[1]
+        assert.are.equal(archive_path, select(2, plugin:isChapterDownloaded(manga, recovered)))
+        plugin:toggleChapterSelection(manga, recovered)
+        local selected = plugin:getSelectedChapters(manga, plugin.current_chapter_context.chapters)
+        assert.are.equal(1, #selected)
+        assert.are.equal(archive_path, selected[1].local_path)
+        assert.is_false(plugin:performChapterAction(manga, recovered, "mark_read"))
+        assert.are.same(before, settings:loadChapterLedger())
+        assert.is_nil(settings:loadReaderReturnContexts()[archive_path].endpoint_scope)
+    end)
+
+    it("shows missing saved chapter information without a blocking load or authoritative empty cache", function()
+        local facade = require("suwayomi/ui")
+        require("spec/support/controller_module_spec_helper").stubControllerDependencies()
+        package.loaded["suwayomi/ui"], package.preload["suwayomi/ui"] = nil, nil
+        facade.updateChapterMenu = require("suwayomi/ui").updateChapterMenu
+        package.loaded["suwayomi/ui/list_menu"] = {
+            update = function(menu, options) menu.item_table = options.item_table end,
+        }
+        respond = function() return nil, 503 end
+        plugin:showChaptersForManga(manga)
+        assert.is_table(plugin.current_chapter_menu)
+        assert.are.same({}, plugin.current_chapter_menu.chapters)
+        assert.is_string(plugin.current_chapter_menu.empty_text)
+        assert.is_nil(loading)
+        local missing_text = plugin.current_chapter_menu.empty_text
+        plugin:refreshChapterMenu({ quick = true })
+        assert.are.equal(missing_text, plugin.current_chapter_menu.item_table[1].text)
+        assert.is_false(plugin.current_chapter_menu.item_table[1].select_enabled)
+        plugin:refreshChapterMenu()
+        assert.are.equal(missing_text, plugin.current_chapter_menu.item_table[1].text)
+        finishRequest()
+        assert.are.same({}, plugin.current_chapter_menu.chapters)
+        assert.is_nil(settings:loadChapterCache(settings:load(), manga))
+    end)
+
+    it("reopens saved chapters before a failed request without acknowledging pending read choices", function()
+        respond = function() return page(nodes(201, 202), 2, false) end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        assert.is_table(settings:loadChapterCache(settings:load(), manga), table.concat(messages, "\n"))
+        assert(settings:saveChapterLedger({
+            ["17:201"] = { manga_id = "17", chapter_id = "201", read = false,
+                pending_read_sync = true, pending_read_state = false },
+        }))
+        plugin.current_chapter_context, plugin.current_chapter_menu = nil, nil
+        loading = nil
+        respond = function() return nil, 503 end
+        plugin:showChaptersForManga(manga)
+        assert.are.same({ "201", "202" }, chapterIds(plugin.current_chapter_menu.chapters))
+        assert.is_nil(loading)
+        assert.is_false(plugin.current_chapter_menu.chapters[1].is_read)
+        assert.is_true(settings:loadChapterLedger()["17:201"].pending_read_sync)
+        finishRequest()
+        assert.are.same({ "201", "202" }, chapterIds(plugin.current_chapter_menu.chapters))
+        assert.is_true(settings:loadChapterLedger()["17:201"].pending_read_sync)
+    end)
+
     it("reopens all 205 chapters and queues five unread chapters beyond page one", function()
         respond = function(request)
             local offset = request.variables.offset or 0
             return page(nodes(offset + 1, math.min(offset + 200, 205)), 205, offset + 200 < 205)
         end
         assert.is_true(plugin:showChaptersForManga(manga))
-        assert.is_nil(plugin.current_chapter_context)
+        assert.are.same({}, plugin.current_chapter_menu.chapters)
         assert.are.same({}, requests)
         finishRequest()
         assert.are.equal(205, #plugin.current_chapter_menu.chapters)
@@ -269,35 +382,6 @@ describe("complete stored chapter loading", function()
         assert.are.same({}, messages)
     end)
 
-    it("preserves the complete view and selection after rejected archive reconciliation", function()
-        saved_filter = "Group A"
-        respond = function()
-            local items = nodes(201, 201)
-            items[1].scanlator = "Group A"
-            return page(items, 1, false)
-        end
-        plugin:showChaptersForManga(manga)
-        finishRequest()
-        local context, menu = plugin.current_chapter_context, plugin.current_chapter_menu
-        local chapter = context.chapters[1]
-        plugin:toggleChapterSelection(manga, chapter)
-        saved_filter = "Group B"
-        respond = function()
-            local items = nodes(202, 202)
-            items[1].scanlator = "Group B"
-            return page(items, 1, false)
-        end
-        queue.downloader.chapterExists = function() return true end
-        settings:getStore().io.write = function() return false, "injected write failure" end
-        plugin:showChaptersForManga(manga)
-        finishRequest()
-        assert.are.equal(context, plugin.current_chapter_context)
-        assert.are.equal(menu, plugin.current_chapter_menu)
-        assert.are.equal("Group A", plugin.current_scanlator_filter)
-        assert.is_true(plugin:isChapterSelected(manga, chapter))
-        assert.is_true(plugin.selection_mode)
-        assert.are.same({ "201" }, chapterIds(plugin.current_chapter_context.chapters))
-    end)
 
     it("preserves the complete view and read ledger without admitting a failed reload action", function()
         respond = function() return page(nodes(1, 1), 1, false) end
@@ -395,7 +479,8 @@ describe("complete stored chapter loading", function()
     end
 
     for _, origin in ipairs({ "chapter title", "chapter bulk" }) do
-        for _, dataset in ipairs({ "unlabeled chapters", "empty result", "labeled chapters", "unrestricted unlabeled chapters" }) do
+        for _, dataset in ipairs({ "unlabeled chapters", "empty result", "labeled chapters",
+            "unrestricted unlabeled chapters", "recovered unlabeled chapters" }) do
             it("offers explicit saved-filter recovery from " .. origin .. " with " .. dataset, function()
                 for name, method in pairs(require("suwayomi/plugin/title_menu").methods) do plugin[name] = method end
                 local restricted = dataset ~= "unrestricted unlabeled chapters"
@@ -426,8 +511,25 @@ describe("complete stored chapter loading", function()
                 facade.updateChapterMenu = function(menu, options)
                     menu.title, menu.chapters = options.title, options.chapters
                 end
-                plugin:showChaptersForManga(manga)
-                finishRequest()
+                if dataset == "recovered unlabeled chapters" then
+                    prepareRefill()
+                    assert(settings:saveMangaKeepNextUnreadDownloads(manga, 5))
+                    manga.endpoint_scope = "https://suwayomi.example"
+                    assert(queue.refill:associate(manga))
+                    manga.endpoint_scope = nil
+                    archive_path = os.tmpname()
+                    local file = assert(io.open(archive_path, "wb"))
+                    file:write("readable archive candidate")
+                    file:close()
+                    manga.local_only = true
+                    assert(settings:saveReaderReturnContexts({
+                        [archive_path] = { path = archive_path, manga_id = "17", chapter_id = "201" },
+                    }))
+                    plugin:showChaptersForManga(manga)
+                else
+                    plugin:showChaptersForManga(manga)
+                    finishRequest()
+                end
                 local initial_ids = not restricted and { "201", "202" }
                     or (dataset == "labeled chapters" and { "201" } or {})
                 assert.are.same(initial_ids, chapterIds(plugin.current_chapter_menu.chapters))
@@ -469,7 +571,7 @@ describe("complete stored chapter loading", function()
                     assert.are.equal(0, filter_writes)
                     return
                 end
-                if dataset ~= "labeled chapters" then
+                if dataset ~= "labeled chapters" and dataset ~= "recovered unlabeled chapters" then
                     select_action("bulk_downloads")
                     select_action("download_next_5_unread")
                     assert.are.same({}, admittedIds())
@@ -484,18 +586,28 @@ describe("complete stored chapter loading", function()
                 assert.are.equal("Saved group", saved_filter)
                 assert.are.same(initial_ids, chapterIds(menu.chapters))
                 select_action("scanlator_filter_all")
-                local expected_ids = dataset == "empty result" and {} or { "201", "202" }
-                assert.is_nil(saved_filter)
+                local expected_ids = dataset == "empty result" and {}
+                    or (dataset == "recovered unlabeled chapters" and { "201" } or { "201", "202" })
+                assert.are.equal(dataset == "recovered unlabeled chapters" and "Saved group" or nil, saved_filter)
                 assert.is_nil(plugin.current_scanlator_filter)
-                assert.are.equal(1, filter_writes)
+                assert.are.equal(dataset == "recovered unlabeled chapters" and 0 or 1, filter_writes)
                 assert.are.equal(menu, plugin.current_chapter_menu)
                 assert.are.same(expected_ids, chapterIds(menu.chapters))
-                assert.are.same(expected_ids, chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
+                assert.are.same(dataset == "recovered unlabeled chapters" and {} or expected_ids,
+                    chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
                 assert.are.same({}, admittedIds())
                 assert.are.same({}, json.decode(saved_ledger))
                 open_action_menu()
                 if dataset ~= "labeled chapters" then assert.is_nil(find_action("scanlator_filter"))
                 else assert.is_table(find_action("scanlator_filter")) end
+                if dataset == "recovered unlabeled chapters" then
+                    assert.is_nil(find_action("bulk_downloads"))
+                    assert.is_false(plugin:performBulkChapterAction("download_next_5_unread"))
+                    assert.are.same({}, admittedIds())
+                    assert.are.same({}, queue:getSnapshot().refills)
+                    assert.is_nil(settings:loadReaderReturnContexts()[archive_path].endpoint_scope)
+                    return
+                end
                 select_action("bulk_downloads")
                 select_action("download_next_5_unread")
                 assert.are.same(expected_ids, admittedIds())
@@ -1045,15 +1157,15 @@ describe("complete stored chapter loading", function()
 
     it("does not cancel a newer load from an already dismissed loading message", function()
         respond = function() return page(nodes(201, 201), 1, false) end
-        plugin:showChaptersForManga(manga)
+        plugin:startLoadMangaChapterContext(manga)
         local old_loading, dismiss = loading, loading.dismiss_callback
         finishRequest()
         assert.is_nil(old_loading.dismiss_callback)
-        plugin:showChaptersForManga(manga)
+        plugin:startLoadMangaChapterContext(manga)
         dismiss()
         respond = function() return page(nodes(301, 301), 1, false) end
         finishRequest()
-        assert.are.same({ "301" }, chapterIds(plugin.current_chapter_menu.chapters))
+        assert.are.same({ "301" }, chapterIds(plugin.current_chapter_context.chapters))
         assert.are.same({}, admittedIds())
         assert.are.same({}, json.decode(saved_ledger))
         assert.are.same({}, messages)
@@ -1073,7 +1185,8 @@ describe("complete stored chapter loading", function()
 
     for _, total in ipairs({ 0, 205 }) do
         it("hands complete reader return of " .. total .. " chapters to the live FileManager host", function()
-            local reader_context = { path = "example.cbz", manga_id = "17", chapter_id = "201" }
+            local reader_context = { path = "example.cbz", manga_id = "17", chapter_id = "201",
+                endpoint_scope = "https://suwayomi.example" }
             settings.loadReaderReturnContexts = function() return { ["example.cbz"] = reader_context } end
             for name, method in pairs(require("suwayomi/reader_return").methods) do plugin[name] = method end
             local destination = { max_batch_queue_chapters = 50 }
@@ -1082,7 +1195,10 @@ describe("complete stored chapter loading", function()
             destination.ui = filemanager
             destination:setCurrentMangaChapterContext(manga, { { id = "999", name = "Old", is_read = false } })
             destination.current_chapter_menu = { chapters = destination.current_chapter_context.chapters }
-            local reader = { document = { file = "example.cbz" }, onClose = function() plugin:retireChapterHost() end }
+            local reader = { document = { file = "example.cbz" }, onClose = function()
+                plugin:retireChapterHost()
+                require("apps/reader/readerui").instance = nil
+            end }
             plugin.ui = reader
             package.preload["apps/reader/readerui"] = function() return { instance = reader } end
             package.preload["apps/filemanager/filemanager"] = function() return { instance = filemanager } end
@@ -1097,13 +1213,13 @@ describe("complete stored chapter loading", function()
                 return { data = { mangas = { totalCount = 1, nodes = { { id = 17 } } } } }
             end
             plugin:returnToSuwayomiChapters(reader_context)
-            local token = plugin.active_reader_return_request
-            finishRequest(token)
+            assert.are.same({}, requests)
             assert.is_nil(plugin.current_chapter_context)
             assert.is_function(scheduled[1])
             table.remove(scheduled, 1)()
             assert.is_true(plugin.suwayomi_host_retired)
             assert.is_nil(plugin.current_chapter_context)
+            finishRequest(destination.active_manga_network_requests.chapter_menu)
             assert.are.equal(total, #destination.current_chapter_menu.chapters)
             destination:downloadNextUnreadChaptersForManga(destination.current_chapter_context.manga, 5, false)
             assert.are.same(total == 0 and {} or { "201", "202", "203", "204", "205" }, admittedIds())
@@ -1387,7 +1503,7 @@ describe("complete stored chapter loading", function()
         assert.are.same({}, messages)
     end)
 
-    for _, action in ipairs({ "fetch_chapters_for_manga", "refresh_manga", "fetch_reader_return_chapters_for_manga" }) do
+    for _, action in ipairs({ "fetch_chapters_for_manga", "refresh_manga" }) do
         it("bounds the final chapter result envelope for " .. action, function()
             require("suwayomi/subprocess/job").max_result_bytes = 1000
             respond = function(request)
@@ -1396,9 +1512,6 @@ describe("complete stored chapter loading", function()
                     return page(nodes(201, 201), 1, false)
                 end
                 local large_manga = { id = 17, title = string.rep("x", 1500) }
-                if action == "fetch_reader_return_chapters_for_manga" then
-                    return { data = { mangas = { totalCount = 1, nodes = { large_manga } } } }
-                end
                 local chapters = nodes(201, 201)
                 chapters[1].name = string.rep("x", 1500)
                 return { data = { fetchManga = { manga = large_manga }, fetchChapters = { chapters = chapters } } }

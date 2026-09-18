@@ -58,7 +58,10 @@ describe("Downloads chapter navigation", function()
         ffi_util.runInSubProcess = function() return 123 end
         ffi_util.isSubProcessDone = function() return false end
         ui = require("ui/uimanager")
-        ui.show = function(_, widget) table.insert(stack, widget) end
+        ui.show = function(_, widget)
+            if widget.text then messages[#messages + 1] = widget.text
+            else table.insert(stack, widget) end
+        end
         ui.close = function(_, widget)
             for index = #stack, 1, -1 do
                 if stack[index] == widget then table.remove(stack, index) end
@@ -121,10 +124,10 @@ describe("Downloads chapter navigation", function()
         assert.are.equal(menu, plugin.current_downloads_menu)
         assert.is_true(plugin:isSuwayomiScreenActive(menu))
         selectAction("open_chapter_list")
-        assert.are.same({ menu }, stack)
+        assert.are.same({ menu, plugin.current_chapter_menu }, stack)
+        assert.is_false(plugin.current_chapter_menu.item_table[1].select_enabled)
         assert.is_not_nil(request)
         assert.are.equal(manga.id, request.request.manga_id)
-        assert.is_nil(plugin.current_chapter_menu)
         return menu, chapter
     end
 
@@ -156,10 +159,12 @@ describe("Downloads chapter navigation", function()
         it("keeps " .. state .. " Downloads origin after chapter loading failure", function()
             local menu = openFrom(state, { id = "manga" })
             request.on_finish({ ok = false, error = "Could not load chapters: HTTP 503" })
-            assert.are.same({ "Could not load chapters: HTTP 503" }, messages)
-            assert.are.same({ menu }, stack)
-            assert.is_nil(plugin.current_chapter_menu)
+            local chapters = plugin.current_chapter_menu
+            assert.are.same({ menu, chapters }, stack)
+            assert.is_false(chapters.item_table[1].select_enabled)
             assert.are.equal(menu, plugin.current_downloads_menu)
+            chapters:onClose()
+            assert.are.same({ menu }, stack)
             assert.are.equal(1, #plugin:getNavigation().entries)
         end)
     end

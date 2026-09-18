@@ -91,6 +91,8 @@ local function installController(options)
                 return { server_url = "https://suwayomi.example" }
             end,
             normalizeEndpointScope = function(_, url) return url end,
+            loadChapterCache = function() return nil end,
+            saveChapterCache = function() return {} end,
             loadMangaKeepNextUnreadDownloads = function(_, target_manga)
                 return (options.keep_next_limits or {})[tostring(target_manga and target_manga.id)]
                     or 0
@@ -201,6 +203,7 @@ local function installController(options)
     for name, method in pairs(controller.methods) do
         plugin[name] = method
     end
+    plugin.getChapterSelectionKey = require("suwayomi/chapters/context").methods.getChapterSelectionKey
     package.loaded["suwayomi/chapters/actions"] = nil
     local actions = require("suwayomi/chapters/actions").methods
     plugin.captureChapterDownloadBatch = actions.captureChapterDownloadBatch
@@ -708,7 +711,8 @@ describe("suwayomi/manga/controller", function()
             chapters = { { id = "old", name = "Old", is_read = false } },
         })
 
-        assert.is_nil(plugin.current_chapter_context)
+        assert.are.equal("m2", plugin.current_chapter_context.manga.id)
+        assert.are.same({}, plugin.current_chapter_context.chapters)
 
         state.network_requests[2].on_finish({
             ok = true,
@@ -887,7 +891,8 @@ describe("suwayomi/manga/controller", function()
 
         assert.are.equal(1, #state.canceled_requests)
         assert.is_nil(plugin.active_manga_network_requests.chapter_menu)
-        assert.is_nil(plugin.current_chapter_context)
+        assert.are.equal(manga, plugin.current_chapter_context.manga)
+        assert.are.same({}, plugin.current_chapter_context.chapters)
     end)
 
     it("does not route normal chapter menu close", function()

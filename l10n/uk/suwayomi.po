@@ -376,9 +376,6 @@ msgstr "Подання розділів змінилося. Виконайте �
 msgid "Chapters"
 msgstr "Розділи"
 
-msgid "Chapters are loading."
-msgstr "Розділи завантажуються."
-
 msgid "Check again"
 msgstr "Перевірити знову"
 
@@ -561,6 +558,10 @@ msgstr ""
 
 msgid "Could not retry download."
 msgstr "Не вдалося повторити завантаження."
+
+msgid ""
+"Could not save chapter information. It may not be available after restarting."
+msgstr ""
 
 msgid "Could not save saved filter."
 msgstr "Не вдалося зберегти фільтр."
@@ -1117,6 +1118,10 @@ msgstr "Немає результатів"
 msgid "No saved Library information is available."
 msgstr "Опис недоступний."
 
+#, fuzzy
+msgid "No saved chapter information is available."
+msgstr "Опис недоступний."
+
 msgid "No saved filters."
 msgstr "Немає збережених фільтрів."
 
@@ -1526,11 +1531,6 @@ msgstr "Для цієї манґи не завантажено розділів.
 
 msgid "This manga has no chapters."
 msgstr "У цієї манґи немає розділів."
-
-msgid ""
-"This recovered manga has no saved server association. Refresh Library before "
-"opening it."
-msgstr ""
 
 msgid "This source has no filters."
 msgstr "Це джерело не має фільтрів."

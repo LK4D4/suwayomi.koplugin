@@ -511,6 +511,100 @@ function SuwayomiSettings:saveLibraryCache(credentials, listing)
     return cache
 end
 
+local function usableChapterCacheValue(value, visiting)
+    local kind = type(value)
+    if kind == "number" then return value == value and value ~= math.huge and value ~= -math.huge end
+    if kind ~= "table" then return kind == "string" or kind == "boolean" end
+    if visiting[value] then return false end
+    visiting[value] = true
+    for key, item in pairs(value) do
+        if (type(key) ~= "string" and type(key) ~= "number")
+            or not usableChapterCacheValue(key, visiting) or not usableChapterCacheValue(item, visiting) then
+            visiting[value] = nil
+            return false
+        end
+    end
+    visiting[value] = nil
+    return true
+end
+
+local function chapterCacheIdentity(settings, row, scope)
+    if type(row) ~= "table" or (row.local_only ~= nil and row.local_only ~= false) then return false end
+    local id = row.id
+    if (type(id) ~= "string" and type(id) ~= "number") or tostring(id) == ""
+        or not usableChapterCacheValue(id) then return false end
+    return row.endpoint_scope == nil or settings:normalizeEndpointScope(row.endpoint_scope) == scope
+end
+
+local CHAPTER_CACHE_NUMBER_FIELDS = { "chapter_number", "source_order" }
+local CHAPTER_CACHE_BOOLEAN_FIELDS = { "is_read", "_suwayomi_is_read", "pending_read_sync" }
+local CHAPTER_CACHE_SOURCE_LABELS = { "name", "displayName", "display_name", "raw_name", "lang" }
+
+local function usableChapterListing(settings, listing, scope)
+    if type(listing) ~= "table" or not usableChapterCacheValue(listing, {})
+        or not chapterCacheIdentity(settings, listing.manga, scope)
+        or not usableLibraryRows({ listing.manga }) or not usableLibraryRows(listing.chapters) then return false end
+    if listing.endpoint_scope ~= nil and settings:normalizeEndpointScope(listing.endpoint_scope) ~= scope then
+        return false
+    end
+    local source = listing.manga.source
+    if source then
+        if source.id ~= nil and type(source.id) ~= "string" and type(source.id) ~= "number" then return false end
+        for _, field in ipairs(CHAPTER_CACHE_SOURCE_LABELS) do
+            if source[field] ~= nil and type(source[field]) ~= "string" then return false end
+        end
+    end
+    for _, chapter in ipairs(listing.chapters) do
+        if not chapterCacheIdentity(settings, chapter, scope)
+            or (chapter.scanlator ~= nil and type(chapter.scanlator) ~= "string") then return false end
+        for _, field in ipairs(CHAPTER_CACHE_NUMBER_FIELDS) do
+            if chapter[field] ~= nil and type(chapter[field]) ~= "number" then return false end
+        end
+        for _, field in ipairs(CHAPTER_CACHE_BOOLEAN_FIELDS) do
+            if chapter[field] ~= nil and type(chapter[field]) ~= "boolean" then return false end
+        end
+    end
+    return true
+end
+
+local function chapterCacheCollection(cache, scope)
+    return type(cache) == "table" and cache.version == 1 and cache.endpoint_scope == scope
+        and type(cache.mangas) == "table"
+end
+
+function SuwayomiSettings:loadChapterCache(credentials, manga)
+    local scope = self:normalizeEndpointScope(type(credentials) == "table" and credentials.server_url)
+    if not scope or not chapterCacheIdentity(self, manga, scope) then return nil end
+    local cache = self:getStore():readKey("chapter_cache")
+    if not chapterCacheCollection(cache, scope) then return nil end
+    local listing = cache.mangas[tostring(manga.id)]
+    if not usableChapterListing(self, listing, scope) or tostring(listing.manga.id) ~= tostring(manga.id) then return nil end
+    local result = copyLibraryValue(listing)
+    result.endpoint_scope = scope
+    return result
+end
+
+function SuwayomiSettings:saveChapterCache(credentials, manga, chapters)
+    local scope = self:normalizeEndpointScope(type(credentials) == "table" and credentials.server_url)
+    local listing = { manga = manga, chapters = chapters }
+    if not scope or not usableChapterListing(self, listing, scope) then return nil, "invalid_chapter_cache" end
+    local cache = { version = 1, endpoint_scope = scope, mangas = {} }
+    local previous = self:getStore():readKey("chapter_cache")
+    if chapterCacheCollection(previous, scope) then
+        for key, saved in pairs(previous.mangas) do
+            if usableChapterListing(self, saved, scope) and key == tostring(saved.manga.id) then
+                cache.mangas[key] = saved
+            end
+        end
+    end
+    cache.mangas[tostring(manga.id)] = copyLibraryValue(listing)
+    local ok, err = self:getStore():saveKey("chapter_cache", cache)
+    if not ok then return nil, err end
+    local result = copyLibraryValue(listing)
+    result.endpoint_scope = scope
+    return result
+end
+
 function SuwayomiSettings:loadSourceCache(credentials_or_url)
     local server_url, auth_identity = self:getSourceCacheScope(credentials_or_url)
     local cache = self:getStore():readKey("source_cache", nil)

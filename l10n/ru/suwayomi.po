@@ -371,9 +371,6 @@ msgstr "Список глав изменился. Повторите это де
 msgid "Chapters"
 msgstr "Главы"
 
-msgid "Chapters are loading."
-msgstr "Главы загружаются."
-
 msgid "Check again"
 msgstr "Проверить снова"
 
@@ -551,6 +548,10 @@ msgstr ""
 
 msgid "Could not retry download."
 msgstr "Не удалось повторить загрузку."
+
+msgid ""
+"Could not save chapter information. It may not be available after restarting."
+msgstr ""
 
 msgid "Could not save saved filter."
 msgstr "Не удалось сохранить фильтр."
@@ -1103,6 +1104,10 @@ msgstr "Нет результатов"
 msgid "No saved Library information is available."
 msgstr "Описание недоступно."
 
+#, fuzzy
+msgid "No saved chapter information is available."
+msgstr "Описание недоступно."
+
 msgid "No saved filters."
 msgstr "Нет сохранённых фильтров."
 
@@ -1514,11 +1519,6 @@ msgstr "Для этой манги главы ещё не загружены."
 
 msgid "This manga has no chapters."
 msgstr "У этой манги нет глав."
-
-msgid ""
-"This recovered manga has no saved server association. Refresh Library before "
-"opening it."
-msgstr ""
 
 msgid "This source has no filters."
 msgstr "У этого источника нет фильтров."

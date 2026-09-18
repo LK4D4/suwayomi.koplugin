@@ -42,6 +42,8 @@ mergeMethods(
 
 function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
     if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
+    if open_when_valid and self.cancelMangaNetworkRequests then self:cancelMangaNetworkRequests() end
+    local local_only = self:isLocalOnlyChapter(manga, chapter)
     local request = {}
     local completed = false
     self.chapter_archive_request = request
@@ -63,7 +65,11 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         completed = true
         if self.refreshChapterMenu then self:refreshChapterMenu() end
         if result.state ~= "valid" then
-            self:showChapterDownloadError(manga, chapter)
+            if local_only then
+                self:showMessage(result.error or I18n.t("Could not verify download"))
+            else
+                self:showChapterDownloadError(manga, chapter)
+            end
             return
         end
         if not open_when_valid then
@@ -77,15 +83,17 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
             return
         end
         if not is_current() then return end
-        local associated, association_err = self:getDownloadQueue().refill:associate(manga)
-        if not associated then
-            self:showMessage(association_err or I18n.t("Failed to save settings."))
-            return
+        if not local_only then
+            local associated, association_err = self:getDownloadQueue().refill:associate(manga)
+            if not associated then
+                self:showMessage(association_err or I18n.t("Failed to save settings."))
+                return
+            end
         end
-        if self.saveReaderReturnContext then
+        if not local_only and self.saveReaderReturnContext then
             self:saveReaderReturnContext(manga, chapter, chapter_path)
         end
-        if self.upsertChapterLedgerEntry then
+        if not local_only and self.upsertChapterLedgerEntry then
             local saved, save_err = self:upsertChapterLedgerEntry(manga, chapter, {
                 path = chapter_path, endpoint_scope = manga.endpoint_scope,
             })
@@ -99,7 +107,7 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         else
             ReaderUI:showReader(chapter_path)
         end
-    end, { is_current = is_current })
+    end, { is_current = is_current, read_only = local_only })
     if not accepted then
         self:showMessage(err == "verification_busy" and I18n.t("Another download is being verified.")
             or I18n.t("Could not verify download"))
@@ -114,6 +122,9 @@ end
 
 function Methods:performChapterAction(manga, chapter, action_id)
     if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
+    if self:isLocalOnlyChapter(manga, chapter) and action_id ~= "open" and action_id ~= "verify_download" then
+        return false
+    end
     self.chapter_archive_request = nil
     if action_id == "open" then
         return self:openChapter(manga, chapter)
@@ -647,6 +658,14 @@ end
 
 
 function Methods:performBulkChapterAction(action_id, menu_context)
+    local context = self.current_chapter_context
+    local manga = context and context.manga
+    if manga and action_id ~= "select_all" and action_id ~= "clear_selection" and action_id ~= "scanlator_filter" then
+        if manga.local_only then return false end
+        for _, chapter in ipairs(context.chapters or {}) do
+            if self:isLocalOnlyChapter(manga, chapter) then return false end
+        end
+    end
     if action_id == "bulk_downloads" then
         self:showBulkDownloadActions(menu_context)
         return true
