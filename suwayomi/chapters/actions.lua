@@ -10,6 +10,7 @@ local ChapterLocalDownloads = require("suwayomi/chapters/local_downloads")
 local ChapterReadActions = require("suwayomi/chapters/read_actions")
 local MangaActionMenu = require("suwayomi/manga/action_menu")
 local SuwayomiDebug = require("suwayomi/debug")
+local SuwayomiSettings = require("suwayomi/settings")
 local I18n = require("suwayomi/i18n")
 
 local ChapterActions = {}
@@ -629,9 +630,10 @@ end
 
 function Methods:getReadDownloadedChaptersFromCurrentContext()
     local manga = self.current_chapter_context and self.current_chapter_context.manga
+    local lookup = manga and self:buildChapterDownloadLookup(manga)
     local chapters = {}
     for _index, chapter in ipairs(self:getReadChaptersFromCurrentContext()) do
-        local downloaded = self:isChapterDownloaded(manga, chapter)
+        local downloaded = self:isChapterDownloaded(manga, chapter, lookup)
         if downloaded then
             table.insert(chapters, chapter)
         end
@@ -662,8 +664,11 @@ function Methods:performBulkChapterAction(action_id, menu_context)
     local manga = context and context.manga
     if manga and action_id ~= "select_all" and action_id ~= "clear_selection" and action_id ~= "scanlator_filter" then
         if manga.local_only then return false end
+        local recovered_refresh = action_id == "refresh_chapters" and manga.id and manga.endpoint_scope
+            and manga.endpoint_scope == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
+        local lookup = self:buildChapterDownloadLookup(manga)
         for _, chapter in ipairs(context.chapters or {}) do
-            if self:isLocalOnlyChapter(manga, chapter) then return false end
+            if self:isLocalOnlyChapter(manga, chapter, lookup) and not recovered_refresh then return false end
         end
     end
     if action_id == "bulk_downloads" then

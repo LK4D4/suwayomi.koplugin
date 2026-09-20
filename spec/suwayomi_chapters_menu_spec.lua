@@ -8,6 +8,7 @@ describe("suwayomi/chapters/menu", function()
         Marker.uninstall()
         package.loaded["suwayomi/chapters/menu"] = nil
         package.loaded["suwayomi/chapters/context"] = nil
+        package.loaded["suwayomi/settings"] = nil
         package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/ui"] = nil
         package.preload["suwayomi/ui"] = nil
@@ -202,6 +203,51 @@ describe("suwayomi/chapters/menu", function()
         assert.are.equal("Chapters", options.title)
         assert.are.equal("Frieren", captured_title_options.title)
         assert.are.equal("select_all", captured_title_options.actions[1].id)
+    end)
+
+    it("keeps refresh available for scoped manga with recovered rows but no chapter mutation actions", function()
+        helper.stubControllerDependencies()
+        local scope = "https://suwayomi.example"
+        package.loaded["suwayomi/settings"] = {
+            load = function() return { server_url = scope } end,
+            normalizeEndpointScope = function(_, value) return value end,
+            loadChapterLedger = function() return {} end,
+            loadReaderReturnContexts = function() return {} end,
+        }
+        package.loaded["suwayomi/chapters/menu"] = nil
+        local recovered = { id = "c1", local_only = true, local_path = "/legacy/chapter.cbz" }
+        local manga = { id = "m1", endpoint_scope = scope }
+        local plugin = {
+            current_chapter_context = { manga = manga, chapters = { recovered } },
+            current_scanlator_filter = "Missing team",
+            getSelectedChapterCount = function() return 0 end,
+            getChapterScanlatorChoices = function() return {} end,
+        }
+        for _, methods in ipairs({
+            require("suwayomi/chapters/menu").methods,
+            dofile("suwayomi/chapters/local_downloads.lua").methods,
+        }) do
+            for name, method in pairs(methods) do plugin[name] = method end
+        end
+        plugin.isChapterDownloaded = function() return true end
+        local function actionIds(actions)
+            local ids = {}
+            for _, action in ipairs(actions) do ids[#ids + 1] = action.id end
+            return ids
+        end
+        assert.are.same({ "select_all", "scanlator_filter", "refresh_chapters" }, actionIds(plugin:getBulkChapterActions()))
+        assert.are.same({ "open", "verify_download" }, actionIds(plugin:getChapterActions(manga, recovered)))
+        plugin.getSelectedChapterCount = function() return 1 end
+        assert.are.same({ "clear_selection", "scanlator_filter", "refresh_chapters" }, actionIds(plugin:getBulkChapterActions()))
+        for _, restricted in ipairs({
+            { id = "m1" },
+            { endpoint_scope = scope },
+            { id = "m1", endpoint_scope = "https://other.example" },
+            { id = "m1", endpoint_scope = scope, local_only = true },
+        }) do
+            plugin.current_chapter_context.manga = restricted
+            assert.are.same({ "clear_selection", "scanlator_filter" }, actionIds(plugin:getBulkChapterActions()))
+        end
     end)
 
     it("marks destructive chapter actions so action menus can separate them", function()

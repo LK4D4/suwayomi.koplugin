@@ -566,8 +566,9 @@ function Methods:setScanlatorFilter(scanlator)
     local context = self.current_chapter_context
     local local_only = context.manga.local_only
     if self.isLocalOnlyChapter then
+        local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(context.manga)
         for _, chapter in ipairs(context.chapters or {}) do
-            if self:isLocalOnlyChapter(context.manga, chapter) then local_only = true; break end
+            if self:isLocalOnlyChapter(context.manga, chapter, lookup) then local_only = true; break end
         end
     end
     if local_only then

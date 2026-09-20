@@ -36,7 +36,7 @@ local function getFirstUnreadFromContext(owner, manga)
     return nil, true
 end
 
-local function canOpenFirstUnread(owner, manga)
+local function canOpenFirstUnread(owner, manga, download_lookup)
     local chapter, has_context = getFirstUnreadFromContext(owner, manga)
     if not chapter and not has_context then
         chapter = manga and manga.first_unread_chapter
@@ -44,7 +44,7 @@ local function canOpenFirstUnread(owner, manga)
     if not chapter or not owner or not owner.isChapterDownloaded then
         return false
     end
-    return owner:isChapterDownloaded(manga, chapter) == true
+    return owner:isChapterDownloaded(manga, chapter, download_lookup) == true
 end
 
 MangaActionMenu.canOpenFirstUnread = canOpenFirstUnread
@@ -77,7 +77,7 @@ function MangaActionMenu.buildMainActions(owner, manga, options)
         table.insert(actions, { id = "select_all", text = I18n.t("Select all") })
     end
     table.insert(actions, { id = "manga_information", text = I18n.t("Manga information") })
-    if canOpenFirstUnread(owner, manga) then
+    if canOpenFirstUnread(owner, manga, options.download_lookup) then
         table.insert(actions, { id = "open_first_unread", text = I18n.t("Open first unread") })
     end
 

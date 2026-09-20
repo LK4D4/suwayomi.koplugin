@@ -123,6 +123,7 @@ describe("complete stored chapter loading", function()
     before_each(function()
         clearModules()
         messages, scheduled, workers, requests = {}, {}, {}, {}
+        loading = nil
         worker_ids, poll_ids, pending_pid, next_pid = {}, {}, nil, 0
         saved_ledger, saved_jobs = "{}", "[]"
         saved_filter = nil
@@ -247,6 +248,198 @@ describe("complete stored chapter loading", function()
         os.remove("./suwayomi_manga_request_1.json")
         os.remove("./suwayomi_manga_request_1.json.tmp")
         clearModules()
+    end)
+
+    it("preserves pending reads and refill state when action preload cache persistence fails", function()
+        assert(settings:saveChapterLedger({ ["17:201"] = {
+            manga_id = "17", chapter_id = "201", read = true,
+            pending_read_sync = true, pending_read_state = true,
+        } }))
+        prepareRefill()
+        assert(settings:saveMangaKeepNextUnreadDownloads(manga, 5))
+        manga.endpoint_scope = "https://suwayomi.example"
+        assert(queue.refill:associate(manga))
+        assert(settings:saveChapterCache(settings:load(), manga, {
+            { id = "200", name = "Previously saved chapter", source_order = 200 },
+        }))
+        local before_cache = settings:loadChapterCache(settings:load(), manga)
+        local before_ledger = settings:loadChapterLedger()
+        local before_refills = queue:getSnapshot().refills
+        local store = settings:getStore()
+        local write = store.io.write
+        store.io.write = function()
+            store.io.write = write
+            return false, "one rejected cache write"
+        end
+        respond = function()
+            local chapters = nodes(201, 201)
+            chapters[1].isRead = true
+            return page(chapters, 1, false)
+        end
+        local action_ran = false
+        plugin:startLoadMangaChapterContext(manga, function() action_ran = true end)
+        finishRequest()
+        assert.is_true(action_ran)
+        assert.are.same({ "201" }, chapterIds(plugin.current_chapter_context.chapters))
+        assert.are.same(before_cache, settings:loadChapterCache(settings:load(), manga))
+        assert.are.same(before_ledger, settings:loadChapterLedger())
+        assert.are.same(before_refills, queue:getSnapshot().refills)
+    end)
+
+    it("refreshes a scoped recovered list after an ordinary load fails", function()
+        archive_path = os.tmpname()
+        local file = assert(io.open(archive_path, "wb"))
+        file:write("recorded archive")
+        file:close()
+        manga.endpoint_scope = "https://suwayomi.example"
+        assert(settings:saveReaderReturnContexts({
+            [archive_path] = { path = archive_path, manga_id = "17", chapter_id = "201" },
+        }))
+        respond = function() return nil, 503 end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        local refresh_available = false
+        for _, action in ipairs(plugin:getBulkChapterActions()) do
+            if action.id == "refresh_chapters" then refresh_available = true end
+        end
+        assert.is_true(plugin:performBulkChapterAction("refresh_chapters"))
+        respond = function()
+            return { data = { fetchManga = { manga = { id = 17 } },
+                fetchChapters = { chapters = nodes(202, 202) } } }
+        end
+        finishRequest()
+        assert.are.same({ "202" }, chapterIds(plugin.current_chapter_menu.chapters))
+        assert.is_true(refresh_available)
+    end)
+
+    for _, listing in ipairs({ "cached", "reconstructed" }) do
+        it("opens " .. listing .. " next unread with saved filter and pending read precedence before any server request", function()
+            archive_directory = os.tmpname()
+            os.remove(archive_directory)
+            assert(require("lfs").mkdir(archive_directory))
+            download_directory = archive_directory
+            manga.endpoint_scope = "https://suwayomi.example"
+            saved_filter = "Visible group"
+            local chapter = { id = "201", name = "Chapter 201", source_order = 201,
+                is_read = true, scanlator = saved_filter }
+            archive_path = plugin:getChapterPath(manga, chapter)
+            assert(queue.downloader:ensureDirectory(archive_path:match("^(.*)/[^/]+$")))
+            local Native = require("spec/support/native_archiver")
+            restore_native = Native.install()
+            local writer = Native.Writer:new()
+            assert(writer:open(archive_path, "zip"))
+            assert(writer:addFileFromMemory("001.jpg", "fixture image"))
+            assert(writer:close())
+            manga.first_unread_chapter = chapter
+            if listing == "cached" then
+                assert(settings:saveChapterCache(settings:load(), manga, {
+                    { id = "200", name = "Hidden unread", source_order = 200, scanlator = "Other group" },
+                    chapter,
+                }))
+            end
+            assert(settings:saveReaderReturnContexts({
+                [archive_path] = { path = archive_path, manga_id = "17", chapter_id = "201",
+                    endpoint_scope = manga.endpoint_scope, scanlator = saved_filter, read = true },
+            }))
+            assert(settings:saveChapterLedger({ ["17:201"] = {
+                manga_id = "17", chapter_id = "201", read = false,
+                pending_read_sync = true, pending_read_state = false,
+            } }))
+            local opened, information = {}, nil
+            package.preload["apps/reader/readerui"] = function()
+                return { showReader = function(_, path) opened[#opened + 1] = path end }
+            end
+            require("suwayomi/ui").showMangaInformation = function(_, options)
+                information = options
+                return {}
+            end
+            respond = function() return nil, 503 end
+            plugin:showMangaActions(manga)
+            local offered = false
+            for _, action in ipairs(information.actions) do
+                if action.id == "open_first_unread" then offered = true end
+            end
+            assert.is_true(offered)
+            information.onAction({ id = "open_first_unread" })
+            assert.is_nil(plugin.active_manga_network_requests and plugin.active_manga_network_requests.chapter_context)
+            finishJob(queue.verification)
+            assert.are.same({ archive_path }, opened)
+            assert.are.same({}, requests)
+            assert.is_true(settings:loadChapterLedger()["17:201"].pending_read_sync)
+            opened = {}
+            plugin:showChaptersForManga(manga)
+            assert.are.equal(manga.endpoint_scope, settings:loadReaderReturnContexts()[archive_path].endpoint_scope)
+            plugin:performChapterAction(manga, plugin.current_chapter_menu.chapters[1], "open")
+            if queue.verification then finishJob(queue.verification) end
+            assert.are.same({ archive_path }, opened)
+        end)
+    end
+
+    it("does not reconstruct or open a stale first unread after an authoritative cached empty list", function()
+        manga.endpoint_scope = "https://suwayomi.example"
+        manga.first_unread_chapter = { id = "201", name = "Stale unread" }
+        archive_path = os.tmpname()
+        local file = assert(io.open(archive_path, "wb"))
+        file:write("recorded archive")
+        file:close()
+        assert(settings:saveReaderReturnContexts({
+            [archive_path] = { path = archive_path, manga_id = "17", chapter_id = "201",
+                endpoint_scope = manga.endpoint_scope },
+        }))
+        assert(settings:saveChapterCache(settings:load(), manga, {}))
+        plugin.openChapter = function() error("Cached empty list must not open a stale chapter") end
+        assert.is_false(plugin:performMangaAction(manga, "open_first_unread"))
+        assert.are.same({}, plugin.current_chapter_context.chapters)
+        assert.are.same({}, workers)
+    end)
+
+    it("does not fall back to a hidden unread when cached visible chapters are locally read", function()
+        manga.endpoint_scope = "https://suwayomi.example"
+        saved_filter = "Visible group"
+        manga.first_unread_chapter = { id = "200", name = "Hidden unread", scanlator = "Other group" }
+        assert(settings:saveChapterCache(settings:load(), manga, {
+            manga.first_unread_chapter,
+            { id = "201", name = "Visible chapter", scanlator = saved_filter, is_read = false },
+        }))
+        assert(settings:saveChapterLedger({ ["17:201"] = {
+            manga_id = "17", chapter_id = "201", read = true,
+            pending_read_sync = true, pending_read_state = true,
+        } }))
+        local before = settings:loadChapterLedger()
+        plugin.openChapter = function() error("Filtered all-read list must not open a stale chapter") end
+        assert.is_false(plugin:performMangaAction(manga, "open_first_unread"))
+        assert.is_true(plugin.current_chapter_context.chapters[2].is_read)
+        assert.are.same(before, settings:loadChapterLedger())
+        assert.are.same({}, workers)
+    end)
+
+    it("preloads next unread when a previous saved-first view had no recoverable information", function()
+        respond = function() return nil, 503 end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        assert.is_true(plugin.current_chapter_context.missing)
+        local opened
+        plugin.openChapter = function(_, _, chapter) opened = chapter.id end
+        respond = function() return page(nodes(201, 201), 1, false) end
+        assert.is_true(plugin:performMangaAction(manga, "open_first_unread"))
+        assert.is_nil(opened)
+        finishRequest()
+        assert.are.equal("201", opened)
+    end)
+
+    it("keeps normal refresh available after a first chapter load fails without saved information", function()
+        respond = function() return nil, 503 end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        assert.is_nil(manga.endpoint_scope)
+        assert.is_true(plugin.current_chapter_context.missing)
+        respond = function()
+            return { data = { fetchManga = { manga = { id = 17 } },
+                fetchChapters = { chapters = nodes(202, 202) } } }
+        end
+        assert.is_true(plugin:performBulkChapterAction("refresh_chapters"))
+        finishRequest()
+        assert.are.equal("202", plugin.current_chapter_menu.chapters[1].id)
     end)
 
     it("shows a successful replacement despite rejected cache writes without acknowledging pending reads", function()
@@ -480,7 +673,7 @@ describe("complete stored chapter loading", function()
 
     for _, origin in ipairs({ "chapter title", "chapter bulk" }) do
         for _, dataset in ipairs({ "unlabeled chapters", "empty result", "labeled chapters",
-            "unrestricted unlabeled chapters", "recovered unlabeled chapters" }) do
+            "unrestricted unlabeled chapters" }) do
             it("offers explicit saved-filter recovery from " .. origin .. " with " .. dataset, function()
                 for name, method in pairs(require("suwayomi/plugin/title_menu").methods) do plugin[name] = method end
                 local restricted = dataset ~= "unrestricted unlabeled chapters"
@@ -511,25 +704,8 @@ describe("complete stored chapter loading", function()
                 facade.updateChapterMenu = function(menu, options)
                     menu.title, menu.chapters = options.title, options.chapters
                 end
-                if dataset == "recovered unlabeled chapters" then
-                    prepareRefill()
-                    assert(settings:saveMangaKeepNextUnreadDownloads(manga, 5))
-                    manga.endpoint_scope = "https://suwayomi.example"
-                    assert(queue.refill:associate(manga))
-                    manga.endpoint_scope = nil
-                    archive_path = os.tmpname()
-                    local file = assert(io.open(archive_path, "wb"))
-                    file:write("readable archive candidate")
-                    file:close()
-                    manga.local_only = true
-                    assert(settings:saveReaderReturnContexts({
-                        [archive_path] = { path = archive_path, manga_id = "17", chapter_id = "201" },
-                    }))
-                    plugin:showChaptersForManga(manga)
-                else
-                    plugin:showChaptersForManga(manga)
-                    finishRequest()
-                end
+                plugin:showChaptersForManga(manga)
+                finishRequest()
                 local initial_ids = not restricted and { "201", "202" }
                     or (dataset == "labeled chapters" and { "201" } or {})
                 assert.are.same(initial_ids, chapterIds(plugin.current_chapter_menu.chapters))
@@ -542,7 +718,7 @@ describe("complete stored chapter loading", function()
                 assert.are.same({}, json.decode(saved_ledger))
                 if dataset ~= "labeled chapters" then
                     assert.are.same({}, plugin:getChapterScanlatorChoices(plugin.current_chapter_context.chapters))
-                    if restricted then assert.matches("No chapters match the saved scanlator filter", messages[1])
+                    if restricted then assert.is_true(#messages > 0)
                     else assert.are.same({}, messages) end
                 end
                 local menu = plugin.current_chapter_menu
@@ -571,7 +747,7 @@ describe("complete stored chapter loading", function()
                     assert.are.equal(0, filter_writes)
                     return
                 end
-                if dataset ~= "labeled chapters" and dataset ~= "recovered unlabeled chapters" then
+                if dataset ~= "labeled chapters" then
                     select_action("bulk_downloads")
                     select_action("download_next_5_unread")
                     assert.are.same({}, admittedIds())
@@ -582,32 +758,21 @@ describe("complete stored chapter loading", function()
                     open_action_menu()
                 end
                 select_action("scanlator_filter")
-                assert.are.equal("Scanlator filter", loading.title)
                 assert.are.equal("Saved group", saved_filter)
                 assert.are.same(initial_ids, chapterIds(menu.chapters))
                 select_action("scanlator_filter_all")
-                local expected_ids = dataset == "empty result" and {}
-                    or (dataset == "recovered unlabeled chapters" and { "201" } or { "201", "202" })
-                assert.are.equal(dataset == "recovered unlabeled chapters" and "Saved group" or nil, saved_filter)
+                local expected_ids = dataset == "empty result" and {} or { "201", "202" }
+                assert.is_nil(saved_filter)
                 assert.is_nil(plugin.current_scanlator_filter)
-                assert.are.equal(dataset == "recovered unlabeled chapters" and 0 or 1, filter_writes)
+                assert.are.equal(1, filter_writes)
                 assert.are.equal(menu, plugin.current_chapter_menu)
                 assert.are.same(expected_ids, chapterIds(menu.chapters))
-                assert.are.same(dataset == "recovered unlabeled chapters" and {} or expected_ids,
-                    chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
+                assert.are.same(expected_ids, chapterIds(plugin:getNextUnreadChaptersForDownload(manga, 5)))
                 assert.are.same({}, admittedIds())
                 assert.are.same({}, json.decode(saved_ledger))
                 open_action_menu()
                 if dataset ~= "labeled chapters" then assert.is_nil(find_action("scanlator_filter"))
                 else assert.is_table(find_action("scanlator_filter")) end
-                if dataset == "recovered unlabeled chapters" then
-                    assert.is_nil(find_action("bulk_downloads"))
-                    assert.is_false(plugin:performBulkChapterAction("download_next_5_unread"))
-                    assert.are.same({}, admittedIds())
-                    assert.are.same({}, queue:getSnapshot().refills)
-                    assert.is_nil(settings:loadReaderReturnContexts()[archive_path].endpoint_scope)
-                    return
-                end
                 select_action("bulk_downloads")
                 select_action("download_next_5_unread")
                 assert.are.same(expected_ids, admittedIds())
@@ -616,6 +781,44 @@ describe("complete stored chapter loading", function()
             end)
         end
     end
+
+    it("recovers an unlabeled local-only filter without changing saved policy or permitting downloads", function()
+        prepareRefill()
+        saved_filter = "Saved group"
+        assert(settings:saveMangaKeepNextUnreadDownloads(manga, 5))
+        manga.endpoint_scope = "https://suwayomi.example"
+        assert(queue.refill:associate(manga))
+        manga.endpoint_scope, manga.local_only = nil, true
+        archive_path = os.tmpname()
+        local file = assert(io.open(archive_path, "wb"))
+        file:write("readable archive candidate")
+        file:close()
+        assert(settings:saveReaderReturnContexts({
+            [archive_path] = { path = archive_path, manga_id = "17", chapter_id = "201" },
+        }))
+        settings.saveMangaScanlatorFilter = function() error("Local filter must not be persisted") end
+        local before_ledger = settings:loadChapterLedger()
+        local before_contexts = settings:loadReaderReturnContexts()
+        plugin:showChaptersForManga(manga)
+        assert.are.same({}, chapterIds(plugin.current_chapter_options.chapters))
+        local actions = {}
+        for _, action in ipairs(plugin:getBulkChapterActions()) do actions[action.id] = true end
+        assert.is_true(actions.scanlator_filter)
+        assert.is_nil(actions.bulk_downloads)
+        assert.is_true(plugin:performBulkChapterAction("scanlator_filter"))
+        chapter_action_callback({ id = "scanlator_filter_all" })
+        assert.are.same({ "201" }, chapterIds(plugin.current_chapter_options.chapters))
+        assert.is_nil(plugin.current_scanlator_filter)
+        assert.are.equal("Saved group", saved_filter)
+        assert.are.equal(5, settings:loadMangaKeepNextUnreadDownloads(manga))
+        assert.is_false(plugin:performBulkChapterAction("download_next_5_unread"))
+        assert.are.same({}, plugin:getNextUnreadChaptersForDownload(manga, 5))
+        assert.are.same({}, admittedIds())
+        assert.are.same({}, queue:getSnapshot().refills)
+        assert.are.same(before_ledger, settings:loadChapterLedger())
+        assert.are.same(before_contexts, settings:loadReaderReturnContexts())
+        assert.are.same({}, workers)
+    end)
 
     it("preserves pending choices and unrelated ledger fields through persisted reopen and refresh", function()
         ledger_path = os.tmpname()

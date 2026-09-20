@@ -93,6 +93,35 @@ local function saveChapterListing(owner, manga, chapters)
     return saved ~= nil
 end
 
+local function prepareChapterListing(owner, manga, chapters, options)
+    options = options or {}
+    if not options.saved and not saveChapterListing(owner, manga, chapters) then
+        -- Membership is authoritative even when storage cannot acknowledge read state.
+        options = copyOptions(options)
+        options.saved = true
+    end
+    local err
+    if not manga.local_only then
+        chapters, err = owner:mergeChaptersWithReadLedger(manga, chapters, options)
+    end
+    if not chapters then
+        owner:showMessage(err or I18n.t("Failed to save settings."))
+    end
+    return chapters, options
+end
+
+local function loadSavedChapterListing(owner, manga, credentials)
+    local listing = not manga.local_only and SuwayomiSettings:loadChapterCache(credentials, manga)
+    if listing then
+        for key, value in pairs(listing.manga) do
+            if manga[key] == nil then manga[key] = value end
+        end
+        manga.endpoint_scope = SuwayomiSettings:normalizeEndpointScope(credentials.server_url)
+        return listing.chapters
+    end
+    return owner.getRecoveredChapters and owner:getRecoveredChapters(manga) or nil
+end
+
 local function guardMangaCallback(owner, manga, callback)
     local is_current = owner.captureChapterActionGuard and owner:captureChapterActionGuard()
     local manga_id = manga and tostring(manga.id or manga.title)
@@ -279,14 +308,11 @@ function Methods:handleChapterContextResult(manga, result, on_ready)
     if result.manga then
         self:applyMangaRefreshResult(manga, result.manga)
     end
-    saveChapterListing(self, manga, result.chapters)
-    local chapters, err = self:mergeChaptersWithReadLedger(manga, result.chapters)
-    if not chapters then
-        self:showMessage(err or I18n.t("Failed to save settings."))
-        return false
-    end
+    local chapters, render_options = prepareChapterListing(self, manga, result.chapters)
+    if not chapters then return false end
     local context = self:setCurrentMangaChapterContext(manga, chapters)
-    self:requestMangaRefill(manga)
+    self.current_chapter_context.saved = render_options.saved == true
+    if not render_options.saved and not manga.local_only then self:requestMangaRefill(manga) end
     if self.current_scanlator_filter and #self:getVisibleChapters(chapters) == 0 then return true end
     if on_ready then
         on_ready(context)
@@ -411,22 +437,8 @@ function Methods:showChapterResultForManga(manga, result, options)
         return
     end
 
-    local render_options = options
-    if not options.saved and not saveChapterListing(self, manga, result.chapters) then
-        -- Membership is authoritative even when storage cannot acknowledge read state.
-        render_options = copyOptions(options)
-        render_options.saved = true
-    end
-    local chapters, err
-    if manga.local_only then
-        chapters = result.chapters
-    else
-        chapters, err = self:mergeChaptersWithReadLedger(manga, result.chapters, render_options)
-    end
-    if not chapters then
-        self:showMessage(err or I18n.t("Failed to save settings."))
-        return false
-    end
+    local chapters, render_options = prepareChapterListing(self, manga, result.chapters, options)
+    if not chapters then return false end
     local previous_context, previous_filter = self.current_chapter_context, self.current_scanlator_filter
     local previous_selection, previous_mode = self.selected_chapters, self.selection_mode
     -- Context publication prunes selection; stage a copy until reconciliation commits.
@@ -509,15 +521,7 @@ function Methods:showChaptersForManga(manga, options)
         return self:startFetchChaptersForManga(manga, options)
     end
     self:cancelMangaNetworkRequests()
-    local listing = not manga.local_only and SuwayomiSettings:loadChapterCache(credentials, manga)
-    local chapters = listing and listing.chapters
-        or (self.getRecoveredChapters and self:getRecoveredChapters(manga))
-    if listing then
-        for key, value in pairs(listing.manga) do
-            if manga[key] == nil then manga[key] = value end
-        end
-        manga.endpoint_scope = scope
-    end
+    local chapters = loadSavedChapterListing(self, manga, credentials)
     local saved_options = copyOptions(options)
     saved_options.saved, saved_options.missing = true, chapters == nil
     self:showChapterResultForManga(manga, { ok = true, chapters = chapters or {} }, saved_options)
@@ -744,21 +748,35 @@ function Methods:performMangaAction(manga, action_id, options)
         return false
     end
     if action_id == "open_first_unread" then
-        if getLoadedMangaChapterContext(self, manga) then
+        if type(manga) ~= "table" then return false end
+        local credentials = SuwayomiSettings:load()
+        local scope = SuwayomiSettings:normalizeEndpointScope(credentials.server_url)
+        if manga.endpoint_scope and manga.endpoint_scope ~= scope then return false end
+        local context = getLoadedMangaChapterContext(self, manga)
+        if not context or context.missing then
+            local chapters = loadSavedChapterListing(self, manga, credentials)
+            if chapters then
+                self:cancelMangaNetworkRequests()
+                chapters = prepareChapterListing(self, manga, chapters, { saved = true })
+                if not chapters then return false end
+                self:setCurrentMangaChapterContext(manga, chapters)
+                context = self.current_chapter_context
+                context.saved = true
+            end
+        end
+        if context and not context.missing then
             local chapter = self:getFirstUnreadChapterForManga(manga)
             if chapter then
                 return self:openChapter(manga, chapter)
             end
             return false
         end
-        return self:withMangaChapterContext(manga, function()
+        return self:startLoadMangaChapterContext(manga, function()
             local resolved_chapter = self:getFirstUnreadChapterForManga(manga)
             if resolved_chapter then
                 self:openChapter(manga, resolved_chapter)
             end
-        end, {
-            defer_empty_context_warning = true,
-        })
+        end)
     end
     if action_id == "refresh_chapters" then
         return self:refreshMangaChapters(manga, options)

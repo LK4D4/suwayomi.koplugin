@@ -40,11 +40,6 @@ local function currentScope(manga)
         == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
 end
 
-local function matchesChapter(entry, chapter)
-    if chapter.id ~= nil then return tostring(entry.chapter_id or "") == tostring(chapter.id) end
-    return chapter.local_path ~= nil and entry.path == chapter.local_path
-end
-
 local function foreignPaths(manga, contexts, ledger)
     local paths = {}
     for _, collection in ipairs({ contexts, ledger }) do
@@ -107,35 +102,59 @@ function Methods:getRecoveredChapters(manga)
     return chapters
 end
 
-function Methods:isLocalOnlyChapter(manga, chapter)
+-- A lookup belongs to one synchronous render/action, never a retained callback.
+function Methods:buildChapterDownloadLookup(manga, ledger)
+    local lookup = {
+        ledger = ledger or SuwayomiSettings:loadChapterLedger(),
+        by_id = {},
+        by_path = {},
+        foreign_paths = {},
+    }
+    local contexts = SuwayomiSettings:loadReaderReturnContexts()
+    for _, collection in ipairs({ contexts, lookup.ledger }) do
+        for _, entry in pairs(collection) do
+            if type(entry) == "table" and type(entry.path) == "string" and entry.path ~= "" then
+                if entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope then
+                    lookup.foreign_paths[entry.path] = true
+                end
+                if matchesManga(entry, manga)
+                    and (entry.endpoint_scope == nil or entry.endpoint_scope == manga.endpoint_scope) then
+                    local paths = lookup.by_path[entry.path] or {}
+                    lookup.by_path[entry.path] = paths
+                    paths[#paths + 1] = entry
+                    local key = tostring(entry.chapter_id or "")
+                    local entries = lookup.by_id[key] or {}
+                    lookup.by_id[key] = entries
+                    entries[#entries + 1] = entry
+                end
+            end
+        end
+    end
+    return lookup
+end
+
+function Methods:isLocalOnlyChapter(manga, chapter, lookup)
     if not manga or manga.local_only or not manga.id or not chapter or chapter.local_only or not chapter.id
         or not currentScope(manga) then return true end
-    local ledger = SuwayomiSettings:loadChapterLedger()
+    local ledger = lookup and lookup.ledger or SuwayomiSettings:loadChapterLedger()
     local entry = ledger[tostring(manga.id) .. ":" .. tostring(chapter.id)]
     return type(entry) == "table" and entry.endpoint_scope ~= nil
         and entry.endpoint_scope ~= manga.endpoint_scope
 end
 
-function Methods:getChapterPath(manga, chapter)
+function Methods:getChapterPath(manga, chapter, lookup)
     if type(manga) ~= "table" or type(chapter) ~= "table" or not currentScope(manga) then return nil end
-    local contexts, ledger = records()
-    local foreign_paths = foreignPaths(manga, contexts, ledger)
-    local recorded_path
-    for _, collection in ipairs({ contexts, ledger }) do
-        for _, entry in pairs(collection) do
-            if (compatible(entry, manga)
-                or (chapter.local_only and entry.endpoint_scope == nil and matchesManga(entry, manga)))
-                and matchesChapter(entry, chapter)
-                and type(entry.path) == "string" and entry.path ~= ""
-                and (not chapter.local_path or chapter.local_path == entry.path)
-                and not foreign_paths[entry.path] and self:chapterArchiveExists(entry.path) then
-                recorded_path = entry.path
-                break
-            end
+    lookup = lookup or self:buildChapterDownloadLookup(manga)
+    local entries
+    if chapter.id ~= nil then entries = lookup.by_id[tostring(chapter.id)]
+    else entries = lookup.by_path[chapter.local_path] end
+    for _, entry in ipairs(entries or {}) do
+        if (compatible(entry, manga) or (chapter.local_only and entry.endpoint_scope == nil))
+            and (not chapter.local_path or chapter.local_path == entry.path)
+            and not lookup.foreign_paths[entry.path] and self:chapterArchiveExists(entry.path) then
+            return entry.path
         end
-        if recorded_path then break end
     end
-    if recorded_path then return recorded_path end
     -- A recovered path is a recorded selection, never permission to probe a guessed path.
     if chapter.local_path or manga.local_only then return nil end
     local download_directory = SuwayomiSettings:loadDownloadDirectory()
@@ -147,12 +166,12 @@ function Methods:getChapterPath(manga, chapter)
     local chapter_path = SuwayomiDownloader.findExistingChapterPath
         and SuwayomiDownloader:findExistingChapterPath(download_directory, manga, chapter)
         or select(2, SuwayomiDownloader:getTargetPath(download_directory, manga, chapter))
-    if foreign_paths[chapter_path] then return nil end
+    if lookup.foreign_paths[chapter_path] then return nil end
     return chapter_path
 end
 
-function Methods:isChapterDownloaded(manga, chapter)
-    local chapter_path = self:getChapterPath(manga, chapter)
+function Methods:isChapterDownloaded(manga, chapter, lookup)
+    local chapter_path = self:getChapterPath(manga, chapter, lookup)
     if not chapter_path then
         return false, nil
     end

@@ -610,6 +610,92 @@ describe("suwayomi/chapters/actions", function()
         assert.are.same({}, plugin.ledger)
     end)
 
+    it("preserves recorded path precedence and explicit selections with a render lookup", function()
+        local returned, recorded, generated = "/saved/return.cbz", "/saved/ledger.cbz", "/downloads/Manga/Chapter 1.cbz"
+        local plugin = build_plugin({
+            existing = { [returned] = true, [recorded] = true, [generated] = true },
+            ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = recorded,
+                endpoint_scope = manga.endpoint_scope } },
+        })
+        assert(settings:saveReaderReturnContexts({
+            [returned] = { manga_id = "m1", chapter_id = "c1", path = returned, endpoint_scope = manga.endpoint_scope },
+        }))
+        local lookup = plugin:buildChapterDownloadLookup(manga)
+        assert.are.equal(returned, plugin:getChapterPath(manga, chapter, lookup))
+        assert.are.equal(recorded, plugin:getChapterPath(manga, { id = "c1", local_path = recorded }, lookup))
+        assert.is_nil(plugin:getChapterPath(manga, { id = "different", local_path = recorded }, lookup))
+        downloader.existing[returned] = nil
+        assert.are.equal(recorded, plugin:getChapterPath(manga, chapter, lookup))
+        downloader.existing[recorded] = nil
+        assert.are.equal(generated, plugin:getChapterPath(manga, chapter, lookup))
+        assert.is_nil(plugin:getChapterPath(manga, { id = "c1", local_path = recorded }, lookup))
+    end)
+
+    it("rejects foreign-owned paths even when another record matches the current manga", function()
+        local path = "/downloads/Manga/Chapter 1.cbz"
+        local plugin = build_plugin({ existing = { [path] = true }, ledger = {
+            ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = "/other.cbz",
+                endpoint_scope = "https://other.example" },
+            ["m2:c2"] = { manga_id = "m2", chapter_id = "c2", path = path,
+                endpoint_scope = "https://other.example" },
+        } })
+        assert(settings:saveReaderReturnContexts({
+            [path] = { manga_id = "m1", chapter_id = "c1", path = path, endpoint_scope = manga.endpoint_scope },
+        }))
+        local lookup = plugin:buildChapterDownloadLookup(manga)
+        assert.is_true(plugin:isLocalOnlyChapter(manga, chapter, lookup))
+        assert.is_nil(plugin:getChapterPath(manga, chapter, lookup))
+        assert.is_nil(plugin:getChapterPath(manga, { id = "c1", local_path = path }, lookup))
+        assert.is_false(plugin:performChapterAction(manga, chapter, "mark_read"))
+        assert.is_false(plugin:performChapterAction(manga, chapter, "delete"))
+    end)
+
+    it("rechecks recorded path ownership when asynchronous verification completes", function()
+        local path, opened, complete = "/downloads/Manga/Chapter 1.cbz"
+        package.preload["apps/reader/readerui"] = function()
+            return { showReader = function(_, selected) opened = selected end }
+        end
+        local plugin = build_plugin({ existing = { [path] = true },
+            queue = { verifyArchive = function(_, _, _, _, callback) complete = callback; return true end } })
+        assert.is_true(plugin:openChapter(manga, chapter))
+        assert(settings:saveReaderReturnContexts({
+            [path] = { manga_id = "m2", chapter_id = "c2", path = path, endpoint_scope = "https://other.example" },
+        }))
+        complete({ state = "valid" })
+        assert.is_nil(opened)
+        assert.are.same({}, plugin.reader_return_contexts)
+        assert.are.same({}, settings:loadChapterLedger())
+        assert.is_nil(settings:getStore():readKey("download_refill"))
+    end)
+
+    it("admits scoped manga refresh without allowing recovered chapter mutations", function()
+        local recovered = { id = "c1", local_only = true, local_path = "/legacy/chapter.cbz" }
+        local plugin = build_plugin({ current_chapter_context = { manga = manga, chapters = { recovered } } })
+        local refreshed = 0
+        plugin.performMangaAction = function()
+            refreshed = refreshed + 1
+            return true
+        end
+        assert.is_true(plugin:performBulkChapterAction("refresh_chapters"))
+        assert.are.equal(1, refreshed)
+        assert.is_false(plugin:performBulkChapterAction("download_selected"))
+        assert.is_false(plugin:performBulkChapterAction("mark_read_selected"))
+        assert.is_false(plugin:performChapterAction(manga, recovered, "delete"))
+        assert.is_false(plugin:performChapterAction(manga, recovered, "mark_read"))
+        for _, restricted in ipairs({
+            { id = "m1" },
+            { endpoint_scope = manga.endpoint_scope },
+            { id = "m1", endpoint_scope = "https://other.example" },
+            { id = "m1", endpoint_scope = manga.endpoint_scope, local_only = true },
+        }) do
+            plugin.current_chapter_context = { manga = restricted, chapters = { recovered } }
+            assert.is_false(plugin:performBulkChapterAction("refresh_chapters"))
+        end
+        assert.are.equal(1, refreshed)
+        assert.are.same({}, settings:loadChapterLedger())
+        assert.are.same({}, settings:loadReaderReturnContexts())
+    end)
+
     it("recovers only scoped recorded chapters in saved order without inventing missing identifiers", function()
         local first, second, foreign = "/recorded/a.cbz", "/recorded/b.cbz", "/other/a.cbz"
         local plugin = build_plugin({ existing = { [first] = true, [second] = true, [foreign] = true } })

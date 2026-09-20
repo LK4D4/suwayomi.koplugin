@@ -183,7 +183,7 @@ function Service:commitCompletion(job, path)
             context.manga_id, context.manga_title = entry.manga_id, entry.manga_title
             context.chapter_id, context.chapter_name = entry.chapter_id, entry.chapter_name
             context.in_library, context.source = job.manga.in_library, copy(job.manga.source)
-            context.endpoint_scope = entry.endpoint_scope
+            if not verification then context.endpoint_scope = entry.endpoint_scope end
             doc.reader_return_contexts[path] = context
             -- Inspection observes an existing archive; it never publishes a
             -- new generation or supersedes an accepted archive-only request.
