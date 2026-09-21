@@ -97,6 +97,15 @@ function Methods:getChapterTitleBarMenuOptions(manga, lookup)
     })
 end
 
+local function hasReadAuthority(manga, chapter, path, lookup)
+    if not manga.endpoint_scope or not lookup or lookup.foreign_paths[path] then return false end
+    for _, entry in ipairs(lookup.by_path[path] or {}) do
+        if entry.endpoint_scope == manga.endpoint_scope
+            and tostring(entry.chapter_id) == tostring(chapter.id) then return true end
+    end
+    return false
+end
+
 function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup)
     local started_at = SuwayomiDebug.now()
     local saved = manga.local_only or (options and options.saved)
@@ -132,6 +141,8 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup)
         end
 
         local chapter_exists, chapter_path = self:isChapterDownloaded(manga, item, lookup)
+        -- Finding readable bytes does not associate them with this server.
+        local read_authority = chapter_exists and not local_only and hasReadAuthority(manga, item, chapter_path, lookup)
         if chapter_exists then
             local metadata_finished = chapter_exists and self:isChapterPathFinishedInKoreader(chapter_path)
             if chapter_exists then
@@ -145,18 +156,18 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup)
                 if chapter.is_read ~= true then
                     chapter.is_read = true
                 end
-                if not local_only and item._suwayomi_is_read ~= true then
+                if read_authority and item._suwayomi_is_read ~= true then
                     item.pending_read_sync = true
                     chapter.pending_read_sync = true
                 end
             end
-            if not saved and not local_only and chapter_exists and item.is_read == true and not metadata_finished then
+            if not saved and read_authority and item.is_read == true and not metadata_finished then
                 self:setKoreaderChapterReadState(chapter_path, true)
                 metadata_write_count = metadata_write_count + 1
             end
         end
 
-        if chapter_exists and not saved and not local_only then
+        if not saved and read_authority then
             local updates = {
                 path = chapter_path,
                 read = item.is_read == true,

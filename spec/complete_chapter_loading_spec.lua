@@ -33,6 +33,7 @@ describe("complete stored chapter loading", function()
         "suwayomi/ui/menu_utils", "suwayomi/ui/browse", "suwayomi/ui/choice_dialogs", "suwayomi/ui/directory",
         "suwayomi/ui/downloads", "suwayomi/ui/list_rows", "suwayomi/ui/manga_info",
         "suwayomi/settings/retention_labels",
+        "suwayomi/readsync/koreader_metadata", "docsettings",
         "suwayomi/ui/list_menu",
     }
 
@@ -311,6 +312,80 @@ describe("complete stored chapter loading", function()
         assert.are.same({ "202" }, chapterIds(plugin.current_chapter_menu.chapters))
         assert.is_true(refresh_available)
     end)
+
+    for _, scope in ipairs({ "unassociated", "associated", "foreign" }) do
+        it("preserves the read authority of a " .. scope .. " archive during recovered-list Refresh", function()
+            archive_directory = os.tmpname()
+            os.remove(archive_directory)
+            assert(require("lfs").mkdir(archive_directory))
+            download_directory = archive_directory
+            manga.endpoint_scope = "https://suwayomi.example"
+            local chapter = { id = "201", name = "Chapter 201", source_order = 201 }
+            archive_path = plugin:getChapterPath(manga, chapter)
+            assert(queue.downloader:ensureDirectory(archive_path:match("^(.*)/[^/]+$")))
+            local file = assert(io.open(archive_path, "wb"))
+            file:write("recorded archive")
+            file:close()
+            ledger_path = archive_directory .. "/metadata.lua"
+            local native_before = 'return { last_page = 2, percent_finished = 2/3, summary = { status = "reading" } }\n'
+            file = assert(io.open(ledger_path, "wb"))
+            file:write(native_before)
+            file:close()
+            package.preload.docsettings = function()
+                return {
+                    findSidecarFile = function() return ledger_path end,
+                    getSidecarFilename = function() return "metadata.lua" end,
+                    getSidecarDir = function() return archive_directory end,
+                    isHashLocationEnabled = function() return false end,
+                }
+            end
+            for name, method in pairs(require("suwayomi/readsync/koreader_metadata").methods) do
+                plugin[name] = method
+            end
+            local endpoint = scope == "associated" and manga.endpoint_scope
+                or (scope == "foreign" and "https://other.example" or nil)
+            assert(settings:saveChapterLedger({ ["17:201"] = {
+                manga_id = "17", chapter_id = "201", path = archive_path, read = false,
+                endpoint_scope = endpoint,
+            } }))
+            assert(settings:saveReaderReturnContexts({
+                [archive_path] = { path = archive_path, manga_id = "17", chapter_id = "201",
+                    endpoint_scope = endpoint },
+            }))
+            local before_ledger = settings:loadChapterLedger()
+            local before_contexts = settings:loadReaderReturnContexts()
+            respond = function() return nil, 503 end
+            plugin:showChaptersForManga(manga)
+            finishRequest()
+            assert.is_true(plugin:performBulkChapterAction("refresh_chapters"))
+            respond = function()
+                local chapters = nodes(201, 203)
+                chapters[1].isRead = true
+                return { data = { fetchManga = { manga = { id = 17 } },
+                    fetchChapters = { chapters = chapters } } }
+            end
+            finishRequest()
+            assert.are.same({ "201", "202", "203" }, chapterIds(plugin.current_chapter_menu.chapters))
+            assert.are.same({ "201", "202", "203" },
+                chapterIds(settings:loadChapterCache(settings:load(), manga).chapters))
+            local native = assert(loadfile(ledger_path))()
+            assert.are.equal(2, native.last_page)
+            if scope == "associated" then
+                assert.is_true(settings:loadChapterLedger()["17:201"].read)
+                assert.are.equal("complete", native.summary.status)
+                assert.are.equal(1, native.percent_finished)
+            else
+                assert.are.same(before_ledger, settings:loadChapterLedger())
+                assert.are.same(before_contexts, settings:loadReaderReturnContexts())
+                file = assert(io.open(ledger_path, "rb"))
+                assert.are.equal(native_before, file:read("*a"))
+                file:close()
+            end
+            file = assert(io.open(archive_path, "rb"))
+            assert.are.equal("recorded archive", file:read("*a"))
+            file:close()
+        end)
+    end
 
     for _, listing in ipairs({ "cached", "reconstructed" }) do
         it("offers and opens " .. listing .. " next unread despite a stale hint with saved filter and pending unread", function()

@@ -814,14 +814,24 @@ describe("process-owned download navigation", function()
     end)
 
     it("rebuilds only the affected manga after deferred cleanup", function()
+        local scoped = { id = "m1", title = "Example", source = { id = "s1", name = "Source" },
+            endpoint_scope = "https://example.invalid" }
+        assert(settings:save({ server_url = scoped.endpoint_scope }))
         local affected, unrelated = host("files"), host("files")
-        local other_manga = { id = "m2", title = "Other" }
+        local other_manga = { id = "m2", title = "Other", endpoint_scope = scoped.endpoint_scope }
         local other_chapter = { id = "other", name = "Other chapter" }
         local cleanup_path, other_path = directory .. "/c1.cbz", directory .. "/other.cbz"
         write(cleanup_path, "finished archive")
         write(other_path, "unrelated archive")
+        assert(settings:saveChapterLedger({ ["m1:c1"] = {
+            manga_id = scoped.id, chapter_id = chapters[1].id, path = cleanup_path, read = false,
+            endpoint_scope = scoped.endpoint_scope,
+        }, ["m2:other"] = {
+            manga_id = other_manga.id, chapter_id = other_chapter.id, path = other_path, read = false,
+            endpoint_scope = other_manga.endpoint_scope,
+        } }))
         for _, view in ipairs({
-            { plugin = affected, manga = manga, chapters = { chapters[1] } },
+            { plugin = affected, manga = scoped, chapters = { chapters[1] } },
             { plugin = unrelated, manga = other_manga, chapters = { other_chapter } },
         }) do
             view.plugin:setCurrentMangaChapterContext(view.manga, view.chapters)
@@ -1878,6 +1888,8 @@ describe("process-owned download navigation", function()
 
     for _, route in ipairs({ "chapter list", "downloaded ledger" }) do
         it("requires completed status rather than final-page progress through " .. route, function()
+            local scoped = { id = "m1", title = "Example", endpoint_scope = "https://example.invalid" }
+            assert(settings:save({ server_url = scoped.endpoint_scope }))
             local plugin = manualHost(0)
             local path = directory .. "/c1.cbz"
             local metadata_path = path .. ".sdr/metadata.lua"
@@ -1885,9 +1897,10 @@ describe("process-owned download navigation", function()
             assert(require("lfs").mkdir(path .. ".sdr"))
             write(metadata_path, 'return { ["summary"] = { ["status"] = "reading" }, ["percent_finished"] = 1 }')
             assert(settings:saveChapterLedger({
-                ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path, read = false },
+                ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path, read = false,
+                    endpoint_scope = scoped.endpoint_scope },
             }))
-            plugin:setCurrentMangaChapterContext(manga, {
+            plugin:setCurrentMangaChapterContext(scoped, {
                 { id = "c1", name = "Chapter 1", is_read = false },
             })
             local function reconcile()

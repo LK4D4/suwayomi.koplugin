@@ -158,6 +158,8 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters, options)
         local key = self:getChapterLedgerKey(manga, item)
         local entry = ledger[key]
         local foreign_entry = entry and entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope
+        local unassociated_archive = entry and entry.path and not entry.endpoint_scope
+            and manga.endpoint_scope ~= nil
         if foreign_entry then entry = nil end
         local suwayomi_is_read = item.is_read == true
         local pending_read_state
@@ -182,7 +184,7 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters, options)
         item._suwayomi_is_read = suwayomi_is_read
         item.is_read = is_read
 
-        if foreign_entry or (options and options.saved) then
+        if foreign_entry or unassociated_archive or (options and options.saved) then
             item.pending_read_sync = entry and entry.pending_read_sync
         elseif remote_matches_pending then
             if is_read or (entry and entry.path) or hasUnrelatedFields(entry) then

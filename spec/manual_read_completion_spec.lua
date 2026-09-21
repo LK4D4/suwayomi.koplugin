@@ -104,7 +104,8 @@ describe("manual read completion integration", function()
     end
     before_each(function()
         clear()
-        manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" } }
+        manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" },
+            endpoint_scope = "https://suwayomi.example" }
         runtime = runtime_helper.install()
         timers, messages, clock = {}, {}, 100
         os.time = function() return clock end
@@ -120,6 +121,7 @@ describe("manual read completion integration", function()
         package.preload.luasettings = function() return { open = function() return { data = {} } end } end
         settings = require("suwayomi/settings")
         settings.store = require("suwayomi/settings/store"):new{ path = directory .. "/settings.lua" }
+        assert(settings:save({ server_url = manga.endpoint_scope }))
         assert(settings.store:saveKey("download_directory", directory))
         local ui = require("ui/uimanager")
         ui.scheduleIn = function(_, delay, callback) timers[#timers + 1] = { at = clock + delay, callback = callback } end
