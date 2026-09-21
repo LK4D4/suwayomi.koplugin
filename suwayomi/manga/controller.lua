@@ -533,6 +533,25 @@ function Methods:showChaptersForManga(manga, options)
 end
 
 
+function Methods:getSavedFirstUnreadMangaChapter(manga)
+    if type(manga) ~= "table" then return nil, false end
+    local credentials = SuwayomiSettings:load()
+    local scope = SuwayomiSettings:normalizeEndpointScope(credentials.server_url)
+    if manga.endpoint_scope and manga.endpoint_scope ~= scope then return nil, true end
+    local chapters = loadSavedChapterListing(self, manga, credentials)
+    if not chapters then return nil, false end
+    chapters = prepareChapterListing(self, manga, chapters, { saved = true })
+    if not chapters then return nil, true end
+    local filter = self:loadMangaScanlatorFilter(manga)
+    for _, chapter in ipairs(chapters) do
+        if chapter.is_read ~= true and (not filter or self:getChapterScanlator(chapter) == filter) then
+            return chapter, true
+        end
+    end
+    return nil, true
+end
+
+
 function Methods:canOpenFirstUnreadMangaChapter(manga)
     return MangaActionMenu.canOpenFirstUnread(self, manga)
 end

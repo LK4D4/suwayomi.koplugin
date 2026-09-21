@@ -313,7 +313,7 @@ describe("complete stored chapter loading", function()
     end)
 
     for _, listing in ipairs({ "cached", "reconstructed" }) do
-        it("opens " .. listing .. " next unread with saved filter and pending read precedence before any server request", function()
+        it("offers and opens " .. listing .. " next unread despite a stale hint with saved filter and pending unread", function()
             archive_directory = os.tmpname()
             os.remove(archive_directory)
             assert(require("lfs").mkdir(archive_directory))
@@ -330,7 +330,7 @@ describe("complete stored chapter loading", function()
             assert(writer:open(archive_path, "zip"))
             assert(writer:addFileFromMemory("001.jpg", "fixture image"))
             assert(writer:close())
-            manga.first_unread_chapter = chapter
+            manga.first_unread_chapter = { id = "202", name = "Undownloaded next chapter", source_order = 202 }
             if listing == "cached" then
                 assert(settings:saveChapterCache(settings:load(), manga, {
                     { id = "200", name = "Hidden unread", source_order = 200, scanlator = "Other group" },
@@ -355,6 +355,8 @@ describe("complete stored chapter loading", function()
             end
             respond = function() return nil, 503 end
             plugin:showMangaActions(manga)
+            assert.is_nil(plugin.current_chapter_context)
+            assert.are.same({}, workers)
             local offered = false
             for _, action in ipairs(information.actions) do
                 if action.id == "open_first_unread" then offered = true end
@@ -388,6 +390,7 @@ describe("complete stored chapter loading", function()
         }))
         assert(settings:saveChapterCache(settings:load(), manga, {}))
         plugin.openChapter = function() error("Cached empty list must not open a stale chapter") end
+        assert.is_false(plugin:canOpenFirstUnreadMangaChapter(manga))
         assert.is_false(plugin:performMangaAction(manga, "open_first_unread"))
         assert.are.same({}, plugin.current_chapter_context.chapters)
         assert.are.same({}, workers)
@@ -407,6 +410,8 @@ describe("complete stored chapter loading", function()
         } }))
         local before = settings:loadChapterLedger()
         plugin.openChapter = function() error("Filtered all-read list must not open a stale chapter") end
+        plugin.isChapterDownloaded = function() return true end
+        assert.is_false(plugin:canOpenFirstUnreadMangaChapter(manga))
         assert.is_false(plugin:performMangaAction(manga, "open_first_unread"))
         assert.is_true(plugin.current_chapter_context.chapters[2].is_read)
         assert.are.same(before, settings:loadChapterLedger())

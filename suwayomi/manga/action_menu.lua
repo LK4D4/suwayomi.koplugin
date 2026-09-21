@@ -38,6 +38,9 @@ end
 
 local function canOpenFirstUnread(owner, manga, download_lookup)
     local chapter, has_context = getFirstUnreadFromContext(owner, manga)
+    if not has_context and owner and owner.getSavedFirstUnreadMangaChapter then
+        chapter, has_context = owner:getSavedFirstUnreadMangaChapter(manga)
+    end
     if not chapter and not has_context then
         chapter = manga and manga.first_unread_chapter
     end
