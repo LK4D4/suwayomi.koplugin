@@ -67,9 +67,12 @@ describe("suwayomi plugin", function()
         assert.are.equal(plugin, runtime.registered_menu_plugin)
     end)
 
-    it("adds the plugin under the search menu section and opens the Suwayomi hub", function()
+    it("adds the plugin under the search menu section and opens Library directly", function()
         local menu_items = {}
-        local plugin = build_plugin()
+        local opened_library = false
+        local plugin = build_plugin({
+            showLibrary = function() opened_library = true end,
+        })
 
         plugin:addToMainMenu(menu_items)
 
@@ -81,25 +84,59 @@ describe("suwayomi plugin", function()
 
         menu_items.suwayomi.callback()
 
-        assert.is_table(runtime.shown_home_dialog)
+        assert.is_true(opened_library)
+        assert.is_nil(runtime.shown_home_dialog)
+    end)
+
+    it("closes the launching KOReader menu before opening Library", function()
+        local menu_items = {}
+        local parent_menu = { name = "search-menu" }
+        local opened_library = false
+        local plugin = build_plugin({
+            showLibrary = function()
+                assert.are.same({ parent_menu }, runtime.closed_widgets)
+                opened_library = true
+            end,
+        })
+
+        plugin:addToMainMenu(menu_items)
+        menu_items.suwayomi.callback(parent_menu)
+
+        assert.are.same({ parent_menu }, runtime.closed_widgets)
+        assert.is_true(opened_library)
+    end)
+
+    for _, missing in ipairs({ "server_url", "download_directory" }) do
+        it("opens setup instead of Library when " .. missing .. " is missing", function()
+            runtime_helper.teardown()
+            runtime = runtime_helper.install({
+                credentials = { server_url = missing == "server_url" and "" or "https://example.test" },
+                download_directory = missing == "download_directory" and "" or "/books",
+            })
+            local setup_options
+            local plugin = build_plugin({
+                showOnboardingSetup = function(_, options) setup_options = options end,
+                showLibrary = function() error("Library must wait for setup") end,
+            })
+            local menu_items = {}
+            plugin:addToMainMenu(menu_items)
+            menu_items.suwayomi.callback()
+
+            assert.are.same({ first_run = true }, setup_options)
+            assert.is_nil(runtime.shown_home_dialog)
+        end)
+    end
+
+    it("keeps the Suwayomi hub available explicitly", function()
+        local plugin = build_plugin()
+        plugin:showHome()
+
         assert.are.equal("Library", runtime.shown_home_dialog.actions[1].text)
         assert.are.equal("Browse", runtime.shown_home_dialog.actions[2].text)
         assert.are.equal("Downloads", runtime.shown_home_dialog.actions[3].text)
         assert.are.equal("Sync", runtime.shown_home_dialog.actions[4].text)
         assert.are.equal("Settings", runtime.shown_home_dialog.actions[5].text)
         assert.are.equal("Close plugin", runtime.shown_home_dialog.actions[6].text)
-    end)
-
-    it("closes the launching KOReader menu before opening the Suwayomi hub", function()
-        local menu_items = {}
-        local plugin = build_plugin()
-        local parent_menu = { name = "search-menu" }
-
-        plugin:addToMainMenu(menu_items)
-        menu_items.suwayomi.callback(parent_menu)
-
-        assert.are.same({ parent_menu }, runtime.closed_widgets)
-        assert.is_table(runtime.shown_home_dialog)
     end)
 
     it("adds only the reader return action in book mode when the document is from Suwayomi", function()

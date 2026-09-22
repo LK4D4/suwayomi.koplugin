@@ -305,7 +305,7 @@ function Methods:addToMainMenu(menu_items)
                 self:showOnboardingSetup({ first_run = true })
                 return
             end
-            self:showHome()
+            self:showLibrary()
         end,
     }
 end

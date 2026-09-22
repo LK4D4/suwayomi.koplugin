@@ -311,6 +311,10 @@ local function installController(options)
         state.home_count = (state.home_count or 0) + 1
         table.insert(state.events, "home")
     end
+    function plugin:showLibrary()
+        state.library_count = (state.library_count or 0) + 1
+        table.insert(state.events, "library")
+    end
     function plugin:pluralize(value, singular, plural)
         return value == 1 and singular or plural
     end
@@ -847,11 +851,13 @@ describe("suwayomi/plugin/settings_controller", function()
             suppress_saved_message = true,
         }, state.choose_download_options)
 
+        assert.is_nil(state.library_count)
         state.choose_download_callback("/storage/emulated/0/Books/Manga")
 
         assert.are.equal("Test connection before continuing.", state.messages[#state.messages])
         assert.is_true(state.closed_plugin)
-        assert.are.equal(1, state.home_count)
+        assert.are.equal(1, state.library_count)
+        assert.is_nil(state.home_count)
     end)
 
     it("requires settings setup wizard to test current connection before continuing", function()
@@ -1019,7 +1025,7 @@ describe("suwayomi/plugin/settings_controller", function()
         assert.are.same({}, state.messages)
     end)
 
-    it("closes settings before landing home after settings-launched setup", function()
+    it("closes settings before opening Library after settings-launched setup", function()
         local plugin, state = installController({
             credentials = { server_url = "https://suwayomi.example" },
             download_directory = "/storage/emulated/0/Books/Manga",
@@ -1049,10 +1055,11 @@ describe("suwayomi/plugin/settings_controller", function()
         }, state.choose_download_options)
         assert.are.equal(0, #state.messages)
         assert.is_true(state.closed_plugin)
-        assert.are.equal(1, state.home_count)
+        assert.are.equal(1, state.library_count)
+        assert.is_nil(state.home_count)
     end)
 
-    it("lands home without a completion toast after setup folder selection", function()
+    it("opens Library without a completion toast after setup folder selection", function()
         local plugin, state = installController({
             credentials = { server_url = "https://suwayomi.example" },
             download_directory = "/storage/emulated/0/Books/Manga",
@@ -1078,7 +1085,7 @@ describe("suwayomi/plugin/settings_controller", function()
 
         assert.are.same({
             "close",
-            "home",
+            "library",
         }, state.events)
     end)
 

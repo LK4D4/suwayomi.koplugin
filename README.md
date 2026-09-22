@@ -38,6 +38,8 @@ Use HTTPS when connecting over a network. HTTP remains supported but exposes pas
 
 ## Read
 
+After setup, **Search > Suwayomi** opens Library directly, using your category-picker preference. The title-bar menu offers **Library** to return there from other plugin screens and **Suwayomi home** for Browse, Downloads, Sync, and Settings. Back from the Library root exits the plugin.
+
 - **Library** opens manga in your Suwayomi library.
 - **Browse** lets you search sources, explore Popular or Latest lists, and install or update source extensions.
 - **Downloads** shows progress and lets you cancel or retry downloads.

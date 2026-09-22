@@ -278,17 +278,21 @@ describe("saved-first Library browsing", function()
         assert.same({}, views[1].rows)
     end)
 
-    it("retires superseded Library widgets instead of revealing inert rows on Back", function()
+    it("returns to Library through the title action without retaining the old navigation branch", function()
         local client, _, views, _, _, actions = fixture({
             categories = { { id = 1, name = "First" }, { id = 2, name = "Second" } },
             manga = { { id = 7, title = "Saved" } },
         })
         client:showLibrary()
         views[1].select(views[1].rows[1])
-        client:showLibrary()
+        local previous_menu = views[2]
+        client.plugin.showLibrary = function() return client:showLibrary() end
+        local title_menu = require("suwayomi/plugin/title_menu")
+        title_menu.methods.performTitleBarAction(client.plugin, previous_menu, { id = "library" })
         assert.is_true(views[1].closed)
         assert.is_true(views[2].closed)
         assert.is_false(client.plugin:getNavigation():contains(views[1]))
+        assert.are.equal(1, #client.plugin:getNavigation().entries)
         views[3].select(views[3].rows[1])
         views[4].select(views[4].rows[1])
         assert.are.equal(7, actions().manga.id)

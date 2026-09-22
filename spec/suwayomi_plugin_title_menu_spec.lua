@@ -45,7 +45,7 @@ describe("suwayomi/plugin/title_menu", function()
         })
     end)
 
-    it("prepends Suwayomi home to screen actions", function()
+    it("prepends Library and Suwayomi home to screen actions", function()
         local TitleMenu = require("suwayomi/plugin/title_menu")
         local plugin = {}
         for name, method in pairs(TitleMenu.methods) do
@@ -56,9 +56,11 @@ describe("suwayomi/plugin/title_menu", function()
             { id = "refresh", text = "Refresh" },
         })
 
-        assert.are.equal("home", actions[1].id)
-        assert.are.equal("Suwayomi home", actions[1].text)
-        assert.are.equal("refresh", actions[2].id)
+        assert.are.equal("library", actions[1].id)
+        assert.are.equal("Library", actions[1].text)
+        assert.are.equal("home", actions[2].id)
+        assert.are.equal("Suwayomi home", actions[2].text)
+        assert.are.equal("refresh", actions[3].id)
     end)
 
     it("routes title-bar labels through i18n", function()
@@ -85,7 +87,8 @@ describe("suwayomi/plugin/title_menu", function()
 
         local actions = plugin:buildTitleBarActions()
 
-        assert.are.equal("tx:Suwayomi home", actions[1].text)
+        assert.are.equal("tx:Library", actions[1].text)
+        assert.are.equal("tx:Suwayomi home", actions[2].text)
     end)
 
     it("cleans marker i18n stubs between tests", function()
@@ -127,8 +130,9 @@ describe("suwayomi/plugin/title_menu", function()
         options.on_title_bar_left_hold(source_menu)
 
         assert.are.equal("Library", shown_action_menu.title)
-        assert.are.equal("home", shown_action_menu.actions[1].id)
-        assert.are.equal("refresh", shown_action_menu.actions[2].id)
+        assert.are.equal("library", shown_action_menu.actions[1].id)
+        assert.are.equal("home", shown_action_menu.actions[2].id)
+        assert.are.equal("refresh", shown_action_menu.actions[3].id)
         assert.is_function(shown_action_menu.anchor)
         assert.are.equal(title_bar_dimen, shown_action_menu.anchor())
 
@@ -185,15 +189,18 @@ describe("suwayomi/plugin/title_menu", function()
         assert.are.same({ "home" }, events)
     end)
 
-    it("keeps Home and unguarded Downloads actions independent of a chapter guard", function()
-        local plugin = { homes = 0, downloads = 0 }
+    it("keeps Library, Home and unguarded Downloads actions independent of a chapter guard", function()
+        local plugin = { libraries = 0, homes = 0, downloads = 0 }
         for name, method in pairs(require("suwayomi/plugin/title_menu").methods) do plugin[name] = method end
+        function plugin:showLibrary() self.libraries = self.libraries + 1 end
         function plugin:showHome() self.homes = self.homes + 1 end
         local function downloadAction() plugin.downloads = plugin.downloads + 1 end
         plugin:showTitleBarActionMenu({}, {
             captureActionGuard = function() return function() return false end end,
             onSelect = downloadAction,
         })
+        action_callback({ id = "library" })
+        assert.are.equal(1, plugin.libraries)
         action_callback({ id = "home" })
         assert.are.equal(1, plugin.homes)
         assert.is_false(action_callback({ id = "download_next_5_unread" }))

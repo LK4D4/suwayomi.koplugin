@@ -274,12 +274,12 @@ end
 
 
 function Methods:finishOnboardingSetup()
-    if self.showHome then
+    if self.showLibrary then
         UIManager:nextTick(function()
             if self.closeSuwayomiPlugin then
                 self:closeSuwayomiPlugin()
             end
-            self:showHome()
+            self:showLibrary()
         end)
         return
     end

@@ -310,7 +310,7 @@ class Inspector:
                  "Setup directory is not the sandbox downloads directory")
         self._tap("Use this folder")
         self._tap("Choose")
-        self.wait("Suwayomi")
+        self.wait("Suwayomi Library")
         result = self.smoke()
         return {"auth_mode": self.auth_mode, "setup_fields_filled": True,
                 "method_selected_via_ui": True, "setup_connection_test_passed": True,
