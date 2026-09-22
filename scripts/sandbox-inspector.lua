@@ -124,10 +124,10 @@ userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
                     control = widget, method = "onTapClose", enabled = true,
                 }
             end
-            local layout, layout_path = widget.layout, path .. "layout/"
-            if type(layout) == "table" and not next(layout) then layout = nil end
-            if not layout and widget.button_table then
-                layout, layout_path = widget.button_table.layout, path .. "button_table/layout/"
+            -- Input dialogs can have focus rows containing only their text fields.
+            local layout, layout_path
+            if widget.button_table then
+                layout, layout_path = nestedLayout(widget.button_table, path .. "button_table/", 8)
             end
             if not layout then
                 layout, layout_path = nestedLayout(widget, path, 8)
