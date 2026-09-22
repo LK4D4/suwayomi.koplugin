@@ -271,7 +271,7 @@ function Methods:handleRefreshMangaResult(manga, result, options)
         return false
     end
     if not result.ok then
-        notify(self, result.error)
+        if not options.quiet_failure then notify(self, result.error) end
         return false
     end
     if type(result.chapters) ~= "table" then
@@ -422,7 +422,7 @@ function Methods:showChapterResultForManga(manga, result, options)
         return
     end
     if not result.ok then
-        notify(self, result.error)
+        if not options.quiet_failure then notify(self, result.error) end
         return
     end
 
@@ -511,13 +511,14 @@ end
 
 function Methods:showChaptersForManga(manga, options)
     if self.suwayomi_host_retired or type(manga) ~= "table" then return false end
-    options = options or {}
+    options = copyOptions(options)
     local credentials = SuwayomiSettings:load()
     local scope = SuwayomiSettings:normalizeEndpointScope(credentials.server_url)
     if manga.endpoint_scope and manga.endpoint_scope ~= scope then return false end
     if getLoadedMangaChapterContext(self, manga) and self.current_chapter_menu
         and (not self.isSuwayomiScreenActive or self:isSuwayomiScreenActive(self.current_chapter_menu)) then
         if manga.local_only then return true end
+        options.quiet_failure = not self.current_chapter_context.missing
         return self:startFetchChaptersForManga(manga, options)
     end
     self:cancelMangaNetworkRequests()
@@ -526,6 +527,7 @@ function Methods:showChaptersForManga(manga, options)
     saved_options.saved, saved_options.missing = true, chapters == nil
     self:showChapterResultForManga(manga, { ok = true, chapters = chapters or {} }, saved_options)
     if manga.local_only then return chapters ~= nil end
+    options.quiet_failure = chapters ~= nil
     if self:isMangaUninitialized(manga) then
         return self:startRefreshMangaForChapters(manga, options)
     end

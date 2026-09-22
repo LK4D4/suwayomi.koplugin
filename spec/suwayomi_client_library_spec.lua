@@ -73,13 +73,13 @@ describe("saved-first Library browsing", function()
         requests[1].on_finish({ ok = false, error = "timeout" })
         assert.are.equal("Saved", views[1].rows[1].title)
         assert.are.equal(1, #views)
-        assert.is_true(messages[1].options.toast)
+        assert.same({}, messages)
     end)
 
     it("reconstructs only recorded existing downloads without modifying their data", function()
         local path = os.tmpname()
         local file = assert(io.open(path, "wb")); file:write("preserve archive bytes"); file:close()
-        local client, requests, views, _, _, actions, title = fixture()
+        local client, requests, views, messages, _, actions, title = fixture()
         local ledger = {
             one = { manga_id = 7, manga_title = "Recovered", chapter_id = 9, path = path,
                 read = true, pending_read_sync = true },
@@ -95,6 +95,7 @@ describe("saved-first Library browsing", function()
         assert.is_true(actions().chapters)
         assert.is_true(actions().manga.local_only)
         requests[1].on_finish({ ok = false })
+        assert.same({}, messages)
         assert.is_true(ledger.one.read)
         assert.is_true(ledger.one.pending_read_sync)
         title().onSelect({ id = "refresh" })
@@ -216,11 +217,34 @@ describe("saved-first Library browsing", function()
             if requests[1] then requests[1].on_finish({ ok = false, error = failure, manga = {} }) end
             views[1].select(views[1].rows[1])
             assert.are.equal(7, actions().manga.id)
-            assert.is_truthy(messages[1])
+            assert.same({}, messages)
             client:showLibrary()
             assert.are.equal(7, views[2].rows[1].id)
         end)
     end
+
+    it("reports a failed explicit Refresh even with saved Library rows", function()
+        local client, requests, _, messages, _, _, title = fixture({
+            categories = {}, manga = { { id = 7, title = "Saved" } },
+        })
+        client:showLibrary()
+        requests[1].on_finish({ ok = false })
+        assert.same({}, messages)
+        title().onSelect({ id = "refresh" })
+        requests[2].on_finish({ ok = false })
+        assert.are.equal(1, #messages)
+    end)
+
+    it("keeps saved empty Library quiet but reports failure without saved information", function()
+        local client, requests, _, messages = fixture({ categories = {}, manga = {} })
+        client:showLibrary()
+        requests[1].on_finish({ ok = false })
+        assert.same({}, messages)
+        client.settings.loadLibraryCache = function() return nil end
+        client:showLibrary()
+        requests[2].on_finish({ ok = false })
+        assert.are.equal(1, #messages)
+    end)
 
     for _, invalidation in ipairs({ "server", "retired", "closed", "cancel", "newer" }) do
         it("rejects obsolete results after " .. invalidation, function()

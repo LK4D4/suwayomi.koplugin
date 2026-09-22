@@ -610,6 +610,7 @@ describe("complete stored chapter loading", function()
         finishRequest()
         assert.are.same({}, plugin.current_chapter_menu.chapters)
         assert.is_nil(settings:loadChapterCache(settings:load(), manga))
+        assert.matches("Incomplete chapter load", messages[#messages])
     end)
 
     it("reopens saved chapters before a failed request without acknowledging pending read choices", function()
@@ -632,7 +633,44 @@ describe("complete stored chapter loading", function()
         finishRequest()
         assert.are.same({ "201", "202" }, chapterIds(plugin.current_chapter_menu.chapters))
         assert.is_true(settings:loadChapterLedger()["17:201"].pending_read_sync)
+        assert.are.same({}, messages)
     end)
+
+    it("keeps repeated cached chapter browsing quiet after incomplete background loads", function()
+        respond = function() return page(nodes(201, 202), 2, false) end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        respond = function() return page(nodes(201, 201), 2, false) end
+        for _, route in ipairs({ "existing menu", "cold reopen", "reader return" }) do
+            if route ~= "existing menu" then
+                plugin.current_chapter_context, plugin.current_chapter_menu = nil, nil
+            end
+            local options = route == "reader return" and { return_context = { chapter_id = "201" } } or {}
+            plugin:showChaptersForManga(manga, options)
+            local result = finishRequest()
+            assert.matches("Incomplete chapter load", result.error)
+            assert.are.same({ "201", "202" }, chapterIds(plugin.current_chapter_menu.chapters))
+            assert.are.same({}, messages)
+        end
+        plugin:refreshMangaChapters(manga)
+        finishRequest()
+        assert.is_truthy(messages[1])
+    end)
+
+    for _, initialized in ipairs({ true, false }) do
+        it("keeps cached empty chapters quiet with initialized=" .. tostring(initialized), function()
+            assert(settings:saveChapterCache(settings:load(), manga, {}))
+            manga.initialized = initialized
+            respond = function() return nil, 503 end
+            plugin:showChaptersForManga(manga)
+            finishRequest()
+            assert.are.same({}, plugin.current_chapter_menu.chapters)
+            assert.are.same({}, messages)
+            plugin:refreshMangaChapters(manga)
+            finishRequest()
+            assert.is_truthy(messages[1])
+        end)
+    end
 
     it("reopens all 205 chapters and queues five unread chapters beyond page one", function()
         respond = function(request)

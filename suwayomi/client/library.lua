@@ -52,9 +52,10 @@ function SuwayomiClient:cancelLibraryNetworkRequests()
 end
 
 local renderLibrary
-local function refreshLibrary(self, session)
+local function refreshLibrary(self, session, background)
     if not live(self, session) then return false end
     self:cancelLibraryNetworkRequests()
+    local quiet = background and (session.saved or #session.listing.manga > 0)
     local token = {}
     session.request = token
     local ok, active = pcall(self:getNetworkRequestJob().start, {
@@ -70,7 +71,7 @@ local function refreshLibrary(self, session)
             if not live(self, session) or session.request ~= token then return end
             session.request, session.active = nil, nil
             if not result or not result.ok then
-                notify(self, I18n.t("Could not refresh Library. Showing saved information."))
+                if not quiet then notify(self, I18n.t("Could not refresh Library. Showing saved information.")) end
                 return
             end
             session.listing = result
@@ -85,7 +86,7 @@ local function refreshLibrary(self, session)
     if not ok or not active then
         if session.request == token then
             session.request = nil
-            notify(self, I18n.t("Could not refresh Library. Showing saved information."))
+            if not quiet then notify(self, I18n.t("Could not refresh Library. Showing saved information.")) end
         end
         return false
     end
@@ -265,7 +266,7 @@ function SuwayomiClient:showLibrary()
     renderLibrary(self, session)
     if session.scope then
         if self.plugin.schedulePendingReadSync then self.plugin:schedulePendingReadSync(credentials) end
-        refreshLibrary(self, session)
+        refreshLibrary(self, session, true)
     end
     return session.category_menu or session.manga_menu
 end
