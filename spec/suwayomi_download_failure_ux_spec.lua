@@ -14,7 +14,7 @@ describe("download failure user actions", function()
     }
     local saved, stack, scheduled, messages, plugin, queue, now, ui, downloads
     local save_error, blocked, terminated
-    local manga = { id = "m1", title = "Example manga" }
+    local manga = { id = "m1", title = "Example manga", endpoint_scope = "https://suwayomi.example" }
     local chapter = { id = "c1", name = "Chapter 1" }
     local full_error = "HTTP 503\n" .. string.rep("診断 details with 100% certainty\n", 200) .. "last detail"
 

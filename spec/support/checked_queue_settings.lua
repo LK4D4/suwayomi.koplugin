@@ -1,5 +1,26 @@
 local SettingsStore = require("suwayomi/settings/store")
 
+-- Use the production origin parser without loading KOReader's settings services.
+local function settingsNormalizers()
+    local old_settings = package.loaded["suwayomi/settings"]
+    local old_preload = package.preload["suwayomi/settings"]
+    local old_datastorage = package.loaded.datastorage
+    local old_luasettings = package.loaded.luasettings
+    package.loaded["suwayomi/settings"] = nil
+    package.preload["suwayomi/settings"] = nil
+    package.loaded.datastorage = { getSettingsDir = function() return "/queue-spec" end }
+    package.loaded.luasettings = {}
+    local ok, loaded = pcall(require, "suwayomi/settings")
+    package.loaded.datastorage = old_datastorage
+    package.loaded.luasettings = old_luasettings
+    package.loaded["suwayomi/settings"] = old_settings
+    package.preload["suwayomi/settings"] = old_preload
+    if not ok then error(loaded) end
+    return loaded.normalizeServerURL, loaded.normalizeEndpointScope
+end
+
+local normalizeServerURL, normalizeEndpointScope = settingsNormalizers()
+
 return function(jobs)
     local files, saves = {}, 0
     local store = SettingsStore:new{
@@ -34,6 +55,8 @@ return function(jobs)
         isBlocked = function() return store:isBlocked() end,
         reconcile = function() return store:reconcile() end,
         load = function() return { server_url = "https://suwayomi.example" } end,
+        normalizeServerURL = normalizeServerURL,
+        normalizeEndpointScope = normalizeEndpointScope,
         loadDownloadQueue = function() return store:readKey("download_queue", {}) end,
         saveDownloadQueue = function(_, value)
             local ok, err = store:saveKey("download_queue", value)

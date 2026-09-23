@@ -2,6 +2,7 @@ package.path = "?.lua;" .. package.path
 
 local Marker = require("spec/support/i18n_marker")
 local checkedQueueSettings = require("spec/support/checked_queue_settings")
+local ENDPOINT_SCOPE = "https://suwayomi.example"
 
 describe("suwayomi/downloads/queue", function()
     local original_io_open
@@ -271,7 +272,7 @@ describe("suwayomi/downloads/queue", function()
             mark_archive_exists_after_download = true,
         })
         local ok = context.queue:enqueue(
-            { id = "m1", title = "Sousou no Frieren" },
+            { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE },
             { id = "398", name = "Official_Vol. 1 Ch. 1" },
             "/books"
         )
@@ -284,7 +285,7 @@ describe("suwayomi/downloads/queue", function()
 
         assert.are.same({}, context.saved_queue())
         assert.are.equal("downloaded", context.queue:getStatus(
-            { id = "m1", title = "Sousou no Frieren" },
+            { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE },
             { id = "398", name = "Official_Vol. 1 Ch. 1" }
         ).state)
     end)
@@ -294,6 +295,7 @@ describe("suwayomi/downloads/queue", function()
         local manga = {
             id = "m1",
             title = "Sousou no Frieren",
+            endpoint_scope = ENDPOINT_SCOPE,
             source = {
                 id = "mangadex",
                 displayName = "MangaDex (EN)",
@@ -364,7 +366,7 @@ describe("suwayomi/downloads/queue", function()
 
     it("does not enqueue a duplicate while a chapter is queued", function()
         local context = build_queue({ subprocess_done = false })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
@@ -377,7 +379,7 @@ describe("suwayomi/downloads/queue", function()
     it("translates the duplicate queue message while keeping queue keys raw", function()
         installMarker()
         local context = build_queue({ subprocess_done = false })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
@@ -389,7 +391,7 @@ describe("suwayomi/downloads/queue", function()
 
     it("can suppress the duplicate download message for bulk enqueue", function()
         local context = build_queue({ subprocess_done = false })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
@@ -401,7 +403,7 @@ describe("suwayomi/downloads/queue", function()
 
     it("cancels a queued download before it starts", function()
         local context = build_queue({ subprocess_done = false })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
         local other_chapter = { id = "399", name = "Official_Vol. 1 Ch. 2" }
 
@@ -422,7 +424,7 @@ describe("suwayomi/downloads/queue", function()
 
     it("batch enqueues multiple chapters with one persistence write and process schedule", function()
         local context = build_queue({ subprocess_done = false })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapters = {
             { id = "398", name = "Official_Vol. 1 Ch. 1" },
             { id = "399", name = "Official_Vol. 1 Ch. 2" },
@@ -443,7 +445,7 @@ describe("suwayomi/downloads/queue", function()
 
     it("clears a terminal chapter status without forcing a refresh", function()
         local context = build_queue()
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:setStatus(manga, chapter, { state = "downloaded" })
@@ -458,7 +460,7 @@ describe("suwayomi/downloads/queue", function()
 
     it("cancels an active download without leaving a failed job", function()
         local context = build_queue({ subprocess_done = false, skip_subprocess_callback = true })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
@@ -485,7 +487,7 @@ describe("suwayomi/downloads/queue", function()
         local context = build_queue()
 
         local message = context.queue:formatFailureMessage(
-            { id = "m1", title = "Sousou no Frieren" },
+            { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE },
             { id = "462", name = "Official_Vol. 7 Ch. 65", chapter_number = 65 },
             "network timeout"
         )
@@ -500,7 +502,7 @@ describe("suwayomi/downloads/queue", function()
         local context = build_queue()
 
         local message = context.queue:formatFailureMessage(
-            { id = "m1", title = "Sousou no Frieren" },
+            { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE },
             { id = "462", name = "Official_Vol. 7 Ch. 65" },
             "network timeout"
         )
@@ -515,7 +517,7 @@ describe("suwayomi/downloads/queue", function()
         local context = build_queue()
 
         context.queue:enqueue(
-            { id = "m1", title = "Sousou no Frieren" },
+            { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE },
             { id = "462", name = "Official_Vol. 7 Ch. 65", chapter_number = 65, source_order = 65 },
             "/books"
         )
@@ -529,7 +531,7 @@ describe("suwayomi/downloads/queue", function()
     end)
 
     it("retries a failure without deleting unknown artifacts", function()
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
         local context = build_queue({
             mark_archive_exists_after_download = true,
@@ -572,11 +574,11 @@ describe("suwayomi/downloads/queue", function()
     end)
 
     it("groups active queued and failed jobs in a download snapshot", function()
-        local failed_manga = { id = "m-failed", title = "Chainsaw Man" }
+        local failed_manga = { id = "m-failed", title = "Chainsaw Man", endpoint_scope = ENDPOINT_SCOPE }
         local failed_chapter = { id = "205", name = "Ch. 205" }
-        local active_manga = { id = "m-active", title = "Frieren" }
+        local active_manga = { id = "m-active", title = "Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local active_chapter = { id = "144", name = "Ch. 144" }
-        local queued_manga = { id = "m-queued", title = "Dandadan" }
+        local queued_manga = { id = "m-queued", title = "Dandadan", endpoint_scope = ENDPOINT_SCOPE }
         local queued_chapter = { id = "192", name = "Ch. 192" }
         local context = build_queue({
             saved_queue = {
@@ -624,7 +626,7 @@ describe("suwayomi/downloads/queue", function()
     end)
 
     it("retries a failed persistent job by key", function()
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
         local context = build_queue({
             saved_queue = {
@@ -650,9 +652,9 @@ describe("suwayomi/downloads/queue", function()
     end)
 
     it("clears failed persistent jobs without clearing queued jobs", function()
-        local failed_manga = { id = "m-failed", title = "Chainsaw Man" }
+        local failed_manga = { id = "m-failed", title = "Chainsaw Man", endpoint_scope = ENDPOINT_SCOPE }
         local failed_chapter = { id = "205", name = "Ch. 205" }
-        local queued_manga = { id = "m-queued", title = "Dandadan" }
+        local queued_manga = { id = "m-queued", title = "Dandadan", endpoint_scope = ENDPOINT_SCOPE }
         local queued_chapter = { id = "192", name = "Ch. 192" }
         local context = build_queue({
             saved_queue = {
@@ -685,7 +687,7 @@ describe("suwayomi/downloads/queue", function()
     end)
 
     it("does not cancel a failed download record", function()
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
         local context = build_queue({
             saved_queue = {
@@ -709,11 +711,11 @@ describe("suwayomi/downloads/queue", function()
     end)
 
     it("cancels all queued downloads without clearing active or failed jobs", function()
-        local active_manga = { id = "m-active", title = "Frieren" }
+        local active_manga = { id = "m-active", title = "Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local active_chapter = { id = "144", name = "Ch. 144" }
-        local queued_manga = { id = "m-queued", title = "Dandadan" }
+        local queued_manga = { id = "m-queued", title = "Dandadan", endpoint_scope = ENDPOINT_SCOPE }
         local queued_chapter = { id = "192", name = "Ch. 192" }
-        local failed_manga = { id = "m-failed", title = "Chainsaw Man" }
+        local failed_manga = { id = "m-failed", title = "Chainsaw Man", endpoint_scope = ENDPOINT_SCOPE }
         local failed_chapter = { id = "205", name = "Ch. 205" }
         local context = build_queue({
             max_active_chapters = 1,
@@ -770,9 +772,9 @@ describe("suwayomi/downloads/queue", function()
     end)
 
     it("cancels all active and queued downloads without clearing failed jobs", function()
-        local failed_manga = { id = "m-failed", title = "Chainsaw Man" }
+        local failed_manga = { id = "m-failed", title = "Chainsaw Man", endpoint_scope = ENDPOINT_SCOPE }
         local failed_chapter = { id = "205", name = "Ch. 205" }
-        local manga = { id = "m1", title = "Frieren" }
+        local manga = { id = "m1", title = "Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local active_chapter = { id = "144", name = "Ch. 144" }
         local queued_chapter = { id = "145", name = "Ch. 145" }
         local context = build_queue({
@@ -810,7 +812,7 @@ describe("suwayomi/downloads/queue", function()
         for _, state in ipairs({ "queued", "downloading" }) do
             local context = build_queue({ skip_subprocess_callback = true, subprocess_done = false, saved_queue = { {
                 key = "m1:c1", state = state, download_directory = "/books",
-                manga = { id = "m1", title = "Example" }, chapter = { id = "c1", name = "One" },
+                manga = { id = "m1", title = "Example", endpoint_scope = ENDPOINT_SCOPE }, chapter = { id = "c1", name = "One" },
                 retry_count = 2, retry_at = 130,
                 progress = { state = state, current = 2, total = 5 },
             } } })
@@ -835,7 +837,7 @@ describe("suwayomi/downloads/queue", function()
     it("retains permanent failure diagnostics even when a final archive exists", function()
         local job = {
             key = "m1:c1", state = "failed", download_directory = "/books",
-            manga = { id = "m1", title = "Example" }, chapter = { id = "c1", name = "One" },
+            manga = { id = "m1", title = "Example", endpoint_scope = ENDPOINT_SCOPE }, chapter = { id = "c1", name = "One" },
             progress = { state = "failed", error = "original error", current = 2, total = 5 },
         }
         local context = build_queue({ saved_queue = { job } })
@@ -860,9 +862,9 @@ describe("suwayomi/downloads/queue", function()
         local context = build_queue({ saved_queue = {
             [1] = "invalid",
             [3] = { key = "m1:c1", state = "queued", download_directory = "/books",
-                manga = { id = "m1", title = "Example" }, chapter = { id = "c1", name = "One" } },
+                manga = { id = "m1", title = "Example", endpoint_scope = ENDPOINT_SCOPE }, chapter = { id = "c1", name = "One" } },
             [5] = { key = "m1:c2", state = "downloading", download_directory = "/books",
-                manga = { id = "m1", title = "Example" }, chapter = { id = "c2", name = "Two" } },
+                manga = { id = "m1", title = "Example", endpoint_scope = ENDPOINT_SCOPE }, chapter = { id = "c2", name = "Two" } },
         } })
         assert(context.queue:recover())
         assert.are.equal(2, #context.saved_queue())
@@ -873,7 +875,7 @@ describe("suwayomi/downloads/queue", function()
     end)
 
     it("requires explicit repair and preserves damage through queued cancellation and restart", function()
-        local manga, chapter = { id = "m1", title = "Example" }, { id = "c1", name = "One" }
+        local manga, chapter = { id = "m1", title = "Example", endpoint_scope = ENDPOINT_SCOPE }, { id = "c1", name = "One" }
         local context = build_queue({ skip_subprocess_callback = true, subprocess_done = false, saved_queue = { {
             key = "m1:c1", state = "failed", download_directory = "/original",
             manga = manga, chapter = chapter,

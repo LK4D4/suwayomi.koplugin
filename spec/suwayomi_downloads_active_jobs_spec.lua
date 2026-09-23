@@ -3,6 +3,7 @@ package.path = "?.lua;" .. package.path
 -- These specs exercise download commands and progress polling on the queue owner.
 local Marker = require("spec/support/i18n_marker")
 local checkedQueueSettings = require("spec/support/checked_queue_settings")
+local ENDPOINT_SCOPE = "https://suwayomi.example"
 
 describe("download queue lifecycle", function()
     local original_io_open
@@ -291,7 +292,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapters = {
             { id = "398", name = "Official_Vol. 1 Ch. 1" },
             { id = "399", name = "Official_Vol. 1 Ch. 2" },
@@ -315,7 +316,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -334,7 +335,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
         assert.is_true(context.queue:enqueue(manga, chapter, "/books"))
         context.queue:process()
@@ -351,7 +352,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -377,7 +378,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -405,7 +406,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -431,7 +432,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -469,7 +470,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -489,7 +490,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -521,7 +522,7 @@ describe("download queue lifecycle", function()
         { name = "prioritizes two due retries over fresh work", times = { 100, 100 }, active = { [1] = true, [2] = true } },
     }) do
         it(scenario.name, function()
-            local manga = { id = "m1", title = "Example" }
+            local manga = { id = "m1", title = "Example", endpoint_scope = ENDPOINT_SCOPE }
             local chapters, jobs = {}, {}
             for index = 1, 4 do
                 chapters[index] = { id = tostring(index), name = "Chapter " .. index }
@@ -563,7 +564,7 @@ describe("download queue lifecycle", function()
             skip_subprocess_callback = true,
             existing_archive_paths = existing_archive_paths,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapters = {
             { id = "398", name = "Official_Vol. 1 Ch. 1" },
             { id = "399", name = "Official_Vol. 1 Ch. 2" },
@@ -597,7 +598,7 @@ describe("download queue lifecycle", function()
         local context = build_queue({
             existing_archive_paths = existing_archive_paths,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -605,8 +606,8 @@ describe("download queue lifecycle", function()
         context.run_scheduled()
 
         assert.are.equal(1, #context.archive_ready_calls)
-        assert.are.equal(manga, context.archive_ready_calls[1].manga)
-        assert.are.equal(chapter, context.archive_ready_calls[1].chapter)
+        assert.are.same(manga, context.archive_ready_calls[1].manga)
+        assert.are.same(chapter, context.archive_ready_calls[1].chapter)
         assert.are.equal(
             "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz",
             context.archive_ready_calls[1].path
@@ -633,7 +634,7 @@ describe("download queue lifecycle", function()
                 chapterExists = function() return archive_exists end,
             },
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -649,7 +650,7 @@ describe("download queue lifecycle", function()
 
     it("keeps downloaded progress failed when the reported archive is missing", function()
         local context = build_queue()
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -680,7 +681,7 @@ describe("download queue lifecycle", function()
                 chapterExists = function() return false end,
             },
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -696,7 +697,7 @@ describe("download queue lifecycle", function()
     it("records translated fallback failures and raw worker errors without interrupting reading", function()
         installMarker()
         local startup = build_queue()
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         startup.queue.ffi_util.runInSubProcess = function()
@@ -770,7 +771,7 @@ describe("download queue lifecycle", function()
             },
         })
 
-        context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
+        context.queue:enqueue({ id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
         context.run_scheduled()
 
         local message = "Could not download \"Sousou no Frieren / Official_Vol. 1 Ch. 1\" (Suwayomi id 398): network timeout"
@@ -791,7 +792,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
         local chapter_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
 
@@ -820,7 +821,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapters = {
             { id = "398", name = "Official_Vol. 1 Ch. 1" },
             { id = "399", name = "Official_Vol. 1 Ch. 2" },
@@ -854,7 +855,7 @@ describe("download queue lifecycle", function()
         })
         local chapter_path = "/books/Sousou no Frieren/Official_Vol. 1 Ch. 1 [id-398].cbz"
 
-        context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
+        context.queue:enqueue({ id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
         table.remove(context.scheduled, 1).callback()
         local active = context.queue:getActiveJob("m1:398")
         local partial = context.queue.downloader:getPartialPath(chapter_path, active.attempt_id)
@@ -893,7 +894,7 @@ describe("download queue lifecycle", function()
             skip_subprocess_callback = true,
         })
 
-        context.queue:enqueue({ id = "m1", title = "Sousou no Frieren" }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
+        context.queue:enqueue({ id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }, { id = "398", name = "Official_Vol. 1 Ch. 1" }, "/books")
         table.remove(context.scheduled, 1).callback()
 
         context.advance(context.queue.WATCHDOG_TIMEOUT_SECONDS + 1)
@@ -911,7 +912,7 @@ describe("download queue lifecycle", function()
             subprocess_done = false,
             skip_subprocess_callback = true,
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -948,7 +949,7 @@ describe("download queue lifecycle", function()
                 end,
             },
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
@@ -979,7 +980,7 @@ describe("download queue lifecycle", function()
                 end,
             },
         })
-        local manga = { id = "m1", title = "Sousou no Frieren" }
+        local manga = { id = "m1", title = "Sousou no Frieren", endpoint_scope = ENDPOINT_SCOPE }
         local chapter = { id = "398", name = "Official_Vol. 1 Ch. 1" }
 
         context.queue:enqueue(manga, chapter, "/books")
