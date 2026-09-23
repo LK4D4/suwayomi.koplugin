@@ -33,7 +33,8 @@ describe("persisted download reconstruction", function()
     local function job(id, state)
         return {
             key = "m1:" .. id, state = state or "queued", download_directory = "/books",
-            manga = { id = "m1", title = "Example" }, chapter = { id = id, name = id },
+            manga = { id = "m1", title = "Example", endpoint_scope = "https://suwayomi.example" },
+            chapter = { id = id, name = id },
         }
     end
     local function savedJobs()
@@ -51,6 +52,7 @@ describe("persisted download reconstruction", function()
         package.preload["suwayomi/settings"] = nil
         settings = require("suwayomi/settings")
         settings.store = require("spec/support/checked_queue_settings")():getStore()
+        assert(settings:save{ server_url = "https://suwayomi.example" })
         assert(settings:saveMaxParallelChapterDownloads(4))
         local ui = require("ui/uimanager")
         ui.quit = function() end

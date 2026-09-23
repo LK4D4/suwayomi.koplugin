@@ -3,7 +3,7 @@ package.path = "?.lua;" .. package.path
 local runtime = require("spec/support/plugin_runtime_spec_helper")
 
 describe("download attempt endpoint authority", function()
-    local settings, queue, children, requests, timers, files, root, now, result
+    local settings, queue, children, requests, timers, files, root, now, result, saved_modules
     local scope, foreign = "https://a.example", "https://b.example"
     local manga, chapter
     local extra = { "suwayomi/chapters/manual_deletion", "suwayomi/chapters/archive_identity" }
@@ -24,7 +24,7 @@ describe("download attempt endpoint authority", function()
         handle:close()
         return content
     end
-    local function newQueue()
+    local function newQueue(downloader)
         local service = require("suwayomi/downloads/service"):new{
             settings = settings,
             ui_manager = { scheduleIn = function(_, delay, callback)
@@ -39,7 +39,7 @@ describe("download attempt endpoint authority", function()
                 isSubProcessDone = function(pid) return children[pid].done == true end,
                 terminateSubProcess = function() end,
             },
-            downloader = {
+            downloader = downloader or {
                 getTargetPath = function(_, directory, _, item)
                     return directory, directory .. "/" .. item.id .. ".cbz"
                 end,
@@ -83,6 +83,7 @@ describe("download attempt endpoint authority", function()
         settings = require("suwayomi/settings")
         settings:setStore(require("spec/support/checked_queue_settings")():getStore())
         children, requests, timers, files, now, result = {}, {}, {}, {}, 100, "success"
+        saved_modules = {}
         root = os.tmpname()
         os.remove(root)
         assert(require("lfs").mkdir(root))
@@ -94,6 +95,9 @@ describe("download attempt endpoint authority", function()
     after_each(function()
         for path in pairs(files) do os.remove(path) end
         assert(require("lfs").rmdir(root))
+        for name, saved in pairs(saved_modules) do
+            package.loaded[name], package.preload[name] = saved.loaded, saved.preload
+        end
         clear()
     end)
 
@@ -266,4 +270,78 @@ describe("download attempt endpoint authority", function()
         assert.equals(original.download_directory, stored().download_directory)
         assert.same({}, children)
     end)
+
+    for _, batch in ipairs({ false, true }) do
+        it("preserves failed A work through explicit Download with B IDs (batch=" .. tostring(batch) .. ")", function()
+            assert(queue:enqueue(manga, chapter, root))
+            change(foreign)
+            queue:process()
+            local original = stored()
+            local other = { id = 101, title = "B title", endpoint_scope = foreign }
+            local collision = { id = 202, name = "B chapter" }
+            if batch then
+                assert.equals(1, queue:enqueueBatch(other, { collision }, root .. "/b", { provenance = "explicit" }))
+            else
+                assert(queue:enqueue(other, collision, root .. "/b", { provenance = "explicit" }))
+            end
+            queue:process()
+            assert.equals("failed", stored().state)
+            assert.same(original.manga, stored().manga)
+            assert.same(original.chapter, stored().chapter)
+            assert.equals(original.download_directory, stored().download_directory)
+            assert.same({}, children)
+        end)
+    end
+
+    it("checks the production downloader HTTP destination after blocking B and restoring A", function()
+        for _, name in ipairs({ "suwayomi/api", "suwayomi/api/transport", "suwayomi/api/parsers",
+            "suwayomi/api/queries", "suwayomi/downloads/downloader", "suwayomi/fs", "ssl.https" }) do
+            saved_modules[name] = { loaded = package.loaded[name], preload = package.preload[name] }
+            package.loaded[name], package.preload[name] = nil, nil
+        end
+        local urls = {}
+        package.loaded["ssl.https"] = { request = function(options)
+            urls[#urls + 1] = options.url
+            return 1, 403, {}
+        end }
+        local downloader = require("suwayomi/downloads/downloader")
+        downloader.getTargetPath = function() return root, root .. "/202.cbz" end
+        downloader.getChapterPathCandidates = function() return { root .. "/202.cbz" } end
+        queue = newQueue(downloader)
+        assert(queue:enqueue(manga, chapter, root))
+        change(foreign)
+        queue:process()
+        assert.equals("failed", stored().state)
+        assert.same({}, children)
+        assert.same({}, urls)
+        change(scope)
+        assert(queue:retryFailed("101:202"))
+        queue:process()
+        files[queue:getActiveJob("101:202").progress_path] = true
+        finish(1)
+        assert.same({ scope .. "/api/v1/chapter/202/download?markAsRead=false" }, urls)
+        assert.equals(scope, stored().manga.endpoint_scope)
+        assert.equals("failed", stored().state) -- Controlled HTTP rejection; no archive published.
+    end)
+
+    for _, command in ipairs({ "enqueue", "enqueueBatch", "redownload" }) do
+        it("preserves incomplete and unsupported failed records during " .. command, function()
+            for _, damage in ipairs({ "manga", "chapter", "download_directory", "key", "version" }) do
+                local job = queue:buildPersistentJob(manga, chapter, root, "failed")
+                if damage == "key" then job.manga.id = 999
+                elseif damage == "version" then job.version = 99
+                else job[damage] = nil end
+                assert(settings:saveDownloadQueue({ job }))
+                local other = { id = 101, title = "B fixture", endpoint_scope = foreign }
+                change(foreign)
+                if command == "enqueueBatch" then
+                    assert.equals(0, queue:enqueueBatch(other, { chapter }, root, { provenance = "explicit" }))
+                else
+                    assert.is_false(queue[command](queue, other, chapter, root, { provenance = "explicit" }))
+                end
+                assert.same({ job }, settings:loadDownloadQueue())
+                assert.same({}, children)
+            end
+        end)
+    end
 end)

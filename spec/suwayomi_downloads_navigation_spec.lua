@@ -115,6 +115,7 @@ describe("Downloads chapter navigation", function()
     after_each(function() runtime_helper.teardown(); clearExtras() end)
 
     local function openFrom(state, manga)
+        manga.endpoint_scope = "https://suwayomi.example"
         local chapter = { id = "chapter", name = "Chapter from network" }
         assert(queue:enqueue(manga, chapter, os.getenv("TEMP") or "/tmp"))
         if state == "active" then queue:process() end

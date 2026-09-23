@@ -4,7 +4,8 @@ local runtime_helper = require("spec/support/plugin_runtime_spec_helper")
 
 describe("stopping download reservations through the process service", function()
     local service, queue, settings, directory, timers, workers, clock, files
-    local manga = { id = "m1", title = "Example", source = { id = "s1", name = "Source" } }
+    local manga = { id = "m1", title = "Example", source = { id = "s1", name = "Source" },
+        endpoint_scope = "https://suwayomi.example" }
     local chapters = {
         { id = "a", name = "A" }, { id = "b", name = "B" },
         { id = "c", name = "C" }, { id = "d", name = "D" },
@@ -92,6 +93,7 @@ describe("stopping download reservations through the process service", function(
         settings = require("suwayomi/settings")
         settings.store = require("suwayomi/settings/store"):new{ path = directory .. "/settings.lua" }
         files[settings.store.path] = true
+        assert(settings:save{ server_url = "https://suwayomi.example" })
         assert(settings:saveDownloadDirectory(directory))
         assert(settings:saveMaxParallelChapterDownloads(2))
         local ui = require("ui/uimanager")

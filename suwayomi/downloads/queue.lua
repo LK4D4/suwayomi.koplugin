@@ -391,7 +391,7 @@ end
 
 function DownloadQueue:retryFailed(key)
     local job = self:findPersistentJob(key, "failed")
-    if not job or not job.manga or not job.chapter or not job.download_directory then
+    if not self.job_store:isRetryable(job) then
         return false, "missing"
     end
     local status = self:getStatus(job.manga, job.chapter)
@@ -993,6 +993,7 @@ end
 
 function DownloadQueue:redownload(manga, chapter, download_directory)
     local job = self:findPersistentJob(self:getKey(manga, chapter))
+    if job and not self.job_store:isRetryable(job) then return false, "missing" end
     return self:admit(job and job.manga or manga, job and job.chapter or chapter,
         job and job.download_directory or download_directory,
         { provenance = "explicit" }, true)
@@ -1004,6 +1005,12 @@ function DownloadQueue:admit(manga, chapter, download_directory, options, repair
         return false, "store_blocked"
     end
     options = options or {}
+    local previous = self:findPersistentJob(self:getKey(manga, chapter))
+    if previous and previous.state == "failed" then
+        if not self.job_store:isRetryable(previous) then return false, "missing" end
+        manga, chapter, download_directory = previous.manga, previous.chapter, previous.download_directory
+        repair = repair or previous.repair
+    end
     local eligible, state = self:canEnqueue(manga, chapter, download_directory)
     if repair and (state == "downloaded" or state == "damaged" or state == "unverified") then eligible = true end
     if not eligible then
@@ -1018,7 +1025,6 @@ function DownloadQueue:admit(manga, chapter, download_directory, options, repair
         enqueue_state = "retry"
     end
 
-    local previous = self:findPersistentJob(self:getKey(manga, chapter))
     local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued", {
         repair = repair,
         progress = previous and previous.progress and (previous.progress.archive_state or repair)
@@ -1077,22 +1083,32 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
 
     for _index, chapter in ipairs(chapters or {}) do
         local key = self:getKey(manga, chapter)
-        if seen[key] or not self:canEnqueue(manga, chapter, download_directory) then
+        local previous = self:findPersistentJob(key, "failed")
+        local job_manga = previous and previous.manga or manga
+        local job_chapter = previous and previous.chapter or chapter
+        local job_directory = previous and previous.download_directory or download_directory
+        if seen[key] or (previous and not self.job_store:isRetryable(previous))
+            or not self:canEnqueue(job_manga, job_chapter, job_directory) then
             if not options.quiet_duplicate then
                 self.onMessage(I18n.t("Chapter download is already in progress."))
             end
         else
             seen[key] = true
-            local persistent_job = self:buildPersistentJob(manga, chapter, download_directory, "queued")
+            local persistent_job = self:buildPersistentJob(job_manga, job_chapter, job_directory, "queued", {
+                repair = previous and previous.repair,
+                progress = previous and previous.repair and self:withArchiveEvidence(previous, { state = "queued" }) or nil,
+            })
             table.insert(persistent_jobs, persistent_job)
             table.insert(candidates, {
                 persistent_job = persistent_job,
                 item = {
                     key = persistent_job.key,
-                    download_directory = download_directory,
+                    download_directory = job_directory,
                     manga = persistent_job.manga,
                     chapter = persistent_job.chapter,
                     downloader = self.downloader,
+                    repair = persistent_job.repair,
+                    progress = persistent_job.progress,
                 },
             })
             queued_count = queued_count + 1

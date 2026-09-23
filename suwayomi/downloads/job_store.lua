@@ -71,11 +71,19 @@ function JobStore:new(options)
     }, self)
 end
 
-function JobStore:isRunnable(job)
+local function hasTransferIdentity(job)
     return hasValidJobKey(job) and job.version == nil
-        and (job.state == "queued" or job.state == "downloading")
         and hasValidIdentity(job.manga) and hasValidIdentity(job.chapter)
         and type(job.download_directory) == "string" and job.download_directory ~= ""
+end
+
+function JobStore:isRunnable(job)
+    return hasTransferIdentity(job) and (job.state == "queued" or job.state == "downloading")
+end
+
+function JobStore:isRetryable(job)
+    return hasTransferIdentity(job) and job.state == "failed"
+        and self.getKey(job.manga, job.chapter) == job.key
 end
 
 function JobStore:isBlocked()
