@@ -454,6 +454,16 @@ function Methods:showChapterResultForManga(manga, result, options)
     self.current_chapter_context.saved = render_options.saved == true
     self.current_chapter_context.missing = options.missing == true
     local chapter_options = self:buildChapterMenuOptions(manga, chapters, nil, render_options)
+    if not chapter_options then
+        -- A late menu save cannot revoke successful server membership.
+        render_options = copyOptions(render_options)
+        render_options.saved = true
+        render_options.confirmed_read_state = true
+        chapters = prepareChapterListing(self, manga, result.chapters, render_options)
+        self.current_chapter_context.chapters = chapters
+        self.current_chapter_context.saved = true
+        chapter_options = self:buildChapterMenuOptions(manga, chapters, nil, render_options)
+    end
     if chapter_options and #chapters == 0 then
         chapter_options.empty_text = options.missing
             and I18n.t("No saved chapter information is available.")

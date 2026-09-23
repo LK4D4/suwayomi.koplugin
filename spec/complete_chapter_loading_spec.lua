@@ -544,6 +544,172 @@ describe("complete stored chapter loading", function()
         assert.is_true(#messages > 0)
     end)
 
+    it("publishes fresh membership after a rejected late menu save", function()
+        respond = function() return page(nodes(201, 201), 1, false) end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        plugin:toggleChapterSelection(manga, plugin.current_chapter_context.chapters[1])
+        local old_guard = plugin:captureChapterActionGuard()
+        archive_path = os.tmpname()
+        local file = assert(io.open(archive_path, "wb"))
+        file:write("preserved archive")
+        file:close()
+        assert(settings:saveChapterLedger({ ["17:202"] = {
+            manga_id = "17", chapter_id = "202", endpoint_scope = manga.endpoint_scope,
+            read = false, path = archive_path,
+        } }))
+        local before = settings:loadChapterLedger()
+        local store = settings:getStore()
+        local write, writes = store.io.write, 0
+        store.io.write = function(handle, content)
+            writes = writes + 1
+            if writes == 2 then return false, "injected menu write failure" end
+            return write(handle, content)
+        end
+        respond = function() return page(nodes(202, 202), 1, false) end
+        plugin:showChaptersForManga(manga)
+        finishRequest()
+        assert.are.same({ "202" }, chapterIds(plugin.current_chapter_context.chapters))
+        assert.are.same({ "202" }, chapterIds(plugin.current_chapter_menu.chapters))
+        assert.are.same({ "202" }, chapterIds(settings:loadChapterCache(settings:load(), manga).chapters))
+        assert.are.same(before, settings:loadChapterLedger())
+        assert.is_false(plugin.current_chapter_menu.chapters[1].is_read)
+        assert.is_false(old_guard())
+        assert.are.same({}, plugin.selected_chapters)
+        assert.are.equal(2, writes)
+        assert.matches("injected menu", messages[#messages])
+        file = assert(io.open(archive_path, "rb"))
+        assert.are.equal("preserved archive", file:read("*a"))
+        file:close()
+    end)
+
+    for _, failure in ipairs({ "rejected", "uncertain" }) do
+        for _, pending in ipairs({ false, true }) do
+            it("uses confirmed reads after a " .. failure .. " late menu save with pending choices " .. tostring(pending), function()
+                respond = function() return page(nodes(201, 203), 3, false) end
+                plugin:showChaptersForManga(manga)
+                finishRequest()
+                local old = plugin.current_chapter_context.chapters
+                plugin:toggleChapterSelection(manga, old[1])
+                plugin:toggleChapterSelection(manga, old[3])
+                local old_guard = plugin:captureChapterActionGuard()
+                prepareRefill()
+                assert(settings:saveMangaKeepNextUnreadDownloads(manga, 5))
+                assert(queue.refill:associate(manga))
+                archive_path, ledger_path = os.tmpname(), os.tmpname()
+                local Native = require("spec/support/native_archiver")
+                restore_native = Native.install()
+                local writer = Native.Writer:new()
+                assert(writer:open(archive_path, "zip"))
+                assert(writer:addFileFromMemory("001.jpg", "fixture image"))
+                assert(writer:close())
+                local function readFile(path)
+                    local file = assert(io.open(path, "rb"))
+                    local content = file:read("*a")
+                    file:close()
+                    return content
+                end
+                local archive_before = readFile(archive_path)
+                local native_before = 'return { last_page = 3, percent_finished = 1, summary = { ["status"] = "complete" } }\n'
+                local file = assert(io.open(ledger_path, "wb"))
+                file:write(native_before)
+                file:close()
+                package.preload.docsettings = function()
+                    return { findSidecarFile = function() return ledger_path end,
+                        getSidecarFilename = function() return "metadata.lua" end,
+                        getSidecarDir = function() return "/nonexistent-sidecars" end,
+                        isHashLocationEnabled = function() return false end }
+                end
+                for name, method in pairs(require("suwayomi/readsync/koreader_metadata").methods) do
+                    plugin[name] = method
+                end
+                local ledger = { ["17:202"] = {
+                    manga_id = "17", chapter_id = "202", endpoint_scope = manga.endpoint_scope,
+                    read = false, path = archive_path,
+                } }
+                if pending then
+                    ledger["17:202"].pending_read_sync = true
+                    ledger["17:202"].pending_read_state = false
+                    ledger["17:203"] = { manga_id = "17", chapter_id = "203", endpoint_scope = manga.endpoint_scope,
+                        read = true, pending_read_sync = true, pending_read_state = true }
+                    ledger["17:204"] = { manga_id = "17", chapter_id = "204", endpoint_scope = manga.endpoint_scope,
+                        read = true, pending_read_sync = true, pending_read_state = true }
+                end
+                assert(settings:saveChapterLedger(ledger))
+                assert(settings:saveReaderReturnContexts({ [archive_path] = {
+                    path = archive_path, manga_id = "17", chapter_id = "202", endpoint_scope = manga.endpoint_scope,
+                } }))
+                saved_filter = "Team"
+                local store = settings:getStore()
+                assert(store:saveKey("unrelated_fixture", { credentials = "fixture-only", deletion = "preserve" }))
+                local write, writes, committed_before_menu = store.io.write, 0
+                local failed_write = pending and 3 or 2
+                store.io.write = function(handle, content)
+                    writes = writes + 1
+                    if writes == failed_write then
+                        committed_before_menu = store:serializeDocument(store:load())
+                        if pending then
+                            assert.is_nil(settings:loadChapterLedger()["17:204"].pending_read_sync)
+                        else
+                            assert.is_true(assert(loadstring(content))().chapter_ledger["17:202"].read)
+                        end
+                        if failure == "rejected" then return false, "injected menu write failure" end
+                    end
+                    return write(handle, content)
+                end
+                store.io.sync_dir = function()
+                    if writes == failed_write and failure == "uncertain" then return false, "injected menu sync failure" end
+                    return true
+                end
+                respond = function()
+                    local replacement = nodes(202, 204)
+                    for _, chapter in ipairs(replacement) do chapter.scanlator = "Team" end
+                    replacement[1].isRead, replacement[3].isRead = pending, pending
+                    return page(replacement, 3, false)
+                end
+                plugin:showChaptersForManga(manga)
+                finishRequest()
+                local context = plugin.current_chapter_context
+                assert.are.same({ "202", "203", "204" }, chapterIds(context.chapters))
+                assert.are.same({ "202", "203", "204" }, chapterIds(plugin.current_chapter_menu.chapters))
+                assert.are.same({ "202", "203", "204" }, chapterIds(settings:loadChapterCache(settings:load(), manga).chapters))
+                assert.is_true(context.saved)
+                for _, chapters in ipairs({ context.chapters, plugin.current_chapter_menu.chapters }) do
+                    assert.is_false(chapters[1].is_read)
+                    assert.are.equal(pending, chapters[2].is_read)
+                    assert.are.equal(pending, chapters[3].is_read)
+                    assert.are.equal(pending or nil, chapters[1].pending_read_sync)
+                    assert.are.equal(pending or nil, chapters[2].pending_read_sync)
+                    assert.is_nil(chapters[3].pending_read_sync)
+                end
+                assert.are.equal(committed_before_menu, store:serializeDocument(store:load()))
+                assert.are.equal(failed_write, writes)
+                assert.matches("injected menu", messages[#messages])
+                assert.is_false(old_guard())
+                assert.is_true(plugin:isChapterSelected(manga, context.chapters[2]))
+                assert.is_false(plugin:isChapterSelected(manga, old[1]))
+                assert.are.same(saved_filter, plugin.current_scanlator_filter)
+                assert.are.equal(archive_before, readFile(archive_path))
+                assert.are.equal(native_before, readFile(ledger_path))
+                assert.are.equal(failure == "uncertain", store:isBlocked())
+                if failure == "uncertain" then
+                    plugin:downloadNextUnreadChaptersForManga(manga, 1, false)
+                    assert.are.same({}, admittedIds())
+                    assert.are.equal(failed_write, writes)
+                    assert.is_true(store:isBlocked())
+                else
+                    local opened
+                    package.preload["apps/reader/readerui"] = function()
+                        return { showReader = function(_, path) opened = path end }
+                    end
+                    assert.is_true(plugin:openChapter(manga, context.chapters[1]))
+                    finishJob(queue.verification)
+                    assert.are.equal(archive_path, opened)
+                end
+            end)
+        end
+    end
+
     for _, route in ipairs({ "display", "action preload" }) do
         for _, failure in ipairs({ "rejected", "uncertain" }) do
             it("publishes " .. route .. " membership after a " .. failure .. " second ledger write", function()

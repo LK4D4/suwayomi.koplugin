@@ -153,7 +153,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup)
             if metadata_finished then
                 metadata_finished_count = metadata_finished_count + 1
             end
-            if metadata_finished and not explicit_unread then
+            if metadata_finished and not explicit_unread and not (options and options.confirmed_read_state) then
                 item.is_read = true
                 if chapter.is_read ~= true then
                     chapter.is_read = true
