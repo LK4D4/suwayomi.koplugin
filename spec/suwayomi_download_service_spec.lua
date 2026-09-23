@@ -5,7 +5,8 @@ local runtime_helper = require("spec/support/plugin_runtime_spec_helper")
 describe("process-owned download navigation", function()
     local original_time = os.time
     local runtime, shell, settings, ui, workers, clock, timers, directory, files, hosts
-    local manga = { id = "m1", title = "Example", source = { id = "s1", name = "Source" } }
+    local server_url = "https://suwayomi.example"
+    local manga = { id = "m1", title = "Example", source = { id = "s1", name = "Source" }, endpoint_scope = server_url }
     local chapters = {
         { id = "c1", name = "Chapter 1" }, { id = "c2", name = "Chapter 2" },
         { id = "c3", name = "Chapter 3" }, { id = "c4", name = "Chapter 4" },
@@ -150,9 +151,11 @@ describe("process-owned download navigation", function()
         local store = require("suwayomi/settings/store"):new{ path = directory .. "-settings.lua" }
         settings.store = store
         files[store.path] = true
+        manga.endpoint_scope = server_url
         assert(store:saveDocument(function(doc)
             doc.download_directory = directory
             doc.max_parallel_chapter_downloads = 2
+            doc.credentials = { server_url = server_url }
         end))
         ui = require("ui/uimanager")
         ui.quit = function(_, ...) return select("#", ...), ... end

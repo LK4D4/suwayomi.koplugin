@@ -22,7 +22,8 @@ describe("download retry across live menus", function()
     for _, name in ipairs(widget_modules) do table.insert(extra_modules, name) end
     local plugin, queue, stack, scheduled, ui, home, downloads_menu, chapters_menu, settings
     local temporary_paths
-    local manga = { id = "retry-manga", title = "Retry manga" }
+    local server_url = "https://suwayomi.example"
+    local manga = { id = "retry-manga", title = "Retry manga", endpoint_scope = server_url }
     local chapter = { id = "retry-chapter", name = "Retry chapter" }
     local full_error = "HTTP 503\n" .. string.rep("Complete error details\n", 80)
 
@@ -110,6 +111,7 @@ describe("download retry across live menus", function()
         os.remove(path)
         table.insert(temporary_paths, path)
         settings:setStore(require("suwayomi/settings/store"):new{ path = path })
+        assert(settings:save({ server_url = server_url }))
         assert(settings:saveMaxParallelChapterDownloads(1))
         local debug = require("suwayomi/debug")
         debug.now, debug.elapsedMs = function() return 0 end, function() return 0 end
