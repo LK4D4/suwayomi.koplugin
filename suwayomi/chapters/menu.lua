@@ -577,9 +577,15 @@ function Methods:showChapterActions(manga, chapter)
         return
     end
 
+    local actions = self:getChapterActions(manga, chapter)
+    if #actions == 0 then
+        self:showMessage(I18n.t("This chapter is not downloaded."))
+        return
+    end
+
     local options = {
         title = chapter.name,
-        actions = self:getChapterActions(manga, chapter),
+        actions = actions,
     }
 
     SuwayomiUI.showChapterActionsMenu(options, function(action)

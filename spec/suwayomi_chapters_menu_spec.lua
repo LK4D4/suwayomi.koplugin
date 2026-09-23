@@ -552,6 +552,37 @@ describe("suwayomi/chapters/menu", function()
         assert.are.equal("Chapter 1", shown_options.title)
     end)
 
+    it("explains a missing local-only download without opening an empty action menu", function()
+        helper.stubControllerDependencies()
+        Marker.install()
+        package.loaded["suwayomi/chapters/menu"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.preload["suwayomi/ui"] = function()
+            return {
+                showChapterActionsMenu = function()
+                    error("empty action menu must not open")
+                end,
+            }
+        end
+        local ChapterMenu = require("suwayomi/chapters/menu")
+        local message
+        local plugin = {
+            isLocalOnlyChapter = function() return true end,
+            isChapterDownloaded = function() return false end,
+            showMessage = function(_, text) message = text end,
+            performChapterAction = function() error("no chapter action is available") end,
+        }
+        for name, method in pairs(ChapterMenu.methods) do plugin[name] = method end
+
+        local manga = { id = "m1", title = "Other manga" }
+        local chapter = { id = "c1", name = "Chapter 1", local_only = true }
+        assert.are.same({}, plugin:getChapterActions(manga, chapter))
+
+        plugin:showChapterActions(manga, chapter)
+
+        assert.are.equal("tx:This chapter is not downloaded.", message)
+    end)
+
     it("translates chapter bulk menu chrome and scanlator menu labels", function()
         helper.stubControllerDependencies()
         Marker.install()
