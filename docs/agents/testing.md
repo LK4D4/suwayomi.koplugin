@@ -210,6 +210,32 @@ Use the actual user path for UI and lifecycle checks. Direct downloader calls ca
 
 Wait for the independent outcome itself. Restore equivalent preconditions and change one factor for comparisons. Stop polling during sleep/standby controls if observation keeps KOReader awake. A check is complete only when the expected UI result agrees with the relevant server, filesystem, and process evidence.
 
+### Read-sync endpoint acceptance
+
+Use two disposable server roots, A and B, with separate ports and credentials. Discover their fixture IDs independently; matching IDs make accidental cross-server mutation observable. Deploy the candidate into one reader profile and record its payload manifest. Keep retention Off.
+
+1. On A, mark an undownloaded chapter read through its chapter menu. Require a pathless ledger entry with A's normalized scope, a real server read transition, and cleared pending state. Mark it unread and require the reverse server transition.
+2. Open a known A download, use native **Mark as finished**, then **Go to Suwayomi**. Wait for A's read state and cleared pending flag. Preserve the archive. Continuous view may reach the completion dialog while reporting page 1; this establishes explicit completion, not a final-page-only control.
+3. Stop A, create a read choice through the normal UI, and confirm its durable pending state. Change the saved connection to B through **Settings → Connection → Login information**. Invoke **Sync**. Require A's pending choice and scope to survive, B's matching chapter to stay unchanged, and association feedback instead of a synced claim.
+4. With the reader stopped and settings privately backed up, seed distinct A-scoped, unknown, and B-scoped pending entries. Label this an injected persistence fixture. Restart under B and invoke **Sync**. Require only B's entry to clear and only its server chapter to change. Repeated Sync must report the retained unsendable choices accurately.
+5. For unknown recovery, stop the reader and back up its settings and native sidecar. Remove the recorded archive's origin evidence and cached association, retain its IDs, clear pending flags, and restore native status to unfinished as a labeled fixture precondition. Reconstruct offline and Open through the normal UI. Require a rendered page without newly established scope or pending sync. Restore the configured server before native **Mark as finished** and close. Require native completion and local read state, still-unknown origin, no pending enrollment, and unchanged matching server read state.
+6. Compare final archive and payload hashes, retain private evidence, and stop owned services. Report scheduling/dispatch races, stale acknowledgments after entry replacement, retry-loop suppression, and rejected/uncertain writes from the composed fixtures separately; ordinary UI timing does not establish those deterministic boundaries.
+
+#### Read-sync desktop evidence — 2026-09-23
+
+Candidate `16ee28566c067e268de6124abcc801829ef66b94` passed the controls above on WSLg, KOReader v2026.07.1, and two Suwayomi v2.3.2243 Basic Auth servers. All 98 deployed files matched source bytes before and after acceptance. No production profile or hardware was used.
+
+| Control | Observed outcome |
+| --- | --- |
+| Download/Open/return | All three PNG pages matched the synthetic source; the exact archive opened and survived reader return. |
+| Pathless read/unread | Both real server transitions succeeded; ledger retained A scope without inventing a file path. |
+| Known-origin completed close | Native completion synchronized to A and cleared pending state. |
+| Saved connection A → B | A's offline choice remained pending; matching B chapters stayed unread; Sync reported unassociated pending changes. |
+| Injected mixed pending batch | B's eligible entry alone cleared; foreign and unknown choices survived, with their B chapters unchanged. |
+| Unknown-origin Open/completed close | Recovered archive rendered; native status became complete and local read became true; scope remained unknown, pending sync absent, and B's matching chapter unread. |
+
+Private fixture backups, observations, and screenshots remain in the disposable acceptance roots. Both servers and the reader were confirmed stopped. The 30 endpoint-scope regressions and full 1,615-spec LuaJIT run cover deterministic boundaries separately. Android lifecycle, permissions, sleep/wake, and physical device behavior remain unverified by this desktop run.
+
 ### Library-cache acceptance
 
 Use the setup, deployment, service, and inspector commands above. Record the baseline/candidate revisions and deployment manifests separately; fixture edits below are test preconditions, not plugin actions.
