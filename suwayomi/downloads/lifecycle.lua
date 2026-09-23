@@ -3,6 +3,7 @@
 -- there is no second state owner or queue callback protocol.
 -- Dependencies: injected process/clock/storage adapters and archive/progress IO.
 -- External progress and process observations are validated before transitions.
+-- Each transfer uses current credentials only for its recorded endpoint origin.
 
 local I18n = require("suwayomi/i18n")
 local ProgressFile = require("suwayomi/downloads/progress_file")
@@ -204,6 +205,16 @@ function Lifecycle:startQueuedJob(queued)
         local saved, save_err = self:finishWithFailure(queued, queued.start_failure)
         return false, saved and "terminal_failure" or save_err
     end
+    local credentials = self:getCredentialsForJob()
+    local origin = self.settings:normalizeEndpointScope(queued.manga.endpoint_scope)
+    local endpoint = self.settings:normalizeEndpointScope(credentials and credentials.server_url)
+    if not origin or origin ~= endpoint then
+        local message = origin
+            and I18n.t("Download belongs to a different server. Restore the original server in Connection settings, then Retry.")
+            or I18n.t("Download server origin is unknown. Cancel this job and download from a verified server chapter list.")
+        local saved, save_err = self:finishWithFailure(queued, message)
+        return false, saved and "terminal_failure" or save_err
+    end
     queued.key = key
     queued.started_at = self.now()
     queued.last_progress_at = queued.started_at
@@ -220,7 +231,7 @@ function Lifecycle:startQueuedJob(queued)
         state = "downloading", current = 0, total = 0, updated_at = queued.last_progress_at,
     })
     queued.progress_path = self:buildProgressPath(queued.manga, queued.chapter, queued.download_directory, attempt_id)
-    queued.credentials = self:getCredentialsForJob()
+    queued.credentials = credentials
     local ok, err = self:upsertPersistentJob(self:buildPersistentJob(queued.manga, queued.chapter, queued.download_directory, "downloading", {
         started_at = queued.started_at,
         last_progress_at = queued.last_progress_at,

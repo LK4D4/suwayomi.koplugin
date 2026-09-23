@@ -592,6 +592,11 @@ msgstr "下载"
 msgid "Download all chapters (up to 50 new)"
 msgstr "下载全部章节（最多新增 50 章）"
 
+msgid ""
+"Download belongs to a different server. Restore the original server in "
+"Connection settings, then Retry."
+msgstr ""
+
 msgid "Download damaged; redownload"
 msgstr "下载文件已损坏；请重新下载"
 
@@ -657,6 +662,11 @@ msgstr "下载选中的"
 
 msgid "Download selected (up to 50 new)"
 msgstr "下载选中的章节（最多新增 50 章）"
+
+msgid ""
+"Download server origin is unknown. Cancel this job and download from a "
+"verified server chapter list."
+msgstr ""
 
 msgid "Download the chapter first."
 msgstr "请先下载此章节。"

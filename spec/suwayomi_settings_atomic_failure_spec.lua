@@ -470,7 +470,7 @@ describe("suwayomi settings atomic failure handling", function()
             runInSubProcess = function() launches = launches + 1; return nil, "fork failed" end,
             isSubProcessDone = function() return true end,
         }
-        assert.is_true(queue:enqueue({ id = "m1" }, { id = "c1" }, "."))
+        assert.is_true(queue:enqueue({ id = "m1", endpoint_scope = "http://suwayomi.test" }, { id = "c1" }, "."))
         queue:process()
         assert.are.equal(0, #queue:getSnapshot().queued)
         assert.are.equal(1, #queue:getSnapshot().failed)
@@ -491,7 +491,7 @@ describe("suwayomi settings atomic failure handling", function()
             end,
             isSubProcessDone = function() return true end,
         }
-        assert.is_true(queue:enqueue({ id = "m1" }, { id = "c1" }, "."))
+        assert.is_true(queue:enqueue({ id = "m1", endpoint_scope = "http://suwayomi.test" }, { id = "c1" }, "."))
         queue:process()
         assert.are.equal(0, #queue:getSnapshot().failed)
         assert.are.equal("downloading", SuwayomiSettings:loadDownloadQueue()[1].state)
@@ -510,7 +510,7 @@ describe("suwayomi settings atomic failure handling", function()
             isSubProcessDone = function() return true end,
             terminateSubProcess = function() end,
         }
-        local manga, chapter = { id = "m1" }, { id = "c1" }
+        local manga, chapter = { id = "m1", endpoint_scope = "http://suwayomi.test" }, { id = "c1" }
         assert.is_true(queue:enqueue(manga, chapter, "."))
         queue:process()
         local path = queue:getActiveJob(queue:getKey(manga, chapter)).progress_path
@@ -544,7 +544,7 @@ describe("suwayomi settings atomic failure handling", function()
             runInSubProcess = function() launches = launches + 1; return launches end,
             isSubProcessDone = function() return false end,
         }
-        local manga, chapter = { id = "m1" }, { id = "c1" }
+        local manga, chapter = { id = "m1", endpoint_scope = "http://suwayomi.test" }, { id = "c1" }
         io_adapter.fail_sync_dir = true
         assert.is_false(queue:enqueue(manga, chapter, "."))
         io_adapter.fail_sync_dir = false
@@ -571,7 +571,7 @@ describe("suwayomi settings atomic failure handling", function()
             runInSubProcess = function() launches = launches + 1; return launches end,
             isSubProcessDone = function() return false end,
         }
-        assert.is_true(queue:enqueue({ id = "m1" }, { id = "c1" }, "."))
+        assert.is_true(queue:enqueue({ id = "m1", endpoint_scope = "http://suwayomi.test" }, { id = "c1" }, "."))
         io_adapter.fail_sync_dir = true
         queue:process()
         local committed_launch = io_adapter.files[settings_path]
@@ -606,7 +606,7 @@ describe("suwayomi settings atomic failure handling", function()
             isSubProcessDone = function() return true end,
             terminateSubProcess = function(pid) table.insert(terminated, pid) end,
         }
-        local manga, chapter = { id = "m1" }, { id = "c1" }
+        local manga, chapter = { id = "m1", endpoint_scope = "http://suwayomi.test" }, { id = "c1" }
         assert.is_true(queue:enqueue(manga, chapter, "."))
         queue:process()
         local path = queue:getActiveJob(queue:getKey(manga, chapter)).progress_path
@@ -638,7 +638,7 @@ describe("suwayomi settings atomic failure handling", function()
             runInSubProcess = function() return 123 end,
             isSubProcessDone = function() return true end,
         }
-        local manga, chapter = { id = "m1" }, { id = "c1" }
+        local manga, chapter = { id = "m1", endpoint_scope = "http://suwayomi.test" }, { id = "c1" }
         assert.is_true(queue:enqueue(manga, chapter, "."))
         table.remove(timers, 1)()
         io_adapter.fail_sync_dir = true
@@ -656,7 +656,7 @@ describe("suwayomi settings atomic failure handling", function()
 
     it("preserves interrupted recovery files and memory until recovery intent commits", function()
         local queue = build_test_queue()
-        local manga, chapter = { id = "m1" }, { id = "c1" }
+        local manga, chapter = { id = "m1", endpoint_scope = "http://suwayomi.test" }, { id = "c1" }
         assert.is_truthy(SuwayomiSettings:saveDownloadQueue({
             queue:buildPersistentJob(manga, chapter, ".", "downloading"),
         }))
@@ -716,7 +716,7 @@ describe("suwayomi settings atomic failure handling", function()
     it("DownloadQueue:enqueue returns false, save_failed and does not modify in-memory items or statuses on failure", function()
         local queue = build_test_queue()
 
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
 
         -- Inject failure during rename
@@ -743,7 +743,7 @@ describe("suwayomi settings atomic failure handling", function()
     it("DownloadQueue:enqueueBatch returns 0, err and rolls back candidates on failure", function()
         local queue = build_test_queue()
 
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapters = {
             { id = "c1", name = "Chapter 1" },
             { id = "c2", name = "Chapter 2" },
@@ -769,7 +769,7 @@ describe("suwayomi settings atomic failure handling", function()
     it("DownloadQueue:cancelPending does not remove job if save fails", function()
         local queue = build_test_queue()
 
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
 
         -- Enqueue successfully
@@ -799,7 +799,7 @@ describe("suwayomi settings atomic failure handling", function()
     it("DownloadQueue:clearFailed does not wipe in-memory statuses if save fails", function()
         local queue = build_test_queue()
 
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
         local key = queue:getKey(manga, chapter)
 
@@ -912,7 +912,7 @@ describe("suwayomi settings atomic failure handling", function()
             terminateSubProcess = function(pid) terminated_pids[pid] = true end,
         }
 
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
         queue:enqueue(manga, chapter, "/sdcard/manga")
 
@@ -945,7 +945,7 @@ describe("suwayomi settings atomic failure handling", function()
             isSubProcessDone = function() return false end,
         }
 
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
         queue:enqueue(manga, chapter, "/sdcard/manga")
         assert.are.equal(1, #queue:getSnapshot().queued)
@@ -979,7 +979,7 @@ describe("suwayomi settings atomic failure handling", function()
         local context_obj = {
             current_scanlator_filter = "OriginalScanlator",
             current_chapter_context = {
-                manga = { id = "m1", title = "Manga 1" },
+                manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" },
             },
             selection_cleared = false,
             menu_refreshed = false,
@@ -1058,7 +1058,7 @@ describe("suwayomi settings atomic failure handling", function()
         for k, v in pairs(ReaderReturn.methods) do
             rr[k] = v
         end
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
         local chapter_path = "/sdcard/manga/m1/c1.cbz"
 
@@ -1087,7 +1087,7 @@ describe("suwayomi settings atomic failure handling", function()
             runInSubProcess = function() launched = true; return 100 end,
             isSubProcessDone = function() return false end,
         }
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
         queue:enqueue(manga, chapter, "/sdcard/manga")
         assert.are.equal(1, #queue:getSnapshot().queued)
@@ -1106,7 +1106,7 @@ describe("suwayomi settings atomic failure handling", function()
             runInSubProcess = function() return 200 end,
             isSubProcessDone = function() return true end,
         }
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
         local test_dir = "."
         queue:enqueue(manga, chapter, test_dir)
@@ -1151,7 +1151,7 @@ describe("suwayomi settings atomic failure handling", function()
             actions_obj[k] = v
         end
 
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
 
         io_adapter.fail_sync_dir = true
@@ -1167,7 +1167,7 @@ describe("suwayomi settings atomic failure handling", function()
 
     it("DownloadQueue:reconcile removes in-memory queued and active jobs that are not in committed storage", function()
         local queue = build_test_queue()
-        local manga = { id = "m1", title = "Manga 1" }
+        local manga = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter = { id = "c1", name = "Chapter 1" }
         queue:enqueue(manga, chapter, "/sdcard/manga")
         assert.are.equal(1, #queue:getSnapshot().queued)
@@ -1191,7 +1191,7 @@ describe("suwayomi settings atomic failure handling", function()
         local queue = build_test_queue()
         local manga1 = { id = "m1", title = "Manga 1", endpoint_scope = "http://suwayomi.test" }
         local chapter1 = { id = "c1", name = "Chapter 1" }
-        local manga2 = { id = "m2", title = "Manga 2" }
+        local manga2 = { id = "m2", title = "Manga 2", endpoint_scope = "http://suwayomi.test" }
         local chapter2 = { id = "c2", name = "Chapter 2" }
         assert(queue.refill:setPolicy(manga1, 5))
         assert(queue:enqueue(manga1, chapter1, "/sdcard/manga"))

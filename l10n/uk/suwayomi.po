@@ -677,6 +677,11 @@ msgstr "Завантажити"
 msgid "Download all chapters (up to 50 new)"
 msgstr "Завантажити всі розділи (до 50 нових)"
 
+msgid ""
+"Download belongs to a different server. Restore the original server in "
+"Connection settings, then Retry."
+msgstr ""
+
 msgid "Download damaged; redownload"
 msgstr "Завантажений файл пошкоджено; завантажте заново"
 
@@ -744,6 +749,11 @@ msgstr "Завантажити вибране"
 
 msgid "Download selected (up to 50 new)"
 msgstr "Завантажити вибране (до 50 нових)"
+
+msgid ""
+"Download server origin is unknown. Cancel this job and download from a "
+"verified server chapter list."
+msgstr ""
 
 msgid "Download the chapter first."
 msgstr "Спочатку завантажте розділ."

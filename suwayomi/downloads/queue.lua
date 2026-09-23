@@ -993,7 +993,8 @@ end
 
 function DownloadQueue:redownload(manga, chapter, download_directory)
     local job = self:findPersistentJob(self:getKey(manga, chapter))
-    return self:admit(manga, chapter, job and job.download_directory or download_directory,
+    return self:admit(job and job.manga or manga, job and job.chapter or chapter,
+        job and job.download_directory or download_directory,
         { provenance = "explicit" }, true)
 end
 
@@ -1033,8 +1034,8 @@ function DownloadQueue:admit(manga, chapter, download_directory, options, repair
     table.insert(self.items, {
         key = persistent_job.key,
         download_directory = download_directory,
-        manga = manga,
-        chapter = chapter,
+        manga = persistent_job.manga,
+        chapter = persistent_job.chapter,
         downloader = self.downloader,
         archive_generation = persistent_job.archive_generation,
         provenance = persistent_job.provenance,
@@ -1089,8 +1090,8 @@ function DownloadQueue:enqueueBatch(manga, chapters, download_directory, options
                 item = {
                     key = persistent_job.key,
                     download_directory = download_directory,
-                    manga = manga,
-                    chapter = chapter,
+                    manga = persistent_job.manga,
+                    chapter = persistent_job.chapter,
                     downloader = self.downloader,
                 },
             })
