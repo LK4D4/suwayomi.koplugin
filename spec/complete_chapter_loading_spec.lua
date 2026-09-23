@@ -544,6 +544,193 @@ describe("complete stored chapter loading", function()
         assert.is_true(#messages > 0)
     end)
 
+    for _, route in ipairs({ "display", "action preload" }) do
+        for _, failure in ipairs({ "rejected", "uncertain" }) do
+            it("publishes " .. route .. " membership after a " .. failure .. " second ledger write", function()
+                respond = function() return page(nodes(201, 201), 1, false) end
+                plugin:showChaptersForManga(manga)
+                finishRequest()
+                plugin:toggleChapterSelection(manga, plugin.current_chapter_context.chapters[1])
+                local old_guard = plugin:captureChapterActionGuard()
+                prepareRefill()
+                assert(settings:saveMangaKeepNextUnreadDownloads(manga, 5))
+                assert(queue.refill:associate(manga))
+                archive_path = os.tmpname()
+                local Native = require("spec/support/native_archiver")
+                restore_native = Native.install()
+                local writer = Native.Writer:new()
+                assert(writer:open(archive_path, "zip"))
+                assert(writer:addFileFromMemory("001.jpg", "fixture image"))
+                assert(writer:close())
+                ledger_path = os.tmpname()
+                local native_before = 'return { last_page = 2, percent_finished = 0.5, summary = { status = "reading" } }\n'
+                local file = assert(io.open(ledger_path, "wb"))
+                file:write(native_before)
+                file:close()
+                package.preload.docsettings = function()
+                    return { findSidecarFile = function() return ledger_path end,
+                        getSidecarFilename = function() return "metadata.lua" end,
+                        getSidecarDir = function() return "/nonexistent-sidecars" end,
+                        isHashLocationEnabled = function() return false end }
+                end
+                for name, method in pairs(require("suwayomi/readsync/koreader_metadata").methods) do
+                    plugin[name] = method
+                end
+                local ledger = {}
+                for id = 202, 206 do
+                    ledger["17:" .. id] = {
+                        manga_id = "17", chapter_id = tostring(id), endpoint_scope = manga.endpoint_scope,
+                        read = id % 2 == 0, pending_read_sync = id < 206 or nil,
+                        pending_read_state = id < 206 and id % 2 == 0,
+                    }
+                end
+                ledger["17:202"].path = archive_path
+                assert(settings:saveChapterLedger(ledger))
+                assert(settings:saveReaderReturnContexts({ [archive_path] = {
+                    path = archive_path, manga_id = "17", chapter_id = "202", endpoint_scope = manga.endpoint_scope,
+                } }))
+                local before = settings:loadChapterLedger()
+                local before_contexts = settings:loadReaderReturnContexts()
+                local before_refills = queue:getSnapshot().refills
+                local store = settings:getStore()
+                local write, writes = store.io.write, 0
+                local after_cache
+                store.io.write = function(handle, content)
+                    writes = writes + 1
+                    if writes == 2 then
+                        assert.are.same({ "202", "203", "204", "205", "206" },
+                            chapterIds(settings:loadChapterCache(settings:load(), manga).chapters))
+                        after_cache = store:serializeDocument(store:load())
+                        local attempted = assert(loadstring(content))()
+                        assert.is_nil(attempted.chapter_ledger["17:202"].pending_read_sync)
+                        assert.is_nil(attempted.chapter_ledger["17:203"].pending_read_sync)
+                        if failure == "rejected" then return false, "injected ledger write failure" end
+                    end
+                    return write(handle, content)
+                end
+                store.io.sync_dir = function()
+                    if writes == 2 and failure == "uncertain" then return false, "injected ledger sync failure" end
+                    return true
+                end
+                respond = function()
+                    local replacement = nodes(202, 206)
+                    replacement[1].isRead, replacement[4].isRead = true, true
+                    return page(replacement, 5, false)
+                end
+                local ready
+                if route == "display" then plugin:showChaptersForManga(manga)
+                else plugin:startLoadMangaChapterContext(manga, function(context) ready = context end) end
+                finishRequest()
+                local context = plugin.current_chapter_context
+                assert.are.same({ "202", "203", "204", "205", "206" }, chapterIds(context.chapters))
+                if route == "display" then
+                    assert.are.same({ "202", "203", "204", "205", "206" }, chapterIds(plugin.current_chapter_menu.chapters))
+                else assert.are.equal(context, ready) end
+                assert.is_true(context.saved)
+                assert.is_false(old_guard())
+                assert.are.same({}, plugin.selected_chapters)
+                for index, chapter in ipairs(context.chapters) do
+                    assert.are.equal(index % 2 == 1, chapter.is_read)
+                    assert.are.equal(index < 5 and true or nil, chapter.pending_read_sync)
+                end
+                assert.are.same(before, settings:loadChapterLedger())
+                assert.are.same(before_contexts, settings:loadReaderReturnContexts())
+                assert.are.same(before_refills, queue:getSnapshot().refills)
+                assert.are.equal(after_cache, store:serializeDocument(store:load()))
+                assert.are.equal(2, writes)
+                assert.matches("injected ledger", messages[#messages])
+                file = assert(io.open(ledger_path, "rb"))
+                assert.are.equal(native_before, file:read("*a"))
+                file:close()
+                assert.are.equal(failure == "uncertain", store:isBlocked())
+                if failure == "uncertain" then
+                    -- Publication cannot bypass the existing mutation fence.
+                    plugin:downloadNextUnreadChaptersForManga(manga, 1, false)
+                    assert.are.same({}, admittedIds())
+                    assert.are.equal(2, writes)
+                    assert.are.same(before, settings:loadChapterLedger())
+                    assert.is_true(store:isBlocked())
+                else
+                    local opened
+                    package.preload["apps/reader/readerui"] = function()
+                        return { showReader = function(_, path) opened = path end }
+                    end
+                    assert.is_true(plugin:openChapter(manga, context.chapters[1]))
+                    finishJob(queue.verification)
+                    assert.are.equal(archive_path, opened)
+                    assert.is_true(settings:loadChapterLedger()["17:202"].pending_read_sync)
+                end
+            end)
+        end
+    end
+
+    for _, route in ipairs({ "display", "action preload" }) do
+        for _, invalidation in ipairs({ "context", "endpoint", "retired host" }) do
+            it("rejects stale " .. route .. " publication after " .. invalidation .. " changes", function()
+                respond = function() return page(nodes(201, 201), 1, false) end
+                plugin:showChaptersForManga(manga)
+                finishRequest()
+                assert(settings:saveChapterLedger({ ["17:202"] = {
+                    manga_id = "17", chapter_id = "202", endpoint_scope = manga.endpoint_scope,
+                    read = true, pending_read_sync = true, pending_read_state = true,
+                } }))
+                local store = settings:getStore()
+                local before = store:serializeDocument(store:load())
+                local write, writes = store.io.write, 0
+                store.io.write = function(handle, content)
+                    writes = writes + 1
+                    if writes == 2 then return false, "injected ledger write failure" end
+                    return write(handle, content)
+                end
+                local ready = false
+                if route == "display" then plugin:showChaptersForManga(manga)
+                else plugin:startLoadMangaChapterContext(manga, function() ready = true end) end
+                local token = plugin.active_manga_network_requests.chapter_menu
+                    or plugin.active_manga_network_requests.chapter_context
+                if invalidation == "context" then
+                    plugin:setCurrentMangaChapterContext(manga, { { id = "301", name = "New context" } })
+                elseif invalidation == "endpoint" then
+                    settings.load = function() return { server_url = "https://other.example" } end
+                else plugin:retireChapterHost() end
+                local context, menu = plugin.current_chapter_context, plugin.current_chapter_menu
+                respond = function()
+                    local replacement = nodes(202, 202)
+                    replacement[1].isRead = true
+                    return page(replacement, 1, false)
+                end
+                finishRequest(token)
+                assert.are.equal(context, plugin.current_chapter_context)
+                assert.are.equal(menu, plugin.current_chapter_menu)
+                assert.are.equal(before, store:serializeDocument(store:load()))
+                assert.are.equal(0, writes)
+                assert.is_false(ready)
+                assert.are.same({}, messages)
+            end)
+        end
+
+        it("acknowledges matching pending choices after successful " .. route .. " persistence", function()
+            manga.endpoint_scope = "https://suwayomi.example"
+            assert(settings:saveChapterLedger({ ["17:202"] = {
+                manga_id = "17", chapter_id = "202", endpoint_scope = manga.endpoint_scope,
+                read = true, pending_read_sync = true, pending_read_state = true,
+            } }))
+            respond = function()
+                local replacement = nodes(202, 202)
+                replacement[1].isRead = true
+                return page(replacement, 1, false)
+            end
+            if route == "display" then plugin:showChaptersForManga(manga)
+            else plugin:startLoadMangaChapterContext(manga) end
+            finishRequest()
+            assert.are.same({ "202" }, chapterIds(plugin.current_chapter_context.chapters))
+            assert.is_false(plugin.current_chapter_context.saved)
+            assert.is_true(settings:loadChapterLedger()["17:202"].read)
+            assert.is_nil(settings:loadChapterLedger()["17:202"].pending_read_sync)
+            assert.is_nil(settings:loadChapterLedger()["17:202"].pending_read_state)
+            assert.are.same({}, messages)
+        end)
+    end
+
     it("keeps newer manga metadata while filling absent information from cached chapters", function()
         manga.in_library = false
         manga.thumbnail_url = "/api/v1/manga/17/thumbnail"

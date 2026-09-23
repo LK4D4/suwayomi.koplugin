@@ -100,12 +100,16 @@ local function prepareChapterListing(owner, manga, chapters, options)
         options = copyOptions(options)
         options.saved = true
     end
-    local err
     if not manga.local_only then
-        chapters, err = owner:mergeChaptersWithReadLedger(manga, chapters, options)
-    end
-    if not chapters then
-        owner:showMessage(err or I18n.t("Failed to save settings."))
+        local merged, err = owner:mergeChaptersWithReadLedger(manga, chapters, options)
+        if not merged then
+            notify(owner, err or I18n.t("Failed to save settings."))
+            -- Keep successful membership, but reload only confirmed read choices.
+            options = copyOptions(options)
+            options.saved = true
+            merged = owner:mergeChaptersWithReadLedger(manga, chapters, options)
+        end
+        chapters = merged
     end
     return chapters, options
 end

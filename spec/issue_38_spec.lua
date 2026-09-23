@@ -10,7 +10,7 @@ describe("remote unread revokes deferred manual deletion (#38)", function()
     local manga
     local extra_modules = {
         "suwayomi/settings/store", "suwayomi/chapters/manual_deletion",
-        "suwayomi/chapters/archive_identity", "docsettings",
+        "suwayomi/chapters/archive_identity", "docsettings", "ui/widget/notification",
     }
     local function clear()
         runtime_helper.teardown()
@@ -234,9 +234,13 @@ describe("remote unread revokes deferred manual deletion (#38)", function()
         assert.same(removed, service.manual_deletion:snapshot()["m:A"])
     end)
 
-    it("does not publish unread or revoke intent when its checked save is rejected", function()
+    it("publishes membership without uncommitted unread or revocation when its checked save is rejected", function()
         holdAndMarkRead(chapters[1])
         acknowledge()
+        local notification
+        package.preload["ui/widget/notification"] = function()
+            return { new = function(_, options) notification = options; return options end }
+        end
         local before = committed()
         local open = settings.store.io.open
         local writes = 0
@@ -247,7 +251,12 @@ describe("remote unread revokes deferred manual deletion (#38)", function()
         end
         local context = preload(false)
         settings.store.io.open = open
-        assert.is_nil(context)
+        assert.is_table(context)
+        assert.is_true(context.saved)
+        assert.same({ "A", "B" }, { context.chapters[1].id, context.chapters[2].id })
+        assert.is_true(context.chapters[1].is_read)
+        assert.matches("injected storage failure", notification.text)
+        assert.equals(2, writes)
         assert.same(before.chapter_ledger, committed().chapter_ledger)
         assert.same(before.manual_archive_state, committed().manual_archive_state)
         assert.is_true(committed().chapter_ledger["m:A"].read)
