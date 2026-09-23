@@ -1,5 +1,5 @@
 -- Boundary: ChapterReadActions.
--- Owns manual read ordering, captured completions, and immediate outcomes.
+-- Owns scoped manual read intent, ordering, captured completions, and immediate outcomes.
 -- Ledger owns checked persistence; the process-owned manual deletion module removes archives.
 
 local SuwayomiDebug = require("suwayomi/debug")
@@ -131,6 +131,12 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
     local started_at = SuwayomiDebug.now()
     local core = self:getDownloadQueue().manual_deletion
     local ledger = copyLedger(options.ledger or self:loadChapterLedger())
+    local scope, scope_err = self:getChapterReadScope(manga, chapters, ledger)
+    if not scope then
+        local result = { committed = false, error = scope_err, marked_read = 0 }
+        showReadSummary(self, result, options)
+        return 0, result
+    end
     local previous = captureContext(self)
     local delete_settings = SuwayomiSettings:loadDeleteChaptersSettings()
     local capture_deletion = delete_settings.delete_after_mark_read == true and not options.skip_delete_after_mark_read
@@ -150,7 +156,8 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
     for _, item in ipairs(prepared) do
         if item.downloaded and item.path then self:setKoreaderChapterReadState(item.path, true) end
         local entry = self:upsertChapterLedgerEntryInLedger(ledger, manga, item.chapter, {
-            path = item.path, read = true, pending_read_sync = true, pending_read_state = true,
+            path = item.downloaded and item.path or nil,
+            endpoint_scope = scope, read = true, pending_read_sync = true, pending_read_state = true,
         })
         item.completion = {
             manga_id = entry.manga_id, chapter_id = entry.chapter_id, read = true,
@@ -222,13 +229,21 @@ end
 local function markUnread(self, manga, chapters, options, batch, clear_selection)
     local core = self:getDownloadQueue().manual_deletion
     local ledger = copyLedger(options.ledger or self:loadChapterLedger())
+    local scope, scope_err = self:getChapterReadScope(manga, chapters, ledger)
+    if not scope then
+        if not options.quiet then
+            self:showMessage(I18n.t("Could not confirm the unread state was saved. Pending deletion may still run. Reopen the chapter list and try again."))
+        end
+        return 0, { committed = false, marked_unread = 0, error = scope_err, summary_shown = not options.quiet }
+    end
     local previous = captureContext(self)
     local keys = {}
     for _, chapter in ipairs(chapters) do
         local downloaded, path = self:isChapterDownloaded(manga, chapter)
         if downloaded and path then self:setKoreaderChapterReadState(path, false) end
         self:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, {
-            path = path, read = false, pending_read_sync = true, pending_read_state = false,
+            path = downloaded and path or nil,
+            endpoint_scope = scope, read = false, pending_read_sync = true, pending_read_state = false,
         })
         keys[#keys + 1] = self:getChapterLedgerKey(manga, chapter)
         updateContext(self, manga, chapter, false)

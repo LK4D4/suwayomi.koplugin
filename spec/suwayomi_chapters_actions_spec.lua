@@ -175,6 +175,8 @@ describe("suwayomi/chapters/actions", function()
         end
 
         local ledger = options.ledger or {}
+        -- Ordinary action fixtures have known origin; recovery controls install their own records.
+        for _, entry in pairs(ledger) do entry.endpoint_scope = entry.endpoint_scope or manga.endpoint_scope end
         local plugin = {
             current_chapter_context = options.current_chapter_context,
             queue = queue,
@@ -301,6 +303,7 @@ describe("suwayomi/chapters/actions", function()
         }
 
         local Actions = require("suwayomi/chapters/actions")
+        plugin.getChapterReadScope = dofile("suwayomi/readsync/ledger.lua").methods.getChapterReadScope
         for name, method in pairs(Actions.methods) do
             plugin[name] = method
         end
@@ -528,7 +531,8 @@ describe("suwayomi/chapters/actions", function()
             }
         end
         local plugin = build_plugin({
-            ledger = { ["m1:c1"] = { read = true, last_page = 7 } },
+            ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1",
+                path = "/downloads/Manga/Chapter 1.cbz", read = true, last_page = 7 } },
             existing = {
                 ["/downloads/Manga/Chapter 1.cbz"] = true,
             },
@@ -565,6 +569,7 @@ describe("suwayomi/chapters/actions", function()
     it("never opens or writes reader metadata for an inconclusive or damaged inspection", function()
         local complete
         local plugin = build_plugin({
+            ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = "/downloads/Manga/Chapter 1.cbz" } },
             existing = { ["/downloads/Manga/Chapter 1.cbz"] = true },
             queue = { verifyArchive = function(_, _, _, _, callback)
                 complete = callback
@@ -572,6 +577,7 @@ describe("suwayomi/chapters/actions", function()
             end },
         })
         local failures = 0
+        local before = settings:loadChapterLedger()
         plugin.showChapterDownloadError = function() failures = failures + 1 end
         for _, state in ipairs({ "unverified", "damaged" }) do
             assert.is_true(plugin:openChapter(manga, chapter))
@@ -579,7 +585,7 @@ describe("suwayomi/chapters/actions", function()
         end
         assert.are.equal(2, failures)
         assert.are.same({}, plugin.reader_return_contexts)
-        assert.are.same({}, plugin.ledger)
+        assert.are.same(before, settings:loadChapterLedger())
         assert.are.same({}, plugin.metadata_updates)
     end)
 

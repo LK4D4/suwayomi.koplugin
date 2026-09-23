@@ -25,6 +25,7 @@ local function installLedger(options)
     helper.stubControllerDependencies()
     local settings = dofile("suwayomi/settings.lua")
     settings:setStore(require("spec/support/checked_queue_settings")():getStore())
+    for _, entry in pairs(options.ledger or {}) do entry.endpoint_scope = "https://suwayomi.example" end
     assert(settings:saveChapterLedger(options.ledger or {}))
     package.preload["suwayomi/settings"] = function() return settings end
     local service = require("suwayomi/downloads/service"):new{
@@ -78,7 +79,7 @@ describe("suwayomi/readsync/ledger", function()
             },
         })
 
-        local chapters = plugin:mergeChaptersWithReadLedger({ id = "m1", title = "Frieren" }, {
+        local chapters = plugin:mergeChaptersWithReadLedger({ id = "m1", title = "Frieren", endpoint_scope = "https://suwayomi.example" }, {
             { id = "c1", name = "Chapter 1", is_read = true },
             { id = "c2", name = "Chapter 2", is_read = false },
         })

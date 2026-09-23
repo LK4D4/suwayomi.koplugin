@@ -99,6 +99,8 @@ end
 
 local function hasReadAuthority(manga, chapter, path, lookup)
     if not manga.endpoint_scope or not lookup or lookup.foreign_paths[path] then return false end
+    local stored = lookup.ledger[tostring(manga.id) .. ":" .. tostring(chapter.id)]
+    if stored and stored.endpoint_scope ~= manga.endpoint_scope then return false end
     for _, entry in ipairs(lookup.by_path[path] or {}) do
         if entry.endpoint_scope == manga.endpoint_scope
             and tostring(entry.chapter_id) == tostring(chapter.id) then return true end

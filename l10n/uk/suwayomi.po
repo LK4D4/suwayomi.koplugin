@@ -1185,6 +1185,9 @@ msgstr "Паралельні завантаження: %1"
 msgid "Password"
 msgstr "Пароль"
 
+msgid "Pending read changes are not associated with the configured server."
+msgstr ""
+
 msgctxt "source mode"
 msgid "Popular"
 msgstr "Популярне"

@@ -9,6 +9,7 @@
 
 local SuwayomiAPI = require("suwayomi/api")
 local SubprocessJob = require("suwayomi/subprocess/job")
+local SuwayomiSettings = require("suwayomi/settings")
 
 local ReadSyncWorker = {}
 
@@ -35,6 +36,10 @@ function ReadSyncWorker:validateItem(credentials, item)
     if not item or not item.chapter_id or item.chapter_id == "" then
         return false, "Missing chapter id."
     end
+    local scope = SuwayomiSettings:normalizeEndpointScope(credentials.server_url)
+    if not scope or item.endpoint_scope ~= scope then
+        return false, "Read sync endpoint mismatch."
+    end
     return true
 end
 
@@ -44,6 +49,7 @@ function ReadSyncWorker:resultEntry(item)
         key = item.key,
         chapter_id = item.chapter_id,
         desired_read_state = item.desired_read_state == true,
+        endpoint_scope = item.endpoint_scope,
     }
 end
 

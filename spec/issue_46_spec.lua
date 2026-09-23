@@ -8,7 +8,8 @@ describe("issue 46 keep-policy suppression", function()
     local directory, runtime, settings, service, plugin, chapters
     local original_time = os.time
     local clock
-    local manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" } }
+    local manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" },
+        endpoint_scope = "https://suwayomi.example" }
     local modules = { "suwayomi/settings/store", "suwayomi/chapters/manual_deletion",
         "suwayomi/chapters/archive_identity", "docsettings" }
     local function clear()

@@ -136,10 +136,20 @@ end
 function Methods:isLocalOnlyChapter(manga, chapter, lookup)
     if not manga or manga.local_only or not manga.id or not chapter or chapter.local_only or not chapter.id
         or not currentScope(manga) then return true end
-    local ledger = lookup and lookup.ledger or SuwayomiSettings:loadChapterLedger()
+    lookup = lookup or self:buildChapterDownloadLookup(manga)
+    local ledger = lookup.ledger
     local entry = ledger[tostring(manga.id) .. ":" .. tostring(chapter.id)]
-    return type(entry) == "table" and entry.endpoint_scope ~= nil
-        and entry.endpoint_scope ~= manga.endpoint_scope
+    if type(entry) == "table" and entry.endpoint_scope ~= manga.endpoint_scope then return true end
+    local path = self:getChapterPath(manga, chapter, lookup)
+    if path and self:chapterArchiveExists(path) then
+        -- A scoped pathless choice does not associate bytes found at a guessed path.
+        for _, record in ipairs(lookup.by_path[path] or {}) do
+            if manga.endpoint_scope and record.endpoint_scope == manga.endpoint_scope
+                and tostring(record.chapter_id) == tostring(chapter.id) then return false end
+        end
+        return true
+    end
+    return false
 end
 
 function Methods:getChapterPath(manga, chapter, lookup)

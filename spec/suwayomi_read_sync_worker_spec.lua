@@ -70,6 +70,8 @@ describe("suwayomi/readsync/worker", function()
 
     before_each(function()
         install_file_mock()
+        require("spec/support/controller_module_spec_helper").stubControllerDependencies()
+        package.loaded["suwayomi/settings"], package.preload["suwayomi/settings"] = nil, nil
         package.loaded["suwayomi/readsync/worker"] = nil
         package.loaded["suwayomi/api"] = nil
     end)
@@ -81,6 +83,7 @@ describe("suwayomi/readsync/worker", function()
         package.loaded["suwayomi/readsync/worker"] = nil
         package.loaded["suwayomi/api"] = nil
         package.preload["suwayomi/api"] = nil
+        package.loaded["suwayomi/settings"] = nil
     end)
 
     it("groups read and unread mutations and writes mixed results atomically", function()
@@ -111,9 +114,9 @@ describe("suwayomi/readsync/worker", function()
         worker:run(
             { server_url = "https://suwayomi.example" },
             {
-                { key = "m1:398", chapter_id = "398", desired_read_state = true },
-                { key = "m1:399", chapter_id = "399", desired_read_state = false },
-                { key = "m1:400", chapter_id = "400", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:398", chapter_id = "398", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:399", chapter_id = "399", desired_read_state = false },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:400", chapter_id = "400", desired_read_state = true },
             },
             "/settings/suwayomi_read_sync_result.json"
         )
@@ -129,11 +132,11 @@ describe("suwayomi/readsync/worker", function()
         local result = worker:readResult("/settings/suwayomi_read_sync_result.json")
         assert.are.equal(3, result.attempted)
         assert.are.same({
-            { key = "m1:398", chapter_id = "398", desired_read_state = true },
-            { key = "m1:400", chapter_id = "400", desired_read_state = true },
+            { endpoint_scope = "https://suwayomi.example", key = "m1:398", chapter_id = "398", desired_read_state = true },
+            { endpoint_scope = "https://suwayomi.example", key = "m1:400", chapter_id = "400", desired_read_state = true },
         }, result.successes)
         assert.are.same({
-            { key = "m1:399", chapter_id = "399", desired_read_state = false, error = "offline" },
+            { endpoint_scope = "https://suwayomi.example", key = "m1:399", chapter_id = "399", desired_read_state = false, error = "offline" },
         }, result.failures)
     end)
 
@@ -155,18 +158,19 @@ describe("suwayomi/readsync/worker", function()
         worker:run(
             { server_url = "https://suwayomi.example" },
             {
-                { key = "m1:398", chapter_id = "398", desired_read_state = true },
-                { key = "m1:399", chapter_id = "399", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:398", chapter_id = "398", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:399", chapter_id = "399", desired_read_state = true },
             },
             "/settings/suwayomi_read_sync_result.json"
         )
 
         local result = worker:readResult("/settings/suwayomi_read_sync_result.json")
         assert.are.same({
-            { key = "m1:398", chapter_id = "398", desired_read_state = true },
+            { endpoint_scope = "https://suwayomi.example", key = "m1:398", chapter_id = "398", desired_read_state = true },
         }, result.successes)
         assert.are.same({
             {
+                endpoint_scope = "https://suwayomi.example",
                 key = "m1:399",
                 chapter_id = "399",
                 desired_read_state = true,
@@ -242,7 +246,7 @@ describe("suwayomi/readsync/worker", function()
         worker:run(
             { server_url = "" },
             {
-                { key = "m1:398", chapter_id = "398", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:398", chapter_id = "398", desired_read_state = true },
             },
             "/settings/suwayomi_read_sync_result.json"
         )

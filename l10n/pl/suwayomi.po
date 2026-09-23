@@ -1086,6 +1086,9 @@ msgstr ""
 msgid "Password"
 msgstr ""
 
+msgid "Pending read changes are not associated with the configured server."
+msgstr ""
+
 msgctxt "source mode"
 msgid "Popular"
 msgstr ""

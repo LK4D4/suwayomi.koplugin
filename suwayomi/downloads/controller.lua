@@ -431,8 +431,10 @@ function Methods:reconcileDownloadedChapterLedger(ledger)
             local explicit_unread = entry.pending_read_sync == true and entry.pending_read_state == false
             if metadata_finished and entry.read ~= true and not explicit_unread then
                 entry.read = true
-                entry.pending_read_sync = true
-                entry.pending_read_state = true
+                if SuwayomiSettings:normalizeEndpointScope(entry.endpoint_scope) then
+                    entry.pending_read_sync = true
+                    entry.pending_read_state = true
+                end
                 changed = true
                 read_count = read_count + 1
             end

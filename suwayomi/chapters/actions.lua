@@ -58,6 +58,7 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         return not self.suwayomi_host_retired
             and self.chapter_archive_request == request
             and (not context_current or context_current())
+            and self:isLocalOnlyChapter(manga, chapter) == local_only
             and (not self.isChapterInCurrentContext or self:isChapterInCurrentContext(manga, chapter))
             and self:getChapterPath(manga, chapter) == chapter_path
     end

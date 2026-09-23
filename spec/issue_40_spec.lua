@@ -8,7 +8,8 @@ describe("completion enrollment storage recovery (#40)", function()
     local directory, runtime, settings, service, plugin, chapters, timers, clock
     local reject_enrollment, writing_enrollment
     local original_time = os.time
-    local manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" } }
+    local manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" },
+        endpoint_scope = "https://suwayomi.example" }
     local function clear()
         runtime_helper.teardown()
         for _, name in ipairs({ "suwayomi/settings/store", "suwayomi/chapters/manual_deletion",
@@ -72,6 +73,7 @@ describe("completion enrollment storage recovery (#40)", function()
     before_each(function()
         clear()
         runtime = runtime_helper.install()
+        require("suwayomi/readsync/worker").readResult = function() return nil end
         timers, clock, reject_enrollment, writing_enrollment = {}, 100, false, false
         os.time = function() return clock end
         directory = os.tmpname():gsub("\\", "/")
@@ -86,6 +88,7 @@ describe("completion enrollment storage recovery (#40)", function()
         package.preload.luasettings = function() return { open = function() return { data = {} } end } end
         settings = require("suwayomi/settings")
         settings.store = require("suwayomi/settings/store"):new{ path = directory .. "/settings.lua" }
+        assert(settings:save{ server_url = manga.endpoint_scope })
         assert(settings.store:saveKey("download_directory", directory))
         local ui = require("ui/uimanager")
         ui.scheduleIn = function(_, delay, callback) timers[#timers + 1] = { at = clock + delay, callback = callback } end

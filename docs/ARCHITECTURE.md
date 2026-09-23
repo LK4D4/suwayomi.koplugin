@@ -80,7 +80,7 @@ One read-only context helper runs across manga independently of chapter concurre
 
 Startup recovers only recorded requests. Transient retries use persisted five-second exponential deadlines capped at five minutes. Rejected requests and unsupported/configuration/identity blockers stay quiet and inspectable. Stop atomically turns policy Off and retires requests, leaving jobs intact. Accepted chapter cancellation retires that manga's evaluation; Cancel all retires every evaluation without disabling policies. Only a later independent trigger can enroll new work.
 
-Origin survives queue publication and explicit plugin Open. Closing an unknown legacy archive cannot associate it with the current server. Fresh context plus an explicit association action establishes scope; opening an existing archive also records its scope. Endpoint scopes exclude credential-bearing userinfo, query strings, and fragments.
+Origin survives queue publication and authorized plugin Open. Opening or closing an unknown legacy archive cannot associate it with the current server. Fresh context plus an explicit association action establishes scope; an existing archive's recorded association is preserved. Endpoint scopes exclude credential-bearing userinfo, query strings, and fragments.
 
 Manga and chapter controls show the saved Auto-download limit and check the selected option when opened, not a captured default. Pending controls show current reasons and fixed retry times; Check again and Turn off auto-download reject stale callbacks. Delete after reading remains independent when Auto-download is Off.
 
@@ -139,6 +139,10 @@ Context/scanlator guards also cover confirmations, directory continuations, erro
 A saved scanlator restriction stays exact when absent from current data: explain the mismatch and return no candidates, not All. Pending local read/unread choices take precedence during ledger merging; normalization preserves unrelated fields, including on pathless entries.
 
 Automatic reconciliation requires KOReader sidecar completed status, never final-page progress or history membership. Explicit plugin read/unread still updates metadata; existing saved read choices are not retroactively cleared. Native completed-status-plus-close enrollment is a separate trigger.
+
+Read synchronization uses the ledger entry's verified endpoint association, including pathless manual read/unread choices established by a current-server action. Existing unknown/foreign ID collisions reject that action through the normal failure response; matching IDs, paths, or current credentials cannot associate old entries. Unknown-origin native completion stays local-only. Remote listing reconciliation preserves unknown and foreign pending choices.
+
+`readsync/controller.lua` reloads configuration and selects only matching scoped entries immediately before dispatch. The worker checks and returns each item's endpoint. Acknowledgment requires the captured endpoint, chapter, desired state, path, and archive generation to still match. Rejected or uncertain saves do not acknowledge success. Only eligible pending work drives automatic retries; explicit Sync reports retained unsendable choices without claiming they are synced. Already-dispatched workers retain their captured credentials and may complete against that endpoint after configuration changes.
 
 Explicit read-state updates select metadata using KOReader's native candidate order, including primary-before-paired-backup precedence. Backup-only metadata supplies the new primary without changing the backup. Inspection or loading uncertainty refuses the update. Cleanup discovers paths separately and never opens native metadata merely to find deletion targets.
 

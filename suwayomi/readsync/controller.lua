@@ -1,6 +1,6 @@
 -- Boundary: ReadSyncController.
 --
--- Responsibility: Owns read-sync scheduling, document-close sync, and reader-open archive evidence refresh.
+-- Responsibility: Owns endpoint-checked read-sync dispatch/acknowledgment, document-close sync, and reader-open archive evidence refresh.
 -- Owned state: Coordinates ledger, KOReader metadata, subprocess files, and a pre-history-touch archive snapshot.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and plugin i18n facade.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -44,20 +44,23 @@ function Methods:startPendingReadSyncWorker(credentials, max_count)
     if self.pending_read_sync_active then
         return true, 0
     end
+    if SuwayomiSettings:getStore():isBlocked() then return false, 0, "persistence_failed" end
 
-    credentials = credentials or SuwayomiSettings:load()
+    local current = SuwayomiSettings:load()
+    local scope = SuwayomiSettings:normalizeEndpointScope(current and current.server_url)
+    if not scope or (credentials and SuwayomiSettings:normalizeEndpointScope(credentials.server_url) ~= scope) then
+        return false, 0
+    end
+    credentials = current
     local ledger = self:loadChapterLedger()
-    local batch = self:buildPendingReadSyncBatch(ledger, max_count)
+    local batch = self:buildPendingReadSyncBatch(ledger, max_count, scope)
     if #batch == 0 then
         return false, 0
     end
-    if not credentials or credentials.server_url == "" then
-        return false, #batch
-    end
-
     local result_path = self:getReadSyncResultPath()
     local active = {
         credentials = credentials,
+        endpoint_scope = scope,
         batch = batch,
         result_path = result_path,
     }
@@ -122,7 +125,7 @@ function Methods:applyPendingReadSyncResult(active, result)
 
     local snapshot_by_key = {}
     for _, item in ipairs(active.batch or {}) do
-        snapshot_by_key[item.key] = item.desired_read_state == true
+        snapshot_by_key[item.key] = item
     end
 
     local ledger = self:loadChapterLedger()
@@ -143,10 +146,18 @@ function Methods:applyPendingReadSyncResult(active, result)
     for _, item in ipairs(result.successes or {}) do
         local key = item.key
         local entry = ledger[key]
+        local snapshot = snapshot_by_key[key]
         local desired_read_state = item.desired_read_state == true
         if entry
+            and snapshot and snapshot.endpoint_scope
+            and snapshot.endpoint_scope == active.endpoint_scope
+            and item.endpoint_scope == snapshot.endpoint_scope
+            and entry.endpoint_scope == snapshot.endpoint_scope
+            and tostring(entry.chapter_id) == snapshot.chapter_id
+            and item.chapter_id == snapshot.chapter_id
+            and entry.archive_generation == snapshot.archive_generation and entry.path == snapshot.path
             and entry.pending_read_sync == true
-            and snapshot_by_key[key] == desired_read_state
+            and snapshot.desired_read_state == desired_read_state
             and self:getDesiredReadStateFromLedgerEntry(entry) == desired_read_state
         then
             entry.pending_read_sync = nil
@@ -181,7 +192,7 @@ end
 function Methods:finishPendingReadSync(_active, synced, attempted)
     self.pending_read_sync_active = nil
 
-    if self:hasPendingReadSync(self:loadChapterLedger()) then
+    if #self:buildPendingReadSyncBatch(self:loadChapterLedger(), 1) > 0 then
         local next_delay = self.read_sync_delay_seconds
         if attempted and attempted > 0 and synced == 0 then
             next_delay = self.pending_read_sync_failure_delay or self.read_sync_failure_delay_seconds
@@ -204,7 +215,7 @@ function Methods:pollPendingReadSync()
 end
 
 
-function Methods:schedulePendingReadSync(credentials, delay_seconds)
+function Methods:schedulePendingReadSync(_credentials, delay_seconds)
     if self.pending_read_sync_scheduled then
         return
     end
@@ -225,8 +236,8 @@ function Methods:schedulePendingReadSync(credentials, delay_seconds)
         if self.pending_read_sync_active then
             return
         end
-        local sync_credentials = credentials or SuwayomiSettings:load()
-        local started, attempted = self:startPendingReadSyncWorker(sync_credentials, self.read_sync_batch_size)
+        -- Delayed work always uses a fresh endpoint, credentials, and ledger selection.
+        local started, attempted = self:startPendingReadSyncWorker(nil, self.read_sync_batch_size)
         if not started then
             if self:hasPendingReadSync(self:loadChapterLedger()) then
                 if attempted and attempted > 0 then
@@ -272,6 +283,8 @@ function Methods:syncReadStateNow()
     end
     if err or (attempted or 0) > 0 then
         self:showMessage(I18n.f("Could not start read sync: %1", err or I18n.t("unknown error")))
+    else
+        self:showMessage(I18n.t("Pending read changes are not associated with the configured server."))
     end
     return false
 end
@@ -315,8 +328,10 @@ function Methods:onCloseDocument()
             and validId(entry.manga_id) and validId(entry.chapter_id) then
             if entry.read ~= true then
                 entry.read = true
-                entry.pending_read_sync = true
-                entry.pending_read_state = true
+                if SuwayomiSettings:normalizeEndpointScope(entry.endpoint_scope) then
+                    entry.pending_read_sync = true
+                    entry.pending_read_state = true
+                end
             end
             local saved = self:saveChapterLedger(ledger, {
                 { id = entry.manga_id, title = entry.manga_title, endpoint_scope = entry.endpoint_scope, require_origin = true },

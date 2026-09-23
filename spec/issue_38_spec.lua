@@ -82,7 +82,7 @@ describe("remote unread revokes deferred manual deletion (#38)", function()
     local function acknowledge()
         local batch = plugin:buildPendingReadSyncBatch(plugin:loadChapterLedger(), 1)
         assert.equals(1, #batch)
-        local synced = plugin:applyPendingReadSyncResult({ batch = batch }, { successes = batch, attempted = #batch })
+        local synced = plugin:applyPendingReadSyncResult({ batch = batch, endpoint_scope = batch[1].endpoint_scope }, { successes = batch, attempted = #batch })
         assert.equals(1, synced)
         assert.is_nil(committed().chapter_ledger[batch[1].key].pending_read_sync)
     end
@@ -109,7 +109,8 @@ describe("remote unread revokes deferred manual deletion (#38)", function()
         runtime = runtime_helper.install()
         timers, clock = {}, 100
         os.time = function() return clock end
-        manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" } }
+        manga = { id = "m", title = "Manga", source = { id = "s", name = "Source" },
+            endpoint_scope = "https://suwayomi.example" }
         directory = os.tmpname():gsub("\\", "/")
         os.remove(directory)
         package.loaded.lfs, package.preload.lfs = nil, nil
@@ -122,6 +123,7 @@ describe("remote unread revokes deferred manual deletion (#38)", function()
         package.preload.luasettings = function() return { open = function() return { data = {} } end } end
         settings = require("suwayomi/settings")
         settings.store = require("suwayomi/settings/store"):new{ path = directory .. "/settings.lua" }
+        assert(settings:save{ server_url = manga.endpoint_scope })
         assert(settings.store:saveKey("download_directory", directory))
         local ui = require("ui/uimanager")
         ui.scheduleIn = function(_, delay, callback) timers[#timers + 1] = { at = clock + delay, callback = callback } end
@@ -235,13 +237,19 @@ describe("remote unread revokes deferred manual deletion (#38)", function()
     it("does not publish unread or revoke intent when its checked save is rejected", function()
         holdAndMarkRead(chapters[1])
         acknowledge()
-        local before = read(settings.store.path)
+        local before = committed()
         local open = settings.store.io.open
-        settings.store.io.open = function() return nil, "injected storage failure" end
+        local writes = 0
+        settings.store.io.open = function(...)
+            writes = writes + 1
+            if writes == 1 then return open(...) end -- The scoped chapter cache saves before ledger reconciliation.
+            return nil, "injected storage failure"
+        end
         local context = preload(false)
         settings.store.io.open = open
         assert.is_nil(context)
-        assert.equals(before, read(settings.store.path))
+        assert.same(before.chapter_ledger, committed().chapter_ledger)
+        assert.same(before.manual_archive_state, committed().manual_archive_state)
         assert.is_true(committed().chapter_ledger["m:A"].read)
         assert.equals("pending", service.manual_deletion:snapshot()["m:A"].state)
         assert.equals("archive pages", read(path("A")))

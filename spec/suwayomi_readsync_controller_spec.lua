@@ -22,6 +22,8 @@ end
 local function buildPlugin(controller, options)
     options = options or {}
     local ledger = options.ledger or {}
+    -- These lifecycle fixtures represent archives already associated with this server.
+    for _, entry in pairs(ledger) do entry.endpoint_scope = "https://suwayomi.example" end
     local plugin = {
         messages = {},
         saved_ledgers = {},
@@ -66,14 +68,16 @@ local function buildPlugin(controller, options)
         end
         return entry.read == true
     end
-    function plugin:buildPendingReadSyncBatch(source_ledger, max_count)
+    function plugin:buildPendingReadSyncBatch(source_ledger, max_count, scope)
+        scope = scope or require("suwayomi/settings"):load().server_url
         local batch = {}
         for key, entry in pairs(source_ledger or ledger) do
-            if entry.pending_read_sync == true and entry.chapter_id then
+            if entry.endpoint_scope == scope and entry.pending_read_sync == true and entry.chapter_id then
                 table.insert(batch, {
                     key = key,
                     chapter_id = entry.chapter_id,
                     desired_read_state = self:getDesiredReadStateFromLedgerEntry(entry),
+                    endpoint_scope = scope,
                 })
                 if max_count and #batch >= max_count then
                     break
@@ -158,6 +162,8 @@ local function installController(options)
     end
     package.preload["suwayomi/settings"] = function()
         return {
+            getStore = function() return { isBlocked = function() return false end } end,
+            normalizeEndpointScope = function(_, url) return url ~= "" and url:gsub("/+$", "") or nil end,
             getSettingsDir = function()
                 return "/settings"
             end,
@@ -268,19 +274,20 @@ describe("suwayomi/readsync/controller", function()
         })
 
         local synced, attempted = plugin:applyPendingReadSyncResult({
+            endpoint_scope = "https://suwayomi.example",
             batch = {
-                { key = "m1:c1", chapter_id = "c1", desired_read_state = true },
-                { key = "m1:c2", chapter_id = "c2", desired_read_state = true },
-                { key = "m1:c3", chapter_id = "c3", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:c1", chapter_id = "c1", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:c2", chapter_id = "c2", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:c3", chapter_id = "c3", desired_read_state = true },
             },
         }, {
             attempted = 3,
             successes = {
-                { key = "m1:c1", chapter_id = "c1", desired_read_state = true },
-                { key = "m1:c2", chapter_id = "c2", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:c1", chapter_id = "c1", desired_read_state = true },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:c2", chapter_id = "c2", desired_read_state = true },
             },
             failures = {
-                { key = "m1:c3", chapter_id = "c3", desired_read_state = true, error = "offline" },
+                { endpoint_scope = "https://suwayomi.example", key = "m1:c3", chapter_id = "c3", desired_read_state = true, error = "offline" },
             },
         })
 
@@ -459,7 +466,7 @@ describe("suwayomi/readsync/controller", function()
         assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
     end)
 
-    it("retries automatic read-sync after missing credentials are later saved", function()
+    it("leaves missing-configuration work idle until another trigger", function()
         local credentials = {
             { server_url = "" },
             { server_url = "https://suwayomi.example" },
@@ -480,10 +487,11 @@ describe("suwayomi/readsync/controller", function()
         plugin:schedulePendingReadSync()
         state.scheduled[1].callback()
 
-        assert.are.equal(2, #state.scheduled)
+        assert.are.equal(1, #state.scheduled)
         assert.are.equal(0, #state.worker_runs)
         assert.is_true(plugin:loadChapterLedger()["m1:c1"].pending_read_sync)
 
+        plugin:schedulePendingReadSync()
         state.scheduled[2].callback()
 
         assert.are.equal("https://suwayomi.example", plugin.pending_read_sync_active.credentials.server_url)
@@ -495,7 +503,7 @@ describe("suwayomi/readsync/controller", function()
         local controller, state = installController({
             worker_result = { attempted = 1, successes = {}, failures = {} },
             loadCredentials = function()
-                return { server_url = "https://new.example" }
+                return { server_url = "https://suwayomi.example", password = "new" }
             end,
         })
         local plugin = buildPlugin(controller, {
@@ -507,7 +515,7 @@ describe("suwayomi/readsync/controller", function()
         plugin:finishPendingReadSync({ credentials = { server_url = "https://old.example" } }, 0, 1)
         state.scheduled[1].callback()
 
-        assert.are.equal("https://new.example", plugin.pending_read_sync_active.credentials.server_url)
+        assert.are.equal("new", plugin.pending_read_sync_active.credentials.password)
     end)
 
 

@@ -273,6 +273,9 @@ describe("bounded bulk download actions", function()
             items[1].is_read = true
             openChapters(items)
             archives["/books/m1-c2.cbz"] = true
+            assert(settings:saveReaderReturnContexts({ ["/books/m1-c2.cbz"] = {
+                path = "/books/m1-c2.cbz", manga_id = manga.id, chapter_id = items[2].id, endpoint_scope = server_url,
+            } }))
             assert.is_true(queue:enqueue(manga, items[3], "/books"))
             if entrypoint == "manga" then
                 plugin:performMangaAction(manga, "download_next_60_unread")
@@ -493,6 +496,9 @@ describe("bounded bulk download actions", function()
         it("keeps " .. action .. " immediate when a small batch fits", function()
             local items = openChapters(chapters(10))
             archives["/books/m1-c1.cbz"] = true
+            assert(settings:saveReaderReturnContexts({ ["/books/m1-c1.cbz"] = {
+                path = "/books/m1-c1.cbz", manga_id = manga.id, chapter_id = items[1].id, endpoint_scope = server_url,
+            } }))
             assert.is_true(queue:enqueue(manga, items[2], "/books"))
             if action == "download_selected" then
                 for index = 1, 5 do plugin:toggleChapterSelection(manga, items[index]) end

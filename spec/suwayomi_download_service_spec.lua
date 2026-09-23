@@ -978,6 +978,16 @@ describe("process-owned download navigation", function()
     end)
 
     local function manualHost(retention, reader)
+        manga.endpoint_scope = settings:normalizeEndpointScope(settings:load().server_url) or "https://suwayomi.example"
+        assert(settings:save{ server_url = manga.endpoint_scope })
+        -- Manual lifecycle controls operate on previously associated downloads.
+        local contexts = settings:loadReaderReturnContexts()
+        for _, chapter in ipairs(chapters) do
+            local path = directory .. "/" .. chapter.id .. ".cbz"
+            contexts[path] = { path = path, manga_id = manga.id, chapter_id = chapter.id,
+                endpoint_scope = manga.endpoint_scope }
+        end
+        assert(settings:saveReaderReturnContexts(contexts))
         assert(settings:saveDeleteChaptersSettings{
             delete_after_mark_read = true, delete_finished_while_reading = retention or 0,
         })
@@ -1227,7 +1237,7 @@ describe("process-owned download navigation", function()
         local path = directory .. "/c1.cbz"
         write(path, "captured archive")
         assert(settings.store:saveKey("reader_return_contexts", {
-            [path] = { path = path, manga_id = "m1", chapter_id = "c1", visit = "original" },
+            [path] = { path = path, manga_id = "m1", chapter_id = "c1", visit = "original", endpoint_scope = manga.endpoint_scope },
         }))
         local original_remove = os.remove
         os.remove = function(value)
@@ -1372,6 +1382,7 @@ describe("process-owned download navigation", function()
     end)
 
     it("renders replacement download state instead of obsolete removed history", function()
+        assert(settings:save({ server_url = "https://example.invalid" }))
         local plugin = manualHost(0)
         local path = directory .. "/c1.cbz"
         write(path, "original archive")
@@ -1427,7 +1438,7 @@ describe("process-owned download navigation", function()
         assert.are.equal("keep backup", read(path .. ".sdr/metadata.lua.old"))
     end)
 
-    it("verifies legacy and pending-removal archives without publishing download authority", function()
+    it("preserves recorded origin while verifying archives without publishing deletion authority", function()
         local plugin, owner = manualHost(0, true)
         local path = directory .. "/c1.cbz"
         local native = require("spec/support/native_archiver")
@@ -1453,6 +1464,7 @@ describe("process-owned download navigation", function()
         end
         verify()
         assert.is_nil(queue.manual_deletion:getTarget("m1:c1", path))
+        assert.are.equal(manga.endpoint_scope, settings:loadChapterLedger()["m1:c1"].endpoint_scope)
         assert(plugin:performChapterAction(manga, chapters[1], "mark_read"))
         local before = settings.store:readKey("manual_archive_state").requests["m1:c1"]
         verify()
@@ -1870,7 +1882,7 @@ describe("process-owned download navigation", function()
             plugin:setCurrentMangaChapterContext(manga, { chapter })
             assert(plugin:performChapterAction(manga, chapter, "mark_unread"))
             local batch = plugin:buildPendingReadSyncBatch(plugin:loadChapterLedger(), 50)
-            assert.are.equal(1, plugin:applyPendingReadSyncResult({ batch = batch }, { successes = batch }))
+            assert.are.equal(1, plugin:applyPendingReadSyncResult({ batch = batch, endpoint_scope = batch[1].endpoint_scope }, { successes = batch }))
             plugin:setCurrentMangaChapterContext(manga, {
                 { id = "c1", name = "Chapter 1", is_read = false },
             })
@@ -1930,6 +1942,7 @@ describe("process-owned download navigation", function()
         assert(settings:saveDeleteChaptersSettings({ delete_finished_while_reading = 3 }))
         assert(settings:saveChapterLedger({ ["m1:c1"] = {
             manga_id = "m1", chapter_id = "c1", path = path, read = already_read,
+            endpoint_scope = "https://suwayomi.example",
         } }))
         local plugin, owner = host("reader", path)
         owner.doc_settings = { readSetting = function(_, key)

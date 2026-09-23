@@ -2,6 +2,7 @@
 -- Read actions and reader lifecycle own metadata, completion publication, and sync ordering.
 -- Manual deletion and refill contribute policy to one staged document; archive bookkeeping
 -- remains with its existing owners. Failed or uncertain saves expose no committed targets.
+-- Pending choices retain their recorded endpoint; current credentials never associate legacy entries.
 
 local SuwayomiSettings = require("suwayomi/settings")
 
@@ -114,6 +115,7 @@ function Methods:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, update
 
     local entry = {}
     for key_name, value in pairs(existing) do entry[key_name] = value end
+    if not ledger[key] then entry.endpoint_scope = manga.endpoint_scope end
     entry.manga_id = tostring(manga.id or existing.manga_id or "")
     entry.manga_title = manga.title or existing.manga_title
     entry.chapter_id = tostring(chapter.id or existing.chapter_id or "")
@@ -127,6 +129,24 @@ function Methods:upsertChapterLedgerEntryInLedger(ledger, manga, chapter, update
 
     ledger[key] = entry
     return entry
+end
+
+
+function Methods:getChapterReadScope(manga, chapters, ledger)
+    local scope = SuwayomiSettings:normalizeEndpointScope(manga and manga.endpoint_scope)
+    local current = SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
+    if not scope or scope ~= current or manga.local_only then return nil, "endpoint_mismatch" end
+    local committed = self:loadChapterLedger()
+    local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga, committed)
+    for _, chapter in ipairs(chapters) do
+        local key = self:getChapterLedgerKey(manga, chapter)
+        local entry, saved = ledger[key], committed[key]
+        if chapter.local_only or not manga.id or not chapter.id
+            or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, chapter, lookup))
+            or (entry and entry.endpoint_scope ~= scope)
+            or (saved and saved.endpoint_scope ~= scope) then return nil, "origin_unknown_or_mismatched" end
+    end
+    return scope
 end
 
 
@@ -158,8 +178,7 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters, options)
         local key = self:getChapterLedgerKey(manga, item)
         local entry = ledger[key]
         local foreign_entry = entry and entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope
-        local unassociated_archive = entry and entry.path and not entry.endpoint_scope
-            and manga.endpoint_scope ~= nil
+        local unassociated_entry = entry and not entry.endpoint_scope
         if foreign_entry then entry = nil end
         local suwayomi_is_read = item.is_read == true
         local pending_read_state
@@ -171,7 +190,7 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters, options)
             end
         end
         local remote_matches_pending = pending_read_state ~= nil and suwayomi_is_read == pending_read_state
-        if options and options.saved then remote_matches_pending = false end
+        if unassociated_entry or (options and options.saved) then remote_matches_pending = false end
         local is_read = pending_read_state
         if remote_matches_pending then
             pending_read_state = nil
@@ -184,7 +203,7 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters, options)
         item._suwayomi_is_read = suwayomi_is_read
         item.is_read = is_read
 
-        if foreign_entry or unassociated_archive or (options and options.saved) then
+        if foreign_entry or unassociated_entry or (options and options.saved) then
             item.pending_read_sync = entry and entry.pending_read_sync
         elseif remote_matches_pending then
             if is_read or (entry and entry.path) or hasUnrelatedFields(entry) then
@@ -230,6 +249,7 @@ function Methods:markCurrentContextChapterReadFromLedger(entry)
 
     local context = self.current_chapter_context
     local manga = context.manga or {}
+    if entry.endpoint_scope ~= manga.endpoint_scope then return false end
     if entry.manga_id and tostring(manga.id or "") ~= tostring(entry.manga_id) then
         return false
     end
@@ -254,13 +274,17 @@ function Methods:markLedgerEntryRead(entry)
     local ledger = self:loadChapterLedger()
     local key = tostring(entry.manga_id or "") .. ":" .. tostring(entry.chapter_id or "")
     local ledger_entry = ledger[key]
-    if not ledger_entry or ledger_entry.read == true then
+    if not ledger_entry or ledger_entry.read == true
+        or ledger_entry.endpoint_scope ~= entry.endpoint_scope
+        or ledger_entry.path ~= entry.path or ledger_entry.archive_generation ~= entry.archive_generation then
         return false
     end
 
     ledger_entry.read = true
-    ledger_entry.pending_read_sync = true
-    ledger_entry.pending_read_state = true
+    if SuwayomiSettings:normalizeEndpointScope(ledger_entry.endpoint_scope) then
+        ledger_entry.pending_read_sync = true
+        ledger_entry.pending_read_state = true
+    end
     local saved_ledger, err = self:saveChapterLedger(ledger)
     if not saved_ledger then return false, nil, err end
     self:markCurrentContextChapterReadFromLedger(ledger_entry)
@@ -280,10 +304,12 @@ function Methods:hasPendingReadSync(ledger)
 end
 
 
-function Methods:buildPendingReadSyncBatch(ledger, max_count)
+function Methods:buildPendingReadSyncBatch(ledger, max_count, endpoint_scope)
+    endpoint_scope = endpoint_scope or SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
     local keys = {}
     for key, entry in pairs(ledger or {}) do
-        if entry.pending_read_sync == true and entry.chapter_id then
+        if endpoint_scope and entry.endpoint_scope == endpoint_scope
+            and entry.pending_read_sync == true and entry.chapter_id then
             table.insert(keys, key)
         end
     end
@@ -303,6 +329,9 @@ function Methods:buildPendingReadSyncBatch(ledger, max_count)
             key = key,
             chapter_id = tostring(entry.chapter_id),
             desired_read_state = desired_read_state == true,
+            endpoint_scope = endpoint_scope,
+            archive_generation = entry.archive_generation,
+            path = entry.path,
         })
     end
     return batch

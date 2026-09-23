@@ -948,6 +948,7 @@ describe("complete stored chapter loading", function()
         local entries = {}
         for _, id in ipairs({ 199, 200, 201, 202 }) do
             entries["17:" .. id] = { manga_id = "17", chapter_id = tostring(id),
+                endpoint_scope = "https://suwayomi.example",
                 read = id == 201 or id == 202, pending_read_sync = id ~= 202,
                 pending_read_state = id == 201 and true or false,
                 archive_generation = { id = "generation-" .. id }, manual_intent = { revision = id } }
@@ -1134,6 +1135,15 @@ describe("complete stored chapter loading", function()
                 if invalidation == "filter change" then
                     downloaded_paths[plugin:getChapterPath(manga, plugin.current_chapter_context.chapters[2])] = true
                 end
+                local associated = settings:loadChapterLedger()
+                for _, item in ipairs(plugin.current_chapter_context.chapters) do
+                    local path = plugin:getChapterPath(manga, item)
+                    if downloaded_paths[path] then
+                        associated["17:" .. item.id] = { manga_id = "17", chapter_id = item.id,
+                            path = path, endpoint_scope = manga.endpoint_scope, read = item.is_read == true }
+                    end
+                end
+                assert(settings:saveChapterLedger(associated))
                 require("suwayomi/downloads/downloader").chapterExists = function(_, path) return downloaded_paths[path] == true end
                 if origin == "chapter title" then plugin:refreshChapterMenu({ quick = true }) end
                 local return_contexts, return_writes, reader_opens = "{}", 0, {}

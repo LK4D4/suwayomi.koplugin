@@ -175,6 +175,14 @@ function Service:commitCompletion(job, path)
             entry.path = path
             if not verification then
                 entry.endpoint_scope = self.settings:normalizeEndpointScope(job.manga.endpoint_scope)
+            elseif not doc.chapter_ledger[key] then
+                local recorded = type(doc.reader_return_contexts) == "table" and doc.reader_return_contexts[path]
+                if type(recorded) == "table" and recorded.path == path
+                    and tostring(recorded.manga_id) == entry.manga_id
+                    and tostring(recorded.chapter_id) == entry.chapter_id then
+                    -- Inspection may copy an existing path association, never the current credentials.
+                    entry.endpoint_scope = self.settings:normalizeEndpointScope(recorded.endpoint_scope)
+                end
             end
             doc.chapter_ledger[key] = entry
             if type(doc.reader_return_contexts) ~= "table" then doc.reader_return_contexts = {} end
