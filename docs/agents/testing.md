@@ -1,329 +1,34 @@
 # Testing workflow for agents
 
-Use local KOReader and a disposable Suwayomi server for runtime verification. Use hardware for platform-sensitive behavior and explicit device acceptance. [AGENTS.md](../../AGENTS.md) owns repository gates, worktrees, packaging, and data safety; the [test strategy](../ARCHITECTURE.md#test-strategy) maps isolated coverage.
+Use this guide before planning verification, running integration/UI/device checks, or handing off manual QA. [AGENTS.md](../../AGENTS.md) owns repository checks, worktrees, and data safety. The [test strategy](../ARCHITECTURE.md#test-strategy) maps isolated coverage. Use the [sandbox runbook](../sandbox.md) only for live server or KOReader work, and the [feature recipes](../testing-recipes.md) when their behavior is in scope. [Dated evidence](../evidence/README.md) records earlier candidates; it is context, not a pass for a new candidate.
 
-## Choose the evidence
+## Select evidence
 
-Match each requirement to a precondition, action, observable outcome, and environment. Run only the layers the change needs:
+For each requirement, write down the precondition, user action or injected fault, independently observable outcome, and environment. Choose the narrowest layers that establish the changed behavior:
 
-| Layer | Establishes | Does not establish |
+| Layer | Establishes | Limit |
 | --- | --- | --- |
-| Isolated LuaJIT specs | Selection, state transitions, deterministic failure boundaries | Real server compatibility or KOReader lifecycle |
-| Plugin code against a real server | GraphQL, authentication, binary responses, parsing and transfers | Menu wiring, reader transitions, device behavior |
-| Local KOReader plus real server | Actual menus, workers, reading, persistence, navigation and restart | Android permissions, physical sleep/wake, e-ink usability |
-| Target device | Required platform behavior under recorded controls | Other platforms or the cause of an unreproduced crash |
+| Isolated LuaJIT specs | Deterministic selection, state transitions, and failure boundaries | No real server or KOReader lifecycle |
+| Plugin with a real server | GraphQL, authentication, binary responses, parsing, and transfers | No menu wiring, reader transition, or device behavior |
+| Desktop KOReader with a real server | Actual menus, workers, reading, persistence, navigation, and restart | No Android permissions, physical sleep/wake, or e-ink usability |
+| Target device | Platform behavior under recorded controls | No claim about untested devices, routes, or crash causes |
 
-Reuse focused specs and prior evidence. A closed issue with accepted gaps does not establish its unchecked cases. Ordinary specs stay offline and independent of a server, KOReader installation, or personal library. Sandbox runs are opt-in.
+Ordinary specs stay offline, without a server, KOReader install, or personal library. Run sandbox checks only when a real integration or UI question warrants them. Follow the LuaJIT command in [AGENTS.md](../../AGENTS.md#tests-and-commands); plain Lua 5.1 lacks `ffi` and misses native archive and durable-storage boundaries.
 
-Run isolated specs with `busted --lua=luajit spec` when the installed Busted launcher does not already select LuaJIT. A LuaRocks launcher can hardcode plain Lua 5.1, which lacks `ffi` and cannot exercise the native archive and durable-storage boundaries.
+## Run the relevant path
 
-## Start a fresh sandbox
+Use the normal widget path for UI claims. A direct downloader call cannot establish that its button works; an injected completion flag cannot establish native completion and close. Label fixture edits and injected faults as preconditions, and distinguish them from the user action being tested. Compare the outcome with independent server, filesystem, saved-state, and process evidence. A matching title or successful tap is insufficient to prove a download or rendered page.
 
-### Prerequisites
+When navigation or entry behavior is in scope, open **KOReader Search > Suwayomi** natively and check the destination and return path. The sandbox's `ui home` and `auth-smoke` helpers enter the plugin directly, so neither proves the native Search entry. Use [sandbox UI controls](../sandbox.md#inspect-the-ui-safely) for the rest of the flow; use [feature recipes](../testing-recipes.md) for endpoint read sync, Library/chapter cache, and related controls.
 
-The shipped launcher supports **Linux x86_64**: native Linux, Windows with [WSLg](https://learn.microsoft.com/en-us/windows/wsl/tutorials/gui-apps), or a Linux VM with a desktop. It is not a native Windows or macOS runtime launcher. Docker is not required.
-
-Provide these prerequisites in that Linux environment:
-
-- [Python 3.9+](https://www.python.org/downloads/). The Python tooling uses only the standard library; no pip packages are required.
-- A working graphical session and the system dependencies needed by the pinned [KOReader desktop Linux](https://github.com/koreader/koreader/wiki/Installation-on-desktop-Linux) release. KOReader v2026.07.1 uses SDL3 and bundles its SDL3 shared library; the sandbox does not require a separate SDL2 installation. A shell alone is not a display. Use the distribution's documented dependencies when provisioning the environment, and inspect the sandbox's private `logs/reader.log` for missing libraries or display initialization failures.
-- HTTPS access for setup to fetch the pinned [KOReader releases](https://github.com/koreader/koreader/releases) and [Suwayomi releases](https://github.com/Suwayomi/Suwayomi-Server/releases). See [Suwayomi installation guidance](https://github.com/Suwayomi/Suwayomi-Server#downloading-and-running-the-app) for upstream requirements.
-
-[scripts/sandbox.py](../../scripts/sandbox.py) owns the release pins and download selection; `sandbox.json` records the installed versions. The scripts download application releases but do not install OS packages or change firewall, routing, DNS, or other network configuration. Provision missing prerequisites separately.
-
-On Windows, run `wsl.exe -- bash`, then run the commands below from the plugin checkout inside Linux. Both `SOURCE` and `ROOT` must be Linux paths, and both services must run in that same environment. Windows paths and a successful Windows browser request do not establish connectivity from KOReader.
-
-### Setup and deploy
-
-Run these commands from the candidate plugin root. Choose an absolute, disposable `ROOT` outside the checkout. Use the same exported values in each terminal or supervised process:
-
-```sh
-export SOURCE="$PWD"
-export ROOT="$HOME/suwayomi-sandboxes/chapter-check"
-python3 scripts/sandbox.py --root "$ROOT" setup
-python3 scripts/sandbox.py --root "$ROOT" deploy --source "$SOURCE" --revision "sandbox-candidate"
-```
-
-`setup` requires an absent or empty root. It refuses existing contents; there is no destructive reset. For another clean comparison, choose a new root. To select unused ports, add `--server-port 4569 --inspector-port 8083` to `setup` with your chosen values. An occupied service port is an error, not permission to kill an unrelated process.
-
-Authentication is explicit. `setup --auth-mode basic_auth` is the default; use `setup --auth-mode simple_login` or `setup --auth-mode ui_login` in a different empty root for either login method. `sandbox.json` records `auth_mode`, and setup writes the matching server and plugin settings. Roots created before this field existed remain Basic Auth. The launcher does not switch or fall back between modes.
-
-Setup creates isolated runtime trees, server data, a KOReader profile, and client downloads. It generates `server-data/local/Sandbox Alpha/Chapter 001.cbz` through `Chapter 003.cbz`, each containing three visibly labeled PNG pages. No personal server, settings, credentials, or library copy is needed.
-
-Deployment copies only the canonical runtime payload into `profile/plugins/suwayomi.koplugin`. `deployment.json` records the caller-supplied revision label and SHA-256 for every deployed file. The script does not authenticate the label against Git; record dirty changes separately and compare the manifest with the intended candidate when reporting exact-hash coverage. The copy does not follow later source edits. Stop KOReader before redeploying. Deployment refuses changed or unrecorded files in an existing payload rather than overwriting uncertain data.
-
-Deployment also refreshes the sandbox-only inspector patch and records its digest. Stop the reader and redeploy after changing the tooling; this leaves credentials and downloaded fixtures intact.
-
-### HTTPS coverage
-
-Use HTTPS when changing transport or authentication. HTTP-only smoke checks do not exercise KOReader's LuaSec client. Install `openssl` and `socat` in the Linux environment, then add `--https-port 4570` to `setup` in a fresh root. The HTTPS, backend, and inspector ports must differ.
-
-Setup generates a private, 30-day localhost certificate under `tls/` and sets the plugin and setup wizard to the HTTPS endpoint. No system trust store is changed. The Python readiness client trusts only this root's certificate; KOReader retains its existing LuaSec certificate policy. This checks HTTPS transport compatibility, not production certificate validation. Create a fresh root after certificate expiry.
-
-Start `run server` and wait for `server ready`, then start this command in another supervised process:
-
-```sh
-python3 scripts/sandbox.py --root "$ROOT" run tls
-```
-
-Wait for **`tls ready`** before starting the reader. This requires certificate-verified HTTPS, authenticated API access, and HTTP 401 without credentials. The TLS proxy and HTTP backend bind only to loopback. Socat's `verify=0` means clients need no client certificate; it does not disable the readiness client's server-certificate validation.
-
-Run `auth-smoke` and the normal UI checks against the configured HTTPS endpoint. Authentication modes remain separate fresh-root controls. Stop the reader, then `stop tls`, then the server; `status` must show all three stopped. Keep TLS keys and raw proxy logs private with the rest of the sandbox.
-
-### Run and wait for readiness
-
-Keep each command in a separate terminal or harness-supervised foreground process. Start the server first:
-
-```sh
-python3 scripts/sandbox.py --root "$ROOT" run server
-```
-
-Wait for **`server ready`**. This requires authenticated readiness and real API seeding of the Local source library, not just process creation. In the second terminal, start KOReader:
-
-For Simple Login, readiness uses a launcher-owned, in-memory cookie jar and posts the generated credentials to `/login.html`. The pinned release must return `303` with `Location: /` and a session cookie; the launcher does not follow that redirect or any API redirect. Authenticated API calls then discover and seed the fixtures, and a separate cookie-free request must be rejected. No cookie is written to disk, printed, or shared with KOReader. This proves server readiness, not plugin authentication.
-
-For UI Login, readiness uses a launcher-owned, in-memory access/refresh token pair obtained through GraphQL login. Protected API calls send the access token as a Bearer header. A rejected access token permits one refresh and one replay; only definite refresh-token rejection permits a new login. Login and refresh carry no old access credentials, and no API redirect is followed. A separate token-free request must be rejected. Tokens are never persisted, printed, or shared with KOReader; launcher readiness does not prove plugin authentication.
-
-```sh
-python3 scripts/sandbox.py --root "$ROOT" run reader
-```
-
-Wait for **`reader ready`**, which requires authenticated inspector access. In a third terminal, inspect owned-process state:
-
-```sh
-python3 scripts/sandbox.py --root "$ROOT" status
-```
-
-If SDL display selection is necessary, prefix the reader command with `SDL_VIDEODRIVER=x11` or `SDL_VIDEODRIVER=wayland`, only when that driver and display are available. Keep the existing `DISPLAY` or `WAYLAND_DISPLAY` from the graphical session. The launcher does not create a desktop or display server.
-
-`status` reports running/stopped state, not readiness. A spawned PID, open TCP port, or HTTP acknowledgment alone is not readiness or a successful plugin request. Report startup failure directly. `stop` targets only sandbox-owned services; never stop another application to free a port.
-
-An immediate restart after graceful shutdown can fail with `Requested sandbox port is already in use` while only old `TIME-WAIT` connections remain. Check the configured port with `ss -ltn` for a listener and `ss -tan` for connection state. If there is no listener and the owned service is stopped, wait for those connections to expire and retry the same launch. Do not kill another process or change an existing sandbox's recorded ports to bypass this transient preflight failure.
-
-### Observe and run the single-chapter smoke
-
-From the plugin root, with both services ready and the fresh English-language profile:
-
-```sh
-python3 scripts/sandbox.py --root "$ROOT" ui home
-python3 scripts/sandbox.py --root "$ROOT" ui observe
-python3 scripts/sandbox.py --root "$ROOT" ui tap "Library"
-python3 scripts/sandbox.py --root "$ROOT" ui wait "Suwayomi Library"
-python3 scripts/sandbox.py --root "$ROOT" ui screenshot "$ROOT/evidence/library.png"
-python3 scripts/sandbox.py --root "$ROOT" smoke
-```
-
-Use returned labels and titles for further navigation. Smoke follows Library, Sandbox Alpha, Open chapters, and a not-yet-downloaded fixture chapter. It invokes Download, waits for Downloaded, checks exactly one new CBZ and unchanged existing archives, and compares all three PNG pages with the source fixture. It then opens that archive, captures a screenshot, and uses the reader menu's Go to Suwayomi action to return. Inspect the returned evidence and screenshot; invocation alone is not success. This does not cover bulk limits, retention, auth failures, or hardware behavior.
-
-If a bundled fixture chapter remains open after manual checks, close it with:
-
-```sh
-python3 scripts/sandbox.py --root "$ROOT" ui close-reader
-```
-
-Then shut down the sandbox:
-
-```sh
-python3 scripts/sandbox.py --root "$ROOT" stop reader
-python3 scripts/sandbox.py --root "$ROOT" stop server
-python3 scripts/sandbox.py --root "$ROOT" status
-```
-
-`ui close-reader` is a reader transition, not process shutdown. By default it expects the bundled `Chapter 001`–`003` list. For custom fixtures, pass `--title "Expected chapter screen title"`; the helper still uses the normal **Go to Suwayomi** action and requires that exact destination without an open document. Close custom documents before `stop reader`, whose automatic close uses the default fixture check. Keep a failed sandbox for diagnosis; starting fresh does not require deleting it.
-
-### Exercise authentication through the actual setup UI
-
-Choose a fresh root with the authentication mode under test, deploy the candidate, and start both services as above. For UI Login, use `setup --auth-mode ui_login`. Then run:
-
-```sh
-python3 scripts/sandbox.py --root "$ROOT" auth-smoke
-```
-
-This English-profile scenario opens **Settings > Setup wizard**, fills all three visible inputs from the sandbox's private configuration, and visits all three authentication choices before selecting the configured method. It tests a deliberately wrong password, requires the failed setup title and disabled **Continue**, restores the correct password, and requires the real worker's success message and tested title with **Continue** enabled. It dismisses result messages through ordinary widget handlers, continues setup, selects the existing sandbox download directory with **Use this folder > Choose**, and runs the single-chapter smoke above. It saves credentials through the real setup callback, not by editing plugin settings. Run it once per fresh comparison root; like `smoke`, it needs an unused fixture chapter.
-
-For deliberate failed credentials or individual controls, use the observed field hint or its 1-based index:
-
-```sh
-python3 scripts/sandbox.py --root "$ROOT" ui home
-python3 scripts/sandbox.py --root "$ROOT" ui tap "Settings"
-python3 scripts/sandbox.py --root "$ROOT" ui tap "Setup wizard"
-python3 scripts/sandbox.py --root "$ROOT" ui fill "Server URL" --credential server_url
-python3 scripts/sandbox.py --root "$ROOT" ui fill "Username" --credential username
-python3 scripts/sandbox.py --root "$ROOT" ui fill "Password" --credential password --invalid
-python3 scripts/sandbox.py --root "$ROOT" ui tap "Test connection"
-python3 scripts/sandbox.py --root "$ROOT" ui observe
-```
-
-Wait for the final failure message, not the loading message. `ui tap "Dismiss message"` dismisses an ordinary informational popup; it does not dismiss a loading operation. Require the failed setup title and disabled **Continue**. Restore the password with `ui fill "Password" --credential password`, test again, dismiss the success message, and require the tested title before continuing. To change methods, tap the observed **Authentication: Basic Auth**, **Authentication: Simple Login**, or **Authentication: UI Login** button, then the desired method in **Authentication method**. Existing typed fields stay in the connection dialog.
-
-For saved-credential controls, open **Settings > Connection > Login information**, fill the visible fields, choose the method, and tap **Save**. Dismiss its saved message, then use the existing **Test connection** action. Correcting settings does not retry failed downloads: navigate to the failed chapter and invoke its ordinary **Retry** action explicitly. Use `ui observe` between steps rather than assuming a previous dialog remains current.
-
-`ui fill FIELD --stdin` accepts exact text from standard input for other visible single-line inputs, including numeric settings. Supply sensitive text through a private pipe or a Python caller, not command arguments or shell history; a trailing newline is rejected. Do not capture screenshots while any password is revealed. Field observations and fill results omit all input values. Screenshots are raw framebuffer evidence and can still contain visible usernames, endpoints, or revealed passwords.
-
-`auth-smoke` does not establish restart, session expiry, independent concurrent sessions, concurrent download limits, read sync, credential changes during active work, ambiguous mutation failures, or bounded authentication recovery. Exercise those separately using the plugin's ordinary widgets and owned-service `stop`/`run` controls. Launcher sessions are intentionally independent of plugin sessions, so successful seeding cannot establish those contracts.
-
-For a server-restart control, keep the plugin process alive while using `stop server` followed by `run server`, wait for authenticated readiness, then exercise another protected operation. Restart probes tolerate TIME_WAIT sockets but still refuse live listeners. A new plugin process alone cannot prove recovery of an existing cookie. For idle-session behavior without a 30-minute wait, a disposable transport control may send an invalid cookie to the real server; record that as injected session invalidation, not elapsed-time expiry.
-
-For UI Login, a normal server restart can preserve JWT validity. Test access rejection and refresh-token rejection separately, including a refresh timeout/server error that must not trigger login fallback. Use short configured token lifetimes for elapsed-time expiry, or label injected invalid-token controls explicitly. Neither control establishes the other.
-
-## Inspect the UI safely
-
-The repository ships [sandbox_ui.py](../../scripts/sandbox_ui.py) and [sandbox-inspector.lua](../../scripts/sandbox-inspector.lua); machine-local inspector prototypes are no longer prerequisites. Setup installs the patch only into the sandbox profile as `patches/2-sandbox-inspector.lua`. It uses KOReader's bundled HTTP inspector, not a production plugin modification or a separate execution service.
-
-The inspector binds to `127.0.0.1` and requires the private `profile/inspector.token`; its port comes from `profile/inspector.port`. Server credentials live in `secrets.json`. Helpers read these files internally. Do not pass secrets as command arguments, print them, or enable transport logging that records headers. Keep the root private and never expose the inspector to a LAN or the Internet. Verify rejected missing/wrong tokens when changing this boundary.
-
-Prefer `observe` for titles, labels, enabled controls, field hints/indices, and page state. `tap` resolves a unique enabled label, waits for its first paint, then queues the existing widget handler on KOReader's next UI tick. `fill` sends a bounded, authenticated POST only to an observed editable input; it uses the widget's ordinary delete/insert methods and waits for the edit acknowledgment without exposing text. The inspector recognizes a dialog's own virtual keyboard, but never skips unrelated modal windows. Missing, stale, or ambiguous controls are failures. Re-observe after navigation or asynchronous updates. `wait` has a deadline and reports the last observation on failure; a matching title does not establish download completion. Use framebuffer screenshots for layout, clipping, covers, rendered pages, and unexpected dialogs, not after every tap. An empty or unsupported observation needs investigation, not a passing assertion.
-
-The inspector also discovers button layouts nested in visual containers, including ordinary confirmation dialogs and touch-only KOReader's button tables without a D-pad focus layout. Re-observe the confirmation and activate its exact visible label; do not bypass confirmation callbacks or traverse arbitrary object properties.
-
-Reader transitions can briefly interrupt inspector access. The helper bounds connection-refused retries to a 15-second transition deadline. It also retries connection resets for read-only observations during that interval, but never replays a possibly executed control action. Other network errors are failures.
-
-The inspector's Bearer token is unrelated to Suwayomi authentication and remains mandatory in all server modes. The allowlist does not expose arbitrary Lua evaluation, global-object browsing, settings assignment, or generic method invocation. When changing input controls, verify rejected missing/wrong tokens, stale fields, unsupported routes/methods, and oversized bodies as well as a real dialog edit. These instructions describe required checks, not checks already executed.
-
-### Native reader controls and incomplete observations
-
-The inspector does not expose every widget. Native configuration choices can have empty labels. If a visible control is still missing after re-observation, capture the framebuffer and use the actual visible control through desktop input. Nested confirmation buttons are now observed directly, so try their labels first. Do not bypass confirmation by calling the downloader, or widen the inspector's method allowlist.
-
-For an X11/WSLg session, `xdotool` is an optional input tool. Identify the window by a process whose `/proc/<pid>/environ` contains the exact sandbox `KO_HOME`; matching only the title can select another KOReader session. Send keys to that window, and derive click coordinates from a current screenshot rather than reusing another dialog's coordinates. On the pinned desktop reader, **Return** opens the bottom configuration panel, **Escape** dismisses it, and **Right** advances the reader. Wait for reader initialization after opening, then verify the page change independently.
-
-The generated three-page CBZ can fit entirely on one screen in the default cropped continuous view. Advancing can then show the end-of-document dialog while the reported top page and saved progress remain **1/3**, not 100%. That is not a valid final-page-only control.
-
-For a final-page test:
-
-1. Open the bottom configuration panel and select **View Mode: page** under the page-view icon. Use a screenshot if the choices have empty observed labels.
-2. Advance through native input until observation reports `document_page == document_pages`; also inspect the rendered last-page label.
-3. Leave the document unfinished and close through **Go to Suwayomi**. Check saved `percent_finished == 1`, non-completed status, plugin/server unread state, and archive presence.
-4. For the positive control, reopen and use the native **Mark as finished** action. Check archive protection while open and the configured outcome after close. A completed document can remain downloaded when retention is Off.
-
-Read synchronization is asynchronous. A pending local read entry immediately after close is not a failed server update; wait for the server result and cleared pending state within a bounded deadline.
-
-## Extend the smoke only where needed
-
-Use the actual user path for UI and lifecycle checks. Direct downloader calls cannot establish button wiring. Injected completion flags cannot establish completion-plus-close behavior. Label programmatic preconditions and faults separately from actions under test.
-
-- **Fixtures:** follow [Suwayomi Local source layout](https://github.com/Suwayomi/Suwayomi-Server/blob/master/docs/Local-Source.md). Keep `Sandbox Alpha` and its three chapter names unchanged: every server start seeds and validates that baseline, and the bundled smoke expects it. Create separate fixture series for more than 200 chapters (pagination), at least six eligible chapters (ahead-five refill), more than 50 (bulk limits), or independent A/B/C completions (retention). Record expected identities/order and discover server-assigned IDs. Refresh and seed additional series through supported server operations; setup does not create them. Numbered CBZs alone do not cover scanlator restrictions, tied source order, extension failures, or archive-export fallback.
-- **Auth:** check GraphQL and binary covers/pages, rejected credentials, expiry/relogin, workers, and server/credential changes. A passing connection check alone is insufficient.
-- **Downloads:** compare admitted IDs with actual workers and jobs. Check CBZ entries/CRC and page bytes against fixtures, not just file existence or a “Downloaded” label. Include Open, visible page, and reader return when relevant.
-- **Cleanup/read sync:** compare archives, sidecars/backups, committed state, server read state, and displayed status. Keep final-page-only and completed-plus-close controls distinct.
-- **Recovery:** distinguish graceful quit, intentional process termination, worker failure, and network outage. Use controlled sandbox shutdown or scoped fault injection, not damaged storage or interrupted unrelated work.
-- **UI:** compare confirmation with actual admissions; inspect stale dialogs, compact sizes, and relevant locales. Successful serialization does not establish readable layout.
-
-Wait for the independent outcome itself. Restore equivalent preconditions and change one factor for comparisons. Stop polling during sleep/standby controls if observation keeps KOReader awake. A check is complete only when the expected UI result agrees with the relevant server, filesystem, and process evidence.
-
-### Read-sync endpoint acceptance
-
-Use two disposable server roots, A and B, with separate ports and credentials. Discover their fixture IDs independently; matching IDs make accidental cross-server mutation observable. Deploy the candidate into one reader profile and record its payload manifest. Keep retention Off.
-
-1. On A, mark an undownloaded chapter read through its chapter menu. Require a pathless ledger entry with A's normalized scope, a real server read transition, and cleared pending state. Mark it unread and require the reverse server transition.
-2. Open a known A download, use native **Mark as finished**, then **Go to Suwayomi**. Wait for A's read state and cleared pending flag. Preserve the archive. Continuous view may reach the completion dialog while reporting page 1; this establishes explicit completion, not a final-page-only control.
-3. Stop A, create a read choice through the normal UI, and confirm its durable pending state. Change the saved connection to B through **Settings → Connection → Login information**. Invoke **Sync**. Require A's pending choice and scope to survive, B's matching chapter to stay unchanged, and association feedback instead of a synced claim.
-4. With the reader stopped and settings privately backed up, seed distinct A-scoped, unknown, and B-scoped pending entries. Label this an injected persistence fixture. Restart under B and invoke **Sync**. Require only B's entry to clear and only its server chapter to change. Repeated Sync must report the retained unsendable choices accurately.
-5. For unknown recovery, stop the reader and back up its settings and native sidecar. Remove the recorded archive's origin evidence and cached association, retain its IDs, clear pending flags, and restore native status to unfinished as a labeled fixture precondition. Reconstruct offline and Open through the normal UI. Require a rendered page without newly established scope or pending sync. Restore the configured server before native **Mark as finished** and close. Require native completion and local read state, still-unknown origin, no pending enrollment, and unchanged matching server read state.
-6. Compare final archive and payload hashes, retain private evidence, and stop owned services. Report scheduling/dispatch races, stale acknowledgments after entry replacement, retry-loop suppression, and rejected/uncertain writes from the composed fixtures separately; ordinary UI timing does not establish those deterministic boundaries.
-
-#### Read-sync desktop evidence — 2026-09-23
-
-Candidate `16ee28566c067e268de6124abcc801829ef66b94` passed the controls above on WSLg, KOReader v2026.07.1, and two Suwayomi v2.3.2243 Basic Auth servers. All 98 deployed files matched source bytes before and after acceptance. No production profile or hardware was used.
-
-| Control | Observed outcome |
-| --- | --- |
-| Download/Open/return | All three PNG pages matched the synthetic source; the exact archive opened and survived reader return. |
-| Pathless read/unread | Both real server transitions succeeded; ledger retained A scope without inventing a file path. |
-| Known-origin completed close | Native completion synchronized to A and cleared pending state. |
-| Saved connection A → B | A's offline choice remained pending; matching B chapters stayed unread; Sync reported unassociated pending changes. |
-| Injected mixed pending batch | B's eligible entry alone cleared; foreign and unknown choices survived, with their B chapters unchanged. |
-| Unknown-origin Open/completed close | Recovered archive rendered; native status became complete and local read became true; scope remained unknown, pending sync absent, and B's matching chapter unread. |
-
-Private fixture backups, observations, and screenshots remain in the disposable acceptance roots. Both servers and the reader were confirmed stopped. The 30 endpoint-scope regressions and full 1,615-spec LuaJIT run cover deterministic boundaries separately. Android lifecycle, permissions, sleep/wake, and physical device behavior remain unverified by this desktop run.
-
-### Library-cache acceptance
-
-Use the setup, deployment, service, and inspector commands above. Record the baseline/candidate revisions and deployment manifests separately; fixture edits below are test preconditions, not plugin actions.
-
-1. Run the single-chapter smoke on a pre-cache baseline (`6959d9f` for issue #50). Stop the reader and retain private copies of its settings and thumbnail directory. Hash the downloaded archive and sidecar after the reader closes. To exercise the legacy raw-image format explicitly, move a fixture's decoded `.bb` into private evidence and place its source PNG at the same cache-key stem with a `.png` extension. Label this as an injected pre-upgrade cache fixture.
-2. Deploy the candidate with the server stopped. Open Library through Home: recorded downloads should supply rows and available covers without setup or linking. Restart offline and repeat. In a separate disposable profile with no usable cache or recorded download metadata, expect missing-information feedback rather than an authoritative empty Library.
-3. Start the server and add a separate synthetic series (for example, `Library Beta`) through the Local source and supported server APIs. Keep `Sandbox Alpha` and its source archives intact. Create a second category and assign the extra series to it. Open Library or choose its ordinary **Refresh**, and require the complete server rows/categories to replace the reconstructed view. Select **Default**, the extra category, and **All manga**; account for the category-picker preference.
-4. For a delayed-response control, verify the sandbox server PID and recorded process start time before suspending that owned process. Open cached Library and select categories/manga while the request remains pending. Resume it and ensure the user's selected manga stays foreground. A stopped server is a separate failure control: cached rows/covers remain usable after failure and cold reader restart. Neither control is a physical network outage.
-5. Remove only the extra series from server Library and choose **Refresh**; require its row to disappear without changing existing archives. For authoritative emptiness, temporarily remove every Library member, refresh to empty, stop the server, and cold-restart only the reader. It must stay empty despite known downloads. Do not restart the launcher server before this assertion: startup reseeds `Sandbox Alpha`. Restore controlled membership afterward.
-6. Repeat **Library → menu → Suwayomi home → Library**, then close the new Library branch. It must return to the underlying KOReader screen, not reveal inert old Library rows. Compare archive/sidecar hashes and preserved credentials/read/download state independently of screenshots.
-7. Retain redacted observations, screenshots, exact payload/inspector hashes, versions, fault descriptions, and expected/actual outcomes. Restore faults and stop owned services. Checked-write rejection, incomplete responses, stale/cross-server publication, and unassociated-ID collisions also have deterministic regressions in the Library, API/worker, and checked-settings specs; report their evidence separately from device observations.
-
-### Chapter-cache acceptance
-
-Keep the Library and chapter controls in the same disposable profile; separate page-progress, server-membership, and unknown-association controls so one cannot mask another.
-
-1. Run the baseline smoke before deploying the candidate (`1425ec6` for issue #51). Save its deployment manifest and private settings; hash the downloaded archive. Add independent Local source series through supported server APIs: a three-chapter removal fixture, a never-opened fixture, and a category containing the removal fixture. Browse Library/categories online, but leave the never-opened manga's chapters unopened.
-2. Browse and download a removal-fixture chapter through the normal UI. Open it, select native **View Mode: page**, advance to page 2, and return through **Go to Suwayomi**. Record the native sidecar and archive hashes. Stop the server, then follow **Library → manga → Open chapters → downloaded chapter → Open**. Require a visible page and immediate reader return, not merely a successful tap acknowledgment. Cold-restart the reader offline and verify native page-2 resume. Repeat at the last page without marking finished; native status, server/plugin read state, and archive presence must remain consistent with unfinished reading.
-3. Open the never-loaded fixture offline: require missing-information feedback, distinct from a successful empty list. For first-upgrade recovery, stop the reader, retain private settings, and remove only `chapter_cache` through the checked store. Strip association/title fields from recorded fixture metadata as a separately labeled legacy-data injection. Keep Library cache for the first run, then omit it for a second run. Existing files must remain reachable, Open/Verify must work without setup, and opening/return must not manufacture endpoint scope or pending synchronization. Restore the saved settings afterward.
-4. For pending-response behavior, verify the sandbox server PID/start time, suspend only that process group, and immediately open cached Library, chapters, and a downloaded archive. Require a visible reader before resuming the server; finally resume it even if the check fails. The sandbox inspector transfers its listener across UI hosts because forked workers retain inherited sockets. Rebinding a new listener during this control is a harness defect, not evidence of a product connection failure.
-5. Remove one source archive from the independent fixture into private evidence, then use **Refresh chapters**. Confirm the real server and chapter screen omit that row while the device archive and sidecar hashes remain unchanged. Restore source files after the control. On Suwayomi v2.3.2243, removing every source chapter returns **No chapters found**, not a successful empty list; expect the previous complete list to survive that failure.
-6. Test successful emptiness separately. With the real server stopped, a disposable authenticated HTTP responder at the same endpoint may inject, for only the controlled manga, `GET_CHAPTERS_MANGA` → `{"data":{"chapters":{"nodes":[],"totalCount":0,"pageInfo":{"hasNextPage":false}}}}`, then `GET_MANGA_CHAPTERS_FETCH` → `{"data":{"fetchChapters":{"chapters":[]}}}`. Reject other requests and never log headers. Open chapters normally, require the explicit empty state, stop the responder, and cold-restart the reader offline. The empty cache must win over retained downloads. Label this **injected successful response**, not a real-server successful empty refresh. Restore the real server and require ordinary opening/refresh to replace the empty cache.
-7. Exercise the existing controls: mark a known chapter read offline, verify a durable pending choice, reconnect and use **Sync**, then independently check server read state. After the chapter refresh settles, mark it unread and verify the reverse transition. Download and explicitly delete a spare chapter through its confirmation, proving the control archive disappears while unrelated archive/progress hashes stay unchanged. A stale action captured before context replacement must be retried from the current menu.
-8. Compare the final deployment manifest with source bytes, retain redacted framebuffers/observations and independent state evidence, restore fixture faults, and stop owned services. Report checked-write rejection, incomplete/oversized responses, scope collisions, and retired-host guards from the composed regression suite separately from desktop observations.
-
-Additional recovery controls, with a private settings backup restored between cases:
-
-- Keep a saved scanlator restriction while removing scanlator/scope metadata from a recorded download. Clear the restriction through the existing menu, then require the file to become visible and open. This is a current-view choice: shared filter settings remain unchanged and the restriction may reappear after reader return. The composed regression also supplies an enabled same-ID Auto-download association and requires no refill enrollment.
-- Retain a recorded file's current endpoint but omit both manga/chapter IDs and descriptive fields; remove other same-path identity records. Reconstruct without Library/chapter caches, Open, and **Go to Suwayomi**. Require the normal directory-identified list, unchanged endpoint, and still-absent IDs.
-- Inject an older title and `in_library=false` into chapter-cache manga metadata while retaining the newer Library snapshot. Open chapters offline; the current Library title and **Remove from library** action must win over those old fields.
-
-#### Issue #51 desktop evidence — 2026-09-18
-
-The disposable WSLg run used KOReader v2026.07.1, Suwayomi v2.3.2243, Basic Auth, baseline `1425ec6`, and the `feat/offline-chapter-cache` candidate. Raw settings, source fixtures, deployment manifests, screenshots, and observations stay outside the checkout. This is desktop evidence, not Android acceptance.
-
-| Control | Observed outcome |
-| --- | --- |
-| Baseline download/Open/return | All three downloaded PNGs matched the generated source pages. |
-| Offline reading and restart | Native page 2 resumed after cold restart; page 3 remained `reading` at 100%, with the archive retained. |
-| Legacy reconstruction | With and without Library cache, incomplete unassociated metadata exposed the recorded file; Open/return left its scope unknown and created no pending sync. |
-| Delayed server | Cached Library/chapter selection reached the visible local page while the owned server was suspended. The initial inspector rebind crash was repaired by listener handoff and the same reproduction then passed. |
-| Real chapter removal | One removed source chapter disappeared from the normal list; its device archive and progress hashes were unchanged. Real source-empty failure retained the last complete list. |
-| Injected complete empty | Both successful empty response envelopes reached the real reader/worker/storage path. The explicit empty screen survived offline cold restart despite retained downloads; ordinary reconnection restored current server membership. |
-| Existing actions | Offline read choice persisted, Sync changed server read state, unread restored it, and confirmed deletion removed only the spare device archive. |
-| Review-repair controls | Existing scanlator controls exposed an unassociated file without changing its saved filter; current-scoped missing-ID Open/return preserved scope without inventing IDs; newer Library title/membership won over injected stale chapter-cache metadata. |
-
-#### Issue #54 targeted desktop and Palma evidence — 2026-09-24
-
-Candidate `f3a3105606106d090d014e540d3ba4472163d5b4` had no dirty runtime changes. All 98 deployed files were hash-verified on WSLg and Palma; device hashes were checked again after acceptance. Desktop used KOReader v2026.07.1, Palma's installed Android package was v2026.03, and the disposable server was Suwayomi v2.3.2243 with Basic Auth. Windows ADB reverse forwarding reached the server through a loopback-only Windows-to-WSL relay; ADB forward exposed the authenticated device inspector. This establishes USB connectivity, not Wi-Fi behavior.
-
-The normal UI downloaded and opened synthetic Chapter 001, then returned through **Go to Suwayomi**. Moving only Chapter 003's source fixture aside made the real server return two chapters instead of three. A separate, disposable profile patch rejected the settings write inside menu construction, or rejected directory sync after replacement. It observed publication and committed state without modifying the deployed plugin. These were injected I/O failures in running KOReader, not actual exhausted storage or power-loss tests. Inspector SHA-256: `21189cdde4a97a05f95ab0584ec7541f9d9dfac9c058616a2577e9dd7edc948b`; fault/observation patch SHA-256: `bad3b4b64bcf5213104817f0192df0bf709585a055205920644c77cc7e7204c8`.
-
-| Control | Observed outcome |
-| --- | --- |
-| Normal download/Open/return, desktop and Palma | **Demonstrated.** Three rendered pages; extracted PNG bytes matched the synthetic source. |
-| Rejected late menu save, desktop and Palma | **Demonstrated.** Error dialog appeared. After dismissal, Chapter 003 was absent; screen rows, current context, and committed cache agreed with the two-chapter server result. Local Open and return still worked. |
-| Uncertain late menu save, desktop and Palma | **Demonstrated.** Same fresh membership; the store fence was active at publication and ambiguity feedback was shown. |
-| Failed-write effects | **Demonstrated in both modes/environments.** Two write attempts, with the second failing inside menu construction; no later save or refill call during publication. Serialized committed settings immediately before and after the failed menu save were identical. |
-| Local file preservation | **Demonstrated.** Download/archive and sidecar hashes were unchanged across both Palma fault controls and the desktop uncertain-write control. |
-| Palma offline cold restart | **Demonstrated.** After confirming the reader stopped and stopping the server, the committed two-chapter cache reappeared and the local three-page archive opened. |
-
-The first Palma fault attempt **failed because the test harness crashed KOReader**: Windows wrote `rejected\r\n`, while the patch's Lua mode assertion expected `rejected` without the retained carriage return. The arm file remained present and no fault report was produced. The same Open/return and refresh passed with the fault patch disabled. Changing only the harness writer to emit LF bytes allowed the original sequence and both fault controls to pass. The production payload did not change. The desktop-oriented quit helper also treated Android's post-quit inspector connection reset as an error; process stoppage was confirmed independently before the offline restart.
-
-Commands exercised the repository sandbox `setup`, `deploy`, `run`, `smoke`, UI controls, `stop`, and `status`, plus disposable Python drivers using `sandbox_ui.Inspector` and Windows ADB. Private manifests, fault snapshots, framebuffer captures, and fixture hashes remain in the isolated acceptance roots outside Git. Source fixtures were restored; desktop reader, server, and relay were confirmed stopped. Palma's original 671 settings files, 98 plugin files, reader settings/backups, and history were restored and hash-verified; its original disabled-app state was restored, and task-owned USB routes and profile patches were removed from the active profile.
-
-Pending read/unread precedence, selection/filter pruning, stale-request guards, successful emptiness, and earlier cache/ledger failures retain composed LuaJIT evidence; they were not separately repeated as device fault cases here. Physical storage failure, power loss, sleep/wake, and Wi-Fi transitions remain unverified by this run.
-
-### Combined release review — 2026-09-24
-
-The [release-readiness review](../release-readiness-2026-09-24.md) records fresh desktop and Palma acceptance on `81779ee`, including the #54 fault controls, offline reading and restart, exact payload verification, repository gates, and restoration evidence. It distinguishes repeated runtime controls from earlier acceptance and the remaining device coverage gaps.
+Keep comparisons controlled: restore equivalent preconditions, change one factor, and record the precise response or fault. Do not count graceful shutdown as power loss, an owned-server stop as a physical network transition, or a fault patch as exhausted storage. Let asynchronous read synchronization settle within a bounded deadline before judging it. During sleep/standby checks, avoid polling that wakes the reader.
 
 ## Hardware and human gaps
 
-Repeat device-sensitive cases on hardware: storage permissions/file identity, OS lifecycle, sleep/wake, real network transitions, touch interaction, and e-ink rendering. Explicit device requirements remain **unverified** until demonstrated or explicitly changed by the maintainer.
-
-For Android, ADB reverse forwarding can connect the device to the sandbox server; ADB forward can expose the device's loopback inspector. Confirm the ADB server's environment and route to Suwayomi. WSL/VM USB attachment or wireless debugging is a separate prerequisite. Other targets can use supported SSH/tunnels or narrowly scoped LAN access to Suwayomi, never a publicly exposed inspector. Record the route actually exercised.
-
-Automate what access permits. Ask a human only to attach/unlock/authorize hardware, perform unavailable physical controls, or judge usability. Supply exact preconditions, steps, expected results, and safe reporting instructions rather than requesting a full manual rerun.
+Repeat device-sensitive requirements on hardware: permissions and file identity, OS lifecycle, sleep/wake, real network transitions, touch behavior, and e-ink rendering. ADB reverse forwarding can route a device to a disposable server; ADB forward can expose its loopback inspector. Record the actual USB, Wi-Fi, SSH, or other route. USB connectivity does not establish Wi-Fi behavior. Keep the inspector loopback-bound and authenticated; never publish it. Ask a human only for physical attachment, unlock/authorization, unavailable physical controls, or usability judgment. Provide exact preconditions, steps, expected results, and safe reporting instructions.
 
 ## Record and finish
 
-Use one concise acceptance record, or include the same fields in a routine handoff:
+Record the requirement and expected/actual result as **demonstrated**, **failed**, or **unverified**. Include candidate revision and dirty changes, deployed hash coverage, installed versions, evidence layer, timestamp, fixture aliases, relevant concurrency and fault controls, commands actually run, artifacts, and remaining gaps. Mark human-reported observations separately. Automated, desktop, and device evidence each retain their own scope; unrun cases are not passes. No observed crash under a control does not establish the cause of an earlier crash.
 
-- Requirement/control, expected result, and actual outcome: **demonstrated**, **failed**, or **unverified**. Identify human-reported evidence separately.
-- Candidate revision and dirty changes, deployed hash coverage, installed versions, and inspection patches.
-- Evidence layer, generic environment, timestamp, fixture aliases, concurrency, navigation, storage availability category, and sleep/network/fault controls.
-- Commands actually run, results, relevant artifacts, and remaining gaps. Runtime smoke does not replace repository gates.
-
-Apply AGENTS.md privacy rules before exporting artifacts. Remove credentials, tokens, endpoints, private paths, personal titles, and identifying device details. Keep raw logs, settings, and generated CBZs out of commits. No observed exit means only no exit under the recorded controls; without reproduction, the original crash cause remains unresolved.
-
-Stop owned services and confirm status before removing a sandbox or its access-control patch. Remove throwaway artifacts only from the identified disposable root; retain failed evidence as needed. Report retained roots/processes and restart/stop commands. The tools and profile patch stay outside every release payload.
+Keep credentials, tokens, endpoints, private paths, source names, titles, raw logs/settings, generated CBZs, and identifying device details out of committed evidence. Redact exported observations and screenshots. Stop owned services, verify their status, and restore temporary device/profile changes. Remove throwaway artifacts only from the identified disposable root, retaining failed evidence for diagnosis. Report retained roots and processes; the sandbox inspector patch remains outside release payloads.
