@@ -1,6 +1,6 @@
 # Authentication
 
-Read this when changing login, transport recovery, credential handling, or authentication tests. [transport.lua](../suwayomi/api/transport.lua) owns the protocols; setup and settings expose an explicit method selector. Basic Auth remains the default for existing configurations. Methods never fall back to one another.
+Read this when changing login, transport recovery, credential handling, or authentication tests. [transport.lua](../suwayomi/api/transport.lua) owns the protocols; setup and settings expose an explicit method selector. Basic Auth remains the default for existing configurations. Methods never fall back to one another. Changing the selected method invalidates the setup connection test.
 
 ## Credentials and sessions
 
@@ -18,7 +18,9 @@ Restarting KOReader causes silent authentication using saved credentials. Editin
 
 Renew reactively, without predicting expiry from the device clock. Refresh timeouts, network/server errors, or unrecognized responses do not permit login fallback. Login and refresh omit old access credentials; refresh replaces only the access token.
 
-GraphQL may return authentication errors with HTTP 200. Replay requires proof that the pre-resolver guard rejected every unaliased root emitted by the request builder, including both manga-refresh roots. Partial execution, arbitrary errors, and ambiguous mutation failures must not cause replay. Connection tests use protected category access, not public introspection.
+GraphQL may return authentication errors with HTTP 200. Replay requires proof that the pre-resolver guard rejected every unaliased root emitted by the request builder, including both manga-refresh roots, with no returned data. Unsupported aliases, fragments, and directives cannot authorize replay. Partial execution, arbitrary errors, and ambiguous mutation failures must not cause replay. Connection tests use protected category access, not public introspection.
+
+GraphQL diagnostics cross the transport boundary as safe classifications, not private response text. Transient source errors retain bounded download retries across authentication methods. Only recognized validation-only responses permit legacy schema fallback; partial execution permits neither that fallback nor authentication replay.
 
 External image origins receive no credentials or sessions. Simple Login and UI Login requests do not follow redirects. HTTP remains supported, but HTTPS is recommended: HTTP exposes passwords and session tokens. Issued UI Login tokens can survive a server password change.
 

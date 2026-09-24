@@ -36,11 +36,13 @@ Use this map before broad searches. Directory-qualified paths are relative to th
 
 ## Authentication
 
-The API transport owns authentication, endpoint construction, GraphQL requests, and bounded archive/page responses. [Authentication](authentication.md) gives the method-specific session and replay contract. Credentials stay in settings; cookies and tokens stay in process memory and never enter worker results or logs. External image origins receive no credentials. Connection testing must query protected category access. In-flight workers keep captured credentials; a later job attempt loads current credentials only for its recorded normalized endpoint. Missing or mismatched origin fails before launch and may be retried after the original endpoint is restored.
+The API transport owns authentication, endpoint construction, GraphQL requests, and bounded archive/page responses. [Authentication](authentication.md) defines method selection, process sessions, replay, diagnostic privacy, and transport compatibility.
 
 ## Download ownership
 
 [ADR-0002](adr/0002-navigation-safe-download-ownership.md) owns process lifetime and bounded quit. One service owns downloads independently of screens; detached screens retire requests and subscriptions while workers, persistence, and cleanup continue. [ADR-0006](adr/0006-unified-download-job-attempt-ownership.md) places pending, active, stopping, and completion-awaiting-persistence transitions behind the queue interface. Callers use commands and snapshots, not its private maps. Explicit archive inspection remains a separate observation lifecycle.
+
+Admission captures job identity and destination. Each later attempt loads current credentials only when the configured normalized endpoint matches the recorded origin. Missing or mismatched origin fails before launch; restoring the original endpoint permits Retry. Explicit retries, including bulk Download, and Redownload preserve an existing job's identity and destination. Running workers retain captured credentials.
 
 [ADR-0005](adr/0005-automatic-download-restart.md) governs restart and archive publication. A checked shared-document write commits queue completion, ledger path, reader-return context, and archive generation before notification. Rejected writes retain in-session ownership and retry bookkeeping without repeating the transfer. An uncertain replacement fences further writes until reconciliation. Startup preserves supported unfinished jobs, retry counts and deadlines; unsupported or incomplete records remain inert. Startup never sweeps unknown temporary files.
 
@@ -54,7 +56,9 @@ Each transfer uses private random attempt files. The worker closes and validates
 
 One process-owned helper obtains complete chapter context. Before admission, refill rechecks endpoint, policy, exact saved scanlator, destination, read/pending-sync state, queue ownership, and manual-deletion fences. Owned and terminal-failed chapters occupy the earliest 5/10/50 unread positions; automatic refill neither backfills beyond the limit nor retries terminal failure. A stale fetch cannot consume a newer request. Explicit cancellation retires the matching evaluation; Stop turns the policy Off and retires requests without deleting admitted jobs. Transient retries have persisted deadlines; configuration and identity blockers remain inspectable.
 
-Existing archives and unknown legacy records do not acquire a current-server origin merely by Open or close. A fresh context and explicit association action establish scope. Endpoint scope excludes credential-bearing URL parts. The saved Auto-download choice is shown when controls open; Delete after reading remains independent. The optional KOReader auto-mark prompt follows an explicit nonzero policy choice and retires only after its plugin setting save succeeds.
+Existing archives and unknown legacy records do not acquire a current-server origin merely by Open or close. A fresh context and explicit association action establish scope. Endpoint scope excludes credential-bearing URL parts. The saved Auto-download choice is shown when controls open; Delete after reading remains independent.
+
+The optional KOReader auto-mark prompt follows an explicit nonzero policy choice. Only Enable or Keep disabled with Don't ask again checked retires it, after a successful plugin setting save. Enable changes KOReader's global preference only after that save. Native Back/outside dismissal ignores the checkbox and leaves the prompt eligible.
 
 ## Manual deletion and retention
 

@@ -56,7 +56,7 @@ Downloaded chapters open without waiting for the server. KOReader saves and resu
 
 Use **Download next** for a one-time batch or **Auto-download** to keep the first unread chapters available. Each action adds at most 50 new chapters. The checked Auto-download choice shows the saved limit; downloaded and queued chapters count toward it. This setting does not delete other downloads.
 
-Selecting a limit may offer **Always mark as finished**. This optional KOReader setting applies to **all KOReader documents** at their end-of-document action. **Keep disabled** leaves Auto-download active and manual read marking available. **Don't ask again** or **Enable** stops future reminders.
+Selecting a limit may offer **Always mark as finished**. This optional KOReader setting applies to **all KOReader documents** at their end-of-document action. **Keep disabled** leaves Auto-download active and manual read marking available. Choose **Keep disabled** with **Don't ask again** checked, or **Enable**, to stop future reminders.
 
 Change finish marking later under **Cogwheel > Document > End of document action > Always mark as finished** in an open document. Auto-download leaves your end action and removal settings unchanged; turning it off does not disable automatic finish marking.
 

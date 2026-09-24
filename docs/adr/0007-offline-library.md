@@ -44,5 +44,3 @@ Exercise the normal UI in a connected → disconnected → reconnected reading s
 This feature adds cached browsing and best-effort reconstruction when no cache exists. It does not change what opening Suwayomi opens: automatically opening Library is a separate change and is not required here.
 
 No second library, download-association UI, multi-server management, new synchronization rules, new download/retention policies, or new reading controls. Reuse the existing screens and behavior rather than redesigning them for offline use.
-
-Acceptance means exercising the scenarios above in the normal UI, including a new-version start with existing downloads, reuse of already-cached thumbnails, and the connected → disconnected → reconnected reading sequence. Check actual chapter opening and saved progress, not just row labels. These are requirements, not claimed test results; follow the [testing workflow](../agents/testing.md).
