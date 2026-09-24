@@ -303,6 +303,10 @@ Commands exercised the repository sandbox `setup`, `deploy`, `run`, `smoke`, UI 
 
 Pending read/unread precedence, selection/filter pruning, stale-request guards, successful emptiness, and earlier cache/ledger failures retain composed LuaJIT evidence; they were not separately repeated as device fault cases here. Physical storage failure, power loss, sleep/wake, and Wi-Fi transitions remain unverified by this run.
 
+### Combined release review — 2026-09-24
+
+The [release-readiness review](../release-readiness-2026-09-24.md) records fresh desktop and Palma acceptance on `81779ee`, including the #54 fault controls, offline reading and restart, exact payload verification, repository gates, and restoration evidence. It distinguishes repeated runtime controls from earlier acceptance and the remaining device coverage gaps.
+
 ## Hardware and human gaps
 
 Repeat device-sensitive cases on hardware: storage permissions/file identity, OS lifecycle, sleep/wake, real network transitions, touch interaction, and e-ink rendering. Explicit device requirements remain **unverified** until demonstrated or explicitly changed by the maintainer.
