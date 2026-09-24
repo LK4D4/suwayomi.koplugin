@@ -6,7 +6,7 @@ status: accepted
 
 Use the normal Library and chapter screens with or without Internet access. Cache server information so those screens and downloaded chapters remain usable when requests fail. The server is authoritative; the cache is not a second library to maintain or reconcile.
 
-This revision was accepted on 2026-09-17 and replaces the design accepted on 2026-09-12. It incorporates the simplification requested on 2026-09-16, not the behavior of the `offline-library` implementation. Acceptance records the intended behavior, not a completed implementation.
+This revision was accepted on 2026-09-17 and replaces the design accepted on 2026-09-12. It incorporates the simplification requested on 2026-09-16, not the behavior of the `offline-library` implementation. Acceptance records the intended behavior, not device verification. The current runtime has checked Library and chapter-list caches and saved-first screens; [architecture](../ARCHITECTURE.md#library-and-chapter-cache) describes those owners. Consult the [testing recipes](../testing-recipes.md#chapter-cache-acceptance) and [evidence index](../evidence/README.md) before claiming an individual scenario passed.
 
 ## Behavior
 
@@ -34,18 +34,9 @@ Keep the last usable cache if a load is incomplete or fails. Report a failed cac
 
 Once a server listing succeeds, it replaces the reconstructed listing. Do not add reconstructed rows back afterward. In particular, a successfully cached empty server library must remain empty rather than trigger reconstruction on the next offline opening.
 
-## Scenarios
+## Acceptance boundaries
 
-| Scenario | Expected behavior |
-| --- | --- |
-| First use of the new version, connected | Show the server library and build its cache, using existing thumbnails. Normal chapter browsing builds the chapter cache. |
-| First use of the new version, disconnected | Rebuild what can be shown from existing chapters, saved metadata, and thumbnails. Allow reading without requiring setup, linking, or a server response. |
-| Read connected, then disconnect | Keep the same lists and cached thumbnails. Downloaded chapters still open, and reading progress still saves. |
-| Open Library or chapters while disconnected | Show the cache, or reconstruct missing information from existing chapters. A failed server load leaves that usable screen in place. |
-| Reconnect | No mode switch or special recovery action. The next normal list opening or refresh obtains server information and replaces the relevant cache. |
-| Server library or chapter list has changed | Show the server result, including removals. Do not preserve extra rows just because files exist. Files and reading progress are not deleted. |
-| Return from reading | Restore the normal chapter screen using available information without waiting for a server response. Existing read/unread and Sync behavior applies. |
-| Restart without Internet access | Saved lists and cached thumbnails remain available; this is not a reset to a different library view. |
+Exercise the normal UI in a connected → disconnected → reconnected reading sequence, including chapter Open, saved progress, return, cached thumbnails, and successful server replacement. Also exercise first use of the new version with existing downloads and no cache: offline reconstruction must expose only recorded files without inventing identities. A successful empty server list is a separate control; it remains empty on offline restart even when local files exist. Failed or incomplete requests must retain the previous usable list. Check a real cache-write failure separately from a failed server request. These are requirements, not claims that each desktop or physical-device case passed; follow the [testing workflow](../agents/testing.md).
 
 ## Scope
 

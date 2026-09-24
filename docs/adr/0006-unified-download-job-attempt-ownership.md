@@ -29,26 +29,8 @@ Use direct orchestration inside the download owner. It holds pending-job and att
 
 A pure transition module with a separate effect executor was considered. It would introduce another instruction protocol and execution-order contract for persistence, worker actions, and notifications. Existing controlled adapters already support failure testing without distributing that coordination across another seam.
 
-## Required behavioral evidence
+## Evidence and boundaries
 
-Exercise the existing queue commands and process-owned download flows with controlled process, clock, and persistence adapters. Preserve composed behavioral tests rather than tests of internal maps or helper identities. The implementation must retain these outcomes:
+The structural acceptance criterion is that callers use queue commands and snapshots instead of inspecting attempt maps. Composed tests must still cover stopping reservations, matching late publication after cancellation, rejected cancellation without false success or released ownership, rejected/uncertain completion without repeated transfer or overwritten read choices, inert unsupported startup records, atomic refill admission, and zero-view execution. Inspection cannot publish a generation; manual deletion retains exact-generation checks. These are behavioral contracts of [ADR-0002](0002-navigation-safe-download-ownership.md), [ADR-0003](0003-durable-manual-delete-intent.md), [ADR-0004](0004-durable-download-ahead-refill.md), and [ADR-0005](0005-automatic-download-restart.md), not new state owned by this ADR. Keep one shared quit budget and preserve unknown worker files.
 
-- Stopping attempts reserve their chapter and concurrency slot until exit is confirmed; unrelated jobs can use spare slots.
-- Accepted cancellation preserves a matching late publication and completes checked bookkeeping without another transfer. A rejected cancellation save does not report success or release ownership.
-- Rejected or uncertain completion saves retain ownership and archive evidence; reconciliation and completion retry do not repeat the transfer or overwrite newer reading choices.
-- Startup and reconciliation preserve retry counts and deadlines, keep unsupported records inert, and do not sweep unknown files.
-- Automatic admission and refill consumption remain atomic. Inspection never publishes a new archive generation, and manual deletion retains exact-generation checks.
-- Navigation and zero-view execution preserve downloads, and shutdown retains the shared bounded quit behavior.
-
-Locality is the structural acceptance criterion: callers no longer inspect or mutate attempt tables to coordinate cancellation, reconstruction, completion, or archive authority. Internal source files may remain separate. Implementation verification must distinguish composed checks and runtime smoke evidence from unexercised device behavior.
-
-A Linux/LuaJIT smoke exercised two real child processes with synthetic ZIP archives: one canceled attempt retained its slot while the other used spare capacity; rejected completion writes retained both attempts; later saves committed both validated archives without another transfer and with zero views. The original completion implementation failed a read-only-input control; the new implementation passed. Process and filesystem evidence does not establish physical-device behavior or live-server compatibility.
-
-## Constraints
-
-- Preserve [ADR-0002](0002-navigation-safe-download-ownership.md): process-owned downloads, execution without views, completion before notification, and one shared two-second quit budget.
-- Preserve [ADR-0003](0003-durable-manual-delete-intent.md): exact archive-generation authority and independent manual-delete intent. Existing download ownership still prevents manual-delete acceptance.
-- Preserve [ADR-0004](0004-durable-download-ahead-refill.md): automatic job admission and consumption of the matching refill request remain one checked transaction.
-- Preserve [ADR-0005](0005-automatic-download-restart.md): isolated attempts, retry-preserving reconstruction, known stopping reservations, validated publication, and preservation of unknown files. Cancellation does not prove worker exit or prevent every late publication.
-- Keep persistence, archive policy, and one-shot request scheduling distinct. Do not add a cross-process lock, ownership registry, recovery journal, or new user-visible behavior.
-- Preserve composed behavioral evidence. Tests must not make raw internal maps or helper identities part of the host-facing interface.
+A Linux/LuaJIT smoke used two real child processes and synthetic ZIP archives. A canceled attempt retained its slot while another used spare capacity; rejected completion writes retained both attempts; later saves committed both validated archives without another transfer and with zero views. A read-only completion-input control failed before the change and passed afterward. This process and filesystem evidence does not establish physical-device behavior or live-server compatibility. The current [evidence index](../evidence/README.md) routes later observations.
