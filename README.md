@@ -22,7 +22,7 @@ You'll need KOReader and a Suwayomi server that your device can reach. Downloads
 
 On Android, the destination is usually `/sdcard/koreader/plugins/`; on Kobo and Kindle, use the device storage containing `koreader/`. On Linux desktop, use `~/.config/koreader/plugins/`.
 
-To update a manual install, replace the plugin folder with the new release and restart KOReader.
+To update a manual install, quit KOReader, replace the plugin folder with the new release, then relaunch. Keep your KOReader settings and downloaded chapters.
 
 ## Connect
 
@@ -32,46 +32,49 @@ To update a manual install, replace the plugin folder with the new release and r
 
 You can repeat setup from **Suwayomi > Settings > Setup wizard**.
 
-Simple Login and UI Login reconnect automatically using saved credentials; session cookies and JWT tokens are never saved. UI Login refreshes rejected access tokens silently and logs in again if the refresh token is rejected. If authentication fails during a download, correct your login settings and retry it from **Downloads**.
+Simple Login and UI Login reconnect automatically using saved credentials; session cookies and JWT tokens are never saved. If authentication fails during a download, correct your login settings and retry it from **Downloads**.
 
 Use HTTPS when connecting over a network. HTTP remains supported but exposes passwords and session tokens to network observers. Suwayomi UI Login tokens can remain valid after the server password changes; changing saved credentials does not cancel already-running downloads.
 
 ## Read
 
-After setup, **Search > Suwayomi** opens Library directly, using your category-picker preference. The title-bar menu offers **Library** to return there from other plugin screens and **Suwayomi home** for Browse, Downloads, Sync, and Settings. Back from the Library root exits the plugin.
+1. Open **Search > Suwayomi** to enter Library, using your category-picker preference.
+2. Choose a manga, open its chapter list, then tap a chapter to download or read it.
+3. Use **Go to Suwayomi** from the reader to return to the chapter list.
 
-- **Library** opens manga in your Suwayomi library.
-- **Browse** lets you search sources, explore Popular or Latest lists, and install or update source extensions.
-- **Downloads** shows progress and lets you cancel or retry downloads.
-- **Sync** sends pending read/unread changes to your server.
+The title-bar menu offers **Library** and **Suwayomi home**. Home provides **Browse** for source search and extensions, **Downloads** for progress/cancel/retry, **Sync** for pending read/unread changes, and **Settings**. Back from the Library root exits the plugin.
 
-Library saves its rows, categories, and thumbnail references automatically. Opening it shows saved information immediately while the server refresh runs; **Refresh** in the Library menu retries a failed load. A complete server response replaces the saved list, including removals or an empty Library, without deleting downloaded chapters or reading progress. If no usable Library cache exists, existing download metadata supplies a best-effort listing. Cache-save failures are reported.
+### Read offline
 
-Chapter lists are saved automatically when you browse them. Saved rows appear immediately; opening a manga or choosing **Refresh chapters** tries the server again without an offline-mode switch. Failed loads retain the saved list. A successful complete list replaces it, including an empty result. If no chapter list was saved, recorded downloads supply the available rows; otherwise the screen explains that chapter information is missing.
+Library and chapter lists save automatically as you browse. Saved lists appear immediately while the server refreshes. Failed loads keep them available; **Refresh** or **Refresh chapters** retries. Complete server results replace saved lists, including removals and empty results, without deleting downloaded chapters or reading progress. Failed saves are reported.
 
-Downloaded chapters open locally without waiting for the server. KOReader saves and resumes reading progress normally, and **Go to Suwayomi** returns to the normal chapter screen even offline. Recovered files without a known server association allow **Open** and **Verify download**, but cannot acquire server read-sync, download, or deletion authority merely by being opened. Downloaded CBZs also remain accessible through KOReader's file browser.
+If no saved list exists, recorded downloads supply available rows. A manga whose chapters were never loaded may have no saved chapter information. Recovered files with no known server connection offer **Open** and **Verify download**; server sync, downloading, and deletion remain unavailable for those rows.
 
-Choose a manga, open its chapters, then tap a chapter to download or read it. Use **Download next** for a one-time batch, or **Auto-download** to keep the first unread chapters available automatically. Each download action adds at most 50 new chapters.
+Downloaded chapters open without waiting for the server. KOReader saves and resumes progress normally, and **Go to Suwayomi** works offline. CBZs also remain accessible through KOReader's file browser.
 
-The **Auto-download** menu shows **Off** or the saved chapter limit for that manga. Downloaded and queued chapters count toward the limit. A checkmark identifies the current choice. This setting does not delete other downloads.
+### Keep chapters ready
 
-Selecting an Auto-download limit may offer KOReader's **Always mark as finished** setting. This optional setting applies to **all KOReader documents** at their end-of-document action. Auto-download also works with manual read marking. **Keep disabled** leaves Auto-download active; check **Don't ask again** to stop reminders. **Enable** also stops future reminders.
+Use **Download next** for a one-time batch or **Auto-download** to keep the first unread chapters available. Each action adds at most 50 new chapters. The checked Auto-download choice shows the saved limit; downloaded and queued chapters count toward it. This setting does not delete other downloads.
 
-To change automatic finish marking later, open a document and use **Cogwheel > Document > End of document action > Always mark as finished**. The plugin leaves your end action and automatic removal settings unchanged; finished chapters remain subject to those removal settings. Turning off Auto-download does not turn automatic finish marking off.
+Selecting a limit may offer **Always mark as finished**. This optional KOReader setting applies to **all KOReader documents** at their end-of-document action. **Keep disabled** leaves Auto-download active and manual read marking available. **Don't ask again** or **Enable** stops future reminders.
 
-Downloads continue while you read. Network failures retry in the background, and unfinished downloads resume after a KOReader restart. Files are organized by source and manga in your chosen download folder.
+Change finish marking later under **Cogwheel > Document > End of document action > Always mark as finished** in an open document. Auto-download leaves your end action and removal settings unchanged; turning it off does not disable automatic finish marking.
 
-Under **Settings > Downloads**, **Delete after reading** keeps the chapters finished most recently in each manga, not the highest chapter numbers. **Delete when marked read** separately requests file removal when you manually mark chapters read in the plugin. See **Download help** for completion rules and deletion details.
+Downloads continue while you read. Temporary network failures retry in the background; unfinished jobs recover after a KOReader restart. Files are organized by source and manga in your download folder.
+
+### Remove finished chapters
+
+Under **Settings > Downloads**, **Delete after reading** keeps the chapters finished most recently in each manga, not the highest chapter numbers. **Delete when marked read** separately requests file removal when you manually mark chapters read. See **Download help** for completion rules and deletion details.
 
 ### Faster downloads with server predownloads
 
-Downloading chapters on your Suwayomi server first can make transfers to KOReader much faster, especially for remote sources. The plugin automatically tries to copy a complete archive instead of fetching pages one at a time and building a CBZ on your device. Saving server downloads as CBZ files also avoids rebuilding the archive on the server for each transfer.
+Predownloading remote chapters on your Suwayomi server can speed up device transfers: the plugin tries to copy a complete archive before fetching individual pages. Saving server downloads as CBZs also avoids rebuilding archives for each transfer.
 
-Use Suwayomi's WebUI to queue chapters in advance, or configure its automatic downloads for future chapter updates. The server can do the slow source fetching while your device is asleep or off. Automatic downloads depend on your server's category and unread-chapter settings; they do not automatically fill an existing backlog.
+Queue chapters through Suwayomi's WebUI, or configure automatic downloads for future updates. Those depend on server category and unread-chapter settings and do not automatically fill an existing backlog.
 
 A CBZ in Suwayomi's **Local source** is not the same as a server download. Local source chapters can still transfer page by page, so a predownloaded remote chapter can be faster.
 
-Your device still needs to connect to copy chapters for offline reading. The plugin does not queue or delete server downloads; its **Auto-download** and removal settings affect only device-local copies.
+Your device still needs to connect to copy chapters. Plugin **Auto-download** and removal settings affect only device-local copies.
 
 ## Need help?
 
@@ -84,4 +87,12 @@ Still stuck? [Open an issue](https://github.com/LK4D4/suwayomi.koplugin/issues).
 
 ## Contributing
 
-Bug reports, pull requests, and translations are welcome. See the [architecture guide](docs/ARCHITECTURE.md) for development details and the [translation guide](docs/TRANSLATING.md) to help with your language.
+Bug reports, pull requests, and translations are welcome. Start with the guide for your task:
+
+| Task | Guide |
+| --- | --- |
+| Develop and test | [Repository rules and commands](AGENTS.md), then [choose verification](docs/agents/testing.md) |
+| Change ownership or behavior | [Architecture](docs/ARCHITECTURE.md), with links to governing decisions |
+| Change authentication | [Authentication contract](docs/authentication.md) |
+| Translate | [Translation guide](docs/TRANSLATING.md) |
+| Inspect past verification | [Acceptance evidence](docs/evidence/README.md) |

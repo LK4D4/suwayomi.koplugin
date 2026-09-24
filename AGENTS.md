@@ -41,11 +41,11 @@ These defaults do not weaken explicit requirements or accepted contracts.
 Run from the plugin root so `package.path = "?.lua;" .. package.path` works. Use LuaJIT locally. Fresh Ubuntu/dev containers need `luajit` and `luarocks`; install user-local LuaRocks packages `busted`, `dkjson`, `luasocket`, `luasec`, and `luacheck`. Gettext tooling supports l10n checks; native archive fixtures use libarchive on Linux/WSL. CI dependencies are listed in `.github/workflows/test.yml`.
 
 - Lint (POSIX or PowerShell): `luacheck --codes spec suwayomi main.lua _meta.lua`
-- Specs (POSIX or PowerShell): `busted spec`
-- Focused spec: `busted spec/<file>`
+- Specs (POSIX or PowerShell): `busted --lua=luajit spec`
+- Focused spec: `busted --lua=luajit spec/<file>`
 - L10n (POSIX): `./scripts/check-l10n.sh`
 
-Luacheck already parses project Lua; do not add a separate `luac` pass.
+Select LuaJIT explicitly: some Busted launchers default to plain Lua 5.1, which lacks `ffi` for native archive/storage checks. Luacheck already parses project Lua; do not add a separate `luac` pass.
 
 - Isolate KOReader dependencies with `package.preload`; clear `package.loaded` and module state before requiring modules under test. Reuse existing fixtures.
 - Keep `spec/main_spec.lua` focused on lifecycle/composition. Settings specs stub `datastorage` and `luasettings`; actual settings are KOReader's `suwayomi.lua`.
