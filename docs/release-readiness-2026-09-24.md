@@ -53,10 +53,10 @@ The storage failures are injected at real KOReader I/O boundaries, not physical 
 
 Palma restoration was verified against fresh pre-test backups: all 671 settings files, all 98 original plugin files, the patches directory, reader settings and backup, and history matched. Original disabled-app state was restored; the reader was confirmed stopped. Task-owned USB routes, active profile instrumentation, and device fixture directory were removed after retaining private evidence. The device sandbox server and Windows relay were confirmed stopped.
 
-Both desktop sandbox readers and both servers were also confirmed stopped. Synthetic sandboxes and private evidence are retained locally. The withdrawn speculative probe was preserved privately and its temporary worktree removed; the review documentation worktree remains for handoff.
+Both desktop sandbox readers and both servers were also confirmed stopped. Synthetic sandboxes and private evidence are retained locally. The withdrawn speculative probe was preserved privately and its temporary worktree removed. At the initial handoff, the review documentation worktree was retained for later finalization.
 
 Final review totals: **Standards: 0 findings. Specification/behavior: 0 confirmed findings.** Neither axis has an unresolved release blocker.
 
 ## Release preparation
 
-Choose the next version, update metadata and the displayed version, and add `docs/releases/<tag>.md`. The release workflow checks that tag, metadata version, and release notes agree. Run required checks and exact-candidate CI again for that changed candidate before release. This review does not publish a release or integrate its documentation branch.
+Choose the next version, update metadata and the displayed version, and add `docs/releases/<tag>.md`. The release workflow checks that tag, metadata version, and release notes agree. Run required checks and exact-candidate CI again for that changed candidate before release. Finalizing this review integrates its documentation; release publication is a separate step.
