@@ -31,6 +31,13 @@ A pure transition module with a separate effect executor was considered. It woul
 
 ## Evidence and boundaries
 
-The structural acceptance criterion is that callers use queue commands and snapshots instead of inspecting attempt maps. Composed tests must still cover stopping reservations, matching late publication after cancellation, rejected cancellation without false success or released ownership, rejected/uncertain completion without repeated transfer or overwritten read choices, inert unsupported startup records, atomic refill admission, and zero-view execution. Inspection cannot publish a generation; manual deletion retains exact-generation checks. These are behavioral contracts of [ADR-0002](0002-navigation-safe-download-ownership.md), [ADR-0003](0003-durable-manual-delete-intent.md), [ADR-0004](0004-durable-download-ahead-refill.md), and [ADR-0005](0005-automatic-download-restart.md), not new state owned by this ADR. Keep one shared quit budget and preserve unknown worker files.
+The structural acceptance criterion is that callers use queue commands and snapshots instead of inspecting attempt maps. Preserve composed evidence for:
+
+- Stopping reservations, spare-slot scheduling, zero-view execution, and the shared quit budget.
+- Matching late publication after cancellation; a rejected cancellation must neither report success nor release ownership.
+- Rejected or uncertain completion without repeated transfer or overwritten read choices.
+- Inert unsupported startup records, preserved unknown worker files, and atomic refill admission.
+
+Inspection cannot publish an archive generation; manual deletion retains exact-generation checks. These are behavioral contracts of [ADR-0002](0002-navigation-safe-download-ownership.md), [ADR-0003](0003-durable-manual-delete-intent.md), [ADR-0004](0004-durable-download-ahead-refill.md), and [ADR-0005](0005-automatic-download-restart.md), not new state owned by this ADR. Persistence, archive policy, and one-shot scheduling stay separate. This refactor adds no cross-process lock, ownership registry, recovery journal, or user-visible behavior.
 
 A Linux/LuaJIT smoke used two real child processes and synthetic ZIP archives. A canceled attempt retained its slot while another used spare capacity; rejected completion writes retained both attempts; later saves committed both validated archives without another transfer and with zero views. A read-only completion-input control failed before the change and passed afterward. This process and filesystem evidence does not establish physical-device behavior or live-server compatibility. The current [evidence index](../evidence/README.md) routes later observations.

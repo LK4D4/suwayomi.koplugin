@@ -1,5 +1,6 @@
 ---
 status: accepted
+date: 2026-09-17
 ---
 
 # Offline Library is a cache of the server
