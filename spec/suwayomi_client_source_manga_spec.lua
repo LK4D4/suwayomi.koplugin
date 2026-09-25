@@ -31,6 +31,66 @@ describe("suwayomi/client source manga flows", function()
     local buildSourceMangaSubprocessFake = helper.buildSourceMangaSubprocessFake
     local buildChapterCountSubprocessFake = helper.buildChapterCountSubprocessFake
 
+    it("remembers the browse view through result refreshes and reopening", function()
+        local shown_options, selected_callback
+        local client, observed = newClient({
+            chapter_count_worker = "disabled",
+            ui = {
+                showMangaMenu = function(_, select, options)
+                    shown_options, selected_callback = options, select
+                    return {}
+                end,
+                updateMangaMenu = function(_, _, _, options) shown_options = options end,
+            },
+        })
+        local preference, saves = "list", 0
+        client.settings.loadBrowseViewMode = function() return preference end
+        client.settings.saveBrowseViewMode = function(_, mode)
+            preference, saves = mode, saves + 1
+            return mode
+        end
+        local source = { id = "s1", name = "Source" }
+        local result = { ok = true, manga = { { id = "m1", title = "One" } } }
+        client:renderMangaForSourceResult({}, source, { type = "POPULAR" }, result)
+        assert.are.equal("list", shown_options.view_mode)
+        assert.is_true(shown_options.on_view_mode_changed("cover_text"))
+        selected_callback(result.manga[1])
+        observed.shown_manga_action_options().onMangaUpdated()
+        assert.are.equal("cover_text", shown_options.view_mode)
+        shown_options.close_callback()
+        assert.is_false(shown_options.on_view_mode_changed("list"))
+        assert.are.equal(1, saves)
+        client:renderMangaForSourceResult({}, source, { type = "POPULAR" }, result)
+        assert.are.equal("cover_text", shown_options.view_mode)
+    end)
+
+    it("reports a failed view save and rejects changes from superseded results", function()
+        local shown_options
+        local client, observed = newClient({
+            chapter_count_worker = "disabled",
+            ui = {
+                showMangaMenu = function(_, _, options)
+                    shown_options = options
+                    return {}
+                end,
+            },
+        })
+        local saves = 0
+        client.settings.saveBrowseViewMode = function()
+            saves = saves + 1
+            return nil, "write_failed"
+        end
+        client:renderMangaForSourceResult({}, { id = "s1" }, { type = "POPULAR" }, {
+            ok = true, manga = { { id = "m1", title = "One" } },
+        })
+        assert.is_false(shown_options.on_view_mode_changed("list"))
+        assert.are.equal("cover_only", shown_options.view_mode)
+        assert.are.same({ "write_failed" }, observed.shown_messages)
+        client._source_manga_load_token = 2
+        assert.is_false(shown_options.on_view_mode_changed("cover_text"))
+        assert.are.equal(1, saves)
+    end)
+
     local function installLocalizedI18n(translations)
         previous_i18n_preload = package.preload["suwayomi/i18n"]
         previous_i18n_loaded = package.loaded["suwayomi/i18n"]

@@ -353,6 +353,31 @@ describe("suwayomi/settings", function()
         assert.are.equal("automatic", settings:loadLibraryCategoryPickerBehavior())
     end)
 
+    it("remembers each browse view mode and defaults invalid preferences to covers", function()
+        local settings = require("suwayomi/settings")
+        assert.are.equal("cover_only", settings:loadBrowseViewMode())
+        for _, mode in ipairs({ "list", "cover_only", "cover_text" }) do
+            assert.are.equal(mode, settings:saveBrowseViewMode(mode))
+            assert.are.equal(mode, stored_data.browse_view_mode)
+            assert.are.equal(mode, settings:loadBrowseViewMode())
+        end
+        assert.is_true(flushed)
+        stored_data.browse_view_mode = "unknown"
+        assert.are.equal("cover_only", settings:loadBrowseViewMode())
+        stored_data.browse_view_mode = {}
+        assert.are.equal("cover_only", settings:loadBrowseViewMode())
+    end)
+
+    it("reports rejected browse view preference writes", function()
+        local settings = require("suwayomi/settings")
+        settings.store = {
+            saveKey = function() return nil, "write_failed" end,
+        }
+        local saved, err = settings:saveBrowseViewMode("list")
+        assert.is_nil(saved)
+        assert.are.equal("write_failed", err)
+    end)
+
     it("saves supported library category picker behavior", function()
         local settings = require("suwayomi/settings")
 

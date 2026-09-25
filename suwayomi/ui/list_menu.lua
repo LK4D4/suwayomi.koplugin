@@ -1,7 +1,7 @@
 -- Boundary: file-manager-like shared list menu.
 --
--- Responsibility: render source, manga, and chapter rows with optional cached
--- thumbnails while preserving KOReader Menu navigation, title bars, paging
+-- Responsibility: render source/chapter lists and optional manga cover grids
+-- with cached thumbnails, preserving KOReader Menu navigation, title bars, paging
 -- rows, and callbacks.
 -- Owned state: visible thumbnail download jobs for the menu instance.
 -- Dependencies: KOReader Menu/widget primitives and image decoder, thumbnail
@@ -190,9 +190,12 @@ local function isSectionHeader(item)
     return type(item) == "table" and item.is_section_header == true
 end
 
-local function thumbnailOptionsForItem(item)
+local function thumbnailOptionsForItem(item, menu)
     if type(item) ~= "table" then
         return nil
+    end
+    if menu and menu.cover_grid and item.manga then
+        return { variant = "poster", width = 240, height = 360 }
     end
     local width = math.floor(tonumber(item.thumbnail_width) or 0)
     local height = math.floor(tonumber(item.thumbnail_height) or 0)
@@ -275,6 +278,9 @@ function ListMenuItem:init()
 
     local width = self.dimen.w
     local height = self.dimen.h
+    if self.menu.cover_grid and self.entry.manga then
+        self.line_color = Blitbuffer.COLOR_WHITE
+    end
     local line_size = Size.line.thin
     local row_dimen = Geom:new{
         w = width,
@@ -351,6 +357,34 @@ function ListMenuItem:buildThumbnail(slot_width, slot_height)
 end
 
 function ListMenuItem:buildRowWidget(width, height)
+    if self.menu.cover_grid and self.entry.manga then
+        local padding = scaled(6)
+        local title_height = self.menu._suwayomi_grid_title_height or 0
+        local cover_height = math.max(1, math.min(height - 2 * padding - title_height, (width - 2 * padding) * 1.5))
+        local cover = self:buildThumbnail(math.max(1, math.floor(cover_height / 1.5)), math.floor(cover_height))
+        if title_height > 0 then
+            return CenterContainer:new{
+                dimen = Geom:new{ w = width, h = height },
+                VerticalGroup:new{
+                    align = "center",
+                    cover,
+                    TextBoxWidget:new{
+                        text = BD.auto(tostring(self.text or "")),
+                        face = fontFace("cfont", 16),
+                        width = math.max(1, width - 2 * padding),
+                        height = title_height,
+                        height_adjust = true,
+                        height_overflow_show_ellipsis = true,
+                        alignment = "center",
+                    },
+                },
+            }
+        end
+        return CenterContainer:new{
+            dimen = Geom:new{ w = width, h = height },
+            cover,
+        }
+    end
     if isSectionHeader(self.entry) then
         local horizontal_padding = scaled(12)
         local title_width = math.max(1, width - 2 * horizontal_padding)
@@ -675,6 +709,44 @@ function ListMenu.setupItemHeights(menu)
     end
 end
 
+function ListMenu.setupGrid(menu)
+    local columns = math.max(1, math.floor(menu.inner_dimen.w / scaled(160)))
+    local tile_width = math.floor(menu.inner_dimen.w / columns)
+    local title_height = menu.view_mode == "cover_text" and 2 * textBoxLineHeight(fontFace("cfont", 16)) or 0
+    local tile_height = math.max(1, math.min(menu.available_height, math.floor(tile_width * 1.5) + title_height))
+    menu._suwayomi_grid_title_height = math.min(title_height, math.floor(tile_height / 3))
+    local text_height = math.min(menu.available_height, scaled(ROW_HEIGHT_BASE))
+    menu.page_items = {{}}
+    menu._suwayomi_grid_rows = {{}}
+    local page, used_height, row = 1, 0, nil
+    for index, item in ipairs(menu.item_table) do
+        local is_cover = item.manga ~= nil
+        local height = is_cover and tile_height or text_height
+        if not is_cover or not row or #row >= columns then
+            if used_height + height > menu.available_height and used_height > 0 then
+                page = page + 1
+                menu.page_items[page] = {}
+                menu._suwayomi_grid_rows[page] = {}
+                used_height = 0
+            end
+            row = {}
+            table.insert(menu._suwayomi_grid_rows[page], row)
+            used_height = used_height + height
+        end
+        item.height = height
+        table.insert(row, index)
+        table.insert(menu.page_items[page], index)
+        if not is_cover then row = nil end
+    end
+    menu.perpage = columns * math.max(1, math.floor(menu.available_height / tile_height))
+    menu.page_num = #menu.page_items
+    menu.page = math.max(1, math.min(menu.page, menu.page_num))
+    menu.item_width = tile_width
+    menu.item_height = tile_height
+    menu._suwayomi_base_item_height = text_height
+    menu.item_dimen = Geom:new{ x = 0, y = 0, w = tile_width, h = tile_height }
+end
+
 function ListMenu.recalculateDimen(menu, no_recalculate_dimen)
     if no_recalculate_dimen and menu.item_dimen then
         return
@@ -702,6 +774,9 @@ function ListMenu.recalculateDimen(menu, no_recalculate_dimen)
 
     local available_height = menu.inner_dimen.h - others_height - Size.line.thin
     menu.available_height = available_height
+    if menu.cover_grid then
+        return ListMenu.setupGrid(menu)
+    end
     if menu._suwayomi_files_per_page == nil then
         menu._suwayomi_files_per_page = menu.items_per_page
             or math.max(1, math.floor(available_height / scale_by_size / ROW_HEIGHT_BASE))
@@ -764,7 +839,7 @@ function ListMenu.prepareThumbnail(menu, item)
     if not item or not item.thumbnail_url or item.thumbnail_url == "" then
         return
     end
-    local thumbnail_options = thumbnailOptionsForItem(item)
+    local thumbnail_options = thumbnailOptionsForItem(item, menu)
     local path = item.thumbnail_path
         or ThumbnailCache.find(menu._suwayomi_thumbnail_credentials, item.thumbnail_url, thumbnail_options)
     item.thumbnail_path = path ~= item.thumbnail_rejected_path and path or nil
@@ -783,7 +858,7 @@ local function markThumbnailResult(menu, thumbnail_key, path)
             and getThumbnailKey(
                 menu._suwayomi_thumbnail_credentials,
                 item.thumbnail_url,
-                thumbnailOptionsForItem(item)
+                thumbnailOptionsForItem(item, menu)
             ) == thumbnail_key
         then
             item.thumbnail_loading = nil
@@ -801,7 +876,7 @@ end
 function ListMenu.startThumbnailJob(menu, item)
     local credentials = menu._suwayomi_thumbnail_credentials
     local thumbnail_url = item.thumbnail_url
-    local thumbnail_options = thumbnailOptionsForItem(item)
+    local thumbnail_options = thumbnailOptionsForItem(item, menu)
     local thumbnail_key = thumbnail_url and getThumbnailKey(credentials, thumbnail_url, thumbnail_options)
     if not item.thumbnail_url
         or item.thumbnail_path
@@ -900,6 +975,7 @@ function ListMenu.updateItems(menu, select_number, no_recalculate_dimen)
         idx_offset = (menu.page - 1) * items_nb
     end
     local visible_items = {}
+    local grid_row, grid_group
     for idx = 1, items_nb do
         local index = menu.items_max_lines and menu.page_items and menu.page_items[menu.page][idx] or idx_offset + idx
         local item = menu.item_table[index]
@@ -931,18 +1007,55 @@ function ListMenu.updateItems(menu, select_number, no_recalculate_dimen)
             entry = item,
             text = getItemText(item),
             mandatory = item.mandatory,
-            dimen = menu.item_dimen:copy(),
+            dimen = menu.cover_grid and Geom:new{
+                x = 0, y = 0,
+                w = item.manga and menu.item_width or menu.inner_dimen.w,
+                h = item.height,
+            } or menu.item_dimen:copy(),
             menu = menu,
             show_parent = menu.show_parent,
             line_color = menu.line_color,
         }
-        table.insert(menu.item_group, item_widget)
-        table.insert(menu.layout, { item_widget })
+        if menu.cover_grid then
+            if not grid_row or index > grid_row[#grid_row] then
+                grid_row = menu._suwayomi_grid_rows[menu.page][#menu.item_group + 1]
+                grid_group = HorizontalGroup:new{ align = "top" }
+                table.insert(menu.item_group, grid_group)
+                table.insert(menu.layout, {})
+            end
+            table.insert(grid_group, item_widget)
+            table.insert(menu.layout[#menu.layout], item_widget)
+        else
+            table.insert(menu.item_group, item_widget)
+            table.insert(menu.layout, { item_widget })
+        end
         table.insert(visible_items, item)
     end
 
-    menu:updatePageInfo(select_number)
+    if menu.cover_grid then
+        -- Native Menu's focus calculation assumes equally sized rows.
+        local grid_layout, flat_layout, positions = menu.layout, {}, {}
+        for y, widgets in ipairs(grid_layout) do
+            for x, widget in ipairs(widgets) do
+                table.insert(flat_layout, { widget })
+                table.insert(positions, { x = x, y = y })
+            end
+        end
+        menu.layout = flat_layout
+        local focus_changed = (menu.itemnumber and menu.itemnumber > 0)
+            or (Device.hasDPad and Device:hasDPad())
+        menu:updatePageInfo(select_number)
+        if focus_changed and menu.selected and positions[menu.selected.y] then
+            menu.selected = positions[menu.selected.y]
+        end
+        menu.layout = grid_layout
+    else
+        menu:updatePageInfo(select_number)
+    end
     menu:mergeTitleBarIntoLayout()
+    if menu._suwayomi_on_view_menu then
+        table.insert(menu.layout, { menu._suwayomi_view_button })
+    end
 
     UIManager:setDirty(menu.show_parent, function()
         local refresh_dimen = old_dimen and old_dimen:combine(menu.dimen) or menu.dimen
@@ -970,7 +1083,48 @@ local function cancelThumbnailJobs(menu)
     menu._suwayomi_thumbnail_generation = (menu._suwayomi_thumbnail_generation or 0) + 1
 end
 
+local function applyViewMode(menu, mode)
+    menu.view_mode = mode or "list"
+    menu.cover_grid = mode == "cover_only" or mode == "cover_text"
+end
+
+function ListMenu.setViewMode(menu, mode)
+    local page_items = menu.page_items and menu.page_items[menu.page]
+    local first_item = page_items and page_items[1] or (menu.page - 1) * menu.perpage + 1
+    cancelThumbnailJobs(menu)
+    for _, item in ipairs(menu.item_table) do
+        if item.manga then
+            item.thumbnail_path = nil
+            item.thumbnail_rejected_path = nil
+        end
+    end
+    applyViewMode(menu, mode)
+    menu._suwayomi_pending_itemnumber = first_item
+    menu._suwayomi_last_notified_page = nil
+    menu._suwayomi_view_mode_update = true
+    menu:updateItems()
+    menu._suwayomi_view_mode_update = nil
+end
+
 function ListMenu.install(menu, options)
+    applyViewMode(menu, options and options.view_mode)
+    menu._suwayomi_on_view_menu = options and options.on_view_menu
+    if menu._suwayomi_on_view_menu and not menu._suwayomi_view_button then
+        menu._suwayomi_view_button = require("ui/widget/button"):new{
+            icon = "appbar.menu",
+            icon_width = scaled(24),
+            icon_height = scaled(24),
+            width = scaled(32),
+            padding = 0,
+            bordersize = 0,
+            show_parent = menu.show_parent,
+            callback = function() return menu._suwayomi_on_view_menu(menu) end,
+        }
+        table.insert(menu.return_button, 1, menu._suwayomi_view_button)
+    end
+    if menu._suwayomi_view_button then
+        menu._suwayomi_view_button:showHide(menu._suwayomi_on_view_menu ~= nil)
+    end
     menu._suwayomi_thumbnail_credentials = options and options.thumbnail_credentials
     menu._suwayomi_on_close = options and options.on_close
     local on_page_changed = options and options.on_page_changed

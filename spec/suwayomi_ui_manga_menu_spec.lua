@@ -6,6 +6,7 @@ describe("suwayomi/ui/manga_menu", function()
     local decoded_images
     local raw_images
     local image_errors
+    local view_dialog
 
     local function clearModules()
         for _, name in ipairs({
@@ -13,6 +14,8 @@ describe("suwayomi/ui/manga_menu", function()
             "suwayomi/ui/list_menu",
             "suwayomi/ui/browse",
             "suwayomi/ui/list_rows",
+            "suwayomi/ui",
+            "ui/widget/button",
             "ui/widget/multiinputdialog",
             "ui/bidi",
             "ffi/blitbuffer",
@@ -78,6 +81,25 @@ describe("suwayomi/ui/manga_menu", function()
         decoded_images = {}
         raw_images = {}
         image_errors = {}
+        view_dialog = nil
+
+        package.preload["suwayomi/ui"] = function()
+            return {
+                showChoiceDialog = function(options)
+                    view_dialog = options
+                    return options
+                end,
+            }
+        end
+        package.preload["ui/widget/button"] = function()
+            return {
+                new = function(_, options)
+                    options.dimen = { w = options.width, h = options.icon_height }
+                    function options:showHide(visible) self.visible = visible end
+                    return options
+                end,
+            }
+        end
 
         package.preload["ui/bidi"] = function()
             return { auto = function(text) return text end }
@@ -86,6 +108,7 @@ describe("suwayomi/ui/manga_menu", function()
             return {
                 COLOR_BLACK = "black",
                 COLOR_DARK_GRAY = "dark_gray",
+                COLOR_WHITE = "white",
             }
         end
         package.preload["ui/renderimage"] = function()
@@ -448,6 +471,209 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_true(saw_title)
         assert.is_true(saw_subtitle)
         assert.is_true(saw_metadata)
+    end)
+
+    it("shows browse covers in a grid without title or metadata labels", function()
+        local browse = require("suwayomi/ui/browse")
+        local manga, selected = {}, nil
+        for index = 1, 7 do
+            manga[index] = { id = index, title = "Manga " .. index, thumbnail_url = "/cover/" .. index }
+            cache_paths[manga[index].thumbnail_url] = "/cover-" .. index .. ".bb"
+            decoded_images["/cover-" .. index .. ".bb"] = { id = index }
+        end
+        local menu = browse.showMangaMenu(manga, function(item) selected = item.id end)
+
+        assert.are.equal(2, #menu.item_group)
+        assert.are.equal(3, #menu.layout[1])
+        assert.are.equal(3, #menu.layout[2])
+        assert.are.same({ { 1, 2, 3, 4, 5, 6 }, { 7 } }, menu.page_items)
+        local tile = menu.layout[1][2]
+        local image = findWidgetByKind(tile, "image")
+        assert.is_true(image.width > 64)
+        assert.is_true(image.height > 96)
+        assert.is_nil(findWidgetByKind(tile, "textbox"))
+        assert.is_nil(findWidgetByKind(tile, "text"))
+        tile:onTapSelect()
+        assert.are.equal(2, selected)
+        local held
+        menu.onMenuHold = function(_, item) held = item.manga.id end
+        tile:onHoldSelect()
+        assert.are.equal(2, held)
+
+        menu.page = 2
+        menu:updateItems(1, true)
+        assert.are.equal(1, #menu.layout[1])
+        assert.are.equal(7, menu.layout[1][1].entry.manga.id)
+        browse.updateMangaMenu(menu, { manga[1] }, function() end)
+        assert.are.equal(1, menu.page)
+        assert.are.equal(1, menu.page_num)
+        assert.is_true(menu.cover_grid)
+    end)
+
+    it("keeps browse status and paging rows full width around cover rows", function()
+        local browse = require("suwayomi/ui/browse")
+        local next_page = false
+        local menu = browse.showMangaMenu({
+            { raw_menu_row = true, text = "Loading", select_enabled = false },
+            { id = 1, title = "One" }, { id = 2, title = "Two" },
+        }, nil, { on_next_page = function() next_page = true end })
+        assert.are.equal(menu.inner_dimen.w, menu.layout[1][1].dimen.w)
+        assert.are.equal(2, #menu.layout[2])
+        assert.are.equal(menu.inner_dimen.w, menu.layout[3][1].dimen.w)
+        assert.are.equal("Loading", findWidgetByKind(menu.layout[1][1], "textbox").text)
+        menu.layout[3][1]:onTapSelect()
+        assert.is_true(next_page)
+    end)
+
+    it("loads poster-sized covers and retains usable placeholders after failures", function()
+        local browse = require("suwayomi/ui/browse")
+        local menu = browse.showMangaMenu({
+            { id = 1, title = "One", thumbnail_url = "/cover/one" },
+            { id = 2, title = "Two" },
+        }, nil, { thumbnail_credentials = { server_url = "http://example.test" } })
+        assert.are.equal(1, #started_jobs)
+        assert.are.same({ variant = "poster", width = 240, height = 360 }, started_jobs[1].thumbnail_options)
+        started_jobs[1].on_finish(started_jobs[1], { ok = false })
+        assert.is_true(menu.item_table[1].thumbnail_failed)
+        assert.is_not_nil(findWidgetByKind(menu.layout[1][1], "text"))
+        assert.is_not_nil(findWidgetByKind(menu.layout[1][2], "text"))
+        assert.are.equal(1, #started_jobs)
+        browse.updateMangaMenu(menu, {}, nil)
+        assert.are.equal(0, #menu.item_group)
+        assert.are.equal(1, menu.page)
+    end)
+
+    it("fits the cover grid on narrow and landscape screens", function()
+        local list_menu = require("suwayomi/ui/list_menu")
+        local menu = { item_table = {}, page = 9 }
+        for index = 1, 17 do menu.item_table[index] = { manga = { id = index } } end
+        for _, dimensions in ipairs({ { 320, 480 }, { 800, 320 } }) do
+            menu.inner_dimen = { w = dimensions[1] }
+            menu.available_height = dimensions[2]
+            list_menu.setupGrid(menu)
+            local seen = {}
+            for _, rows in ipairs(menu._suwayomi_grid_rows) do
+                local height = 0
+                for _, row in ipairs(rows) do
+                    height = height + menu.item_table[row[1]].height
+                    assert.is_true(#row * menu.item_width <= dimensions[1])
+                    for _, index in ipairs(row) do table.insert(seen, index) end
+                end
+                assert.is_true(height <= dimensions[2])
+            end
+            assert.are.equal(17, #seen)
+            for index = 1, 17 do assert.are.equal(index, seen[index]) end
+            assert.is_true(menu.page <= menu.page_num)
+        end
+    end)
+
+    it("restores grid focus by item number with a full-width row above covers", function()
+        local browse = require("suwayomi/ui/browse")
+        local menu = browse.showMangaMenu({
+            { raw_menu_row = true, text = "Status" },
+            { id = 1, title = "One" }, { id = 2, title = "Two" },
+        }, nil)
+        -- Exercise the native Menu's single-column focus calculation.
+        menu.updatePageInfo = function(self, index)
+            assert.are.equal(1, #self.layout[1])
+            self.selected = { x = 1, y = index }
+            self.layout[index][1]:onFocus()
+            self.itemnumber = nil
+        end
+        menu._suwayomi_pending_itemnumber = 3
+        menu:updateItems()
+        assert.are.same({ x = 2, y = 2 }, menu.selected)
+        assert.are.equal("black", menu.layout[2][2]._underline_container.color)
+        menu.layout[2][2]:onUnfocus()
+        assert.are.equal("white", menu.layout[2][2]._underline_container.color)
+    end)
+
+    it("switches between list, covers, and titles below covers through the view button", function()
+        local browse = require("suwayomi/ui/browse")
+        local options = {}
+        options.on_view_mode_changed = function(mode)
+            options.view_mode = mode
+            return true
+        end
+        local manga = { { id = 1, title = "A long manga title that wraps below the cover", thumbnail_url = "/one" } }
+        cache_paths["/one"] = "/one.bb"
+        decoded_images["/one.bb"] = {}
+        local menu = browse.showMangaMenu(manga, nil, options)
+        local button = menu._suwayomi_view_button
+        assert.is_true(button.visible)
+        assert.are.equal(button, menu.return_button[1])
+        button.callback()
+        assert.are.equal("cover_only", view_dialog.current)
+        assert.are.same({ "list", "cover_only", "cover_text" }, {
+            view_dialog.choices[1].value, view_dialog.choices[2].value, view_dialog.choices[3].value,
+        })
+        view_dialog.onSelect("cover_text")
+        local tile = menu.layout[1][1]
+        local column = findWidgetByKind(tile, "vertical_group")
+        assert.is_not_nil(findWidgetByKind(column[1], "image"))
+        assert.are.equal(manga[1].title, column[2].text)
+        assert.are.equal("center", column[2].alignment)
+        assert.is_true(column[2].height_overflow_show_ellipsis)
+        assert.are.equal(32, column[2].height)
+
+        button.callback()
+        assert.are.equal("cover_text", view_dialog.current)
+        view_dialog.onSelect("list")
+        assert.is_false(menu.cover_grid)
+        assert.are.equal(menu.inner_dimen.w, menu.item_group[1].dimen.w)
+        assert.is_true(menu.item_group[1].dimen.h < 200)
+        assert.are.equal(manga[1].title, findWidgetByKind(menu.item_group[1], "textbox").text)
+        assert.is_true(findWidgetByKind(menu.item_group[1], "image").width < 64)
+
+        browse.updateMangaMenu(menu, manga, nil, options)
+        assert.are.equal("list", menu.view_mode)
+        assert.are.equal(button, menu._suwayomi_view_button)
+        button.callback()
+        view_dialog.onSelect("cover_only")
+        assert.is_nil(findWidgetByKind(menu.layout[1][1], "textbox"))
+        assert.is_true(findWidgetByKind(menu.layout[1][1], "image").width > 64)
+    end)
+
+    it("keeps the current view when its preference cannot be saved", function()
+        local browse = require("suwayomi/ui/browse")
+        local menu = browse.showMangaMenu({ { id = 1, title = "One" } }, nil, {
+            on_view_mode_changed = function() return false end,
+        })
+        menu._suwayomi_view_button.callback()
+        view_dialog.onSelect("list")
+        assert.are.equal("cover_only", menu.view_mode)
+        assert.is_true(menu.cover_grid)
+    end)
+
+    it("preserves the visible manga across view changes and cancels obsolete cover jobs", function()
+        local browse = require("suwayomi/ui/browse")
+        local list_menu = require("suwayomi/ui/list_menu")
+        local rows = {}
+        for index = 1, 23 do rows[index] = { id = index, title = tostring(index), thumbnail_url = "/" .. index } end
+        local page_changes = 0
+        local menu = browse.showMangaMenu(rows, nil, {
+            thumbnail_credentials = { server_url = "http://example.test" },
+            on_page_changed = function() page_changes = page_changes + 1 end,
+        })
+        menu.inner_dimen.h = 501
+        menu.page = 3
+        menu.itemnumber = nil
+        menu:updateItems()
+        assert.are.equal(13, menu.layout[1][1].entry.manga.id)
+        local stale_job = started_jobs[1]
+        list_menu.setViewMode(menu, "cover_text")
+        assert.are.equal(5, menu.page)
+        assert.are.equal(13, menu.layout[1][1].entry.manga.id)
+        assert.is_true(stale_job.canceled)
+        stale_job.on_finish(stale_job, { ok = true, path = "/stale.bb" })
+        assert.is_nil(menu.item_table[1].thumbnail_path)
+        list_menu.setViewMode(menu, "list")
+        local visible_ids = {}
+        for _, widget in ipairs(menu.item_group) do visible_ids[widget.entry.manga.id] = true end
+        assert.is_true(visible_ids[13])
+        assert.is_true(page_changes >= 4)
+        local list_job = started_jobs[#started_jobs]
+        assert.are.same({ variant = "manga_cover", width = 64, height = 96 }, list_job.thumbnail_options)
     end)
 
     it("keeps long names in fixed-height rows like File Manager", function()

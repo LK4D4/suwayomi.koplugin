@@ -598,6 +598,13 @@ msgstr "Не удалось обновить библиотеку."
 msgid "Could not verify download"
 msgstr "Не удалось проверить загрузку"
 
+msgid "Cover only"
+msgstr ""
+
+#, fuzzy
+msgid "Cover with text"
+msgstr "Текст поиска"
+
 msgid "Delete"
 msgstr "Удалить"
 
@@ -959,6 +966,10 @@ msgid "Library category picker settings are unavailable."
 msgstr "Настройки выбора категории библиотеки недоступны."
 
 msgid "Library loaded, but could not be saved for next time."
+msgstr ""
+
+msgctxt "manga view"
+msgid "List"
 msgstr ""
 
 msgid "Loading canceled."
@@ -1598,6 +1609,9 @@ msgstr "Проверить загрузку"
 
 msgid "Verifying download"
 msgstr "Проверка загрузки"
+
+msgid "View"
+msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."
 msgstr "Ожидание проверки непрочитанных глав для загрузки."

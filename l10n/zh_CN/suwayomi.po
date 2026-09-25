@@ -528,6 +528,13 @@ msgstr "无法更新书架。"
 msgid "Could not verify download"
 msgstr "无法校验下载"
 
+msgid "Cover only"
+msgstr ""
+
+#, fuzzy
+msgid "Cover with text"
+msgstr "搜索文本"
+
 msgid "Delete"
 msgstr "删除"
 
@@ -874,6 +881,10 @@ msgid "Library category picker settings are unavailable."
 msgstr "书架分类选择器设置不可用。"
 
 msgid "Library loaded, but could not be saved for next time."
+msgstr ""
+
+msgctxt "manga view"
+msgid "List"
 msgstr ""
 
 msgid "Loading canceled."
@@ -1486,6 +1497,9 @@ msgstr "校验下载"
 
 msgid "Verifying download"
 msgstr "正在校验下载"
+
+msgid "View"
+msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."
 msgstr "等待检查哪些未读章节需要下载。"

@@ -524,6 +524,12 @@ msgstr ""
 msgid "Could not verify download"
 msgstr ""
 
+msgid "Cover only"
+msgstr ""
+
+msgid "Cover with text"
+msgstr ""
+
 msgid "Delete"
 msgstr ""
 
@@ -870,6 +876,10 @@ msgid "Library category picker settings are unavailable."
 msgstr ""
 
 msgid "Library loaded, but could not be saved for next time."
+msgstr ""
+
+msgctxt "manga view"
+msgid "List"
 msgstr ""
 
 msgid "Loading canceled."
@@ -1473,6 +1483,9 @@ msgid "Verify download"
 msgstr ""
 
 msgid "Verifying download"
+msgstr ""
+
+msgid "View"
 msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."

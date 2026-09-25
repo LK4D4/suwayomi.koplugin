@@ -1,4 +1,4 @@
--- Boundary: Browse/library list and search UI.
+-- Boundary: Browse manga grids, library lists, and search UI.
 --
 -- Responsibility: build source, search, browse manga, and library category menus
 -- while preserving controller-owned callbacks.
@@ -1085,10 +1085,33 @@ local function buildMangaMenuTable(manga_list, onSelectCallback, options)
     return menu_table
 end
 
+local function mangaViewMenuCallback(options)
+    if not options.on_view_mode_changed then return nil end
+    return function(menu)
+        return getUI().showChoiceDialog{
+            title = I18n.t("View"),
+            current = menu.view_mode,
+            choices = {
+                { value = "list", text = I18n.c("manga view", "List") },
+                { value = "cover_only", text = I18n.t("Cover only") },
+                { value = "cover_text", text = I18n.t("Cover with text") },
+            },
+            anchor = function() return menu._suwayomi_view_button.dimen end,
+            onSelect = function(mode)
+                if mode ~= menu.view_mode and options.on_view_mode_changed(mode) == true then
+                    getListMenu().setViewMode(menu, mode)
+                end
+            end,
+        }
+    end
+end
+
 function BrowseUI.showMangaMenu(manga_list, onSelectCallback, options)
     options = options or {}
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
     return getListMenu().show{
+        view_mode = options.view_mode or "cover_only",
+        on_view_menu = mangaViewMenuCallback(options),
         title = options.title or I18n.t("Suwayomi Manga"),
         title_bar_left_icon = options.title_bar_left_icon,
         fixed_item_heights = options.fixed_item_heights ~= false,
@@ -1109,6 +1132,8 @@ function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
     options = options or {}
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
     return getListMenu().update(menu, {
+        view_mode = options.view_mode or "cover_only",
+        on_view_menu = mangaViewMenuCallback(options),
         title = options.title or menu.title,
         title_bar_left_icon = options.title_bar_left_icon,
         item_table = menu_table,

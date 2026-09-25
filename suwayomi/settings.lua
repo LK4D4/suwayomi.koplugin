@@ -460,6 +460,26 @@ function SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
     return normalized
 end
 
+function SuwayomiSettings:normalizeBrowseViewMode(mode)
+    if mode == "list" or mode == "cover_only" or mode == "cover_text" then
+        return mode
+    end
+    return "cover_only"
+end
+
+function SuwayomiSettings:loadBrowseViewMode()
+    return self:normalizeBrowseViewMode(self:getStore():readKey("browse_view_mode", "cover_only"))
+end
+
+function SuwayomiSettings:saveBrowseViewMode(mode)
+    local normalized = self:normalizeBrowseViewMode(mode)
+    local ok, err = self:getStore():saveKey("browse_view_mode", normalized)
+    if not ok then
+        return nil, err
+    end
+    return normalized
+end
+
 local function usableLibraryRows(rows)
     if type(rows) ~= "table" then return false end
     local count, seen = 0, {}
