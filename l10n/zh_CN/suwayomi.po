@@ -291,6 +291,14 @@ msgstr "无法取消下载：存储状态不明确"
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr "无法删除章节：存储状态不明确"
 
+#, fuzzy
+msgid "Cannot determine the next chapter from the saved list."
+msgstr "无法从设备删除此章节。"
+
+#, fuzzy
+msgid "Cannot determine the next chapter from this book."
+msgstr "无法从设备删除此章节。"
+
 msgid "Cannot enqueue download: storage is ambiguous"
 msgstr "无法将下载加入队列：存储状态不明确"
 
@@ -463,6 +471,10 @@ msgstr "无法加载已保存的筛选器。"
 
 msgid "Could not load source filters."
 msgstr "无法加载源筛选器。"
+
+#, fuzzy
+msgid "Could not open the next chapter."
+msgstr "无法加载章节。"
 
 msgid "Could not queue download: %1"
 msgstr "无法将下载加入队列：%1"
@@ -950,6 +962,10 @@ msgstr "从不询问"
 msgid "New folder"
 msgstr "新文件夹"
 
+#, fuzzy
+msgid "Next chapter"
+msgstr "此章节"
+
 msgid "Next page"
 msgstr "下一页"
 
@@ -1006,6 +1022,10 @@ msgstr "没有可新增的下载：章节已下载或已在下载队列中。"
 
 msgid "No new downloads queued."
 msgstr "没有新的下载排队。"
+
+#, fuzzy
+msgid "No next chapter in saved list."
+msgstr "未选择章节。"
 
 msgid "No poster"
 msgstr "没有封面"
@@ -1301,6 +1321,9 @@ msgstr "源加载超时。"
 msgid "Status"
 msgstr "状态"
 
+msgid "Stay here"
+msgstr ""
+
 msgid "Suwayomi"
 msgstr "Suwayomi"
 
@@ -1385,6 +1408,17 @@ msgstr "文本"
 
 msgid "Text filter"
 msgstr "文本筛选器"
+
+msgid "The next chapter archive is damaged."
+msgstr ""
+
+msgid ""
+"The next chapter could not be verified. This does not mean it is damaged."
+msgstr ""
+
+#, fuzzy
+msgid "The next chapter has unfinished download work."
+msgstr "此章节未下载。"
 
 msgid ""
 "The server rejected the chapter request. Check connection settings, then "
@@ -1486,6 +1520,9 @@ msgstr "校验下载"
 
 msgid "Verifying download"
 msgstr "正在校验下载"
+
+msgid "Verifying next chapter…"
+msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."
 msgstr "等待检查哪些未读章节需要下载。"

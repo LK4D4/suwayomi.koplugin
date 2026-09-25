@@ -335,6 +335,14 @@ msgstr "Нельзя отменить загрузки: состояние хр�
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr "Нельзя удалить главу: состояние хранилища не определено"
 
+#, fuzzy
+msgid "Cannot determine the next chapter from the saved list."
+msgstr "Не удалось удалить эту главу с устройства."
+
+#, fuzzy
+msgid "Cannot determine the next chapter from this book."
+msgstr "Не удалось удалить эту главу с устройства."
+
 msgid "Cannot enqueue download: storage is ambiguous"
 msgstr "Нельзя добавить загрузку в очередь: состояние хранилища не определено"
 
@@ -531,6 +539,10 @@ msgstr "Не удалось загрузить сохранённые фильт
 
 msgid "Could not load source filters."
 msgstr "Не удалось загрузить фильтры источника."
+
+#, fuzzy
+msgid "Could not open the next chapter."
+msgstr "Не удалось загрузить главы."
 
 msgid "Could not queue download: %1"
 msgstr "Не удалось добавить загрузку в очередь: %1"
@@ -1037,6 +1049,10 @@ msgstr "Никогда не спрашивать"
 msgid "New folder"
 msgstr "Новая папка"
 
+#, fuzzy
+msgid "Next chapter"
+msgstr "эта глава"
+
 msgid "Next page"
 msgstr "Следующая страница"
 
@@ -1100,6 +1116,10 @@ msgstr ""
 
 msgid "No new downloads queued."
 msgstr "Новые загрузки не добавлены в очередь."
+
+#, fuzzy
+msgid "No next chapter in saved list."
+msgstr "Главы не выбраны."
 
 msgid "No poster"
 msgstr "Нет обложки"
@@ -1408,6 +1428,9 @@ msgstr "Истекло время ожидания загрузки источн
 msgid "Status"
 msgstr "Статус"
 
+msgid "Stay here"
+msgstr ""
+
 msgid "Suwayomi"
 msgstr "Suwayomi"
 
@@ -1493,6 +1516,17 @@ msgstr "Текст"
 
 msgid "Text filter"
 msgstr "Текстовый фильтр"
+
+msgid "The next chapter archive is damaged."
+msgstr ""
+
+msgid ""
+"The next chapter could not be verified. This does not mean it is damaged."
+msgstr ""
+
+#, fuzzy
+msgid "The next chapter has unfinished download work."
+msgstr "Эта глава не скачана."
 
 msgid ""
 "The server rejected the chapter request. Check connection settings, then "
@@ -1598,6 +1632,9 @@ msgstr "Проверить загрузку"
 
 msgid "Verifying download"
 msgstr "Проверка загрузки"
+
+msgid "Verifying next chapter…"
+msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."
 msgstr "Ожидание проверки непрочитанных глав для загрузки."

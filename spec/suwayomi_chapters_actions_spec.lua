@@ -27,6 +27,7 @@ describe("suwayomi/chapters/actions", function()
             "suwayomi/i18n",
             "suwayomi/settings",
             "suwayomi/downloads/downloader",
+            "suwayomi/downloads/archive",
             "suwayomi/downloads/queue",
             "suwayomi/downloads/lifecycle",
             "suwayomi/downloads/status_formatter",
@@ -267,6 +268,7 @@ describe("suwayomi/chapters/actions", function()
                     chapter = target_chapter,
                     path = chapter_path,
                 })
+                return true
             end,
             getChaptersBefore = function(_, selected)
                 return options.chapters_before or { selected }
@@ -588,6 +590,126 @@ describe("suwayomi/chapters/actions", function()
         assert.are.same(before, settings:loadChapterLedger())
         assert.are.same({}, plugin.metadata_updates)
     end)
+
+    it("keeps one reader-initiated verification pending and switches natively without read mutations", function()
+        local path = os.tmpname()
+        local file = assert(io.open(path, "wb"))
+        file:write("PK\005\006" .. string.rep("\0", 18))
+        file:close()
+        local complete, verification_options, opened, calls = nil, nil, nil, 0
+        local reader = { document = { file = "/current.cbz" },
+            switchDocument = function(_, selected) opened = selected end }
+        package.preload["apps/reader/readerui"] = function() return { instance = reader } end
+        local plugin = build_plugin({ existing = { [path] = true },
+            ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path,
+                read = false, pending_read_sync = true, pending_read_state = false } },
+            queue = { status = { ["m1:c1"] = { state = "failed" } },
+                verifyArchive = function(_, _, _, _, callback, options)
+                calls = calls + 1
+                complete, verification_options = callback, options
+                return true
+            end },
+        })
+        local options = { reader = reader, is_current = function() return true end,
+            on_blocked = function(reason) error(reason) end }
+        local before = settings:loadChapterLedger()
+        assert.is_true(plugin:verifyChapterDownload(manga, chapter, true, options))
+        assert.is_false(plugin:verifyChapterDownload(manga, chapter, true, options))
+        assert.are.equal(1, calls)
+        assert.is_nil(opened)
+        assert.is_true(verification_options.read_only)
+        assert.are.equal("Verifying next chapter…", plugin.messages[1])
+        complete({ state = "valid", identity = require("suwayomi/downloads/archive").identity(path) })
+        assert.are.equal(path, opened)
+        assert.are.same(before, settings:loadChapterLedger())
+        assert.are.same({}, plugin.metadata_updates)
+        assert.are.same({}, plugin.refreshes)
+        assert.is_nil(settings:getStore():readKey("download_refill"))
+        original_os_remove(path)
+        package.preload["apps/reader/readerui"] = nil
+    end)
+
+    for _, state in ipairs({ "queued", "downloading", "running", "stopping", "finalizing" }) do
+        it("blocks Next while the successor is " .. state, function()
+            local reason
+            local plugin = build_plugin({ queue = { status = { ["m1:c1"] = { state = state } },
+                verifyArchive = function() error("Owned archive must not be inspected") end } })
+            assert.is_false(plugin:verifyChapterDownload(manga, chapter, true, {
+                reader = {}, on_blocked = function(message) reason = message end,
+            }))
+            assert.are.equal("The next chapter has unfinished download work.", reason)
+        end)
+    end
+
+    it("reports a missing next archive without starting verification", function()
+        local reason
+        local plugin = build_plugin({ queue = { verifyArchive = function() error("No archive") end } })
+        assert.is_false(plugin:verifyChapterDownload(manga, chapter, true, {
+            reader = {}, on_blocked = function(message) reason = message end,
+        }))
+        assert.are.equal("Download the chapter first.", reason)
+    end)
+
+    for _, scenario in ipairs({ "damaged", "unverified", "busy", "reader", "document", "selection", "path", "identity", "owned", "save" }) do
+        it("stays in the reader when Next verification encounters " .. scenario, function()
+            local path = os.tmpname()
+            local file = assert(io.open(path, "wb"))
+            file:write("PK\005\006" .. string.rep("\0", 18))
+            file:close()
+            local complete, reason, opened, current = nil, nil, false, true
+            local reader = { document = { file = "/current.cbz" },
+                switchDocument = function() opened = true end }
+            local reader_ui = { instance = reader }
+            package.preload["apps/reader/readerui"] = function() return reader_ui end
+            local plugin = build_plugin({ existing = { [path] = true },
+                ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = path } },
+                queue = { status = { ["m1:c1"] = { state = "failed" } },
+                    verifyArchive = function(_, _, _, _, callback)
+                        complete = callback
+                        if scenario == "busy" then return false, "verification_busy" end
+                        return true
+                    end },
+            })
+            local accepted = plugin:verifyChapterDownload(manga, chapter, true, {
+                reader = reader, is_current = function() return current end,
+                on_blocked = function(message) reason = message end,
+            })
+            local identity = require("suwayomi/downloads/archive").identity(path)
+            if scenario == "busy" then
+                assert.is_false(accepted)
+                assert.are.equal("Another download is being verified.", reason)
+            else
+                assert.is_true(accepted)
+                if scenario == "reader" then reader_ui.instance = { document = reader.document } end
+                if scenario == "document" then reader.document = { file = "/current.cbz" } end
+                if scenario == "selection" then current = false end
+                if scenario == "path" then plugin.getChapterPath = function() return "/replacement.cbz" end end
+                if scenario == "identity" then
+                    local replacement = assert(io.open(path, "wb"))
+                    local marker = "\nSuwayomi-Archive-v1:" .. string.rep("1", 32) .. ":0\n"
+                    replacement:write("PK\005\006" .. string.rep("\0", 16) .. string.char(#marker, 0) .. marker)
+                    replacement:close()
+                end
+                if scenario == "owned" then plugin.queue.status["m1:c1"].state = "queued" end
+                if scenario == "save" then plugin.saveReaderReturnContext = function() return nil, "Save failed" end end
+                complete({ state = scenario == "damaged" and "damaged"
+                    or scenario == "unverified" and "unverified" or "valid", identity = identity })
+                if scenario == "damaged" then
+                    assert.are.equal("The next chapter archive is damaged.", reason)
+                elseif scenario == "unverified" then
+                    assert.are.equal("The next chapter could not be verified. This does not mean it is damaged.", reason)
+                elseif scenario == "save" then
+                    assert.are.equal("Save failed", reason)
+                else
+                    assert.is_nil(reason)
+                end
+            end
+            assert.is_false(opened)
+            assert.are.same({}, plugin.metadata_updates)
+            original_os_remove(path)
+            package.preload["apps/reader/readerui"] = nil
+        end)
+    end
 
     it("drops verification after a newer open request, context change, path change, or host retirement", function()
         local callbacks = {}

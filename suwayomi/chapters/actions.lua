@@ -41,33 +41,65 @@ mergeMethods(
     ChapterReadActions.methods
 )
 
-function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
-    if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
-    if open_when_valid and self.cancelMangaNetworkRequests then self:cancelMangaNetworkRequests() end
+function Methods:verifyChapterDownload(manga, chapter, open_when_valid, options)
+    options = options or {}
+    local reader = options.reader
+    if reader and self.next_chapter_pending and self.next_chapter_pending() then return false end
+    if not reader and self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
+    if not reader and open_when_valid and self.cancelMangaNetworkRequests then self:cancelMangaNetworkRequests() end
+    local function blocked(message)
+        if reader then
+            self.next_chapter_pending = nil
+            options.on_blocked(message)
+        else
+            self:showMessage(message)
+        end
+        return false
+    end
+    local queue = self:getDownloadQueue()
+    if reader and queue:ownsChapter(queue:getKey(manga, chapter)) then
+        return blocked(I18n.t("The next chapter has unfinished download work."))
+    end
     local local_only = self:isLocalOnlyChapter(manga, chapter)
     local request = {}
     local completed = false
     self.chapter_archive_request = request
-    local context_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
+    local context_current = options.is_current or (self.captureChapterActionGuard and self:captureChapterActionGuard())
     local downloaded, chapter_path = self:isChapterDownloaded(manga, chapter)
     if not downloaded or not chapter_path then
-        self:showMessage(I18n.t("Download the chapter first."))
-        return false
+        return blocked(I18n.t("Download the chapter first."))
     end
+    local Archive = reader and require("suwayomi/downloads/archive")
+    local identity = Archive and Archive.identity(chapter_path)
+    if reader and not identity then return blocked(I18n.t("Could not verify download")) end
+    local reader_document = reader and reader.document
     local function is_current()
         return not self.suwayomi_host_retired
             and self.chapter_archive_request == request
             and (not context_current or context_current())
             and self:isLocalOnlyChapter(manga, chapter) == local_only
-            and (not self.isChapterInCurrentContext or self:isChapterInCurrentContext(manga, chapter))
+            and (reader or not self.isChapterInCurrentContext or self:isChapterInCurrentContext(manga, chapter))
             and self:getChapterPath(manga, chapter) == chapter_path
+            and (not reader or (require("apps/reader/readerui").instance == reader
+                and reader.document == reader_document
+                and not queue:ownsChapter(queue:getKey(manga, chapter))
+                and Archive.identity(chapter_path) == identity))
     end
-    local accepted, err = self:getDownloadQueue():verifyArchive(manga, chapter, chapter_path, function(result)
+    if reader then
+        if not is_current() then return false end
+        self.next_chapter_pending = is_current
+        self:showMessage(I18n.t("Verifying next chapter…"), { toast = true, timeout = 2 })
+    end
+    local accepted, err = queue:verifyArchive(manga, chapter, chapter_path, function(result)
         if completed or not is_current() then return end
         completed = true
-        if self.refreshChapterMenu then self:refreshChapterMenu() end
+        if reader then self.next_chapter_pending = nil end
+        if not reader and self.refreshChapterMenu then self:refreshChapterMenu() end
         if result.state ~= "valid" then
-            if local_only then
+            if reader then
+                blocked(result.state == "damaged" and I18n.t("The next chapter archive is damaged.")
+                    or I18n.t("The next chapter could not be verified. This does not mean it is damaged."))
+            elseif local_only then
                 self:showMessage(result.error or I18n.t("Could not verify download"))
             else
                 self:showChapterDownloadError(manga, chapter)
@@ -81,10 +113,22 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         if not ok or not ReaderUI
             or not ((ReaderUI.instance and ReaderUI.instance.switchDocument) or ReaderUI.showReader)
         then
-            self:showMessage(I18n.t("KOReader could not open this chapter right now."))
+            blocked(I18n.t("KOReader could not open this chapter right now."))
             return
         end
         if not is_current() then return end
+        if reader then
+            -- Native switching owns saved position, completion, and close-triggered work.
+            if result.identity ~= identity then return end
+            local saved, save_err = self:saveReaderReturnContext(manga, chapter, chapter_path)
+            if not saved then
+                blocked(save_err or I18n.t("Failed to save settings."))
+                return
+            end
+            if not is_current() then return end
+            reader:switchDocument(chapter_path)
+            return
+        end
         if not local_only then
             local associated, association_err = self:getDownloadQueue().refill:associate(manga)
             if not associated then
@@ -109,9 +153,9 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         else
             ReaderUI:showReader(chapter_path)
         end
-    end, { is_current = is_current, read_only = local_only })
+    end, { is_current = is_current, read_only = reader ~= nil or local_only })
     if not accepted then
-        self:showMessage(err == "verification_busy" and I18n.t("Another download is being verified.")
+        blocked(err == "verification_busy" and I18n.t("Another download is being verified.")
             or I18n.t("Could not verify download"))
     end
     return accepted, err

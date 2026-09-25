@@ -139,7 +139,7 @@ describe("suwayomi plugin", function()
         assert.are.equal("Close plugin", runtime.shown_home_dialog.actions[6].text)
     end)
 
-    it("adds only the reader return action in book mode when the document is from Suwayomi", function()
+    it("adds adjacent reader return and next actions for a recognized Suwayomi document", function()
         runtime_helper.teardown()
         runtime = runtime_helper.install({
             reader_return_contexts = {
@@ -161,6 +161,7 @@ describe("suwayomi plugin", function()
             returnToSuwayomiChapters = function(self)
                 self.returned_to_chapters = true
             end,
+            openNextChapter = function(self) self.next_requested = true end,
         })
 
         plugin:addToMainMenu(menu_items)
@@ -170,7 +171,11 @@ describe("suwayomi plugin", function()
         assert.are.equal("Go to Suwayomi", menu_items.suwayomi_reader_return.text)
         assert.are.equal("main", menu_items.suwayomi_reader_return.sorting_hint)
         assert.are.equal("suwayomi_reader_return", runtime.reader_menu_order.main[1])
-        assert.are.equal("history", runtime.reader_menu_order.main[2])
+        assert.are.equal("suwayomi_next_chapter", runtime.reader_menu_order.main[2])
+        assert.are.equal("history", runtime.reader_menu_order.main[3])
+        assert.are.equal("Next chapter", menu_items.suwayomi_next_chapter.text)
+        menu_items.suwayomi_next_chapter.callback()
+        assert.is_true(plugin.next_requested)
 
         menu_items.suwayomi_reader_return.callback()
 
@@ -200,8 +205,9 @@ describe("suwayomi plugin", function()
         plugin:addToMainMenu({})
 
         assert.are.equal("suwayomi_reader_return", runtime.reader_menu_order.main[1])
-        assert.are.equal("history", runtime.reader_menu_order.main[2])
-        assert.is_nil(runtime.reader_menu_order.main[3])
+        assert.are.equal("suwayomi_next_chapter", runtime.reader_menu_order.main[2])
+        assert.are.equal("history", runtime.reader_menu_order.main[3])
+        assert.is_nil(runtime.reader_menu_order.main[4])
     end)
 
     it("does not add a reader menu item for non-Suwayomi books", function()
@@ -217,6 +223,7 @@ describe("suwayomi plugin", function()
 
         assert.is_nil(menu_items.suwayomi)
         assert.is_nil(menu_items.suwayomi_reader_return)
+        assert.is_nil(menu_items.suwayomi_next_chapter)
     end)
 
     it("constructs the client lazily and reuses it", function()

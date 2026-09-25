@@ -340,6 +340,14 @@ msgstr "Неможливо скасувати завантаження: стан
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr "Неможливо видалити розділ: стан сховища неоднозначний"
 
+#, fuzzy
+msgid "Cannot determine the next chapter from the saved list."
+msgstr "Не вдалося видалити цей розділ із пристрою."
+
+#, fuzzy
+msgid "Cannot determine the next chapter from this book."
+msgstr "Не вдалося видалити цей розділ із пристрою."
+
 msgid "Cannot enqueue download: storage is ambiguous"
 msgstr "Неможливо додати завантаження в чергу: стан сховища неоднозначний"
 
@@ -541,6 +549,10 @@ msgstr "Не вдалося завантажити збережені фільт
 
 msgid "Could not load source filters."
 msgstr "Не вдалося завантажити фільтри джерела."
+
+#, fuzzy
+msgid "Could not open the next chapter."
+msgstr "Не вдалося завантажити розділи."
 
 msgid "Could not queue download: %1"
 msgstr "Не вдалося додати завантаження в чергу: %1"
@@ -1050,6 +1062,10 @@ msgstr "Ніколи не питати"
 msgid "New folder"
 msgstr "Нова тека"
 
+#, fuzzy
+msgid "Next chapter"
+msgstr "цей розділ"
+
 msgid "Next page"
 msgstr "Наступна сторінка"
 
@@ -1114,6 +1130,10 @@ msgstr ""
 
 msgid "No new downloads queued."
 msgstr "Нові завантаження не додано в чергу."
+
+#, fuzzy
+msgid "No next chapter in saved list."
+msgstr "Розділи не вибрано."
 
 msgid "No poster"
 msgstr "Немає постера"
@@ -1420,6 +1440,9 @@ msgstr "Час очікування завантаження джерела ми
 msgid "Status"
 msgstr "Статус"
 
+msgid "Stay here"
+msgstr ""
+
 msgid "Suwayomi"
 msgstr "Suwayomi"
 
@@ -1505,6 +1528,17 @@ msgstr "Текст"
 
 msgid "Text filter"
 msgstr "Текстовий фільтр"
+
+msgid "The next chapter archive is damaged."
+msgstr ""
+
+msgid ""
+"The next chapter could not be verified. This does not mean it is damaged."
+msgstr ""
+
+#, fuzzy
+msgid "The next chapter has unfinished download work."
+msgstr "Цей розділ не завантажено."
 
 msgid ""
 "The server rejected the chapter request. Check connection settings, then "
@@ -1610,6 +1644,9 @@ msgstr "Перевірити завантаження"
 
 msgid "Verifying download"
 msgstr "Перевірка завантаження"
+
+msgid "Verifying next chapter…"
+msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."
 msgstr "Очікування перевірки, які непрочитані розділи потрібно завантажити."

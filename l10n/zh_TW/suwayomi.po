@@ -286,6 +286,12 @@ msgstr ""
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr ""
 
+msgid "Cannot determine the next chapter from the saved list."
+msgstr ""
+
+msgid "Cannot determine the next chapter from this book."
+msgstr ""
+
 msgid "Cannot enqueue download: storage is ambiguous"
 msgstr ""
 
@@ -449,6 +455,9 @@ msgid "Could not load saved filters."
 msgstr ""
 
 msgid "Could not load source filters."
+msgstr ""
+
+msgid "Could not open the next chapter."
 msgstr ""
 
 msgid "Could not queue download: %1"
@@ -928,6 +937,9 @@ msgstr ""
 msgid "New folder"
 msgstr ""
 
+msgid "Next chapter"
+msgstr ""
+
 msgid "Next page"
 msgstr ""
 
@@ -983,6 +995,9 @@ msgid ""
 msgstr ""
 
 msgid "No new downloads queued."
+msgstr ""
+
+msgid "No next chapter in saved list."
 msgstr ""
 
 msgid "No poster"
@@ -1276,6 +1291,9 @@ msgstr ""
 msgid "Status"
 msgstr ""
 
+msgid "Stay here"
+msgstr ""
+
 msgid "Suwayomi"
 msgstr ""
 
@@ -1357,6 +1375,16 @@ msgid "Text"
 msgstr ""
 
 msgid "Text filter"
+msgstr ""
+
+msgid "The next chapter archive is damaged."
+msgstr ""
+
+msgid ""
+"The next chapter could not be verified. This does not mean it is damaged."
+msgstr ""
+
+msgid "The next chapter has unfinished download work."
 msgstr ""
 
 msgid ""
@@ -1457,6 +1485,9 @@ msgid "Verify download"
 msgstr ""
 
 msgid "Verifying download"
+msgstr ""
+
+msgid "Verifying next chapter…"
 msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."
