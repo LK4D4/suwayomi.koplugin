@@ -11,4 +11,5 @@ These dated records describe the named candidate, environment, method, observed 
 | [C1 chapter publication, 2026-09-23](chapter-publication-c1-acceptance-2026-09-23.md) | Desktop and Palma checked-write publication |
 | [Issue #54, 2026-09-24](issue-54-chapter-publication-2026-09-24.md) | Targeted desktop and Palma late menu save controls |
 | [Issue #55, 2026-09-25](issue-55-chapter-publication-2026-09-25.md) | Chapter-publication refactor, composed checks, and focused desktop controls |
+| [Issue #56, 2026-09-25](issue-56-chapter-lookup-2026-09-25.md) | Chapter-lookup refactor, scope and save-ownership checks, desktop Open/read state |
 | [Release readiness, 2026-09-24](release-readiness-2026-09-24.md) | Review of exact candidate, CI, desktop, Palma, and remaining gaps |
