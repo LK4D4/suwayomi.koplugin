@@ -1,8 +1,8 @@
 -- Boundary: ReaderReturn.
 --
--- Responsibility: Persist chapter return context and hand reader return to the live FileManager chapter flow.
--- Owned state: Settings-backed return contexts keyed by local chapter path and a cancellable deferred handoff.
--- Dependencies: KOReader reader/filemanager UI modules, Suwayomi settings, plugin i18n facade, and chapter menu methods.
+-- Responsibility: Persist return context, guard reader Next selection, and hand reader return to the live FileManager chapter flow.
+-- Owned state: Settings-backed path contexts, captured reader/selection guards, and a cancellable deferred return handoff.
+-- Dependencies: KOReader reader/filemanager UI and confirmation widgets, settings, i18n, chapter context, and verified-open methods.
 -- External data: Document paths and persisted contexts are optional; scope and freshness gate reader teardown/publication.
 
 local SuwayomiSettings = require("suwayomi/settings")

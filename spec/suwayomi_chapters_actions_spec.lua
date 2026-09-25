@@ -650,6 +650,43 @@ describe("suwayomi/chapters/actions", function()
         assert.are.equal("Download the chapter first.", reason)
     end)
 
+    it("records a scoped failed-job archive before Next so native completion can synchronize it", function()
+        local path = os.tmpname()
+        local file = assert(io.open(path, "wb"))
+        file:write("PK\005\006" .. string.rep("\0", 18))
+        file:close()
+        local complete, opened
+        local reader = { document = { file = "/current.cbz" },
+            switchDocument = function(_, selected) opened = selected end }
+        package.preload["apps/reader/readerui"] = function() return { instance = reader } end
+        local plugin = build_plugin({ existing = { [path] = true },
+            queue = { status = { ["m1:c1"] = { state = "failed" } },
+                verifyArchive = function(_, _, _, _, callback) complete = callback; return true end },
+        })
+        assert(settings:saveReaderReturnContexts({ [path] = {
+            path = path, manga_id = "m1", chapter_id = "c1", endpoint_scope = manga.endpoint_scope,
+        } }))
+        plugin.queue.settings = settings
+        for name, method in pairs(dofile("suwayomi/readsync/ledger.lua").methods) do plugin[name] = method end
+        plugin.getChapterDownloadKey = require("suwayomi/chapters/context").methods.getChapterDownloadKey
+        assert.is_nil(settings:loadChapterLedger()["m1:c1"])
+        assert.is_true(plugin:verifyChapterDownload(manga, chapter, true, {
+            reader = reader, is_current = function() return true end,
+            on_blocked = function(reason) error(reason) end,
+        }))
+        complete({ state = "valid", identity = require("suwayomi/downloads/archive").identity(path) })
+        assert.are.equal(path, opened)
+        local entry = settings:loadChapterLedger()["m1:c1"]
+        assert.are.equal(path, entry.path)
+        assert.are.equal(manga.endpoint_scope, entry.endpoint_scope)
+        assert.is_false(entry.read)
+        assert.is_nil(entry.pending_read_sync)
+        assert.are.same({}, plugin.metadata_updates)
+        assert.is_nil(settings:getStore():readKey("download_refill"))
+        original_os_remove(path)
+        package.preload["apps/reader/readerui"] = nil
+    end)
+
     for _, scenario in ipairs({ "damaged", "unverified", "busy", "reader", "document", "selection", "path", "identity", "owned", "save" }) do
         it("stays in the reader when Next verification encounters " .. scenario, function()
             local path = os.tmpname()

@@ -117,19 +117,8 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid, options)
             return
         end
         if not is_current() then return end
-        if reader then
-            -- Native switching owns saved position, completion, and close-triggered work.
-            if result.identity ~= identity then return end
-            local saved, save_err = self:saveReaderReturnContext(manga, chapter, chapter_path)
-            if not saved then
-                blocked(save_err or I18n.t("Failed to save settings."))
-                return
-            end
-            if not is_current() then return end
-            reader:switchDocument(chapter_path)
-            return
-        end
-        if not local_only then
+        if reader and result.identity ~= identity then return end
+        if not reader and not local_only then
             local associated, association_err = self:getDownloadQueue().refill:associate(manga)
             if not associated then
                 self:showMessage(association_err or I18n.t("Failed to save settings."))
@@ -137,17 +126,23 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid, options)
             end
         end
         if not local_only and self.saveReaderReturnContext then
-            self:saveReaderReturnContext(manga, chapter, chapter_path)
+            local saved, save_err = self:saveReaderReturnContext(manga, chapter, chapter_path)
+            if reader and not saved then
+                blocked(save_err or I18n.t("Failed to save settings."))
+                return
+            end
         end
         if not local_only and self.upsertChapterLedgerEntry then
             local saved, save_err = self:upsertChapterLedgerEntry(manga, chapter, {
                 path = chapter_path, endpoint_scope = manga.endpoint_scope,
             })
             if not saved then
-                self:showMessage(save_err or I18n.t("Failed to save settings."))
+                blocked(save_err or I18n.t("Failed to save settings."))
                 return
             end
         end
+        -- Recheck after persistence; native switching owns progress and completion.
+        if reader and not is_current() then return end
         if ReaderUI.instance and ReaderUI.instance.switchDocument then
             ReaderUI.instance:switchDocument(chapter_path)
         else
