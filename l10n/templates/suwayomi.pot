@@ -1406,6 +1406,11 @@ msgid ""
 "settings stay unchanged. You can change it there at any time."
 msgstr ""
 
+msgid ""
+"This book belongs to another server. Go to Suwayomi opens the configured "
+"Library."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""
 

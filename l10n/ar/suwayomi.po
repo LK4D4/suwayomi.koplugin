@@ -1455,6 +1455,11 @@ msgstr ""
 "يؤثر هذا الإعداد في KOReader على جميع المستندات. لا يتغير إجراء النهاية ولا "
 "إعدادات الإزالة. يمكنك تغييره من هناك في أي وقت."
 
+msgid ""
+"This book belongs to another server. Go to Suwayomi opens the configured "
+"Library."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""
 

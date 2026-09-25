@@ -1394,6 +1394,11 @@ msgstr ""
 "Cài đặt KOReader này áp dụng cho mọi tài liệu. Hành động cuối tài liệu và "
 "cài đặt xóa không thay đổi. Bạn có thể đổi cài đặt này tại đó bất cứ lúc nào."
 
+msgid ""
+"This book belongs to another server. Go to Suwayomi opens the configured "
+"Library."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""
 

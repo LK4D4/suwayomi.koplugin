@@ -1405,6 +1405,11 @@ msgstr ""
 "pengaturan penghapusan tidak berubah. Anda dapat mengubahnya di sana kapan "
 "saja."
 
+msgid ""
+"This book belongs to another server. Go to Suwayomi opens the configured "
+"Library."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""
 

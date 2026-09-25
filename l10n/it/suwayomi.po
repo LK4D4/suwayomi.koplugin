@@ -1415,6 +1415,11 @@ msgstr ""
 "documento e le impostazioni di rimozione non cambiano. Puoi modificarla lì "
 "in qualsiasi momento."
 
+msgid ""
+"This book belongs to another server. Go to Suwayomi opens the configured "
+"Library."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""
 

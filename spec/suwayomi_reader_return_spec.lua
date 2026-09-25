@@ -143,6 +143,7 @@ describe("suwayomi/reader_return", function()
         local filemanager = require("apps/filemanager/filemanager").instance
         filemanager.suwayomi = {
             ui = filemanager,
+            showLibrary = function() table.insert(state.events, "show-library") end,
             showChaptersForManga = function(destination, manga, show_options)
                 table.insert(state.events, "show-chapters")
                 state.shown_destination = destination
@@ -633,6 +634,24 @@ describe("suwayomi/reader_return", function()
 
         assert.are.same({}, state.events)
         assert.is_nil(state.shown_manga)
+    end)
+
+    it("takes the blocked Next dialog to the configured Library for a foreign endpoint", function()
+        local plugin = linked_reader()
+        plugin:getCurrentReaderReturnContext().endpoint_scope = "https://other.example"
+        plugin:showNextChapterBlocked("Cannot determine the next chapter from this book.")
+        assert.is_truthy(state.dialog.text:find("configured Library", 1, true))
+        state.dialog.ok_callback()
+        assert.are.same({ "close-reader", "reinit-filemanager", "show-library" }, state.events)
+        assert.is_nil(state.shown_manga)
+    end)
+
+    it("does not use a blocked Next navigation dialog after the endpoint changes", function()
+        local plugin = linked_reader()
+        plugin:showNextChapterBlocked("Unavailable")
+        state.server_url = "https://other.example"
+        state.dialog.ok_callback()
+        assert.are.same({}, state.events)
     end)
 
     it("ignores a deferred return after the reader document changes", function()

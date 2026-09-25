@@ -1415,6 +1415,11 @@ msgstr ""
 "művelet és a törlési beállítások nem változnak. Ezt a beállítást ott "
 "bármikor módosíthatja."
 
+msgid ""
+"This book belongs to another server. Go to Suwayomi opens the configured "
+"Library."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""
 

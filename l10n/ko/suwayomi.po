@@ -1393,6 +1393,11 @@ msgstr ""
 "이 KOReader 설정은 모든 문서에 적용됩니다. 문서 끝 동작과 삭제 설정은 바뀌지 "
 "않습니다. 같은 메뉴에서 언제든 이 설정을 바꿀 수 있습니다."
 
+msgid ""
+"This book belongs to another server. Go to Suwayomi opens the configured "
+"Library."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""
 

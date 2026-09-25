@@ -1399,6 +1399,11 @@ msgstr ""
 "此 KOReader 設定適用於所有文件，不會變更結尾動作或刪除設定。您隨時可以在該處"
 "變更此設定。"
 
+msgid ""
+"This book belongs to another server. Go to Suwayomi opens the configured "
+"Library."
+msgstr ""
+
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""
 

@@ -314,6 +314,10 @@ function Methods:showNextChapterBlocked(reason, chapter)
     if self.suwayomi_host_retired or not reader then return false end
     local context = copyTable(self:getReaderReturnContextForPath(path))
     local text = reason or I18n.t("Could not open the next chapter.")
+    local endpoint_scope = SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
+    if context and present(context.endpoint_scope) and context.endpoint_scope ~= endpoint_scope then
+        text = text .. "\n\n" .. I18n.t("This book belongs to another server. Go to Suwayomi opens the configured Library.")
+    end
     if chapter and chapter.name and chapter.name ~= "" then
         text = tostring(chapter.name) .. "\n\n" .. text
     end
@@ -326,8 +330,9 @@ function Methods:showNextChapterBlocked(reason, chapter)
             local current_reader, current_document, current_path = liveReaderForPlugin(self)
             if not self.suwayomi_host_retired and current_reader == reader
                 and current_document == document and current_path == path
+                and endpoint_scope == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
                 and contextMatches(self:getReaderReturnContextForPath(path), context) then
-                self:returnToSuwayomiChapters(context)
+                self:returnToSuwayomiChapters(context, { allow_library_fallback = true })
             end
         end,
     })
@@ -413,7 +418,7 @@ function Methods:closeReaderToFileManager(callback, should_continue)
     end)
 end
 
-function Methods:returnToSuwayomiChapters(context)
+function Methods:returnToSuwayomiChapters(context, return_options)
     if self.suwayomi_host_retired then return false end
     context = copyTable(context or self:getCurrentReaderReturnContext())
     if not context or not context.path then
@@ -422,7 +427,8 @@ function Methods:returnToSuwayomiChapters(context)
     end
 
     local endpoint_scope = SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
-    if present(context.endpoint_scope) and context.endpoint_scope ~= endpoint_scope then
+    local foreign_context = present(context.endpoint_scope) and context.endpoint_scope ~= endpoint_scope
+    if foreign_context and not (return_options and return_options.allow_library_fallback) then
         return false
     end
     if not contextMatches(self:getCurrentReaderReturnContext(), context) then return false end
@@ -448,7 +454,11 @@ function Methods:returnToSuwayomiChapters(context)
         if ReaderUI.instance or not contextMatches(self:getReaderReturnContextForPath(context.path), context) then
             return
         end
-        destination:showChaptersForManga(manga, options)
+        if foreign_context then
+            destination:showLibrary()
+        else
+            destination:showChaptersForManga(manga, options)
+        end
     end, function()
         if self.suwayomi_host_retired or self.active_reader_return_request ~= request_token then
             return false
