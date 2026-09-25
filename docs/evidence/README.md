@@ -12,5 +12,5 @@ These dated records describe the named candidate, environment, method, observed 
 | [Issue #54, 2026-09-24](issue-54-chapter-publication-2026-09-24.md) | Targeted desktop and Palma late menu save controls |
 | [Issue #55, 2026-09-25](issue-55-chapter-publication-2026-09-25.md) | Chapter-publication refactor, composed checks, and focused desktop controls |
 | [Issue #56, 2026-09-25](issue-56-chapter-lookup-2026-09-25.md) | Chapter-lookup refactor, scope and save-ownership checks, desktop Open/read state |
-| [Issue #58, 2026-09-25](issue-58-next-chapter-2026-09-25.md) | Reader Next selection, saved positions, offline navigation, native completion, and pending Palma acceptance |
+| [Issue #58, 2026-09-25](issue-58-next-chapter-2026-09-25.md) | Reader Next selection, desktop offline/completion controls, and Palma saved-position and blocked-navigation acceptance |
 | [Release readiness, 2026-09-24](release-readiness-2026-09-24.md) | Review of exact candidate, CI, desktop, Palma, and remaining gaps |

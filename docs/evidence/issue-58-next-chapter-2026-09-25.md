@@ -1,6 +1,6 @@
 # Issue #58: reader Next chapter acceptance, 2026-09-25
 
-Implementation is complete on `codex/next-chapter-58`; physical Palma acceptance remains unverified. This record does not authorize publication or permanent device deployment.
+Implementation is complete on `codex/next-chapter-58`; focused desktop and physical Palma acceptance passed under the controls below. This record does not authorize publication or permanent device deployment.
 
 ## Candidate and environment
 
@@ -43,12 +43,21 @@ Private local evidence retains deployment hashes, framebuffer images, and redact
 
 ## Palma and remaining limits
 
-Read-only Windows ADB inspection found one connected, unlocked Palma with KOReader v2026.03, currently disabled and stopped, and an existing profile. No device acceptance was performed.
+After explicit user approval, a physical Palma running Android 11 and KOReader v2026.03 used a disposable profile and the same `bcfcb73` runtime candidate. All 98 deployed payload files were hash-verified before and after acceptance. The real Suwayomi sandbox server was reached through a USB ADB reverse route and a host relay; the authenticated inspector used a separate USB forward route. This does not establish Wi-Fi behavior.
 
-Automatic approval review rejected the proposed temporary full-profile isolation and staged deployment because the implementation request did not explicitly authorize that device-state change or transfer of synthetic settings. The action never executed. The original profile remains in place, app state is unchanged, no task backup/replacement profile or USB routes exist, and the task relay was stopped. Explicit user approval is pending for temporary staging, native menu checks, and exact original-profile/app-state restoration.
+| Control | Observed result | Status |
+| --- | --- | --- |
+| Native reader menu | **Next chapter** appeared immediately beside **Go to Suwayomi**. | Demonstrated |
+| Download and saved-position navigation | Chapters 001 and 002 were downloaded through the UI. Chapter 002 was put into native page view, advanced to page 2, and closed through Go to Suwayomi. Opening Chapter 001 and invoking its native Next action displayed the verification notice, then rendered Chapter 002 at saved page 2; the framebuffer showed fixture label `00202`. | Demonstrated |
+| Independent archive and saved-state inspection | All three PNG pages in each downloaded CBZ matched the corresponding source fixture bytes. Chapter 002's native sidecar recorded `last_page=2`, matching the rendered successor. | Demonstrated |
+| Missing Chapter 003 | Next from Chapter 002 named Chapter 003 and said to download it first. **Stay here** retained Chapter 002 at page 2; **Go to Suwayomi** returned to the correct three-chapter list. | Demonstrated |
+| Repeated touch input | Two taps at the Next row followed by a top touch settled on Chapter 002 at page 2 without double advance or a Chapter 003 dialog. The timing does not prove that both taps reached an active Next callback; deterministic pending-duplicate behavior remains established by specs. | Demonstrated with timing limit |
+| Verification notice touch | Touching the observed verification notice allowed the transition to settle on Chapter 002 at page 2. | Demonstrated |
 
-Physical file handling, repeated taps, notice readability, touch responsiveness, and e-ink usability therefore remain **unverified**. Desktop observations do not establish them. GitHub CI, push, merge, release, and issue closure were not performed by this implementation task.
+The inspector's initial token file had Windows line endings and was corrected to LF before acceptance; candidate plugin bytes were unchanged. Device framebuffer images establish rendered content and dialog layout. Human judgments of physical e-ink readability, ghosting, and touch responsiveness remain **unverified**. The device run did not repeat the desktop completion/retention matrix or inject every stale-state and inspection failure. GitHub CI, push, merge, release, and issue closure were not performed by this implementation task.
 
 ## Cleanup and retained resources
 
-The disposable desktop server and reader both reported stopped after final acceptance. No live task relay or device routing remains. The private sandbox root, task scratch helpers/screenshots, and clean implementation/selection worktrees remain for handoff and possible approved Palma acceptance. No personal archives, credentials, settings, raw logs, or generated CBZs are committed.
+The original Palma profile was isolated only after all 1,217 file hashes were captured and verified. After acceptance, the original profile was restored and every hash matched. An independent second audit confirmed the same 1,217 files with zero mismatches, the original disabled/stopped app state, no USB routes, and removal of the task's backup, disposable profile, and generated download directories.
+
+The disposable desktop server and reader both reported stopped after final acceptance. The task relay exited successfully and its listener was absent. The private sandbox root, task scratch helpers/screenshots and synthetic archive evidence, and clean implementation/selection worktrees remain for handoff. No personal archives, credentials, settings, raw logs, or generated CBZs are committed.
