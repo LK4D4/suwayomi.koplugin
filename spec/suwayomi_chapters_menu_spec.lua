@@ -173,7 +173,7 @@ describe("suwayomi/chapters/menu", function()
         package.loaded["suwayomi/chapters/menu"] = nil
         local ChapterMenu = require("suwayomi/chapters/menu")
         local captured_title_options
-        local plugin = {}
+        local plugin = { loadChapterLedger = function() return {} end }
         for name, method in pairs(ChapterMenu.methods) do
             plugin[name] = method
         end

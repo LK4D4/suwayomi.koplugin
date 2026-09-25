@@ -1,7 +1,7 @@
 -- Boundary: ChapterLocalDownloads.
 --
--- Responsibility: Recover recorded readable chapters, resolve scope-safe local paths, and remove managed sidecars before their archive.
--- Owned state: None; settings and downloader modules remain the source of truth.
+-- Responsibility: Recover recorded chapters, decide record association/read authority, resolve scope-safe paths, and remove sidecars before archives.
+-- Owned state: Synchronous lookup indexes borrow the caller's working ledger; settings and downloader remain the source of truth.
 -- Dependencies: Suwayomi settings and downloader path helpers.
 -- External data: Download directory, manga/chapter metadata, and filesystem paths are treated as untrusted boundary inputs.
 
@@ -133,6 +133,28 @@ function Methods:buildChapterDownloadLookup(manga, ledger)
     return lookup
 end
 
+local function hasScopedPathRecord(manga, chapter, path, lookup)
+    for _, record in ipairs(lookup.by_path[path] or {}) do
+        if manga.endpoint_scope and record.endpoint_scope == manga.endpoint_scope
+            and tostring(record.chapter_id) == tostring(chapter.id) then return true end
+    end
+    return false
+end
+
+function Methods:hasChapterReadAuthority(manga, chapter, path, lookup)
+    if not manga.endpoint_scope or not lookup or lookup.foreign_paths[path] then return false end
+    local stored = lookup.ledger[tostring(manga.id) .. ":" .. tostring(chapter.id)]
+    if stored and stored.endpoint_scope ~= manga.endpoint_scope then return false end
+    return hasScopedPathRecord(manga, chapter, path, lookup)
+end
+
+function Methods:getChapterReadEntry(manga, chapter, lookup)
+    local entry = lookup.ledger[self:getChapterLedgerKey(manga, chapter)]
+    -- Unknown scope remains applicable here; archive authority requires known scope.
+    if entry and entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope then return nil end
+    return entry
+end
+
 function Methods:isLocalOnlyChapter(manga, chapter, lookup)
     if not manga or manga.local_only or not manga.id or not chapter or chapter.local_only or not chapter.id
         or not currentScope(manga) then return true end
@@ -143,11 +165,7 @@ function Methods:isLocalOnlyChapter(manga, chapter, lookup)
     local path = self:getChapterPath(manga, chapter, lookup)
     if path and self:chapterArchiveExists(path) then
         -- A scoped pathless choice does not associate bytes found at a guessed path.
-        for _, record in ipairs(lookup.by_path[path] or {}) do
-            if manga.endpoint_scope and record.endpoint_scope == manga.endpoint_scope
-                and tostring(record.chapter_id) == tostring(chapter.id) then return false end
-        end
-        return true
+        return not hasScopedPathRecord(manga, chapter, path, lookup)
     end
     return false
 end

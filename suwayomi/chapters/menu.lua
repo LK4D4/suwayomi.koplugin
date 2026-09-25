@@ -1,6 +1,6 @@
 -- Boundary: ChapterMenu.
 --
--- Responsibility: Owns chapter row, action, bulk action, and quick-refresh menu construction.
+-- Responsibility: Owns chapter menus and render reconciliation; local_downloads decides record association and read authority.
 -- Owned state: Builds UI data structures and callbacks; destructive actions remain in suwayomi/chapters/actions.lua.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -97,18 +97,9 @@ function Methods:getChapterTitleBarMenuOptions(manga, lookup)
     })
 end
 
-local function hasReadAuthority(manga, chapter, path, lookup)
-    if not manga.endpoint_scope or not lookup or lookup.foreign_paths[path] then return false end
-    local stored = lookup.ledger[tostring(manga.id) .. ":" .. tostring(chapter.id)]
-    if stored and stored.endpoint_scope ~= manga.endpoint_scope then return false end
-    for _, entry in ipairs(lookup.by_path[path] or {}) do
-        if entry.endpoint_scope == manga.endpoint_scope
-            and tostring(entry.chapter_id) == tostring(chapter.id) then return true end
-    end
-    return false
-end
-
-function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup)
+-- Keep the supplied ledger separate: its absence makes this render own persistence.
+-- A caller-provided lookup must borrow the same read_ledger used for reconciliation.
+function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup, read_ledger)
     local started_at = SuwayomiDebug.now()
     local saved = manga.local_only or (options and options.saved)
     local items = {}
@@ -119,7 +110,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup)
     local reader_return_entries = {}
     local snapshot = self:getDownloadQueue():getSnapshot()
     local manual_snapshot, manual_error = snapshot.manual_deletion, snapshot.manual_deletion_error
-    local read_ledger = ledger or (lookup and lookup.ledger) or self:loadChapterLedger()
+    read_ledger = ledger or read_ledger or self:loadChapterLedger()
     lookup = lookup or (self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga, read_ledger))
     local ledger_changed = false
 
@@ -131,10 +122,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup)
         local local_only = manga.local_only or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, item, lookup))
         item._suwayomi_manual_deletion = not local_only and (manual_snapshot[self:getChapterDownloadKey(manga, item)]
             or (manual_error and { state = "blocked", reason = manual_error } or nil)) or nil
-        local read_entry = not local_only and read_ledger[self:getChapterLedgerKey(manga, item)]
-        if read_entry and read_entry.endpoint_scope and read_entry.endpoint_scope ~= manga.endpoint_scope then
-            read_entry = nil
-        end
+        local read_entry = not local_only and self:getChapterReadEntry(manga, item, lookup)
         local explicit_unread = type(read_entry) == "table"
             and read_entry.pending_read_sync == true and read_entry.pending_read_state == false
         if explicit_unread then
@@ -144,7 +132,8 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup)
 
         local chapter_exists, chapter_path = self:isChapterDownloaded(manga, item, lookup)
         -- Finding readable bytes does not associate them with this server.
-        local read_authority = chapter_exists and not local_only and hasReadAuthority(manga, item, chapter_path, lookup)
+        local read_authority = chapter_exists and not local_only
+            and self:hasChapterReadAuthority(manga, item, chapter_path, lookup)
         if chapter_exists then
             local metadata_finished = chapter_exists and self:isChapterPathFinishedInKoreader(chapter_path)
             if chapter_exists then
@@ -240,8 +229,9 @@ end
 
 function Methods:buildChapterMenuOptions(manga, chapters, ledger, options)
     local visible_chapters = self:getVisibleChapters(chapters)
-    local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga, ledger)
-    local items, err = self:buildChapterMenuItems(manga, visible_chapters, ledger, options, lookup)
+    local read_ledger = ledger or self:loadChapterLedger()
+    local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga, read_ledger)
+    local items, err = self:buildChapterMenuItems(manga, visible_chapters, ledger, options, lookup, read_ledger)
     if not items then return nil, err end
 
     return copyTitleBarOptions({
@@ -263,13 +253,16 @@ function Methods:buildCachedChapterMenuMap()
 end
 
 
-function Methods:buildQuickChapterMenuItems(manga, chapters, lookup)
-    lookup = lookup or (self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga))
-    if manga.local_only then return self:buildChapterMenuItems(manga, chapters, nil, { saved = true }, lookup) end
+function Methods:buildQuickChapterMenuItems(manga, chapters, lookup, read_ledger)
+    read_ledger = read_ledger or self:loadChapterLedger()
+    lookup = lookup or (self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga, read_ledger))
+    if manga.local_only then
+        return self:buildChapterMenuItems(manga, chapters, nil, { saved = true }, lookup, read_ledger)
+    end
     if self.isLocalOnlyChapter then
         for _, chapter in ipairs(chapters or {}) do
             if self:isLocalOnlyChapter(manga, chapter, lookup) then
-                return self:buildChapterMenuItems(manga, chapters, nil, { saved = true }, lookup)
+                return self:buildChapterMenuItems(manga, chapters, nil, { saved = true }, lookup, read_ledger)
             end
         end
     end
@@ -325,11 +318,12 @@ end
 
 function Methods:buildQuickChapterMenuOptions(manga, chapters)
     local visible_chapters = self:getVisibleChapters(chapters)
-    local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga)
+    local read_ledger = self:loadChapterLedger()
+    local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga, read_ledger)
 
     return copyTitleBarOptions({
         title = self.formatChapterListScreenTitle and self:formatChapterListScreenTitle(manga) or I18n.t("Chapters"),
-        chapters = self:buildQuickChapterMenuItems(manga, visible_chapters, lookup),
+        chapters = self:buildQuickChapterMenuItems(manga, visible_chapters, lookup, read_ledger),
     }, self:getChapterTitleBarMenuOptions(manga, lookup))
 end
 

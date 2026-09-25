@@ -251,6 +251,54 @@ describe("complete stored chapter loading", function()
         clearModules()
     end)
 
+    for _, supplied in ipairs({ false, true }) do
+        it("preserves menu ledger save ownership with a supplied ledger: " .. tostring(supplied), function()
+            archive_path = os.tmpname()
+            manga.endpoint_scope = "https://suwayomi.example"
+            assert(settings:saveChapterLedger({ ["17:201"] = {
+                manga_id = "17", chapter_id = "201", endpoint_scope = manga.endpoint_scope,
+                read = false, path = archive_path,
+            } }))
+            for name, method in pairs(require("suwayomi/reader_return").methods) do plugin[name] = method end
+            plugin.isChapterPathFinishedInKoreader = function() return true end
+            local before = settings:loadChapterLedger()
+            local working = supplied and plugin:loadChapterLedger() or nil
+            local options = assert(plugin:buildChapterMenuOptions(manga, {
+                { id = "201", name = "Chapter 201", is_read = false },
+            }, working))
+            assert.is_true(options.chapters[1].is_read)
+            if supplied then
+                assert.is_true(working["17:201"].read)
+                assert.is_true(working["17:201"].pending_read_sync)
+                assert.are.same(before, settings:loadChapterLedger())
+                assert.are.same({}, settings:loadReaderReturnContexts())
+            else
+                assert.is_true(settings:loadChapterLedger()["17:201"].read)
+                assert.is_true(settings:loadChapterLedger()["17:201"].pending_read_sync)
+                assert.is_table(settings:loadReaderReturnContexts()[archive_path])
+            end
+        end)
+    end
+
+    it("keeps pending unread and saves untouched in quick recovered-row fallback", function()
+        archive_path = os.tmpname()
+        manga.endpoint_scope = "https://suwayomi.example"
+        assert(settings:saveChapterLedger({ ["17:201"] = {
+            manga_id = "17", chapter_id = "201", endpoint_scope = manga.endpoint_scope,
+            path = archive_path, read = false, pending_read_sync = true, pending_read_state = false,
+        } }))
+        local before = settings:getStore():getTransactionId()
+        plugin.isChapterPathFinishedInKoreader = function() return true end
+        local chapters = {
+            { id = "local", name = "Recovered chapter", local_only = true, local_path = "/missing.cbz" },
+            { id = "201", name = "Chapter 201", is_read = true },
+        }
+        local options = plugin:buildQuickChapterMenuOptions(manga, chapters)
+        assert.is_false(options.chapters[2].is_read)
+        assert.is_false(chapters[2].is_read)
+        assert.are.equal(before, settings:getStore():getTransactionId())
+    end)
+
     it("preserves pending reads and refill state when action preload cache persistence fails", function()
         assert(settings:saveChapterLedger({ ["17:201"] = {
             manga_id = "17", chapter_id = "201", read = true,
