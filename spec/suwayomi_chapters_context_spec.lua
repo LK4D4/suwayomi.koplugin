@@ -90,6 +90,62 @@ describe("suwayomi/chapters/context", function()
         })
     end)
 
+    it("selects the next saved chapter by source order and exact saved scanlator, regardless of reads", function()
+        local chapters = {
+            { id = "30", name = "Later downloaded", source_order = 4, scanlator = "A", is_read = false },
+            { id = "12", name = "Special release", source_order = 2, scanlator = "B", is_read = true },
+            { id = "11", name = "Current", source_order = 1, scanlator = "B", is_read = false },
+            { id = "20", name = "Same-order release", source_order = 2, scanlator = "A", is_read = true },
+            { id = "10", name = "Earlier unread gap", source_order = 0, scanlator = "A", is_read = false },
+        }
+        fake_settings.load = function() return { server_url = "https://suwayomi.example" } end
+        fake_settings.normalizeEndpointScope = function(_, url) return url end
+        fake_settings.loadChapterCache = function(_, _, manga)
+            assert.are.equal("m1", manga.id)
+            return { manga = { id = "m1", title = "Saved manga" }, chapters = chapters }
+        end
+        fake_settings.loadMangaScanlatorFilter = function() return "A" end
+        local plugin = installPlugin()
+        local manga, next_chapter = plugin:getNextSavedChapter({
+            manga_id = "m1", chapter_id = "11", endpoint_scope = "https://suwayomi.example",
+        })
+        assert.are.equal("Saved manga", manga.title)
+        assert.are.equal("20", next_chapter.id)
+        assert.are.equal(true, next_chapter.is_read)
+        chapters[4].scanlator = "B"
+        local _, later = plugin:getNextSavedChapter({
+            manga_id = "m1", chapter_id = "11", endpoint_scope = "https://suwayomi.example",
+        })
+        assert.are.equal("30", later.id)
+    end)
+
+    it("refuses unknown identity, endpoint, empty and incomplete saved order", function()
+        local loads = 0
+        local chapters = { { id = "1", source_order = 1 }, { id = "2", source_order = 2 } }
+        fake_settings.load = function() return { server_url = "https://suwayomi.example" } end
+        fake_settings.normalizeEndpointScope = function(_, url) return url end
+        fake_settings.loadChapterCache = function()
+            loads = loads + 1
+            return { manga = { id = "m1" }, chapters = chapters }
+        end
+        local plugin = installPlugin()
+        local function fails(context, expected)
+            local manga, chapter, err = plugin:getNextSavedChapter(context)
+            assert.is_nil(manga)
+            assert.is_nil(chapter)
+            assert.matches(expected, err)
+        end
+        fails({ manga_id = "m1", endpoint_scope = "https://suwayomi.example" }, "Cannot determine")
+        fails({ manga_id = "m1", chapter_id = "1", endpoint_scope = "https://other.example" }, "Cannot determine")
+        assert.are.equal(0, loads)
+        fails({ manga_id = "m1", chapter_id = "missing", endpoint_scope = "https://suwayomi.example" }, "Cannot determine")
+        fails({ manga_id = "m1", chapter_id = "2", endpoint_scope = "https://suwayomi.example" }, "No next chapter")
+        chapters = {}
+        fails({ manga_id = "m1", chapter_id = "1", endpoint_scope = "https://suwayomi.example" }, "Cannot determine")
+        chapters = { { id = "1", source_order = 1 }, { id = "2" } }
+        fails({ manga_id = "m1", chapter_id = "1", endpoint_scope = "https://suwayomi.example" }, "Cannot determine")
+    end)
+
     it("keeps chapter screen titles short while preserving detail titles", function()
         local controller = require("suwayomi/chapters/context")
         local manga = {

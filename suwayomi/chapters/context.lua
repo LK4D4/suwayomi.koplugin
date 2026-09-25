@@ -208,6 +208,63 @@ function Methods:getAllChaptersForManga(manga)
     return self:getVisibleChapters(context.chapters or {})
 end
 
+function Methods:getNextSavedChapter(context)
+    local manga_id = type(context) == "table" and context.manga_id
+    local chapter_id = type(context) == "table" and context.chapter_id
+    if manga_id == nil or tostring(manga_id) == "" or chapter_id == nil or tostring(chapter_id) == "" then
+        return nil, nil, I18n.t("Cannot determine the next chapter from this book.")
+    end
+    local credentials = SuwayomiSettings:load()
+    local scope = SuwayomiSettings:normalizeEndpointScope(credentials and credentials.server_url)
+    if not scope or context.endpoint_scope ~= scope then
+        return nil, nil, I18n.t("Cannot determine the next chapter from this book.")
+    end
+    local listing = SuwayomiSettings:loadChapterCache(credentials, { id = manga_id, endpoint_scope = scope })
+    if type(listing) ~= "table" or type(listing.manga) ~= "table"
+        or tostring(listing.manga.id or "") ~= tostring(manga_id)
+        or type(listing.chapters) ~= "table" or #listing.chapters == 0 then
+        return nil, nil, I18n.t("Cannot determine the next chapter from the saved list.")
+    end
+
+    local chapters, seen = {}, {}
+    for _, chapter in ipairs(listing.chapters) do
+        if type(chapter) ~= "table" or chapter.id == nil or tostring(chapter.id) == ""
+            or type(chapter.source_order) ~= "number" or seen[tostring(chapter.id)] then
+            return nil, nil, I18n.t("Cannot determine the next chapter from the saved list.")
+        end
+        seen[tostring(chapter.id)] = true
+        chapters[#chapters + 1] = chapter
+    end
+    table.sort(chapters, function(a, b)
+        if a.source_order == b.source_order then
+            local left, right = tonumber(a.id), tonumber(b.id)
+            if left and right then return left < right end
+            return tostring(a.id) < tostring(b.id)
+        end
+        return a.source_order < b.source_order
+    end)
+    local current_index
+    for index, chapter in ipairs(chapters) do
+        if tostring(chapter.id) == tostring(chapter_id) then
+            current_index = index
+            break
+        end
+    end
+    if not current_index then
+        return nil, nil, I18n.t("Cannot determine the next chapter from the saved list.")
+    end
+    local manga = listing.manga
+    manga.endpoint_scope = scope
+    local filter = self:loadMangaScanlatorFilter(manga)
+    for index = current_index + 1, #chapters do
+        local chapter = chapters[index]
+        if not filter or self:getChapterScanlator(chapter) == filter then
+            return manga, chapter
+        end
+    end
+    return nil, nil, I18n.t("No next chapter in saved list.")
+end
+
 
 function Methods:getChapterDownloadKey(manga, chapter)
     return self:getDownloadQueue():getKey(manga, chapter)

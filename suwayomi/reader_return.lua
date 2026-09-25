@@ -300,6 +300,80 @@ function Methods:getCurrentReaderReturnContext()
     return self:getReaderReturnContextForPath(self:getCurrentReaderDocumentPath())
 end
 
+local function liveReaderForPlugin(plugin)
+    local ok_reader, ReaderUI = pcall(require, "apps/reader/readerui")
+    local reader = ok_reader and ReaderUI and ReaderUI.instance
+    if not reader or reader ~= plugin.ui or not reader.document then return nil end
+    local path = readerDocumentPath(reader)
+    if not path or path == "" then return nil end
+    return reader, reader.document, path
+end
+
+function Methods:showNextChapterBlocked(reason, chapter)
+    local reader, document, path = liveReaderForPlugin(self)
+    if self.suwayomi_host_retired or not reader then return false end
+    local context = copyTable(self:getReaderReturnContextForPath(path))
+    local text = reason or I18n.t("Could not open the next chapter.")
+    if chapter and chapter.name and chapter.name ~= "" then
+        text = tostring(chapter.name) .. "\n\n" .. text
+    end
+    local ConfirmBox = require("ui/widget/confirmbox")
+    UIManager:show(ConfirmBox:new{
+        text = text,
+        cancel_text = I18n.t("Stay here"),
+        ok_text = I18n.t("Go to Suwayomi"),
+        ok_callback = function()
+            local current_reader, current_document, current_path = liveReaderForPlugin(self)
+            if not self.suwayomi_host_retired and current_reader == reader
+                and current_document == document and current_path == path
+                and contextMatches(self:getReaderReturnContextForPath(path), context) then
+                self:returnToSuwayomiChapters(context)
+            end
+        end,
+    })
+    return true
+end
+
+function Methods:openNextChapter()
+    local reader, document, path = liveReaderForPlugin(self)
+    if self.suwayomi_host_retired or not reader then return false end
+    local context = copyTable(self:getReaderReturnContextForPath(path))
+    if not context or context.path ~= path then return false end
+    local manga, chapter, err = self:getNextSavedChapter(context)
+    if not chapter then
+        self:showNextChapterBlocked(err)
+        return false
+    end
+    local chapter_context = self.current_chapter_context
+    local scanlator_filter = self.current_scanlator_filter
+    local saved_filter = self:loadMangaScanlatorFilter(manga)
+    local endpoint_scope = SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
+    local function is_current()
+        if self.suwayomi_host_retired or self.current_chapter_context ~= chapter_context
+            or self.current_scanlator_filter ~= scanlator_filter
+            or self:loadMangaScanlatorFilter(manga) ~= saved_filter
+            or SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url) ~= endpoint_scope
+        then return false end
+        local current_reader, current_document, current_path = liveReaderForPlugin(self)
+        if current_reader ~= reader or current_document ~= document or current_path ~= path
+            or not contextMatches(self:getReaderReturnContextForPath(path), context) then return false end
+        local current_manga, current_chapter = self:getNextSavedChapter(context)
+        return current_manga ~= nil and current_chapter ~= nil
+            and tostring(current_manga.id) == tostring(manga.id)
+            and tostring(current_chapter.id) == tostring(chapter.id)
+            and current_chapter.source_order == chapter.source_order
+            and current_chapter.name == chapter.name
+            and current_chapter.scanlator == chapter.scanlator
+    end
+    return self:verifyChapterDownload(manga, chapter, true, {
+        reader = reader,
+        is_current = is_current,
+        on_blocked = function(reason)
+            if is_current() then self:showNextChapterBlocked(reason, chapter) end
+        end,
+    })
+end
+
 function Methods:cancelReaderReturnRequest()
     local request = self.active_reader_return_request
     if not request then

@@ -14,6 +14,7 @@ describe("suwayomi/reader_return", function()
             "ui/uimanager",
             "apps/reader/readerui",
             "apps/filemanager/filemanager",
+            "ui/widget/confirmbox",
             "gettext",
         }) do
             package.loaded[name] = nil
@@ -66,6 +67,7 @@ describe("suwayomi/reader_return", function()
         end
         package.preload["ui/uimanager"] = function()
             return {
+                show = function(_, dialog) state.dialog = dialog end,
                 nextTick = function(_, callback)
                     if options.defer_next_tick then
                         state.next_tick_callback = callback
@@ -74,6 +76,9 @@ describe("suwayomi/reader_return", function()
                     end
                 end,
             }
+        end
+        package.preload["ui/widget/confirmbox"] = function()
+            return { new = function(_, fields) return fields end }
         end
         package.preload["apps/reader/readerui"] = function()
             return {
@@ -159,6 +164,8 @@ describe("suwayomi/reader_return", function()
             "saveReaderReturnContextsForChapters",
             "getCurrentReaderReturnContext",
             "returnToSuwayomiChapters",
+            "openNextChapter",
+            "showNextChapterBlocked",
             "cancelReaderReturnRequest",
         })
     end)
@@ -457,6 +464,93 @@ describe("suwayomi/reader_return", function()
         }
         return build_plugin(options)
     end
+
+    local function next_reader()
+        local plugin = linked_reader()
+        local chapter = { id = "c2", name = "Chapter 2", source_order = 2, scanlator = "A" }
+        local manga = { id = "m1", endpoint_scope = "https://suwayomi.example" }
+        plugin.getNextSavedChapter = function()
+            return manga, chapter
+        end
+        plugin.loadMangaScanlatorFilter = function() return state.saved_filter end
+        plugin.verifyChapterDownload = function(_, selected_manga, selected_chapter, open, options)
+            assert.are.equal(manga, selected_manga)
+            assert.are.equal(chapter, selected_chapter)
+            assert.is_true(open)
+            state.verify_options = options
+            table.insert(state.events, "verify")
+            return true
+        end
+        return plugin, manga, chapter
+    end
+
+    it("captures the exact current reader and saved successor for verification", function()
+        local plugin = next_reader()
+        assert.is_true(plugin:openNextChapter())
+        assert.are.same({ "verify" }, state.events)
+        assert.are.equal(plugin.ui, state.verify_options.reader)
+        assert.is_true(state.verify_options.is_current())
+        plugin.ui.document = { file = "/downloads/Local/Manga/Chapter 1.cbz" }
+        assert.is_false(state.verify_options.is_current())
+    end)
+
+    it("rejects a replacement reader, changed endpoint, context, filter, or candidate", function()
+        local plugin, manga, chapter = next_reader()
+        assert.is_true(plugin:openNextChapter())
+        local guard = state.verify_options.is_current
+        local ReaderUI = require("apps/reader/readerui")
+        local original = ReaderUI.instance
+        ReaderUI.instance = { document = original.document }
+        assert.is_false(guard())
+        ReaderUI.instance = original
+        state.server_url = "https://other.example"
+        assert.is_false(guard())
+        state.server_url = "https://suwayomi.example"
+        state.contexts[original.document.file].chapter_id = "different"
+        assert.is_false(guard())
+        state.contexts[original.document.file].chapter_id = "c1"
+        plugin.current_scanlator_filter = "B"
+        assert.is_false(guard())
+        plugin.current_scanlator_filter = nil
+        state.saved_filter = "B"
+        assert.is_false(guard())
+        state.saved_filter = nil
+        plugin.getNextSavedChapter = function() return manga, { id = chapter.id, name = "Changed" } end
+        assert.is_false(guard())
+    end)
+
+    it("keeps the reader open on a blocked next chapter and navigates only by explicit choice", function()
+        local plugin = next_reader()
+        assert.is_true(plugin:openNextChapter())
+        state.verify_options.on_blocked("Download the chapter first.")
+        assert.matches("Chapter 2", state.dialog.text)
+        assert.matches("Download the chapter first", state.dialog.text)
+        assert.are.equal("Stay here", state.dialog.cancel_text)
+        assert.are.equal("Go to Suwayomi", state.dialog.ok_text)
+        assert.are.same({ "verify" }, state.events)
+        state.dialog.ok_callback()
+        assert.are.same({ "verify", "close-reader", "reinit-filemanager", "show-chapters" }, state.events)
+    end)
+
+    it("does not navigate from a blocked dialog after the reader changes", function()
+        local plugin = next_reader()
+        plugin:openNextChapter()
+        state.verify_options.on_blocked("Missing chapter")
+        plugin.ui.document.file = "/downloads/Local/Manga/Other.cbz"
+        state.dialog.ok_callback()
+        assert.are.same({ "verify" }, state.events)
+    end)
+
+    it("explains an unknown successor without requesting verification", function()
+        local plugin = linked_reader()
+        plugin.getNextSavedChapter = function()
+            return nil, nil, "No next chapter in saved list."
+        end
+        plugin.verifyChapterDownload = function() error("must not verify") end
+        assert.is_false(plugin:openNextChapter())
+        assert.are.equal("No next chapter in saved list.", state.dialog.text)
+        assert.are.same({}, state.events)
+    end)
 
     it("closes normally and immediately restores chapters on the live FileManager host", function()
         local plugin = linked_reader()
