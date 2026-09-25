@@ -874,6 +874,61 @@ describe("complete stored chapter loading", function()
             end)
         end
 
+        it("keeps finished-sidecar reconciliation exclusive to display during " .. route, function()
+            manga.endpoint_scope = "https://suwayomi.example"
+            for name, method in pairs(require("suwayomi/reader_return").methods) do plugin[name] = method end
+            archive_path, ledger_path = os.tmpname(), os.tmpname()
+            local file = assert(io.open(archive_path, "wb"))
+            file:write("preserved archive")
+            file:close()
+            local native_before = 'return { last_page = 3, percent_finished = 1, summary = { ["status"] = "complete" } }\n'
+            file = assert(io.open(ledger_path, "wb"))
+            file:write(native_before)
+            file:close()
+            package.preload.docsettings = function()
+                return { findSidecarFile = function() return ledger_path end,
+                    getSidecarFilename = function() return "metadata.lua" end,
+                    getSidecarDir = function() return "/nonexistent-sidecars" end,
+                    isHashLocationEnabled = function() return false end }
+            end
+            for name, method in pairs(require("suwayomi/readsync/koreader_metadata").methods) do
+                plugin[name] = method
+            end
+            assert(settings:saveChapterLedger({ ["17:202"] = {
+                manga_id = "17", chapter_id = "202", endpoint_scope = manga.endpoint_scope,
+                read = false, path = archive_path,
+            } }))
+            local before_ledger = settings:loadChapterLedger()
+            local before_contexts = settings:loadReaderReturnContexts()
+            respond = function() return page(nodes(202, 202), 1, false) end
+            local ready
+            if route == "display" then plugin:showChaptersForManga(manga)
+            else plugin:startLoadMangaChapterContext(manga, function(context) ready = context end) end
+            finishRequest()
+            local context = plugin.current_chapter_context
+            assert.are.same({ "202" }, chapterIds(context.chapters))
+            assert.are.same({ "202" }, chapterIds(settings:loadChapterCache(settings:load(), manga).chapters))
+            if route == "display" then
+                assert.is_true(context.chapters[1].is_read)
+                assert.is_true(plugin.current_chapter_menu.chapters[1].is_read)
+                assert.is_true(settings:loadChapterLedger()["17:202"].read)
+                assert.is_true(settings:loadChapterLedger()["17:202"].pending_read_sync)
+                assert.is_table(settings:loadReaderReturnContexts()[archive_path])
+            else
+                assert.are.equal(context, ready)
+                assert.is_false(ready.chapters[1].is_read)
+                assert.is_nil(plugin.current_chapter_menu)
+                assert.are.same(before_ledger, settings:loadChapterLedger())
+                assert.are.same(before_contexts, settings:loadReaderReturnContexts())
+            end
+            file = assert(io.open(ledger_path, "rb"))
+            assert.are.equal(native_before, file:read("*a"))
+            file:close()
+            file = assert(io.open(archive_path, "rb"))
+            assert.are.equal("preserved archive", file:read("*a"))
+            file:close()
+        end)
+
         it("acknowledges matching pending choices after successful " .. route .. " persistence", function()
             manga.endpoint_scope = "https://suwayomi.example"
             assert(settings:saveChapterLedger({ ["17:202"] = {

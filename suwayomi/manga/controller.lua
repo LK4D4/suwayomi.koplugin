@@ -1,7 +1,7 @@
 -- Boundary: MangaController.
 --
--- Responsibility: Owns saved-first chapter loading, manga actions, library membership, and first-unread selection.
--- Owned state: Coordinates API/client calls but leaves chapter row/menu state to chapter modules.
+-- Responsibility: Owns saved-first chapter loading/publication, manga actions, library membership, and first-unread selection.
+-- Owned state: Stages chapter context and persistence fallback; chapter modules retain row reconciliation and selection mechanics.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
 
@@ -112,6 +112,45 @@ local function prepareChapterListing(owner, manga, chapters, options)
         chapters = merged
     end
     return chapters, options
+end
+
+local function publishChapterListing(owner, manga, original_chapters, options, show_menu)
+    options = options or {}
+    local chapters, render_options = prepareChapterListing(owner, manga, original_chapters, options)
+    if not chapters then return nil end
+    local previous_context, previous_filter = owner.current_chapter_context, owner.current_scanlator_filter
+    local previous_selection, previous_mode = owner.selected_chapters, owner.selection_mode
+    -- Display stages selection because a failed menu build restores the prior context.
+    if show_menu and previous_selection then
+        owner.selected_chapters = {}
+        for key, selected in pairs(previous_selection) do owner.selected_chapters[key] = selected end
+    end
+    owner:setCurrentMangaChapterContext(manga, chapters)
+    local context = owner.current_chapter_context
+    owner.current_chapter_context.saved = render_options.saved == true
+    if show_menu then
+        owner.current_chapter_context.missing = options.missing == true
+        local chapter_options = owner:buildChapterMenuOptions(manga, chapters, nil, render_options)
+        if not chapter_options then
+            -- Rebuild successful membership from unmodified input and confirmed reads.
+            render_options = copyOptions(render_options)
+            render_options.saved = true
+            render_options.confirmed_read_state = true
+            chapters = prepareChapterListing(owner, manga, original_chapters, render_options)
+            owner.current_chapter_context.chapters = chapters
+            owner.current_chapter_context.saved = true
+            chapter_options = owner:buildChapterMenuOptions(manga, chapters, nil, render_options)
+        end
+        if not chapter_options then
+            owner.current_chapter_context, owner.current_scanlator_filter = previous_context, previous_filter
+            owner.selected_chapters, owner.selection_mode = previous_selection, previous_mode
+            return nil
+        end
+        show_menu(chapters, chapter_options)
+    end
+    -- Display publishes its widget first; preload enrolls before its caller's on_ready.
+    if not render_options.saved and not manga.local_only then owner:requestMangaRefill(manga) end
+    return context
 end
 
 local function loadSavedChapterListing(owner, manga, credentials)
@@ -312,12 +351,9 @@ function Methods:handleChapterContextResult(manga, result, on_ready)
     if result.manga then
         self:applyMangaRefreshResult(manga, result.manga)
     end
-    local chapters, render_options = prepareChapterListing(self, manga, result.chapters)
-    if not chapters then return false end
-    local context = self:setCurrentMangaChapterContext(manga, chapters)
-    self.current_chapter_context.saved = render_options.saved == true
-    if not render_options.saved and not manga.local_only then self:requestMangaRefill(manga) end
-    if self.current_scanlator_filter and #self:getVisibleChapters(chapters) == 0 then return true end
+    local context = publishChapterListing(self, manga, result.chapters)
+    if not context then return false end
+    if self.current_scanlator_filter and #self:getVisibleChapters(context.chapters) == 0 then return true end
     if on_ready then
         on_ready(context)
     end
@@ -441,85 +477,58 @@ function Methods:showChapterResultForManga(manga, result, options)
         return
     end
 
-    local chapters, render_options = prepareChapterListing(self, manga, result.chapters, options)
-    if not chapters then return false end
-    local previous_context, previous_filter = self.current_chapter_context, self.current_scanlator_filter
-    local previous_selection, previous_mode = self.selected_chapters, self.selection_mode
-    -- Context publication prunes selection; stage a copy until reconciliation commits.
-    if previous_selection then
-        self.selected_chapters = {}
-        for key, selected in pairs(previous_selection) do self.selected_chapters[key] = selected end
-    end
-    self:setCurrentMangaChapterContext(manga, chapters)
-    self.current_chapter_context.saved = render_options.saved == true
-    self.current_chapter_context.missing = options.missing == true
-    local chapter_options = self:buildChapterMenuOptions(manga, chapters, nil, render_options)
-    if not chapter_options then
-        -- A late menu save cannot revoke successful server membership.
-        render_options = copyOptions(render_options)
-        render_options.saved = true
-        render_options.confirmed_read_state = true
-        chapters = prepareChapterListing(self, manga, result.chapters, render_options)
-        self.current_chapter_context.chapters = chapters
-        self.current_chapter_context.saved = true
-        chapter_options = self:buildChapterMenuOptions(manga, chapters, nil, render_options)
-    end
-    if chapter_options and #chapters == 0 then
-        chapter_options.empty_text = options.missing
-            and I18n.t("No saved chapter information is available.")
-            or I18n.t("This manga has no chapters.")
-    end
-    if not chapter_options then
-        self.current_chapter_context, self.current_scanlator_filter = previous_context, previous_filter
-        self.selected_chapters, self.selection_mode = previous_selection, previous_mode
-        return false
-    end
-
-    local previous_chapter_menu = self.current_chapter_menu
-    local update_menu = previous_chapter_menu and previous_context
-        and self:getChapterSelectionKey(previous_context.manga, {}) == self:getChapterSelectionKey(manga, {})
-        and SuwayomiUI.updateChapterMenu
-        and (not self.isSuwayomiScreenActive or self:isSuwayomiScreenActive(previous_chapter_menu))
-    if not update_menu and previous_chapter_menu and self.isSuwayomiScreenActive
-        and self:isSuwayomiScreenActive(previous_chapter_menu) and self.closeMenu then
-        self.current_chapter_menu = nil
-        self:closeMenu(previous_chapter_menu)
-    end
-
-    local chapter_menu
-    self.current_chapter_options = chapter_options
-    self.current_chapter_options.itemnumber = findReturnedChapterItemNumber(chapters, options.return_context)
-    local reader_return_close_target = options.reader_return_close_target
-    self.current_chapter_options.close_callback = function()
-        local is_current_menu = self.current_chapter_menu == chapter_menu
-        if is_current_menu then
+    local previous_context = self.current_chapter_context
+    local context = publishChapterListing(self, manga, result.chapters, options, function(chapters, chapter_options)
+        if #chapters == 0 then
+            chapter_options.empty_text = options.missing
+                and I18n.t("No saved chapter information is available.")
+                or I18n.t("This manga has no chapters.")
+        end
+        local previous_chapter_menu = self.current_chapter_menu
+        local update_menu = previous_chapter_menu and previous_context
+            and self:getChapterSelectionKey(previous_context.manga, {}) == self:getChapterSelectionKey(manga, {})
+            and SuwayomiUI.updateChapterMenu
+            and (not self.isSuwayomiScreenActive or self:isSuwayomiScreenActive(previous_chapter_menu))
+        if not update_menu and previous_chapter_menu and self.isSuwayomiScreenActive
+            and self:isSuwayomiScreenActive(previous_chapter_menu) and self.closeMenu then
             self.current_chapter_menu = nil
-            self:cancelMangaNetworkRequests()
+            self:closeMenu(previous_chapter_menu)
         end
-        if is_current_menu
-            and not self.suwayomi_plugin_closing
-            and reader_return_close_target
-            and self.openReaderReturnCloseTarget
-        then
-            return self:openReaderReturnCloseTarget(reader_return_close_target)
+
+        local chapter_menu
+        self.current_chapter_options = chapter_options
+        self.current_chapter_options.itemnumber = findReturnedChapterItemNumber(chapters, options.return_context)
+        local reader_return_close_target = options.reader_return_close_target
+        self.current_chapter_options.close_callback = function()
+            local is_current_menu = self.current_chapter_menu == chapter_menu
+            if is_current_menu then
+                self.current_chapter_menu = nil
+                self:cancelMangaNetworkRequests()
+            end
+            if is_current_menu
+                and not self.suwayomi_plugin_closing
+                and reader_return_close_target
+                and self.openReaderReturnCloseTarget
+            then
+                return self:openReaderReturnCloseTarget(reader_return_close_target)
+            end
+            return nil
         end
-        return nil
-    end
-    local function select(chapter) self:handleChapterTap(manga, chapter) end
-    local function hold(chapter) self:toggleChapterSelection(manga, chapter) end
-    if update_menu then
-        chapter_menu = previous_chapter_menu
-        SuwayomiUI.updateChapterMenu(chapter_menu, self.current_chapter_options, select, hold)
-    else
-        chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, select, hold)
-        if self.trackSuwayomiScreen then self:trackSuwayomiScreen("chapters", chapter_menu) end
-    end
-    self.current_chapter_menu = chapter_menu
-    if #chapters == 0 and not options.saved then
-        notify(self, I18n.t("This manga has no chapters."))
-    end
-    if not render_options.saved and not manga.local_only then self:requestMangaRefill(manga) end
-    return true
+        local function select(chapter) self:handleChapterTap(manga, chapter) end
+        local function hold(chapter) self:toggleChapterSelection(manga, chapter) end
+        if update_menu then
+            chapter_menu = previous_chapter_menu
+            SuwayomiUI.updateChapterMenu(chapter_menu, self.current_chapter_options, select, hold)
+        else
+            chapter_menu = SuwayomiUI.showChapterMenu(self.current_chapter_options, select, hold)
+            if self.trackSuwayomiScreen then self:trackSuwayomiScreen("chapters", chapter_menu) end
+        end
+        self.current_chapter_menu = chapter_menu
+        if #chapters == 0 and not options.saved then
+            notify(self, I18n.t("This manga has no chapters."))
+        end
+    end)
+    return context ~= nil
 end
 
 
