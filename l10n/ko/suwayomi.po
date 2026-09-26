@@ -306,6 +306,10 @@ msgstr ""
 msgid "Chapter actions"
 msgstr ""
 
+msgid ""
+"Chapter controls expired. Reopen the current chapter actions and try again."
+msgstr ""
+
 msgid "Chapter download failed."
 msgstr ""
 
@@ -396,6 +400,9 @@ msgstr ""
 msgid "Could not clear failed downloads: %1"
 msgstr ""
 
+msgid "Could not close settings."
+msgstr ""
+
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] ""
@@ -438,6 +445,9 @@ msgstr ""
 msgid "Could not download \"%1\"%2: %3"
 msgstr ""
 
+msgid "Could not flush settings."
+msgstr ""
+
 msgid "Could not load Suwayomi extensions."
 msgstr ""
 
@@ -456,6 +466,12 @@ msgstr ""
 msgid "Could not load source filters."
 msgstr ""
 
+msgid "Could not open settings for writing."
+msgstr ""
+
+msgid "Could not prepare settings."
+msgstr ""
+
 msgid "Could not queue download: %1"
 msgstr ""
 
@@ -466,6 +482,9 @@ msgid "Could not redownload chapter."
 msgstr ""
 
 msgid "Could not refresh Library. Showing saved information."
+msgstr ""
+
+msgid "Could not replace settings."
 msgstr ""
 
 msgid "Could not retry download."
@@ -511,6 +530,9 @@ msgstr ""
 msgid "Could not start source loading: unknown error"
 msgstr ""
 
+msgid "Could not sync settings."
+msgstr ""
+
 msgid "Could not update auto-download: %1"
 msgstr ""
 
@@ -518,6 +540,9 @@ msgid "Could not update library."
 msgstr ""
 
 msgid "Could not verify download"
+msgstr ""
+
+msgid "Could not write settings."
 msgstr ""
 
 msgid "Cover only"
@@ -1264,6 +1289,12 @@ msgstr ""
 msgid "Settings are unavailable."
 msgstr ""
 
+msgid "Settings directory unavailable."
+msgstr ""
+
+msgid "Settings save failed."
+msgstr ""
+
 msgid "Setup wizard"
 msgstr ""
 
@@ -1474,6 +1505,21 @@ msgid "Use this folder"
 msgstr ""
 
 msgid "Username"
+msgstr ""
+
+msgid ""
+"Verification finished, but its result could not be saved. %1 Try Open or "
+"Verify download again."
+msgstr ""
+
+msgid ""
+"Verification finished, but saving its result is blocked by uncertain "
+"storage. Wait for storage recovery, then try Open or Verify download again."
+msgstr ""
+
+msgid ""
+"Verification is blocked by uncertain storage. Wait for storage recovery, "
+"then try again."
 msgstr ""
 
 msgid "Verify download"

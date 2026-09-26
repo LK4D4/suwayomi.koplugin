@@ -367,6 +367,13 @@ msgstr "Вибір категорії: %1"
 msgid "Chapter actions"
 msgstr "Дії з розділом"
 
+#, fuzzy
+msgid ""
+"Chapter controls expired. Reopen the current chapter actions and try again."
+msgstr ""
+"Не вдалося додати завантаження в чергу. Знову відкрийте список розділів і "
+"повторіть спробу."
+
 msgid "Chapter download failed."
 msgstr "Не вдалося завантажити розділ."
 
@@ -468,6 +475,10 @@ msgstr "Не вдалося скасувати завантаження: %1"
 msgid "Could not clear failed downloads: %1"
 msgstr "Не вдалося очистити невдалі завантаження: %1"
 
+#, fuzzy
+msgid "Could not close settings."
+msgstr "Не вдалося завантажити манґу."
+
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] "Не вдалося підтвердити %1 завантаження розділу."
@@ -534,6 +545,10 @@ msgstr "Не вдалося видалити цей розділ із прист
 msgid "Could not download \"%1\"%2: %3"
 msgstr "Не вдалося завантажити \"%1\"%2: %3"
 
+#, fuzzy
+msgid "Could not flush settings."
+msgstr "Не вдалося зберегти налаштування."
+
 msgid "Could not load Suwayomi extensions."
 msgstr "Не вдалося завантажити розширення Suwayomi."
 
@@ -554,6 +569,14 @@ msgstr "Не вдалося завантажити збережені фільт
 msgid "Could not load source filters."
 msgstr "Не вдалося завантажити фільтри джерела."
 
+#, fuzzy
+msgid "Could not open settings for writing."
+msgstr "Не вдалося почати завантаження манґи."
+
+#, fuzzy
+msgid "Could not prepare settings."
+msgstr "Не вдалося зберегти налаштування."
+
 msgid "Could not queue download: %1"
 msgstr "Не вдалося додати завантаження в чергу: %1"
 
@@ -567,6 +590,10 @@ msgstr "Не вдалося завантажити розділ заново."
 
 msgid "Could not refresh Library. Showing saved information."
 msgstr ""
+
+#, fuzzy
+msgid "Could not replace settings."
+msgstr "Не вдалося зберегти налаштування."
 
 msgid "Could not retry download."
 msgstr "Не вдалося повторити завантаження."
@@ -611,6 +638,10 @@ msgstr "Не вдалося почати завантаження джерела
 msgid "Could not start source loading: unknown error"
 msgstr "Не вдалося почати завантаження джерела: невідома помилка"
 
+#, fuzzy
+msgid "Could not sync settings."
+msgstr "Не вдалося зберегти налаштування."
+
 msgid "Could not update auto-download: %1"
 msgstr "Не вдалося оновити автозавантаження: %1"
 
@@ -619,6 +650,10 @@ msgstr "Не вдалося оновити бібліотеку."
 
 msgid "Could not verify download"
 msgstr "Не вдалося перевірити завантаження"
+
+#, fuzzy
+msgid "Could not write settings."
+msgstr "Не вдалося почати пошук."
 
 msgid "Cover only"
 msgstr ""
@@ -1417,6 +1452,14 @@ msgstr "Налаштування"
 msgid "Settings are unavailable."
 msgstr "Налаштування недоступні."
 
+#, fuzzy
+msgid "Settings directory unavailable."
+msgstr "Налаштування недоступні."
+
+#, fuzzy
+msgid "Settings save failed."
+msgstr "Налаштування недоступні."
+
 msgid "Setup wizard"
 msgstr "Майстер налаштування"
 
@@ -1640,6 +1683,21 @@ msgstr "Використати цю теку"
 
 msgid "Username"
 msgstr "Ім'я користувача"
+
+msgid ""
+"Verification finished, but its result could not be saved. %1 Try Open or "
+"Verify download again."
+msgstr ""
+
+msgid ""
+"Verification finished, but saving its result is blocked by uncertain "
+"storage. Wait for storage recovery, then try Open or Verify download again."
+msgstr ""
+
+msgid ""
+"Verification is blocked by uncertain storage. Wait for storage recovery, "
+"then try again."
+msgstr ""
 
 msgid "Verify download"
 msgstr "Перевірити завантаження"

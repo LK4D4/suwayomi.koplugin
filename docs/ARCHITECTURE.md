@@ -50,6 +50,8 @@ A cancel request does not prove a child exited. Known stopping children keep cha
 
 Each transfer uses private random attempt files. The worker closes and validates a CBZ before same-filesystem publication. Validation checks ZIP structure, entry integrity, and the captured expected page count when one exists; it does not prove content correctness. Validate off the UI thread before publication, adoption of an existing archive, plugin-mediated Open, or explicit Verify, not during row rendering. Inspection errors are inconclusive, not damage. Only explicit Redownload authorizes replacement of known damage; the old archive and KOReader metadata stay until a validated replacement succeeds. Unknown leftovers and workers from another process are not reclaimed. Hot reload and simultaneous writable KOReader processes remain unsupported.
 
+Explicit inspection waits for confirmed worker exit before persistence and callback delivery. A failed or fenced completion save ends that inspection with a redacted persistence-stage error, preserving the archive and checked-store fence. Ordinary Open or Verify can retry with fresh identity checks after recovery; failure never schedules a later automatic open. Diagnostics distinguish worker waiting, persistence failure, and callback delivery failure.
+
 ## Download ahead
 
 [ADR-0004](adr/0004-durable-download-ahead-refill.md) owns refill policy and request persistence. The service stores one revisioned request per manga with verified endpoint association, not proposed chapter candidates. Completed close, manual read/unread, actual reconciliation, successful chapter context publication, and policy/filter changes can enroll work. Rendering and queue progress cannot. Enrollment shares the checked read/intent transaction; admission and consumption of the matching request revision also commit together.
@@ -88,7 +90,11 @@ Chapter rendering passes one mutable working ledger separately from the opaque l
 
 Pending local read choices take precedence over remote flags. Read-sync acknowledgments require a still-matching endpoint, chapter, desired state, path, and archive generation; unknown or foreign origin never syncs under current credentials. KOReader sidecar completed status plus close, not final-page progress or history membership, triggers native completion. Native metadata candidate selection respects primary-before-backup order. Failure or uncertainty refuses a speculative update.
 
+A pending choice with verified endpoint and chapter identity remains applicable to rows and current context when its recorded archive is absent or the generated path changes. Foreign-path exclusions and stricter unknown-origin rules still apply. This display precedence does not grant archive mutation, adoption, or synchronization authority.
+
 Explicit bulk download captures at most 50 eligible chapter identities before confirmation, then revalidates context and queue eligibility at acceptance. Reduced eligibility does not backfill from the omitted remainder. A rejected save admits no jobs; an uncertain save is reported as unconfirmed. Saved scanlator restrictions remain exact when absent from a new list. Chapter actions captured against a retired context cannot execute.
+
+Expired chapter controls report their rejection without replaying the command. Bulk controls reopen against the current context only on the same live manga screen and endpoint; single actions and confirmations explain how to reopen. Retired hosts remain silent. The underlying context guard stays observational for asynchronous verification and request callbacks.
 
 ## UI, localization, and diagnostics
 

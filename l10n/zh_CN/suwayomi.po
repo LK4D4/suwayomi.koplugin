@@ -316,6 +316,11 @@ msgstr "分类选择：%1"
 msgid "Chapter actions"
 msgstr "章节操作"
 
+#, fuzzy
+msgid ""
+"Chapter controls expired. Reopen the current chapter actions and try again."
+msgstr "无法将下载加入队列。请重新打开章节列表并重试。"
+
 msgid "Chapter download failed."
 msgstr "章节下载失败。"
 
@@ -412,6 +417,10 @@ msgstr "无法取消下载：%1"
 msgid "Could not clear failed downloads: %1"
 msgstr "无法清除失败的下载：%1"
 
+#, fuzzy
+msgid "Could not close settings."
+msgstr "无法加载漫画。"
+
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] "无法确认 %1 个章节下载。"
@@ -456,6 +465,10 @@ msgstr "无法从设备删除此章节。"
 msgid "Could not download \"%1\"%2: %3"
 msgstr "无法下载“%1”%2：%3"
 
+#, fuzzy
+msgid "Could not flush settings."
+msgstr "无法保存设置。"
+
 msgid "Could not load Suwayomi extensions."
 msgstr "无法加载 Suwayomi 扩展。"
 
@@ -474,6 +487,14 @@ msgstr "无法加载已保存的筛选器。"
 msgid "Could not load source filters."
 msgstr "无法加载源筛选器。"
 
+#, fuzzy
+msgid "Could not open settings for writing."
+msgstr "无法开始加载漫画。"
+
+#, fuzzy
+msgid "Could not prepare settings."
+msgstr "无法保存设置。"
+
 msgid "Could not queue download: %1"
 msgstr "无法将下载加入队列：%1"
 
@@ -485,6 +506,10 @@ msgstr "无法重新下载章节。"
 
 msgid "Could not refresh Library. Showing saved information."
 msgstr ""
+
+#, fuzzy
+msgid "Could not replace settings."
+msgstr "无法保存设置。"
 
 msgid "Could not retry download."
 msgstr "无法重试下载。"
@@ -529,6 +554,10 @@ msgstr "无法开始加载源：%1"
 msgid "Could not start source loading: unknown error"
 msgstr "无法开始加载源：未知错误"
 
+#, fuzzy
+msgid "Could not sync settings."
+msgstr "无法保存设置。"
+
 msgid "Could not update auto-download: %1"
 msgstr "无法更新自动下载：%1"
 
@@ -537,6 +566,10 @@ msgstr "无法更新书架。"
 
 msgid "Could not verify download"
 msgstr "无法校验下载"
+
+#, fuzzy
+msgid "Could not write settings."
+msgstr "无法开始搜索。"
 
 msgid "Cover only"
 msgstr ""
@@ -1298,6 +1331,14 @@ msgstr "设置"
 msgid "Settings are unavailable."
 msgstr "设置不可用。"
 
+#, fuzzy
+msgid "Settings directory unavailable."
+msgstr "设置不可用。"
+
+#, fuzzy
+msgid "Settings save failed."
+msgstr "设置不可用。"
+
 msgid "Setup wizard"
 msgstr "设置向导"
 
@@ -1512,6 +1553,21 @@ msgstr "使用此文件夹"
 
 msgid "Username"
 msgstr "用户名"
+
+msgid ""
+"Verification finished, but its result could not be saved. %1 Try Open or "
+"Verify download again."
+msgstr ""
+
+msgid ""
+"Verification finished, but saving its result is blocked by uncertain "
+"storage. Wait for storage recovery, then try Open or Verify download again."
+msgstr ""
+
+msgid ""
+"Verification is blocked by uncertain storage. Wait for storage recovery, "
+"then try again."
+msgstr ""
 
 msgid "Verify download"
 msgstr "校验下载"

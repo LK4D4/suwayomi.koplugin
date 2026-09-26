@@ -362,6 +362,13 @@ msgstr "Выбор категории: %1"
 msgid "Chapter actions"
 msgstr "Действия с главами"
 
+#, fuzzy
+msgid ""
+"Chapter controls expired. Reopen the current chapter actions and try again."
+msgstr ""
+"Не удалось добавить загрузки в очередь. Снова откройте список глав и "
+"повторите попытку."
+
 msgid "Chapter download failed."
 msgstr "Не удалось скачать главу."
 
@@ -462,6 +469,10 @@ msgstr "Не удалось отменить загрузку: %1"
 msgid "Could not clear failed downloads: %1"
 msgstr "Не удалось очистить загрузки с ошибками: %1"
 
+#, fuzzy
+msgid "Could not close settings."
+msgstr "Не удалось загрузить мангу."
+
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] "Не удалось подтвердить %1 загрузку главы."
@@ -525,6 +536,10 @@ msgstr "Не удалось удалить эту главу с устройст
 msgid "Could not download \"%1\"%2: %3"
 msgstr "Не удалось скачать «%1»%2: %3"
 
+#, fuzzy
+msgid "Could not flush settings."
+msgstr "Не удалось сохранить настройки."
+
 msgid "Could not load Suwayomi extensions."
 msgstr "Не удалось загрузить расширения Suwayomi."
 
@@ -544,6 +559,14 @@ msgstr "Не удалось загрузить сохранённые фильт
 msgid "Could not load source filters."
 msgstr "Не удалось загрузить фильтры источника."
 
+#, fuzzy
+msgid "Could not open settings for writing."
+msgstr "Не удалось начать загрузку манги."
+
+#, fuzzy
+msgid "Could not prepare settings."
+msgstr "Не удалось сохранить настройки."
+
 msgid "Could not queue download: %1"
 msgstr "Не удалось добавить загрузку в очередь: %1"
 
@@ -557,6 +580,10 @@ msgstr "Не удалось скачать главу заново."
 
 msgid "Could not refresh Library. Showing saved information."
 msgstr ""
+
+#, fuzzy
+msgid "Could not replace settings."
+msgstr "Не удалось сохранить настройки."
 
 msgid "Could not retry download."
 msgstr "Не удалось повторить загрузку."
@@ -601,6 +628,10 @@ msgstr "Не удалось начать загрузку источников: 
 msgid "Could not start source loading: unknown error"
 msgstr "Не удалось начать загрузку источников: неизвестная ошибка"
 
+#, fuzzy
+msgid "Could not sync settings."
+msgstr "Не удалось сохранить настройки."
+
 msgid "Could not update auto-download: %1"
 msgstr "Не удалось изменить автозагрузку: %1"
 
@@ -609,6 +640,10 @@ msgstr "Не удалось обновить библиотеку."
 
 msgid "Could not verify download"
 msgstr "Не удалось проверить загрузку"
+
+#, fuzzy
+msgid "Could not write settings."
+msgstr "Не удалось начать поиск."
 
 msgid "Cover only"
 msgstr ""
@@ -1405,6 +1440,14 @@ msgstr "Настройки"
 msgid "Settings are unavailable."
 msgstr "Настройки недоступны."
 
+#, fuzzy
+msgid "Settings directory unavailable."
+msgstr "Настройки недоступны."
+
+#, fuzzy
+msgid "Settings save failed."
+msgstr "Настройки недоступны."
+
 msgid "Setup wizard"
 msgstr "Мастер настройки"
 
@@ -1628,6 +1671,21 @@ msgstr "Использовать эту папку"
 
 msgid "Username"
 msgstr "Имя пользователя"
+
+msgid ""
+"Verification finished, but its result could not be saved. %1 Try Open or "
+"Verify download again."
+msgstr ""
+
+msgid ""
+"Verification finished, but saving its result is blocked by uncertain "
+"storage. Wait for storage recovery, then try Open or Verify download again."
+msgstr ""
+
+msgid ""
+"Verification is blocked by uncertain storage. Wait for storage recovery, "
+"then try again."
+msgstr ""
 
 msgid "Verify download"
 msgstr "Проверить загрузку"
