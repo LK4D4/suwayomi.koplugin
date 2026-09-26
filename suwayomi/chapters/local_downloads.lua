@@ -149,9 +149,19 @@ function Methods:hasChapterReadAuthority(manga, chapter, path, lookup)
 end
 
 function Methods:getChapterReadEntry(manga, chapter, lookup)
+    if not currentScope(manga) then return nil end
     local entry = lookup.ledger[self:getChapterLedgerKey(manga, chapter)]
-    -- Unknown scope remains applicable here; archive authority requires known scope.
-    if entry and entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope then return nil end
+    if type(entry) ~= "table" or (entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope)
+        or (entry.manga_id ~= nil and tostring(entry.manga_id) ~= tostring(manga.id))
+        or (entry.chapter_id ~= nil and tostring(entry.chapter_id) ~= tostring(chapter.id)) then return nil end
+    -- Unknown origin can describe its recorded file or a pathless local choice,
+    -- never another archive. Display precedence does not grant read authority.
+    if entry.path then
+        if lookup.foreign_paths[entry.path] or self:getChapterPath(manga, chapter, lookup) ~= entry.path then return nil end
+    elseif not entry.endpoint_scope then
+        local downloaded, path = self:isChapterDownloaded(manga, chapter, lookup)
+        if downloaded and path and not hasScopedPathRecord(manga, chapter, path, lookup) then return nil end
+    end
     return entry
 end
 

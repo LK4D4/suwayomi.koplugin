@@ -122,7 +122,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup,
         local local_only = manga.local_only or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, item, lookup))
         item._suwayomi_manual_deletion = not local_only and (manual_snapshot[self:getChapterDownloadKey(manga, item)]
             or (manual_error and { state = "blocked", reason = manual_error } or nil)) or nil
-        local read_entry = not local_only and self:getChapterReadEntry(manga, item, lookup)
+        local read_entry = self:getChapterReadEntry(manga, item, lookup)
         local explicit_unread = type(read_entry) == "table"
             and read_entry.pending_read_sync == true and read_entry.pending_read_state == false
         if explicit_unread then
@@ -397,8 +397,10 @@ function Methods:getBulkChapterActions(lookup)
         if show_scanlator_filter then
             table.insert(actions, { id = "scanlator_filter", text = I18n.t("Scanlator filter"), submenu = true })
         end
-        if context.manga.id and not context.manga.local_only and context.manga.endpoint_scope
-            and context.manga.endpoint_scope == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url) then
+        if context.manga.id and not context.manga.local_only
+            and ((context.missing and not context.manga.endpoint_scope)
+                or (context.manga.endpoint_scope and context.manga.endpoint_scope
+                    == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url))) then
             table.insert(actions, { id = "refresh_chapters", text = I18n.t("Refresh chapters") })
         end
         return actions
