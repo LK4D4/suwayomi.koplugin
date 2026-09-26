@@ -492,9 +492,23 @@ class DesktopUpgrade:
         self.ui.tap("appbar.menu")
         self.ui.tap("Bulk downloads >")
         self.check("safe_action", any(c.get("label") == "Download first unread" and c.get("enabled") for c in self.ui._observe()["controls"]))
-        self.native_key("Escape")
+        self.ui.tap("Download first unread")
+        chapters = values["chapter_cache"]["mangas"][self.manga_id]["chapters"]
+        second = next(c for c in chapters if c["name"] == "Chapter 002")
+        key = self.manga_id + ":" + str(second["id"])
+        def safe_downloaded(state):
+            saved = (self.settings().get("chapter_ledger") or {}).get(key, {})
+            return bool(saved.get("path") and Path(saved["path"]).is_file())
+        self.ui._wait(safe_downloaded, "safe unrelated download", 90)
+        from sandbox_ui import _pages
         after = self.settings()
-        self.check("preserved", after["chapter_ledger"][self.ledger_key] == entry and self.files() == before_files)
+        downloaded = after["chapter_ledger"][key]
+        self.check("safe_action", downloaded.get("endpoint_scope") == values["credentials"]["server_url"]
+                   and _pages(Path(downloaded["path"])) == _pages(self.root / "server-data/local/Sandbox Alpha/Chapter 002.cbz"))
+        after_files = self.files()
+        self.check("preserved", after["chapter_ledger"][self.ledger_key] == entry
+                   and all(after_files.get(path) == digest for path, digest in before_files.items()))
+        before_files = after_files
         self.stop("reader")
         entry["endpoint_scope"] = "https://foreign.invalid"
         self.write_settings(values)

@@ -28,7 +28,7 @@ The report records Git candidate/dirty state, runtime versions, canonical deploy
 | Scenario | Independent outcomes |
 | --- | --- |
 | Native entry and reader return | Search > Suwayomi opens Library; real server membership; downloaded fixture pages match; exact archive opens, page-two progress survives native return/reopen; archive preserved. |
-| Mixed authority | Unknown-origin archive exposes safe local actions; unrelated current listing controls remain available; known foreign bytes gain no Open/delete authority; saved uncertain record and files preserved. |
+| Mixed authority | Unknown-origin archive exposes safe local actions; an unrelated current chapter downloads with matching pages; known foreign bytes gain no Open/delete authority; saved uncertain record and files preserved. |
 | Pending unread | Normal manual read and Refresh establish server/cache Read; offline manual unread followed by labeled absent-old-path/changed-destination preconditions stays Unread in rows/context and admits the correct first unread; original bytes preserved. |
 | Verification faults | Injected rename rejection and directory-sync uncertainty produce feedback, release inspection, retain fence and bytes/progress, and permit explicit recovery. These are not storage-exhaustion tests. |
 | Stale controls | A real background response invalidates an open ordinary action; rejection feedback appears without replay, then fresh Off succeeds. |
