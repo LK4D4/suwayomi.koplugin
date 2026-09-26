@@ -654,7 +654,11 @@ class DesktopUpgrade:
                    and entry.get("endpoint_scope") == self.baseline["credentials"]["server_url"]
                    and Path(opened["document_file"]) == self.archive and opened["document_pages"] == 3
                    and _pages(self.archive) == _pages(self.root / "server-data/local/Sandbox Alpha/Chapter 001.cbz"))
-        self.ui.close_reader()
+        # This injected unassociated archive has no plugin return record.
+        self.ui._request("/koreader/ui/menu/onShowMenu/")
+        self.ui._wait(lambda state: state.get("screen") == "reader-menu", "reader menu")
+        self.ui.tap("appbar.filebrowser")
+        self.ui._wait(lambda state: not state.get("document_file"), "native file browser close")
 
     def refresh_empty(self):
         count = self.count("context-publication")
