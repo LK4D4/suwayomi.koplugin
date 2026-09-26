@@ -286,8 +286,7 @@ function Methods:confirmChapterDownloadBatch(manga, chapters, download_directory
     local function accept()
         return self:enqueueSelectedChapterDownloads(batch.manga, batch.chapters, batch.download_directory, batch)
     end
-    -- Stale batch admission reports zero without persisting or changing selection.
-    return self:showBulkActionConfirmation(table.concat(parts, "\n"), I18n.t("Queue"), accept, accept)
+    return self:showBulkActionConfirmation(table.concat(parts, "\n"), I18n.t("Queue"), accept)
 end
 
 function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_directory, batch)
