@@ -670,21 +670,21 @@ describe("suwayomi/chapters/actions", function()
         local working = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1",
             endpoint_scope = manga.endpoint_scope, read = false } }
         local lookup = plugin:buildChapterDownloadLookup(manga, working)
-        assert.is_false(plugin:hasChapterReadAuthority(manga, chapter, guessed, lookup))
+        assert.is_false(plugin:hasChapterArchiveReadAssociation(manga, chapter, guessed, lookup))
         assert(settings:saveReaderReturnContexts({
             [recorded] = { manga_id = "m1", chapter_id = "c1", path = recorded,
                 endpoint_scope = manga.endpoint_scope },
         }))
         lookup = plugin:buildChapterDownloadLookup(manga, working)
-        assert.is_true(plugin:hasChapterReadAuthority(manga, chapter, recorded, lookup))
-        assert.is_false(plugin:hasChapterReadAuthority(manga, { id = "other" }, recorded, lookup))
+        assert.is_true(plugin:hasChapterArchiveReadAssociation(manga, chapter, recorded, lookup))
+        assert.is_false(plugin:hasChapterArchiveReadAssociation(manga, { id = "other" }, recorded, lookup))
         -- Reconciliation replaces entries in the same working ledger during rendering.
         working["m1:c1"] = { endpoint_scope = "https://other.example" }
-        assert.is_false(plugin:hasChapterReadAuthority(manga, chapter, recorded, lookup))
+        assert.is_false(plugin:hasChapterArchiveReadAssociation(manga, chapter, recorded, lookup))
         working["m1:c1"] = { read = false }
-        assert.is_false(plugin:hasChapterReadAuthority(manga, chapter, recorded, lookup))
+        assert.is_false(plugin:hasChapterArchiveReadAssociation(manga, chapter, recorded, lookup))
         working["m1:c1"] = nil
-        assert.is_true(plugin:hasChapterReadAuthority(manga, chapter, recorded, lookup))
+        assert.is_true(plugin:hasChapterArchiveReadAssociation(manga, chapter, recorded, lookup))
     end)
 
     it("selects pathless read choices with unknown scope but excludes known foreign scope", function()
@@ -692,13 +692,13 @@ describe("suwayomi/chapters/actions", function()
         local working = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1",
             read = false, pending_read_sync = true, pending_read_state = false } }
         local lookup = plugin:buildChapterDownloadLookup(manga, working)
-        assert.are.equal(working["m1:c1"], plugin:getChapterReadEntry(manga, chapter, lookup))
+        assert.are.equal(working["m1:c1"], plugin:getApplicableChapterReadChoice(manga, chapter, lookup))
         working["m1:c1"].endpoint_scope = manga.endpoint_scope
-        assert.are.equal(working["m1:c1"], plugin:getChapterReadEntry(manga, chapter, lookup))
+        assert.are.equal(working["m1:c1"], plugin:getApplicableChapterReadChoice(manga, chapter, lookup))
         working["m1:c1"].endpoint_scope = "https://other.example"
-        assert.is_nil(plugin:getChapterReadEntry(manga, chapter, lookup))
+        assert.is_nil(plugin:getApplicableChapterReadChoice(manga, chapter, lookup))
         working["m1:c1"] = nil
-        assert.is_nil(plugin:getChapterReadEntry(manga, chapter, lookup))
+        assert.is_nil(plugin:getApplicableChapterReadChoice(manga, chapter, lookup))
     end)
 
     it("rejects foreign-owned paths even when another record matches the current manga", function()
@@ -713,8 +713,8 @@ describe("suwayomi/chapters/actions", function()
             [path] = { manga_id = "m1", chapter_id = "c1", path = path, endpoint_scope = manga.endpoint_scope },
         }))
         local lookup = plugin:buildChapterDownloadLookup(manga)
-        assert.is_true(plugin:isLocalOnlyChapter(manga, chapter, lookup))
-        assert.is_false(plugin:hasChapterReadAuthority(manga, chapter, path, lookup))
+        assert.is_false(plugin:canMutateChapterArchive(manga, chapter, lookup))
+        assert.is_false(plugin:hasChapterArchiveReadAssociation(manga, chapter, path, lookup))
         assert.is_nil(plugin:getChapterPath(manga, chapter, lookup))
         assert.is_nil(plugin:getChapterPath(manga, { id = "c1", local_path = path }, lookup))
         assert.is_false(plugin:performChapterAction(manga, chapter, "mark_read"))

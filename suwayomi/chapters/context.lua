@@ -1,6 +1,6 @@
 -- Boundary: ChapterContext.
 --
--- Responsibility: Owns chapter context, selection, filtering, status formatting, and ledger merge helpers.
+-- Responsibility: Owns chapter context, selection, filtering, and status formatting; listing identity gates persisted filters.
 -- Owned state: State lives on the plugin instance so KOReader callbacks keep the same behavior during the extraction.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -485,7 +485,7 @@ end
 
 
 function Methods:canQueueChapterDownload(manga, chapter, download_directory, lookup)
-    if chapter.is_read == true or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, chapter, lookup)) then
+    if chapter.is_read == true or (self.canMutateChapterArchive and not self:canMutateChapterArchive(manga, chapter, lookup)) then
         return false
     end
 
@@ -565,11 +565,11 @@ end
 function Methods:setScanlatorFilter(scanlator)
     if self.suwayomi_host_retired or not self.current_chapter_context then return false end
     local context = self.current_chapter_context
-    local local_only = context.manga.local_only
-    if self.isLocalOnlyChapterContext then
-        local_only = self:isLocalOnlyChapterContext(context.manga, context.chapters)
+    local current_listing = not context.manga.local_only
+    if self.hasCurrentChapterListing then
+        current_listing = self:hasCurrentChapterListing(context.manga, context.chapters)
     end
-    if local_only then
+    if not current_listing then
         -- Recovered IDs may collide with another server's saved filter or refill policy.
         self.current_scanlator_filter = SuwayomiSettings:normalizeMangaScanlatorFilter(scanlator)
         self:clearChapterSelection(true)

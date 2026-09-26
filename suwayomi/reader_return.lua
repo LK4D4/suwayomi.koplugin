@@ -1,6 +1,6 @@
 -- Boundary: ReaderReturn.
 --
--- Responsibility: Persist return context, resolve legacy listing metadata, and hand return to the live FileManager.
+-- Responsibility: Persist return context, select current listing identity independently of legacy archive/read association, and hand return to the live FileManager.
 -- Owned state: Settings-backed return contexts keyed by local chapter path and a cancellable deferred handoff.
 -- Dependencies: KOReader reader/filemanager UI modules, Suwayomi settings, plugin i18n facade, and chapter menu methods.
 -- External data: Document paths and persisted contexts are optional; scope and freshness gate reader teardown/publication.
@@ -201,7 +201,7 @@ local function matchesListingManga(context, manga, scope)
         and present(manga.source.id) == present(context.source.id)
 end
 
-local function resolveLegacyListing(context)
+local function resolveCurrentListingForLegacyReturn(context)
     if present(context.endpoint_scope) or not present(context.manga_id)
         or not present(context.chapter_id) or not present(context.manga_title)
         or type(context.source) ~= "table" or not present(context.source.id) then return nil end
@@ -241,7 +241,7 @@ local function resolveLegacyListing(context)
 end
 
 local function buildReturnedManga(context)
-    local listing_manga = resolveLegacyListing(context)
+    local listing_manga = resolveCurrentListingForLegacyReturn(context)
     if listing_manga then return listing_manga end
     return {
         id = context.manga_id,

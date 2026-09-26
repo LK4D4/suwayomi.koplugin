@@ -1,6 +1,6 @@
 -- Boundary: ChapterActions.
 --
--- Responsibility: Public chapter actions, captured bulk download confirmations, and checked admission results, composed with focused read/delete modules.
+-- Responsibility: Public chapter actions using separate listing, archive-presence, and mutation-admission decisions, composed with focused read/delete modules.
 -- Owned state: State stays on the plugin instance so KOReader callbacks keep stable method names and return values.
 -- Dependencies: Focused chapter action modules, KOReader UI helpers, settings, debug timing, and i18n.
 -- External data: API responses, settings values, queue status, worker files, and filesystem paths remain untrusted at module boundaries.
@@ -45,7 +45,7 @@ mergeMethods(
 function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
     if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
     if open_when_valid and self.cancelMangaNetworkRequests then self:cancelMangaNetworkRequests() end
-    local local_only = self:isLocalOnlyChapter(manga, chapter)
+    local mutation_allowed = self:canMutateChapterArchive(manga, chapter)
     local request = {}
     local completed = false
     self.chapter_archive_request = request
@@ -59,7 +59,7 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         return not self.suwayomi_host_retired
             and self.chapter_archive_request == request
             and (not context_current or context_current())
-            and self:isLocalOnlyChapter(manga, chapter) == local_only
+            and self:canMutateChapterArchive(manga, chapter) == mutation_allowed
             and (not self.isChapterInCurrentContext or self:isChapterInCurrentContext(manga, chapter))
             and self:getChapterPath(manga, chapter) == chapter_path
     end
@@ -72,7 +72,7 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         end
         if self.refreshChapterMenu then self:refreshChapterMenu() end
         if result.state ~= "valid" then
-            if local_only then
+            if not mutation_allowed then
                 self:showMessage(result.error or I18n.t("Could not verify download"))
             else
                 self:showChapterDownloadError(manga, chapter)
@@ -90,17 +90,17 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
             return
         end
         if not is_current() then return end
-        if not local_only then
+        if mutation_allowed then
             local associated, association_err = self:getDownloadQueue().refill:associate(manga)
             if not associated then
                 self:showMessage(association_err or I18n.t("Failed to save settings."))
                 return
             end
         end
-        if not local_only and self.saveReaderReturnContext then
+        if mutation_allowed and self.saveReaderReturnContext then
             self:saveReaderReturnContext(manga, chapter, chapter_path)
         end
-        if not local_only and self.upsertChapterLedgerEntry then
+        if mutation_allowed and self.upsertChapterLedgerEntry then
             local saved, save_err = self:upsertChapterLedgerEntry(manga, chapter, {
                 path = chapter_path, endpoint_scope = manga.endpoint_scope,
             })
@@ -114,7 +114,7 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         else
             ReaderUI:showReader(chapter_path)
         end
-    end, { is_current = is_current, read_only = local_only })
+    end, { is_current = is_current, read_only = not mutation_allowed })
     if not accepted then
         self:showMessage(StatusFormatter.formatVerificationStartError(err))
     end
@@ -128,7 +128,7 @@ end
 
 function Methods:performChapterAction(manga, chapter, action_id)
     if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
-    if self:isLocalOnlyChapter(manga, chapter) and action_id ~= "open" and action_id ~= "verify_download" then
+    if not self:canMutateChapterArchive(manga, chapter) and action_id ~= "open" and action_id ~= "verify_download" then
         return false
     end
     self.chapter_archive_request = nil
@@ -242,7 +242,7 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
             if not context_allowed or (current_ids and not current_ids[tostring(chapter.id)])
                 or not queue:canEnqueue(manga, chapter, download_directory) then
                 batch.skipped = batch.skipped + 1
-            elseif self:isLocalOnlyChapter(manga, chapter, lookup) then
+            elseif not self:canMutateChapterArchive(manga, chapter, lookup) then
                 batch.blocked = batch.blocked + 1
             elseif #batch.chapters >= batch.limit then
                 batch.capped = batch.capped + 1
@@ -323,7 +323,7 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
         local current = current_chapters[queue:getKey(batch.manga, chapter)]
         local scanlator_filter = batch.saved_filter or batch.filter
         if not stale and queue:canEnqueue(batch.manga, current or chapter, batch.download_directory)
-            and self:isLocalOnlyChapter(batch.manga, current or chapter, lookup) then
+            and not self:canMutateChapterArchive(batch.manga, current or chapter, lookup) then
             batch.blocked = (batch.blocked or 0) + 1
         elseif not stale and (not batch.context or current) and not (batch.unread and current and current.is_read == true)
             and (not scanlator_filter or self:getChapterScanlator(current or chapter) == scanlator_filter) then
@@ -686,7 +686,7 @@ function Methods:performBulkChapterAction(action_id, menu_context)
             and ((context.missing and not manga.endpoint_scope)
                 or (manga.endpoint_scope and manga.endpoint_scope
                     == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)))
-        if self:isLocalOnlyChapterContext(manga, context.chapters) and not recovered_refresh then
+        if not self:hasCurrentChapterListing(manga, context.chapters) and not recovered_refresh then
             self:showMessage(I18n.t("This action requires a chapter list associated with the current server."))
             return false
         end
@@ -695,7 +695,7 @@ function Methods:performBulkChapterAction(action_id, menu_context)
             local targets = action_id == "delete_selected" and self:getSelectedChapters(manga, context.chapters)
                 or self:getReadDownloadedChaptersFromCurrentContext()
             for _, chapter in ipairs(targets) do
-                if self:isLocalOnlyChapter(manga, chapter, lookup) then
+                if not self:canMutateChapterArchive(manga, chapter, lookup) then
                     self:showMessage(I18n.t("Cannot delete these downloads: a chapter lacks a verified server association."))
                     return false
                 end
