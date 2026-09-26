@@ -177,6 +177,101 @@ describe("saved-first Library browsing", function()
         assert.same({}, views[2].rows)
     end)
 
+    it("shows all authoritative manga when refresh removes the selected category", function()
+        local temporary = { id = 1, name = "Temporary" }
+        local remaining = { id = 2, name = "Remaining" }
+        local client, requests, views = fixture({
+            categories = { temporary, remaining },
+            manga = { { id = 7, title = "Beta", categories = { temporary } } },
+        })
+        client:showLibrary()
+        views[1].select(views[1].rows[2])
+        assert.are.equal(7, views[2].rows[1].id)
+
+        requests[1].on_finish({ ok = true, categories = { remaining }, manga = {
+            { id = 8, title = "Alpha", categories = { remaining } },
+            { id = 7, title = "Beta", categories = {} },
+        } })
+
+        assert.is_nil(client.library_session.category)
+        assert.same({ 8, 7 }, { views[2].rows[1].id, views[2].rows[2].id })
+        assert.same({ "All manga", "Remaining" }, { views[1].rows[1].name, views[1].rows[2].name })
+        assert.are.equal(2, #client.plugin:getNavigation().entries)
+        views[1].select(views[1].rows[2])
+        assert.are.equal(8, views[2].rows[1].id)
+    end)
+
+    it("keeps Default and All selections on replacement, then accepts a genuinely empty Library", function()
+        local client, requests, views, _, _, _, title = fixture({
+            categories = { { id = 0, name = "Default" }, { id = 1, name = "Other" } },
+            manga = { { id = 7, title = "Old default", categories = {} } },
+        })
+        client:showLibrary()
+        views[1].select(views[1].rows[2])
+        requests[1].on_finish({ ok = true,
+            categories = { { id = 0, name = "Renamed Default" }, { id = 1, name = "Other" } },
+            manga = { { id = 8, title = "New default", categories = {} } },
+        })
+        assert.are.equal(0, client.library_session.category.id)
+        assert.are.equal("Renamed Default", client.library_session.category.name)
+        assert.are.equal(8, views[2].rows[1].id)
+        views[1].select(views[1].rows[1])
+        title().onSelect({ id = "refresh" })
+        requests[2].on_finish({ ok = true, categories = {}, manga = {} })
+        assert.same({}, views[2].rows)
+        assert.is_nil(client.library_session.category.id)
+        assert.same({ "All manga" }, { views[1].rows[1].name })
+    end)
+
+    it("keeps the selected category after a failed or incomplete refresh", function()
+        local client, requests, views, _, _, _, title = fixture({
+            categories = { { id = 1, name = "Selected" }, { id = 2, name = "Other" } },
+            manga = { { id = 7, title = "Saved", categories = { { id = 1 } } } },
+        })
+        client:showLibrary()
+        views[1].select(views[1].rows[2])
+        requests[1].on_finish({ ok = false })
+        title().onSelect({ id = "refresh" })
+        requests[2].on_finish({ ok = true, categories = {} })
+        assert.are.equal(1, client.library_session.category.id)
+        assert.are.equal(7, views[2].rows[1].id)
+        assert.are.equal("Selected", views[1].rows[2].name)
+    end)
+
+    it("shows all current rows after a deleted selection even if cache saving fails", function()
+        local client, requests, views, messages = fixture({
+            categories = { { id = 1, name = "Selected" }, { id = 2, name = "Other" } },
+            manga = { { id = 7, title = "Saved", categories = { { id = 1 } } } },
+        })
+        client.settings.saveLibraryCache = function() return nil, "rejected" end
+        client:showLibrary()
+        views[1].select(views[1].rows[2])
+        requests[1].on_finish({ ok = true, categories = {}, manga = {
+            { id = 8, title = "Current", categories = {} },
+        } })
+        assert.is_nil(client.library_session.category)
+        assert.are.equal(8, views[2].rows[1].id)
+        assert.are.equal(1, #messages)
+    end)
+
+    it("rebinds a surviving selection to fresh category metadata, including an empty result", function()
+        local client, requests, views = fixture({
+            categories = { { id = 1, name = "Old name" }, { id = 2, name = "Other" } },
+            manga = { { id = 7, title = "Old row", categories = { { id = 1 } } } },
+        })
+        client:showLibrary()
+        views[1].select(views[1].rows[2])
+        requests[1].on_finish({ ok = true,
+            categories = { { id = 1, name = "New name" }, { id = 2, name = "Other" } },
+            manga = { { id = 8, title = "Elsewhere", categories = { { id = 2 } } } },
+        })
+        assert.are.equal("New name", client.library_session.category.name)
+        assert.same({}, views[2].rows)
+        assert.are.equal("New name", views[1].rows[2].name)
+        views[1].select(views[1].rows[1])
+        assert.are.equal(8, views[2].rows[1].id)
+    end)
+
     it("retries through ordinary Refresh and keeps successful empty results on reopening", function()
         local client, requests, views, _, _, _, title = fixture({
             categories = {}, manga = { { id = 7, title = "Old" } },
