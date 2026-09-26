@@ -108,4 +108,20 @@ describe("issue 61 pending unread display", function()
         assert.same({}, f.writes)
     end)
 
+    it("rejects a pathless choice when a foreign owner hides the guessed archive", function()
+        f:legacy(nil)
+        f.existing["/downloads/1.cbz"], f.finished["/downloads/1.cbz"] = true, true
+        assert(f.settings:saveReaderReturnContexts({ ["/downloads/1.cbz"] = {
+            manga_id = "99", chapter_id = "99", path = "/downloads/1.cbz", endpoint_scope = "https://other.example",
+        } }))
+        f.chapters[1].is_read = true
+        local before = f.settings:getStore():load()
+        local merged = assert(f.plugin:mergeChaptersWithReadLedger(f.manga, { f.chapters[1] }, { saved = true }))
+        assert.is_true(merged[1].is_read)
+        local items = f.plugin:buildChapterMenuItems(f.manga, merged, nil, { saved = true })
+        assert.is_true(items[1].is_read)
+        assert.same(before, f.settings:getStore():load())
+        assert.same({}, f.writes)
+    end)
+
 end)

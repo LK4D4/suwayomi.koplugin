@@ -159,8 +159,9 @@ function Methods:getChapterReadEntry(manga, chapter, lookup)
     if entry.path then
         if lookup.foreign_paths[entry.path] or self:getChapterPath(manga, chapter, lookup) ~= entry.path then return nil end
     elseif not entry.endpoint_scope then
-        local downloaded, path = self:isChapterDownloaded(manga, chapter, lookup)
-        if downloaded and path and not hasScopedPathRecord(manga, chapter, path, lookup) then return nil end
+        local path, reason = self:getChapterPath(manga, chapter, lookup)
+        if reason == "foreign_path" then return nil end
+        if path and self:chapterArchiveExists(path) and not hasScopedPathRecord(manga, chapter, path, lookup) then return nil end
     end
     return entry
 end
@@ -195,6 +196,7 @@ end
 function Methods:getChapterPath(manga, chapter, lookup)
     if type(manga) ~= "table" or type(chapter) ~= "table" or not currentScope(manga) then return nil end
     lookup = lookup or self:buildChapterDownloadLookup(manga)
+    if chapter.local_path and lookup.foreign_paths[chapter.local_path] then return nil, "foreign_path" end
     local entries
     if chapter.id ~= nil then entries = lookup.by_id[tostring(chapter.id)]
     else entries = lookup.by_path[chapter.local_path] end
@@ -216,7 +218,7 @@ function Methods:getChapterPath(manga, chapter, lookup)
     local chapter_path = SuwayomiDownloader.findExistingChapterPath
         and SuwayomiDownloader:findExistingChapterPath(download_directory, manga, chapter)
         or select(2, SuwayomiDownloader:getTargetPath(download_directory, manga, chapter))
-    if lookup.foreign_paths[chapter_path] then return nil end
+    if lookup.foreign_paths[chapter_path] then return nil, "foreign_path" end
     return chapter_path
 end
 
