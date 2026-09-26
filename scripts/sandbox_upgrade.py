@@ -85,7 +85,8 @@ REQUIRED = {
     "pending-unread": {"cache_read", "row_unread", "context_unread", "admitted", "preserved"},
     "verification-faults": {"rejected_twice", "released", "uncertain", "fenced", "recovered", "preserved"},
     "stale-controls": {"feedback", "policy", "ledger", "fresh_off"},
-    "publication-stages": {"cache", "merge", "visible", "empty", "stale", "preserved", "preload"},
+    "publication-stages": {"cache-reject", "cache-uncertain", "merge-reject", "merge-uncertain",
+                           "visible-reject", "visible-uncertain", "empty", "stale", "preserved", "preload"},
     "deleted-category": {"selected", "deleted", "all_manga"},
     "browse-layouts": {"discovered", "list", "cover_text", "cover_only", "last_page"},
 }
@@ -597,7 +598,7 @@ class DesktopUpgrade:
                 expected_cache = 3 if stage == "cache" and outcome == "reject" else 2
                 ack = (disk.get("chapter_ledger") or {}).get(second_key, {})
                 expected_pending = stage == "cache" or (stage == "merge" and outcome == "reject")
-                self.check(stage, "Chapter 001" in labels and "Chapter 002" in labels and "Chapter 003" not in labels
+                self.check(stage + "-" + outcome, "Chapter 001" in labels and "Chapter 002" in labels and "Chapter 003" not in labels
                            and len(persisted) == expected_cache
                            and (ack.get("pending_read_sync") is True) == expected_pending
                            and ack.get("read") is False and ack.get("chapter_id") == str(second["id"])
@@ -623,26 +624,30 @@ class DesktopUpgrade:
         self.fault("none")
         self.reset(self.baseline)
         self.stop("reader")
-        self.write_settings(copy.deepcopy(self.baseline))
+        values = copy.deepcopy(self.baseline)
+        values["chapter_cache"]["mangas"].pop(self.manga_id)
+        self.write_settings(values)  # Labeled missing-cache precondition forces action preload.
         self.start("reader")
         self.native_entry()
+        self.ui._wait(lambda state: any(c.get("label") == "Sandbox Alpha" for c in state["controls"]), "preload manga")
         self.ui.tap("Sandbox Alpha")
         before = self.count("menu-preparation")
         preloads = self.count("action-preload")
-        self.ui.tap("Bulk downloads >")
-        self.ui.tap("Download first unread")
+        self.ui.tap("Open next unread")
         self.ui._wait(lambda state: self.count("action-preload") > preloads, "action preload")
-        def downloaded_second(state):
-            entry = (self.settings().get("chapter_ledger") or {}).get(second_key, {})
-            return bool(entry.get("path") and Path(entry["path"]).is_file())
-        self.ui._wait(downloaded_second, "preload command completion", 90)
+        opened = self.ui._wait(lambda state: state.get("screen") == "reader" and state.get("document_file"),
+                               "preload action opens archive", 90)
         from sandbox_ui import _pages
-        entry = self.settings()["chapter_ledger"][second_key]
+        saved = self.settings()
+        entry = saved["chapter_ledger"][self.ledger_key]
         context = next(e for e in reversed(self.events()) if e["event"] == "context-publication")
         self.check("preload", self.count("menu-preparation") == before
                    and len(context["reads"]) == 3
+                   and len(saved["chapter_cache"]["mangas"][self.manga_id]["chapters"]) == 3
                    and entry.get("endpoint_scope") == self.baseline["credentials"]["server_url"]
-                   and _pages(Path(entry["path"])) == _pages(self.root / "server-data/local/Sandbox Alpha/Chapter 002.cbz"))
+                   and Path(opened["document_file"]) == self.archive and opened["document_pages"] == 3
+                   and _pages(self.archive) == _pages(self.root / "server-data/local/Sandbox Alpha/Chapter 001.cbz"))
+        self.ui.close_reader()
 
     def refresh_empty(self):
         count = self.count("context-publication")
