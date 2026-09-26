@@ -190,7 +190,7 @@ class DesktopUpgrade:
                 if service == "reader":
                     self.ui._transition_until = 0
                     self.ui._observe(deadline=deadline)
-                    # Inspector starts before the cold FileManager finishes installing input handlers.
+                    # Let initial UI transitions settle before the first observed action.
                     time.sleep(2)
                     self.ui._observe(deadline=deadline)
                 else:
@@ -233,7 +233,7 @@ class DesktopUpgrade:
                         "F1" if value == "menu" else value], check=True)
 
     def native_entry(self):
-        self.native_key("menu")
+        self.ui._request("/koreader/ui/menu/onShowMenu/")
         self.ui._wait(lambda s: any(c.get("label") == "appbar.search" for c in s["controls"]), "native Search tab")
         if not any(c.get("label") == "appbar.search" and c.get("selected") for c in self.ui._observe()["controls"]):
             self.ui.tap("appbar.search")
@@ -457,6 +457,9 @@ class DesktopUpgrade:
                 jobs = list(jobs.values())
             self.check("admitted", any(str(j.get("chapter", {}).get("id")) == self.chapter_id for j in jobs))
             self.check("preserved", sandbox.digest(held) == original_hash)
+        except Exception:
+            self.diagnose("pending-unread-before-stop")
+            raise
         finally:
             self.stop("reader")
             if self.archive.exists():
