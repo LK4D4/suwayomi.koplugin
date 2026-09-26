@@ -229,16 +229,17 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
     end
     local seen = {}
     local scanlator_filter = batch.saved_filter or batch.filter
+    local lookup = self:buildChapterDownloadLookup(manga)
     for _index, chapter in ipairs(chapters or {}) do
         local key = queue:getKey(manga, chapter)
         if not seen[key] and (not scanlator_filter or self:getChapterScanlator(chapter) == scanlator_filter)
             and not (batch.unread and chapter.is_read == true) then
             seen[key] = true
-            if self:isLocalOnlyChapter(manga, chapter) then
-                batch.blocked = batch.blocked + 1
-            elseif not context_allowed or (current_ids and not current_ids[tostring(chapter.id)])
+            if not context_allowed or (current_ids and not current_ids[tostring(chapter.id)])
                 or not queue:canEnqueue(manga, chapter, download_directory) then
                 batch.skipped = batch.skipped + 1
+            elseif self:isLocalOnlyChapter(manga, chapter, lookup) then
+                batch.blocked = batch.blocked + 1
             elseif #batch.chapters >= batch.limit then
                 batch.capped = batch.capped + 1
             else
@@ -314,10 +315,12 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
         current_chapters[queue:getKey(batch.context.manga, chapter)] = chapter
     end
     local candidates = {}
+    local lookup = not stale and self:buildChapterDownloadLookup(batch.manga)
     for _, chapter in ipairs(batch.chapters) do
         local current = current_chapters[queue:getKey(batch.manga, chapter)]
         local scanlator_filter = batch.saved_filter or batch.filter
-        if not stale and self:isLocalOnlyChapter(batch.manga, current or chapter) then
+        if not stale and queue:canEnqueue(batch.manga, current or chapter, batch.download_directory)
+            and self:isLocalOnlyChapter(batch.manga, current or chapter, lookup) then
             batch.blocked = (batch.blocked or 0) + 1
         elseif not stale and (not batch.context or current) and not (batch.unread and current and current.is_read == true)
             and (not scanlator_filter or self:getChapterScanlator(current or chapter) == scanlator_filter) then
@@ -676,8 +679,10 @@ function Methods:performBulkChapterAction(action_id, menu_context)
     local context = self.current_chapter_context
     local manga = context and context.manga
     if manga and action_id ~= "select_all" and action_id ~= "clear_selection" and action_id ~= "scanlator_filter" then
-        local recovered_refresh = action_id == "refresh_chapters" and not manga.local_only and manga.id and manga.endpoint_scope
-            and manga.endpoint_scope == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
+        local recovered_refresh = action_id == "refresh_chapters" and not manga.local_only and manga.id
+            and ((context.missing and not manga.endpoint_scope)
+                or (manga.endpoint_scope and manga.endpoint_scope
+                    == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)))
         if self:isLocalOnlyChapterContext(manga, context.chapters) and not recovered_refresh then
             self:showMessage(I18n.t("This action requires a chapter list associated with the current server."))
             return false

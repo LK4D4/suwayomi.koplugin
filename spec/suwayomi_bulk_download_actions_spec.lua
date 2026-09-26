@@ -336,7 +336,7 @@ describe("bounded bulk download actions", function()
                 if size == 0 then
                     assert.are.same({}, stack)
                     assert.are.same({}, storedJobs())
-                    assert.are.equal("No new downloads available: chapters are already downloaded or in the download queue.", messages[#messages])
+                    assert.are.equal("No new downloads available: chapters are already downloaded, queued, or lack a verified server association.", messages[#messages])
                     return
                 end
                 local expected_count = math.min(size, 50)

@@ -484,8 +484,8 @@ function Methods:formatBulkDownloadMessage(queued, skipped)
 end
 
 
-function Methods:canQueueChapterDownload(manga, chapter, download_directory)
-    if chapter.is_read == true or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, chapter)) then
+function Methods:canQueueChapterDownload(manga, chapter, download_directory, lookup)
+    if chapter.is_read == true or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, chapter, lookup)) then
         return false
     end
 
@@ -516,11 +516,12 @@ function Methods:getNextUnreadChaptersForDownload(manga, limit, download_directo
     local seen = {}
     local queue = self:getDownloadQueue()
     local saved_filter = self:loadMangaScanlatorFilter(manga)
+    local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga)
     for _index, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
         local key = queue:getKey(manga, chapter)
         if not seen[key] and (not saved_filter or self:getChapterScanlator(chapter) == saved_filter) then
             seen[key] = true
-            if self:canQueueChapterDownload(manga, chapter, download_directory) then
+            if self:canQueueChapterDownload(manga, chapter, download_directory, lookup) then
                 table.insert(chapters, chapter)
                 if #chapters >= limit then
                     break
