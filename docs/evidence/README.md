@@ -4,6 +4,7 @@ These dated records describe the named candidate, environment, method, observed 
 
 | Record | Scope |
 | --- | --- |
+| [Issues #67–#70, 2026-09-26](issues-67-70-acceptance-2026-09-26.md) | Authority/preparation boundaries, composed historical controls, repeatable upgrade acceptance; all eight desktop and Palma scenarios with verified restoration |
 | [Issues #63–#66, 2026-09-26](issues-63-66-acceptance-2026-09-26.md) | Pending unread path changes, verification persistence recovery, stale controls, fail-closed localization discovery; desktop and Palma with verified restoration |
 | [Issue #51 chapter cache, 2026-09-18](issue-51-chapter-cache-2026-09-18.md) | Desktop offline chapters, recovery, and injected empty response |
 | [Authentication, 2026-09-09](authentication-2026-09-09.md) | Earlier authentication investigation and bounded evidence |
