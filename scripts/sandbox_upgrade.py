@@ -190,6 +190,9 @@ class DesktopUpgrade:
                 if service == "reader":
                     self.ui._transition_until = 0
                     self.ui._observe(deadline=deadline)
+                    # Inspector starts before the cold FileManager finishes installing input handlers.
+                    time.sleep(2)
+                    self.ui._observe(deadline=deadline)
                 else:
                     self.server.request("/api/v1/source/list")
                     if not (self.root / "server.pid.json").exists():
