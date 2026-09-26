@@ -385,11 +385,8 @@ function Methods:getBulkChapterActions(lookup)
     local actions = {}
     local context = self.current_chapter_context
     local local_only = context and context.manga and context.manga.local_only
-    if context and context.manga and self.isLocalOnlyChapter then
-        lookup = lookup or (self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(context.manga))
-        for _, chapter in ipairs(context.chapters or {}) do
-            if self:isLocalOnlyChapter(context.manga, chapter, lookup) then local_only = true; break end
-        end
+    if context and self.isLocalOnlyChapterContext then
+        local_only = self:isLocalOnlyChapterContext(context.manga, context.chapters)
     end
     local show_scanlator_filter = self.current_scanlator_filter ~= nil
         or #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0

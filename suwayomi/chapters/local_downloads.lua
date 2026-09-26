@@ -155,6 +155,18 @@ function Methods:getChapterReadEntry(manga, chapter, lookup)
     return entry
 end
 
+function Methods:isLocalOnlyChapterContext(manga, chapters)
+    if not manga or manga.local_only or not manga.id or not manga.endpoint_scope or not currentScope(manga) then
+        return true
+    end
+    -- Reconstructed rows carry explicit local-only identity; a legacy ledger
+    -- entry alone cannot remove authority from a complete server listing.
+    for _, chapter in ipairs(chapters or {}) do
+        if chapter.local_only then return true end
+    end
+    return false
+end
+
 function Methods:isLocalOnlyChapter(manga, chapter, lookup)
     if not manga or manga.local_only or not manga.id or not chapter or chapter.local_only or not chapter.id
         or not currentScope(manga) then return true end

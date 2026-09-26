@@ -210,7 +210,7 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
     local batch = {
         manga = queue:copyMangaMetadata(manga), chapters = {},
         download_directory = download_directory,
-        skipped = options.skipped or 0, capped = 0, scope = options.scope,
+        skipped = options.skipped or 0, blocked = 0, capped = 0, scope = options.scope,
         limit = self.max_batch_queue_chapters,
         context = self.current_chapter_context, unread = options.unread,
         menu = self.current_chapter_menu, filter = self.current_scanlator_filter,
@@ -234,7 +234,9 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
         if not seen[key] and (not scanlator_filter or self:getChapterScanlator(chapter) == scanlator_filter)
             and not (batch.unread and chapter.is_read == true) then
             seen[key] = true
-            if not context_allowed or (current_ids and not current_ids[tostring(chapter.id)])
+            if self:isLocalOnlyChapter(manga, chapter) then
+                batch.blocked = batch.blocked + 1
+            elseif not context_allowed or (current_ids and not current_ids[tostring(chapter.id)])
                 or not queue:canEnqueue(manga, chapter, download_directory) then
                 batch.skipped = batch.skipped + 1
             elseif #batch.chapters >= batch.limit then
@@ -249,8 +251,11 @@ end
 
 
 local function noDownloadCandidatesMessage(batch)
+    if (batch.blocked or 0) > 0 then
+        return I18n.t("No downloads queued: these chapters lack a verified server association.")
+    end
     if batch.skipped > 0 then
-        return I18n.t("No new downloads available: chapters are already downloaded or in the download queue.")
+        return I18n.t("No new downloads available: chapters are already downloaded, queued, or lack a verified server association.")
     end
     if batch.saved_filter then
         return I18n.t("No eligible chapters match the saved scanlator filter.")
@@ -312,7 +317,9 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
     for _, chapter in ipairs(batch.chapters) do
         local current = current_chapters[queue:getKey(batch.manga, chapter)]
         local scanlator_filter = batch.saved_filter or batch.filter
-        if not stale and (not batch.context or current) and not (batch.unread and current and current.is_read == true)
+        if not stale and self:isLocalOnlyChapter(batch.manga, current or chapter) then
+            batch.blocked = (batch.blocked or 0) + 1
+        elseif not stale and (not batch.context or current) and not (batch.unread and current and current.is_read == true)
             and (not scanlator_filter or self:getChapterScanlator(current or chapter) == scanlator_filter) then
             table.insert(candidates, chapter)
         end
@@ -343,6 +350,11 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
         status = stale and "stale" or (enqueue_err and "failed" or "accepted"),
         code = enqueue_err and tostring(enqueue_err):match("^([%w_]+)"),
     })
+    if (batch.blocked or 0) > 0 then
+        self:showMessage(I18n.count(batch.blocked,
+            "Skipped %1 chapter without a verified server association.",
+            "Skipped %1 chapters without a verified server association."))
+    end
     if not enqueue_err and not stale and outcome.failed == 0 and outcome.unconfirmed == 0 then
         return queued, enqueue_err
     end
@@ -664,12 +676,22 @@ function Methods:performBulkChapterAction(action_id, menu_context)
     local context = self.current_chapter_context
     local manga = context and context.manga
     if manga and action_id ~= "select_all" and action_id ~= "clear_selection" and action_id ~= "scanlator_filter" then
-        if manga.local_only then return false end
-        local recovered_refresh = action_id == "refresh_chapters" and manga.id and manga.endpoint_scope
+        local recovered_refresh = action_id == "refresh_chapters" and not manga.local_only and manga.id and manga.endpoint_scope
             and manga.endpoint_scope == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
-        local lookup = self:buildChapterDownloadLookup(manga)
-        for _, chapter in ipairs(context.chapters or {}) do
-            if self:isLocalOnlyChapter(manga, chapter, lookup) and not recovered_refresh then return false end
+        if self:isLocalOnlyChapterContext(manga, context.chapters) and not recovered_refresh then
+            self:showMessage(I18n.t("This action requires a chapter list associated with the current server."))
+            return false
+        end
+        if action_id == "delete_selected" or action_id == "delete_read_downloaded" then
+            local lookup = self:buildChapterDownloadLookup(manga)
+            local targets = action_id == "delete_selected" and self:getSelectedChapters(manga, context.chapters)
+                or self:getReadDownloadedChaptersFromCurrentContext()
+            for _, chapter in ipairs(targets) do
+                if self:isLocalOnlyChapter(manga, chapter, lookup) then
+                    self:showMessage(I18n.t("Cannot delete these downloads: a chapter lacks a verified server association."))
+                    return false
+                end
+            end
         end
     end
     if action_id == "bulk_downloads" then

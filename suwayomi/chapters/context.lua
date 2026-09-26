@@ -485,7 +485,7 @@ end
 
 
 function Methods:canQueueChapterDownload(manga, chapter, download_directory)
-    if chapter.is_read == true then
+    if chapter.is_read == true or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, chapter)) then
         return false
     end
 
@@ -565,11 +565,8 @@ function Methods:setScanlatorFilter(scanlator)
     if self.suwayomi_host_retired or not self.current_chapter_context then return false end
     local context = self.current_chapter_context
     local local_only = context.manga.local_only
-    if self.isLocalOnlyChapter then
-        local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(context.manga)
-        for _, chapter in ipairs(context.chapters or {}) do
-            if self:isLocalOnlyChapter(context.manga, chapter, lookup) then local_only = true; break end
-        end
+    if self.isLocalOnlyChapterContext then
+        local_only = self:isLocalOnlyChapterContext(context.manga, context.chapters)
     end
     if local_only then
         -- Recovered IDs may collide with another server's saved filter or refill policy.
