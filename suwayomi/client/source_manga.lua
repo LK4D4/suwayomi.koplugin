@@ -1296,9 +1296,7 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
     menu_options.on_page_changed = function(menu, changed_page)
         session.menu = menu
         self:restartVisibleBrowseChapterCounts(session, refreshMangaMenu)
-        if not menu._suwayomi_view_mode_update
-            and self:shouldAppendSourceMangaPage(session, menu, changed_page)
-        then
+        if self:shouldAppendSourceMangaPage(session, menu, changed_page) then
             self:startSourceMangaAppendLoad(session, refreshMangaMenu)
         end
     end

@@ -1101,9 +1101,7 @@ function ListMenu.setViewMode(menu, mode)
     applyViewMode(menu, mode)
     menu._suwayomi_pending_itemnumber = first_item
     menu._suwayomi_last_notified_page = nil
-    menu._suwayomi_view_mode_update = true
     menu:updateItems()
-    menu._suwayomi_view_mode_update = nil
 end
 
 function ListMenu.install(menu, options)

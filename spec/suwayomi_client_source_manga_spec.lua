@@ -2022,6 +2022,60 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal(shown_menu, updates[#updates].menu)
     end)
 
+    for _, view_change in ipairs({ false, true }) do
+        it("continues pagination after " .. (view_change and "a layout change" or "normal paging"), function()
+            local subprocess_job, started = buildSourceMangaSubprocessFake()
+            local menu, options, visible
+            local client = newClient({
+                subprocess_job = subprocess_job,
+                source_manga_worker = {},
+                chapter_count_worker = "disabled",
+                ffi_util = {},
+                ui_manager = {},
+                ui = {
+                    showMangaMenu = function()
+                        menu = { page = 1, page_num = 2, perpage = 12 }
+                        return menu
+                    end,
+                    updateMangaMenu = function(_, manga, _, menu_options)
+                        visible, options = manga, menu_options
+                    end,
+                },
+            })
+            local rows = {}
+            for index = 1, 20 do rows[index] = { id = tostring(index), title = tostring(index) } end
+            client:showMangaForSource({ id = "s1" }, { skip_mode_menu = true })
+            started[1].on_finish(started[1], { ok = true, manga = rows, has_next_page = true })
+            assert.are.equal(1, #started)
+
+            -- A wider grid fits the loaded batch on one page; native Next is disabled.
+            if view_change then
+                menu.perpage, menu.page_num = 24, 1
+                menu._suwayomi_view_mode_update = true
+            else
+                menu.page = 2
+            end
+            options.on_page_changed(menu, menu.page)
+            assert.are.equal(2, #started)
+            assert.are.equal(2, started[2].browse_options.page)
+            assert.are.equal(rows, visible)
+            options.on_page_changed(menu, menu.page)
+            assert.are.equal(2, #started)
+            menu._suwayomi_view_mode_update = nil
+
+            started[2].on_finish(started[2], {
+                ok = true,
+                manga = { rows[20], { id = "21", title = "21" } },
+                has_next_page = false,
+            })
+            assert.are.equal(21, #visible)
+            for index = 1, 20 do assert.are.equal(rows[index], visible[index]) end
+            assert.are.equal(view_change and 1 or 2, menu.page)
+            options.on_page_changed(menu, menu.page)
+            assert.are.equal(2, #started)
+        end)
+    end
+
     it("keeps appending while the refreshed menu remains on the last local page", function()
         local subprocess_job, started = buildSourceMangaSubprocessFake()
         local updates = {}
