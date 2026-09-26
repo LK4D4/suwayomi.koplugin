@@ -114,10 +114,14 @@ userpatch.registerPatchPluginFunc("suwayomi", function(Plugin)
     end
     local Settings = require("suwayomi/settings")
     local store = Settings:getStore()
+    local preparations = 0
     local function wrap(receiver, method, stage)
         local original = assert(receiver[method], "Missing upgrade collaborator: " .. method)
         receiver[method] = function(...)
-            if stage == "visible" then record("menu-preparation") end
+            if stage == "visible" then
+                preparations = preparations + 1
+                record("menu-preparation")
+            end
             local fault = mode()
             if fault ~= stage .. "-reject" and fault ~= stage .. "-uncertain" then return original(...) end
             local seam = fault:find("uncertain", 1, true) and "sync_dir" or "rename"
@@ -152,8 +156,9 @@ userpatch.registerPatchPluginFunc("suwayomi", function(Plugin)
     end
     local preload = Plugin.handleChapterContextResult
     Plugin.handleChapterContextResult = function(...)
+        local before = preparations
         local out = { preload(...) }
-        record("action-preload")
+        record("action-preload", { display_preparations = preparations - before })
         return unpack(out)
     end
     local Request = require("suwayomi/network/request_job")

@@ -626,12 +626,18 @@ class DesktopUpgrade:
         self.stop("reader")
         values = copy.deepcopy(self.baseline)
         values["chapter_cache"]["mangas"].pop(self.manga_id)
-        self.write_settings(values)  # Labeled missing-cache precondition forces action preload.
+        for entry in values.get("chapter_ledger", {}).values():
+            if str(entry.get("manga_id")) == self.manga_id:
+                entry.pop("path", None)
+        contexts = values.get("reader_return_contexts", {})
+        for key in list(contexts):
+            if str(contexts[key].get("manga_id")) == self.manga_id:
+                contexts.pop(key)
+        self.write_settings(values)  # Missing cache and recorded paths force preload; actual bytes remain.
         self.start("reader")
         self.native_entry()
         self.ui._wait(lambda state: any(c.get("label") == "Sandbox Alpha" for c in state["controls"]), "preload manga")
         self.ui.tap("Sandbox Alpha")
-        before = self.count("menu-preparation")
         preloads = self.count("action-preload")
         self.ui.tap("Open next unread")
         self.ui._wait(lambda state: self.count("action-preload") > preloads, "action preload")
@@ -641,7 +647,8 @@ class DesktopUpgrade:
         saved = self.settings()
         entry = saved["chapter_ledger"][self.ledger_key]
         context = next(e for e in reversed(self.events()) if e["event"] == "context-publication")
-        self.check("preload", self.count("menu-preparation") == before
+        preload = next(e for e in reversed(self.events()) if e["event"] == "action-preload")
+        self.check("preload", preload["display_preparations"] == 0
                    and len(context["reads"]) == 3
                    and len(saved["chapter_cache"]["mangas"][self.manga_id]["chapters"]) == 3
                    and entry.get("endpoint_scope") == self.baseline["credentials"]["server_url"]
