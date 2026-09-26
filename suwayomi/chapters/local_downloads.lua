@@ -154,10 +154,14 @@ function Methods:getChapterReadEntry(manga, chapter, lookup)
     if type(entry) ~= "table" or (entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope)
         or (entry.manga_id ~= nil and tostring(entry.manga_id) ~= tostring(manga.id))
         or (entry.chapter_id ~= nil and tostring(entry.chapter_id) ~= tostring(chapter.id)) then return nil end
-    -- Unknown origin can describe its recorded file or a pathless local choice,
-    -- never another archive. Display precedence does not grant read authority.
+    -- A scoped pending choice follows chapter identity when its archive moves.
+    -- Other entries still describe their recorded file, never another archive.
+    -- Display precedence does not grant archive read authority.
     if entry.path then
-        if lookup.foreign_paths[entry.path] or self:getChapterPath(manga, chapter, lookup) ~= entry.path then return nil end
+        local path, reason = self:getChapterPath(manga, chapter, lookup)
+        if lookup.foreign_paths[entry.path] or reason == "foreign_path" then return nil end
+        local scoped_pending = entry.endpoint_scope and entry.pending_read_sync == true
+        if not scoped_pending and path ~= entry.path then return nil end
     elseif not entry.endpoint_scope then
         local path, reason = self:getChapterPath(manga, chapter, lookup)
         if reason == "foreign_path" then return nil end
