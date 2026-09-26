@@ -224,10 +224,10 @@ class DesktopUpgrade:
         if len(windows) != 1:
             raise Blocked("Expected one visible window owned by this sandbox")
         window = windows.pop()
-        if value == "menu":
-            subprocess.run(["xdotool", "key", "--window", window, "F1"], check=True)
-        else:
-            subprocess.run(["xdotool", "key", "--window", window, value], check=True)
+        subprocess.run(["xdotool", "windowfocus", "--sync", window], check=True)
+        time.sleep(.4)
+        subprocess.run(["xdotool", "key", "--clearmodifiers", "--delay", "100",
+                        "F1" if value == "menu" else value], check=True)
 
     def native_entry(self):
         self.native_key("menu")
@@ -556,6 +556,7 @@ class DesktopUpgrade:
                     "manga_id": self.manga_id, "chapter_id": str(second["id"]),
                     "endpoint_scope": values["credentials"]["server_url"], "read": False,
                     "pending_read_sync": True, "pending_read_state": False,
+                    "path": str(self.root / "downloads/missing-002.cbz"),
                 }
                 self.write_settings(values)
                 remote = self.graphql('mutation($input:UpdateChapterInput!){updateChapter(input:$input){chapter{id isRead}}}',
@@ -585,7 +586,11 @@ class DesktopUpgrade:
                 expected_pending = stage == "cache" or (stage == "merge" and outcome == "reject")
                 self.check(stage, "Chapter 001" in labels and "Chapter 002" in labels and "Chapter 003" not in labels
                            and len(persisted) == expected_cache
-                           and (ack.get("pending_read_sync") is True) == expected_pending)
+                           and (ack.get("pending_read_sync") is True) == expected_pending
+                           and ack.get("read") is False and ack.get("chapter_id") == str(second["id"])
+                           and ack.get("endpoint_scope") == values["credentials"]["server_url"]
+                           and ack.get("path") == str(self.root / "downloads/missing-002.cbz")
+                           and (ack.get("pending_read_state") is False if expected_pending else ack.get("pending_read_state") is None))
                 self.check("preserved", sandbox.digest(self.archive) == before)
                 self.diagnose(stage + "-" + outcome)
                 self.fault("none")
@@ -610,10 +615,21 @@ class DesktopUpgrade:
         self.native_entry()
         self.ui.tap("Sandbox Alpha")
         before = self.count("menu-preparation")
+        preloads = self.count("action-preload")
         self.ui.tap("Bulk downloads >")
         self.ui.tap("Download first unread")
-        self.ui._wait(lambda state: self.count("action-preload") > 0, "action preload")
-        self.check("preload", self.count("menu-preparation") == before)
+        self.ui._wait(lambda state: self.count("action-preload") > preloads, "action preload")
+        def downloaded_second(state):
+            entry = (self.settings().get("chapter_ledger") or {}).get(second_key, {})
+            return bool(entry.get("path") and Path(entry["path"]).is_file())
+        self.ui._wait(downloaded_second, "preload command completion", 90)
+        from sandbox_ui import _pages
+        entry = self.settings()["chapter_ledger"][second_key]
+        context = next(e for e in reversed(self.events()) if e["event"] == "context-publication")
+        self.check("preload", self.count("menu-preparation") == before
+                   and len(context["reads"]) == 3
+                   and entry.get("endpoint_scope") == self.baseline["credentials"]["server_url"]
+                   and _pages(Path(entry["path"])) == _pages(self.root / "server-data/local/Sandbox Alpha/Chapter 002.cbz"))
 
     def refresh_empty(self):
         count = self.count("context-publication")
@@ -672,7 +688,8 @@ class DesktopUpgrade:
         self.check("discovered", any(c.get("label", "").startswith("Upgrade Manga") for c in self.ui._observe()["controls"]))
         for name, label in (("list", "List"), ("cover_text", "Cover with text"), ("cover_only", "Cover only")):
             state = self.ui._observe()
-            if state.get("pages", 1) > 1 and state.get("page") == 1:
+            self.check(name, state.get("pages", 0) > 1)
+            if state.get("page") == 1:
                 self.native_key("Next")
                 state = self.ui._wait(lambda current: current.get("page", 0) > 1, "later Browse page")
             first = next(c["label"] for c in state["controls"] if c.get("label", "").startswith("Upgrade Manga"))
