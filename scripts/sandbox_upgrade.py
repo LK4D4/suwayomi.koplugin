@@ -582,7 +582,8 @@ class DesktopUpgrade:
                 state = self.ui._wait(lambda state: self.count("stage-fault") > count, "injected stage fault")
                 if state.get("message"):
                     (self.evidence.directory / (stage + "-" + outcome + "-feedback.json")).write_text(json.dumps(state))
-                    self.ui.tap("Dismiss message")
+                    if any(c.get("label") == "Dismiss message" for c in state["controls"]):
+                        self.ui.tap("Dismiss message")
                 state = self.ui._wait(lambda state: any(c.get("label") == "Chapter 001" for c in state["controls"]),
                                       "chapter membership after stage feedback")
                 labels = {c.get("label") for c in state["controls"]}
