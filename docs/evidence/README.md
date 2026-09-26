@@ -13,3 +13,4 @@ These dated records describe the named candidate, environment, method, observed 
 | [Issue #55, 2026-09-25](issue-55-chapter-publication-2026-09-25.md) | Chapter-publication refactor, composed checks, and focused desktop controls |
 | [Issue #56, 2026-09-25](issue-56-chapter-lookup-2026-09-25.md) | Chapter-lookup refactor, scope and save-ownership checks, desktop Open/read state |
 | [Release readiness, 2026-09-24](release-readiness-2026-09-24.md) | Review of exact candidate, CI, desktop, Palma, and remaining gaps |
+| [Issues #59–#62, 2026-09-26](issues-59-62-acceptance-2026-09-26.md) | Combined candidate, desktop legacy actions/return/unread/category checks, and pending Palma acceptance |
