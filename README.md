@@ -44,7 +44,7 @@ Use HTTPS when connecting over a network. HTTP remains supported but exposes pas
 
 The title-bar menu offers **Library** and **Suwayomi home**. Home provides **Browse** for source search and extensions, **Downloads** for progress/cancel/retry, **Sync** for pending read/unread changes, and **Settings**. Back from the Library root exits the plugin.
 
-Browse manga results default to a grid of large covers. Tap the small menu icon at the bottom left to choose **List**, **Cover only**, or **Cover with text** (titles below the covers). Your choice is saved, and switching views keeps your place. Tap a manga to open it. Grids adapt to the screen width; paging and status messages remain full-width rows.
+Browse manga results default to List when no view preference is saved. Existing saved choices are preserved. Tap the small menu icon at the bottom left to choose **List**, **Cover only**, or **Cover with text** (titles below the covers). Your choice is saved, and switching views keeps your place. Tap a manga to open it. Grids adapt to the screen width; paging and status messages remain full-width rows.
 
 ### Read offline
 

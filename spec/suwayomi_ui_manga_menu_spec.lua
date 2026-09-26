@@ -473,6 +473,19 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_true(saw_metadata)
     end)
 
+    it("defaults new and refreshed browse menus to List without a preference", function()
+        local browse = require("suwayomi/ui/browse")
+        local rows = { { id = 1, title = "One" } }
+        local menu = browse.showMangaMenu(rows, nil)
+        assert.are.equal("list", menu.view_mode)
+        assert.is_false(menu.cover_grid)
+        browse.updateMangaMenu(menu, rows, nil, { view_mode = "cover_only" })
+        assert.is_true(menu.cover_grid)
+        browse.updateMangaMenu(menu, rows, nil)
+        assert.are.equal("list", menu.view_mode)
+        assert.is_false(menu.cover_grid)
+    end)
+
     it("shows browse covers in a grid without title or metadata labels", function()
         local browse = require("suwayomi/ui/browse")
         local manga, selected = {}, nil
@@ -481,7 +494,7 @@ describe("suwayomi/ui/manga_menu", function()
             cache_paths[manga[index].thumbnail_url] = "/cover-" .. index .. ".bb"
             decoded_images["/cover-" .. index .. ".bb"] = { id = index }
         end
-        local menu = browse.showMangaMenu(manga, function(item) selected = item.id end)
+        local menu = browse.showMangaMenu(manga, function(item) selected = item.id end, { view_mode = "cover_only" })
 
         assert.are.equal(2, #menu.item_group)
         assert.are.equal(3, #menu.layout[1])
@@ -504,7 +517,7 @@ describe("suwayomi/ui/manga_menu", function()
         menu:updateItems(1, true)
         assert.are.equal(1, #menu.layout[1])
         assert.are.equal(7, menu.layout[1][1].entry.manga.id)
-        browse.updateMangaMenu(menu, { manga[1] }, function() end)
+        browse.updateMangaMenu(menu, { manga[1] }, function() end, { view_mode = "cover_only" })
         assert.are.equal(1, menu.page)
         assert.are.equal(1, menu.page_num)
         assert.is_true(menu.cover_grid)
@@ -516,7 +529,7 @@ describe("suwayomi/ui/manga_menu", function()
         local menu = browse.showMangaMenu({
             { raw_menu_row = true, text = "Loading", select_enabled = false },
             { id = 1, title = "One" }, { id = 2, title = "Two" },
-        }, nil, { on_next_page = function() next_page = true end })
+        }, nil, { view_mode = "cover_only", on_next_page = function() next_page = true end })
         assert.are.equal(menu.inner_dimen.w, menu.layout[1][1].dimen.w)
         assert.are.equal(2, #menu.layout[2])
         assert.are.equal(menu.inner_dimen.w, menu.layout[3][1].dimen.w)
@@ -530,7 +543,7 @@ describe("suwayomi/ui/manga_menu", function()
         local menu = browse.showMangaMenu({
             { id = 1, title = "One", thumbnail_url = "/cover/one" },
             { id = 2, title = "Two" },
-        }, nil, { thumbnail_credentials = { server_url = "http://example.test" } })
+        }, nil, { view_mode = "cover_only", thumbnail_credentials = { server_url = "http://example.test" } })
         assert.are.equal(1, #started_jobs)
         assert.are.same({ variant = "poster", width = 240, height = 360 }, started_jobs[1].thumbnail_options)
         started_jobs[1].on_finish(started_jobs[1], { ok = false })
@@ -572,7 +585,7 @@ describe("suwayomi/ui/manga_menu", function()
         local menu = browse.showMangaMenu({
             { raw_menu_row = true, text = "Status" },
             { id = 1, title = "One" }, { id = 2, title = "Two" },
-        }, nil)
+        }, nil, { view_mode = "cover_only" })
         -- Exercise the native Menu's single-column focus calculation.
         menu.updatePageInfo = function(self, index)
             assert.are.equal(1, #self.layout[1])
@@ -603,7 +616,7 @@ describe("suwayomi/ui/manga_menu", function()
         assert.is_true(button.visible)
         assert.are.equal(button, menu.return_button[1])
         button.callback()
-        assert.are.equal("cover_only", view_dialog.current)
+        assert.are.equal("list", view_dialog.current)
         assert.are.same({ "list", "cover_only", "cover_text" }, {
             view_dialog.choices[1].value, view_dialog.choices[2].value, view_dialog.choices[3].value,
         })
@@ -640,9 +653,9 @@ describe("suwayomi/ui/manga_menu", function()
             on_view_mode_changed = function() return false end,
         })
         menu._suwayomi_view_button.callback()
-        view_dialog.onSelect("list")
-        assert.are.equal("cover_only", menu.view_mode)
-        assert.is_true(menu.cover_grid)
+        view_dialog.onSelect("cover_only")
+        assert.are.equal("list", menu.view_mode)
+        assert.is_false(menu.cover_grid)
     end)
 
     it("preserves the visible manga across view changes and cancels obsolete cover jobs", function()
@@ -652,6 +665,7 @@ describe("suwayomi/ui/manga_menu", function()
         for index = 1, 23 do rows[index] = { id = index, title = tostring(index), thumbnail_url = "/" .. index } end
         local page_changes = 0
         local menu = browse.showMangaMenu(rows, nil, {
+            view_mode = "cover_only",
             thumbnail_credentials = { server_url = "http://example.test" },
             on_page_changed = function() page_changes = page_changes + 1 end,
         })

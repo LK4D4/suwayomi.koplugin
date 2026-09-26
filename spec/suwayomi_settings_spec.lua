@@ -353,9 +353,9 @@ describe("suwayomi/settings", function()
         assert.are.equal("automatic", settings:loadLibraryCategoryPickerBehavior())
     end)
 
-    it("remembers each browse view mode and defaults invalid preferences to covers", function()
+    it("remembers each browse view mode and defaults missing or invalid preferences to List", function()
         local settings = require("suwayomi/settings")
-        assert.are.equal("cover_only", settings:loadBrowseViewMode())
+        assert.are.equal("list", settings:loadBrowseViewMode())
         for _, mode in ipairs({ "list", "cover_only", "cover_text" }) do
             assert.are.equal(mode, settings:saveBrowseViewMode(mode))
             assert.are.equal(mode, stored_data.browse_view_mode)
@@ -363,9 +363,9 @@ describe("suwayomi/settings", function()
         end
         assert.is_true(flushed)
         stored_data.browse_view_mode = "unknown"
-        assert.are.equal("cover_only", settings:loadBrowseViewMode())
+        assert.are.equal("list", settings:loadBrowseViewMode())
         stored_data.browse_view_mode = {}
-        assert.are.equal("cover_only", settings:loadBrowseViewMode())
+        assert.are.equal("list", settings:loadBrowseViewMode())
     end)
 
     it("reports rejected browse view preference writes", function()

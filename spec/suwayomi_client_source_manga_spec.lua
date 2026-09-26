@@ -84,7 +84,7 @@ describe("suwayomi/client source manga flows", function()
             ok = true, manga = { { id = "m1", title = "One" } },
         })
         assert.is_false(shown_options.on_view_mode_changed("list"))
-        assert.are.equal("cover_only", shown_options.view_mode)
+        assert.are.equal("list", shown_options.view_mode)
         assert.are.same({ "write_failed" }, observed.shown_messages)
         client._source_manga_load_token = 2
         assert.is_false(shown_options.on_view_mode_changed("cover_text"))

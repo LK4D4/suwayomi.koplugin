@@ -1110,7 +1110,7 @@ function BrowseUI.showMangaMenu(manga_list, onSelectCallback, options)
     options = options or {}
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
     return getListMenu().show{
-        view_mode = options.view_mode or "cover_only",
+        view_mode = options.view_mode or "list",
         on_view_menu = mangaViewMenuCallback(options),
         title = options.title or I18n.t("Suwayomi Manga"),
         title_bar_left_icon = options.title_bar_left_icon,
@@ -1132,7 +1132,7 @@ function BrowseUI.updateMangaMenu(menu, manga_list, onSelectCallback, options)
     options = options or {}
     local menu_table = buildMangaMenuTable(manga_list, onSelectCallback, options)
     return getListMenu().update(menu, {
-        view_mode = options.view_mode or "cover_only",
+        view_mode = options.view_mode or "list",
         on_view_menu = mangaViewMenuCallback(options),
         title = options.title or menu.title,
         title_bar_left_icon = options.title_bar_left_icon,
