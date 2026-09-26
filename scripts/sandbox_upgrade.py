@@ -85,7 +85,7 @@ REQUIRED = {
     "pending-unread": {"cache_read", "row_unread", "context_unread", "admitted", "preserved"},
     "verification-faults": {"rejected_twice", "released", "uncertain", "fenced", "recovered", "preserved"},
     "stale-controls": {"feedback", "policy", "ledger", "fresh_off"},
-    "publication-stages": {"cache", "merge", "visible", "empty", "stale", "preserved"},
+    "publication-stages": {"cache", "merge", "visible", "empty", "stale", "preserved", "preload"},
     "deleted-category": {"selected", "deleted", "all_manga"},
     "browse-layouts": {"discovered", "list", "cover_text", "cover_only", "last_page"},
 }
@@ -139,6 +139,8 @@ class DesktopUpgrade:
         self.server = sandbox.ServerClient(root)
         self.children = []
         self.baseline = None
+        self.baseline_files = {}
+        self.reset_number = 0
         self.archive = None
 
     def check(self, name, condition):
@@ -272,12 +274,33 @@ class DesktopUpgrade:
         self.stop("reader")
         self.fault("none")
         if settings is not None:
+            import shutil
+            self.reset_number += 1
+            retained = self.evidence.directory / ("before-reset-" + str(self.reset_number))
+            retained.mkdir()
+            for path in (self.root / "downloads").rglob("*"):
+                if path.is_file():
+                    relative = path.relative_to(self.root / "downloads")
+                    target = retained / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(path, target)
+                    if relative.as_posix() not in self.baseline_files:
+                        path.unlink()  # Preserved above; only this run's synthetic root.
+            for relative, data in self.baseline_files.items():
+                path = self.root / "downloads" / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
             self.write_settings(copy.deepcopy(settings))
         running = sandbox.live_process(self.root, "server")
         if online and not running:
             self.start("server")
         elif not online and running:
             self.stop("server")
+        if online and settings is not None:
+            cached = settings["chapter_cache"]["mangas"][self.manga_id]["chapters"]
+            for chapter in cached:
+                self.graphql('mutation($input:UpdateChapterInput!){updateChapter(input:$input){chapter{id isRead}}}',
+                             {"input": {"id": int(chapter["id"]), "patch": {"isRead": chapter.get("is_read") is True}}})
         self.start("reader")
         self.native_entry()
         self.chapters()
@@ -311,10 +334,12 @@ class DesktopUpgrade:
         else:
             self.native_key("Escape")
             self.rows()
-        archives = list((self.root / "downloads").rglob("*.cbz"))
-        if len(archives) != 1:
-            raise AcceptanceFailure("Expected exactly one downloaded archive")
-        self.archive = archives[0]
+        saved = self.settings()
+        cached = saved["chapter_cache"]["mangas"][self.manga_id]["chapters"]
+        first_id = str(next(c["id"] for c in cached if c["name"] == "Chapter 001"))
+        self.archive = Path(saved["chapter_ledger"][self.manga_id + ":" + first_id]["path"])
+        if not self.archive.is_file() or not self.archive.is_relative_to(self.root / "downloads"):
+            raise AcceptanceFailure("Expected downloaded synthetic archive inside owned root")
         before = sandbox.digest(self.archive)
         self.check("pages", _pages(self.archive) == _pages(self.root / "server-data/local/Sandbox Alpha/Chapter 001.cbz"))
         self.ui.tap("Chapter 001")
@@ -344,6 +369,8 @@ class DesktopUpgrade:
         self.rows()
         self.check("archives", sandbox.digest(self.archive) == before)
         self.baseline = self.settings()
+        self.baseline_files = {path.relative_to(self.root / "downloads").as_posix(): path.read_bytes()
+                               for path in (self.root / "downloads").rglob("*") if path.is_file()}
         cached = self.baseline["chapter_cache"]["mangas"][self.manga_id]["chapters"]
         self.chapter_id = str(next(c["id"] for c in cached if c["name"] == "Chapter 001"))
         self.ledger_key = self.manga_id + ":" + self.chapter_id
@@ -422,7 +449,7 @@ class DesktopUpgrade:
             self.ui.tap("appbar.menu")
             self.ui.tap("Bulk downloads >")
             self.ui.tap("Download first unread")
-            jobs = self.settings().get("download_jobs", {})
+            jobs = self.settings().get("download_queue", {})
             if isinstance(jobs, dict):
                 jobs = list(jobs.values())
             self.check("admitted", any(str(j.get("chapter", {}).get("id")) == self.chapter_id for j in jobs))
@@ -475,7 +502,10 @@ class DesktopUpgrade:
         import os
         import signal
         import sandbox
-        self.reset(self.baseline)
+        import copy
+        configured = copy.deepcopy(self.baseline)
+        configured["manga_keep_next_unread_downloads"] = {self.manga_id: 5}
+        self.reset(configured)
         self.ui.tap("appbar.menu")
         self.ui.tap("Library")
         self.ui._wait(lambda s: any(c.get("label") == "Sandbox Alpha" for c in s["controls"]), "Library")
@@ -493,6 +523,7 @@ class DesktopUpgrade:
             os.kill(server["pid"], signal.SIGCONT)
         self.ui._wait(lambda s: self.count("context-publication") > prior, "background publication")
         before = self.settings()
+        self.check("policy", (before.get("manga_keep_next_unread_downloads") or {}).get(self.manga_id) == 5)
         self.ui.tap("Turn off auto-download")
         self.message("Chapter controls expired.")
         self.check("feedback", self.count("stale-guard") > 0)
@@ -505,38 +536,84 @@ class DesktopUpgrade:
             label = next(c["label"] for c in self.ui._observe()["controls"] if c.get("label", "").startswith("Auto-download:"))
             self.ui.tap(label)
         self.ui.tap("Turn off auto-download")
-        self.check("fresh_off", not (self.settings().get("manga_keep_next_unread_downloads") or {}).get(self.manga_id))
+        after = self.settings()
+        requests = (after.get("download_refill") or {}).get("requests") or {}
+        self.check("fresh_off", not (after.get("manga_keep_next_unread_downloads") or {}).get(self.manga_id)
+                   and not requests.get(self.manga_id))
 
     def publication_stages(self):
-        # Fault patch rejects actual checked-store IO only inside the named stage.
+        import copy
+        import sandbox
+        cached = self.baseline["chapter_cache"]["mangas"][self.manga_id]["chapters"]
+        second = next(c for c in cached if c["name"] == "Chapter 002")
+        second_key = self.manga_id + ":" + str(second["id"])
         for stage in ("cache", "merge", "visible"):
-            self.reset(self.baseline)
-            self.ui.tap("Chapter 001")
-            self.ui.tap("Mark as read")
-            self.ui._wait(lambda state: "Read" in (self.row().get("status") or ""), "manual read")
-            time.sleep(1)
-            before = self.files()
-            self.fault(stage)
-            count = self.count("stage-fault")
-            self.refresh()
-            self.ui._wait(lambda s: self.count("stage-fault") > count, "injected " + stage + " failure")
-            time.sleep(3.2)
-            self.check(stage, len([c for c in self.rows()["controls"] if c.get("label", "").startswith("Chapter 00")]) == 3)
-            self.check("preserved", self.files() == before)
-            self.fault("none")
-        # These are labeled response-boundary controls, not actual server emptiness.
+            for outcome in ("reject", "uncertain"):
+                self.reset(self.baseline)
+                self.stop("reader")
+                values = copy.deepcopy(self.baseline)
+                values["chapter_ledger"][second_key] = {
+                    "manga_id": self.manga_id, "chapter_id": str(second["id"]),
+                    "endpoint_scope": values["credentials"]["server_url"], "read": False,
+                    "pending_read_sync": True, "pending_read_state": False,
+                }
+                self.write_settings(values)
+                remote = self.graphql('mutation($input:UpdateChapterInput!){updateChapter(input:$input){chapter{id isRead}}}',
+                    {"input": {"id": int(self.chapter_id), "patch": {"isRead": True}}})
+                if remote["updateChapter"]["chapter"]["isRead"] is not True:
+                    raise AcceptanceFailure("Server read precondition failed")
+                server_chapters = self.server.request(f"/api/v1/manga/{self.manga_id}/chapters")
+                if len(server_chapters) != 3:
+                    raise AcceptanceFailure("Server fixture discovery changed")
+                before = sandbox.digest(self.archive)
+                self.fault(stage + "-" + outcome)
+                count = self.count("stage-fault")
+                self.start("reader")
+                self.native_entry()
+                self.ui.tap("Sandbox Alpha")
+                self.ui.tap("Open chapters")
+                state = self.ui._wait(lambda state: self.count("stage-fault") > count
+                    and any(c.get("label") == "Chapter 001" for c in state["controls"]), "injected stage fault")
+                time.sleep(3.2)
+                state = self.ui._observe()
+                labels = {c.get("label") for c in state["controls"]}
+                disk = self.settings()
+                persisted = disk["chapter_cache"]["mangas"][self.manga_id]["chapters"]
+                # Labeled response fixture drops Chapter 003 after the real server returns all three.
+                expected_cache = 3 if stage == "cache" and outcome == "reject" else 2
+                ack = (disk.get("chapter_ledger") or {}).get(second_key, {})
+                expected_pending = stage == "cache" or (stage == "merge" and outcome == "reject")
+                self.check(stage, "Chapter 001" in labels and "Chapter 002" in labels and "Chapter 003" not in labels
+                           and len(persisted) == expected_cache
+                           and (ack.get("pending_read_sync") is True) == expected_pending)
+                self.check("preserved", sandbox.digest(self.archive) == before)
+                self.diagnose(stage + "-" + outcome)
+                self.fault("none")
+        self.reset(self.baseline)
         self.fault("empty")
         self.refresh_empty()
-        self.check("empty", not any(c.get("label", "").startswith("Chapter 00") for c in self.ui._observe()["controls"]))
+        self.check("empty", self.settings()["chapter_cache"]["mangas"][self.manga_id]["chapters"] in ([], {}))
         self.fault("none")
         self.reset(self.baseline)
         self.fault("stale-response")
         before = self.settings()
+        count = self.count("stale-response-injected")
         self.ui.tap("appbar.menu")
         self.ui.tap("Refresh chapters")
-        self.ui._wait(lambda s: any(e["event"] == "stale-response-injected" for e in self.events()), "stale response injection")
+        self.ui._wait(lambda state: self.count("stale-response-injected") > count, "stale response injection")
         self.check("stale", self.settings()["chapter_cache"] == before["chapter_cache"])
         self.fault("none")
+        self.reset(self.baseline)
+        self.stop("reader")
+        self.write_settings(copy.deepcopy(self.baseline))
+        self.start("reader")
+        self.native_entry()
+        self.ui.tap("Sandbox Alpha")
+        before = self.count("menu-preparation")
+        self.ui.tap("Bulk downloads >")
+        self.ui.tap("Download first unread")
+        self.ui._wait(lambda state: self.count("action-preload") > 0, "action preload")
+        self.check("preload", self.count("menu-preparation") == before)
 
     def refresh_empty(self):
         count = self.count("context-publication")
@@ -593,8 +670,11 @@ class DesktopUpgrade:
         self.ui.tap("Popular")
         self.ui.wait("Popular")
         self.check("discovered", any(c.get("label", "").startswith("Upgrade Manga") for c in self.ui._observe()["controls"]))
-        for name, label in (("list", "List"), ("cover_text", "Cover + text"), ("cover_only", "Cover only")):
+        for name, label in (("list", "List"), ("cover_text", "Cover with text"), ("cover_only", "Cover only")):
             state = self.ui._observe()
+            if state.get("pages", 1) > 1 and state.get("page") == 1:
+                self.native_key("Next")
+                state = self.ui._wait(lambda current: current.get("page", 0) > 1, "later Browse page")
             first = next(c["label"] for c in state["controls"] if c.get("label", "").startswith("Upgrade Manga"))
             buttons = [c for c in state["controls"] if c.get("label") == "appbar.menu"]
             if not buttons:
@@ -603,7 +683,11 @@ class DesktopUpgrade:
             self.ui.wait("View")
             self.ui.tap(label)
             self.ui.wait("Popular")
-            self.check(name, any(c.get("label") == first for c in self.ui._observe()["controls"]))
+            observed = self.ui._observe()
+            self.check(name, observed.get("view_mode") == name
+                       and self.settings().get("browse_view_mode", "list") == name
+                       and any(c.get("label") == first for c in observed["controls"]))
+            self.ui.screenshot(self.evidence.directory / ("browse-" + name + ".png"))
         seen = set()
         for _ in range(30):
             state = self.ui._observe()

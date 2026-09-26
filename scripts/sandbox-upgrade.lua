@@ -37,7 +37,7 @@ userpatch.registerPatchPluginFunc("suwayomi", function(Plugin)
         local store = queue.settings:getStore()
         local read = store.io.read
         store.io.read = function(...)
-            if store.is_blocked and mode() == "uncertain" then
+            if store.is_blocked and mode():find("uncertain", 1, true) then
                 record("reconciliation-held", { blocked = true })
                 return nil, "controlled unreadable destination"
             end
@@ -108,14 +108,17 @@ userpatch.registerPatchPluginFunc("suwayomi", function(Plugin)
     local function wrap(receiver, method, stage)
         local original = assert(receiver[method], "Missing upgrade collaborator: " .. method)
         receiver[method] = function(...)
-            if mode() ~= stage then return original(...) end
-            local rename = store.io.rename
-            store.io.rename = function()
-                record("stage-fault", { stage = stage })
+            if stage == "visible" then record("menu-preparation") end
+            local fault = mode()
+            if fault ~= stage .. "-reject" and fault ~= stage .. "-uncertain" then return original(...) end
+            local seam = fault:find("uncertain", 1, true) and "sync_dir" or "rename"
+            local before = store.io[seam]
+            store.io[seam] = function()
+                record("stage-fault", { stage = stage, outcome = fault })
                 return nil, "controlled acceptance failure"
             end
             local result = { pcall(original, ...) }
-            store.io.rename = rename
+            store.io[seam] = before
             if not result[1] then error(result[2]) end
             return unpack(result, 2)
         end
@@ -126,11 +129,23 @@ userpatch.registerPatchPluginFunc("suwayomi", function(Plugin)
     wrap(Plugin, Plugin.prepareChapterMenuItems and "prepareChapterMenuItems" or "buildChapterMenuItems", "visible")
     local show = Plugin.showChapterResultForManga
     Plugin.showChapterResultForManga = function(self, manga, result, options)
+        if not (options and options.saved) and
+            (mode():match("^cache%-") or mode():match("^merge%-") or mode():match("^visible%-")) then
+            assert(result and result.ok and #result.chapters == 3, "Unexpected stage response fixture")
+            table.remove(result.chapters, 3)
+            record("membership-subset-injected", { count = 2 })
+        end
         if mode() == "empty" then
             result = { ok = true, chapters = {} }
             record("empty-response-injected")
         end
         return show(self, manga, result, options)
+    end
+    local preload = Plugin.handleChapterContextResult
+    Plugin.handleChapterContextResult = function(...)
+        local out = { preload(...) }
+        record("action-preload")
+        return unpack(out)
     end
     local Request = require("suwayomi/network/request_job")
     local start_request = Request.start
