@@ -10,7 +10,7 @@ describe("scoped pending chapter choices", function()
     local function publish(saved)
         local merged = assert(f.plugin:mergeChaptersWithReadLedger(f.manga, { f.chapters[1] }, { saved = saved }))
         f.plugin:setCurrentMangaChapterContext(f.manga, merged)
-        local rows = assert(f.plugin:buildChapterMenuItems(f.manga, merged, nil, { saved = saved }))
+        local rows = assert(f.plugin:buildChapterMenuOptions(f.manga, merged, nil, { saved = saved })).chapters
         return merged, rows
     end
 
@@ -40,7 +40,7 @@ describe("scoped pending chapter choices", function()
                         assert.equals("/downloads/old.cbz", f.plugin:getChapterPath(f.manga, merged[1]))
                     else
                         local lookup = f.plugin:buildChapterDownloadLookup(f.manga)
-                        assert.is_false(f.plugin:hasChapterReadAuthority(f.manga, merged[1], "/downloads/1.cbz", lookup))
+                        assert.is_false(f.plugin:hasChapterArchiveReadAssociation(f.manga, merged[1], "/downloads/1.cbz", lookup))
                     end
                     assert.equals(archive == "recorded", f.existing["/downloads/old.cbz"])
                     assert.equals(archive ~= "absent", f.existing["/downloads/1.cbz"])

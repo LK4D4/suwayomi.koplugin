@@ -5,12 +5,12 @@ describe("issue 59 mixed legacy chapter actions", function()
     before_each(function() f = Fixture.new() end)
     after_each(Fixture.clear)
     it("fails explicitly if classification or lookup is removed or replaced", function()
-        local classifier = f.plugin.isLocalOnlyChapter
-        f.plugin.isLocalOnlyChapter = nil
-        assert.has_error(function() f:render({ saved = true }) end, "missing or replaced chapter collaborator: isLocalOnlyChapter")
-        f.plugin.isLocalOnlyChapter = function() return false end
-        assert.has_error(function() f:render({ saved = true }) end, "missing or replaced chapter collaborator: isLocalOnlyChapter")
-        f.plugin.isLocalOnlyChapter = classifier
+        local classifier = f.plugin.canMutateChapterArchive
+        f.plugin.canMutateChapterArchive = nil
+        assert.has_error(function() f:render({ saved = true }) end, "missing or replaced chapter collaborator: canMutateChapterArchive")
+        f.plugin.canMutateChapterArchive = function() return true end
+        assert.has_error(function() f:render({ saved = true }) end, "missing or replaced chapter collaborator: canMutateChapterArchive")
+        f.plugin.canMutateChapterArchive = classifier
         local lookup = f.plugin.buildChapterDownloadLookup
         f.plugin.buildChapterDownloadLookup = nil
         assert.has_error(function() f:render({ saved = true }) end, "missing or replaced chapter collaborator: buildChapterDownloadLookup")
@@ -59,7 +59,7 @@ describe("issue 59 mixed legacy chapter actions", function()
         it("offers and executes safe bulk work with " .. (archive and "recorded bytes" or "a pathless legacy choice"), function()
             f:legacy(archive and "/downloads/1.cbz" or nil)
             local before = f.settings:loadChapterLedger()
-            assert.is_true(f.plugin:isLocalOnlyChapter(f.manga, f.chapters[1]))
+            assert.is_false(f.plugin:canMutateChapterArchive(f.manga, f.chapters[1]))
             assert(f.settings:saveMangaScanlatorFilter(f.manga, "A"))
             f.plugin:setCurrentMangaChapterContext(f.manga, f.chapters)
             f.plugin:showBulkChapterActions()

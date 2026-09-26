@@ -38,11 +38,17 @@ function Fixture.new()
         for key, method in pairs(require(name).methods) do plugin[key] = method end
     end
     local required = {
-        buildChapterDownloadLookup = require("suwayomi/chapters/local_downloads").methods.buildChapterDownloadLookup,
-        isLocalOnlyChapter = require("suwayomi/chapters/local_downloads").methods.isLocalOnlyChapter,
-        getChapterReadEntry = require("suwayomi/chapters/local_downloads").methods.getChapterReadEntry,
-        buildChapterMenuOptions = require("suwayomi/chapters/menu").methods.buildChapterMenuOptions,
-        getNextUnreadChaptersForDownload = require("suwayomi/chapters/context").methods.getNextUnreadChaptersForDownload,
+        { "suwayomi/chapters/local_downloads", "buildChapterDownloadLookup" },
+        { "suwayomi/chapters/local_downloads", "hasCurrentChapterListing" },
+        { "suwayomi/chapters/local_downloads", "canMutateChapterArchive" },
+        { "suwayomi/chapters/local_downloads", "getApplicableChapterReadChoice" },
+        { "suwayomi/chapters/local_downloads", "hasChapterArchiveReadAssociation" },
+        { "suwayomi/readsync/ledger", "mergeChaptersWithReadLedger" },
+        { "suwayomi/chapters/context", "setCurrentMangaChapterContext" },
+        { "suwayomi/chapters/context", "getNextUnreadChaptersForDownload" },
+        { "suwayomi/chapters/menu", "prepareChapterMenuItems" },
+        { "suwayomi/chapters/menu", "buildChapterMenuOptions" },
+        { "suwayomi/chapters/actions", "performChapterAction" },
     }
     plugin.getDownloadQueue = function() return service.queue end
     plugin.getChapterDownloadKey = function(_, manga, chapter) return service.queue:getKey(manga, chapter) end
@@ -61,8 +67,11 @@ function Fixture.new()
     local fixture = { settings = settings, plugin = plugin, queue = service.queue, manga = manga, chapters = chapters,
         scope = scope, existing = existing, finished = finished, writes = writes, menus = menus, messages = messages }
     function fixture:assertComposed()
-        for name, method in pairs(required) do
-            assert(self.plugin[name] == method, "missing or replaced chapter collaborator: " .. name)
+        for _, entry in ipairs(required) do
+            local name = entry[2]
+            local method = require(entry[1]).methods[name]
+            assert(type(method) == "function" and self.plugin[name] == method,
+                "missing or replaced chapter collaborator: " .. name)
         end
     end
     function fixture:render(options)
@@ -87,6 +96,7 @@ function Fixture.new()
     function fixture:action(id)
         for _, action in ipairs(assert(menus[#menus]).options.actions) do if action.id == id then return action end end
     end
+    fixture:assertComposed()
     return fixture
 end
 return Fixture

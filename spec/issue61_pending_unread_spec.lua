@@ -14,7 +14,7 @@ describe("issue 61 pending unread display", function()
                 local merged = assert(f.plugin:mergeChaptersWithReadLedger(f.manga, { f.chapters[1] }, { saved = saved }))
                 assert.is_false(merged[1].is_read)
                 f.plugin:setCurrentMangaChapterContext(f.manga, merged)
-                local items = f.plugin:buildChapterMenuItems(f.manga, merged, nil, { saved = saved })
+                local items = assert(f.plugin:buildChapterMenuOptions(f.manga, merged, nil, { saved = saved })).chapters
                 assert.is_false(items[1].is_read)
                 assert.is_false(f.plugin.current_chapter_context.chapters[1].is_read)
                 assert.same(before, f.settings:loadChapterLedger())
@@ -45,7 +45,7 @@ describe("issue 61 pending unread display", function()
             local before = f.settings:loadChapterLedger()
             local merged = assert(f.plugin:mergeChaptersWithReadLedger(f.manga, { f.chapters[1] }, { saved = true }))
             assert.is_true(merged[1].is_read)
-            local items = f.plugin:buildChapterMenuItems(f.manga, merged, nil, { saved = true })
+            local items = assert(f.plugin:buildChapterMenuOptions(f.manga, merged, nil, { saved = true })).chapters
             assert.is_true(items[1].is_read)
             assert.same(before, f.settings:loadChapterLedger())
             assert.same({}, f.writes)
@@ -62,7 +62,7 @@ describe("issue 61 pending unread display", function()
             f.finished["/downloads/1.cbz"] = true
             local before = f.settings:loadChapterLedger()
             local merged = assert(f.plugin:mergeChaptersWithReadLedger(f.manga, { f.chapters[1] }, { saved = true }))
-            local items = f.plugin:buildChapterMenuItems(f.manga, merged, nil, { saved = true })
+            local items = assert(f.plugin:buildChapterMenuOptions(f.manga, merged, nil, { saved = true })).chapters
             assert.is_true(items[1].is_read)
             assert.same(before, f.settings:loadChapterLedger())
             assert.same({}, f.writes)
@@ -75,8 +75,8 @@ describe("issue 61 pending unread display", function()
         assert(f.settings:saveChapterLedger(ledger))
         f.finished["/downloads/1.cbz"] = true
         local before = f.settings:getStore():load()
-        local items = f.plugin:buildChapterMenuItems(f.manga, { f.chapters[1] }, nil,
-            { saved = true, confirmed_read_state = true })
+        local items = assert(f.plugin:buildChapterMenuOptions(f.manga, { f.chapters[1] }, nil,
+            { saved = true, confirmed_read_state = true })).chapters
         assert.is_false(items[1].is_read)
         assert.same(before, f.settings:getStore():load())
         assert.same({}, f.writes)
@@ -87,7 +87,7 @@ describe("issue 61 pending unread display", function()
         f.chapters[1].is_read = true
         local before = f.settings:loadChapterLedger()
         local merged = assert(f.plugin:mergeChaptersWithReadLedger(f.manga, { f.chapters[1] }, { saved = true }))
-        local items = f.plugin:buildChapterMenuItems(f.manga, merged, nil, { saved = true })
+        local items = assert(f.plugin:buildChapterMenuOptions(f.manga, merged, nil, { saved = true })).chapters
         assert.is_false(items[1].is_read)
         assert.same(before, f.settings:loadChapterLedger())
         assert.same({}, f.writes)
@@ -102,7 +102,7 @@ describe("issue 61 pending unread display", function()
         f.chapters[1].is_read = true
         local before = f.settings:getStore():load()
         local merged = assert(f.plugin:mergeChaptersWithReadLedger(f.manga, { f.chapters[1] }, { saved = true }))
-        local items = f.plugin:buildChapterMenuItems(f.manga, merged, nil, { saved = true })
+        local items = assert(f.plugin:buildChapterMenuOptions(f.manga, merged, nil, { saved = true })).chapters
         assert.is_false(items[1].is_read)
         assert.same(before, f.settings:getStore():load())
         assert.same({}, f.writes)
@@ -118,7 +118,7 @@ describe("issue 61 pending unread display", function()
         local before = f.settings:getStore():load()
         local merged = assert(f.plugin:mergeChaptersWithReadLedger(f.manga, { f.chapters[1] }, { saved = true }))
         assert.is_true(merged[1].is_read)
-        local items = f.plugin:buildChapterMenuItems(f.manga, merged, nil, { saved = true })
+        local items = assert(f.plugin:buildChapterMenuOptions(f.manga, merged, nil, { saved = true })).chapters
         assert.is_true(items[1].is_read)
         assert.same(before, f.settings:getStore():load())
         assert.same({}, f.writes)
