@@ -1,6 +1,6 @@
 -- Boundary: ChapterMenu.
 --
--- Responsibility: Owns chapter menus and render reconciliation; local_downloads decides record association and read authority.
+-- Responsibility: Prepares chapter display/read state, then builds observational rows; local_downloads decides record association and read authority.
 -- Owned state: Builds UI data structures and callbacks; destructive actions remain in suwayomi/chapters/actions.lua.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -136,9 +136,9 @@ function Methods:getChapterTitleBarMenuOptions(manga, lookup)
     })
 end
 
--- Keep the supplied ledger separate: its absence makes this render own persistence.
+-- Keep the supplied ledger separate: its absence makes preparation own persistence.
 -- A caller-provided lookup must borrow the same read_ledger used for reconciliation.
-function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup, read_ledger)
+function Methods:prepareChapterMenuItems(manga, chapters, ledger, options, lookup, read_ledger)
     local started_at = SuwayomiDebug.now()
     local saved = manga.local_only or (options and options.saved)
     local items = {}
@@ -158,10 +158,11 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup,
         for key, value in pairs(chapter) do
             item[key] = value
         end
-        local local_only = manga.local_only or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, item, lookup))
+        local local_only = manga.local_only
+            or (self.canMutateChapterArchive and not self:canMutateChapterArchive(manga, item, lookup))
         item._suwayomi_manual_deletion = not local_only and (manual_snapshot[self:getChapterDownloadKey(manga, item)]
             or (manual_error and { state = "blocked", reason = manual_error } or nil)) or nil
-        local read_entry = self:getChapterReadEntry(manga, item, lookup)
+        local read_entry = self:getApplicableChapterReadChoice(manga, item, lookup)
         local explicit_unread = type(read_entry) == "table"
             and read_entry.pending_read_sync == true and read_entry.pending_read_state == false
         if explicit_unread then
@@ -172,7 +173,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup,
         local chapter_exists, chapter_path = self:isChapterDownloaded(manga, item, lookup)
         -- Finding readable bytes does not associate them with this server.
         local read_authority = chapter_exists and not local_only
-            and self:hasChapterReadAuthority(manga, item, chapter_path, lookup)
+            and self:hasChapterArchiveReadAssociation(manga, item, chapter_path, lookup)
         if chapter_exists then
             local metadata_finished = chapter_exists and self:isChapterPathFinishedInKoreader(chapter_path)
             if chapter_exists then
@@ -213,24 +214,11 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup,
         end
 
         local status = not local_only and self:getChapterDownloadStatus(manga, item) or nil
-
         if not status then
-            if chapter_exists then
-                status = { state = "downloaded" }
-            elseif item.is_read then
-                status = { state = "read" }
-            end
+            if chapter_exists then status = { state = "downloaded" }
+            elseif item.is_read then status = { state = "read" } end
         end
-        item.menu_text = item.name
-        item._suwayomi_download_status = copyDownloadStatus(status)
-        item.menu_status = self:getDownloadQueue():formatChapterMenuStatus(item, status)
-        if self.selection_mode then
-            if self:isChapterSelected(manga, item) then
-                item.menu_status = self:addChapterSelectionMarker(item.menu_status)
-            end
-        end
-
-        table.insert(items, item)
+        items[#items + 1] = { chapter = item, status = status }
     end
 
     if not ledger and ledger_changed then
@@ -252,7 +240,7 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup,
     end
 
     SuwayomiDebug.log({
-        operation = "buildChapterMenuItems",
+        operation = "prepareChapterMenuItems",
         event = "end",
         manga_id = manga and manga.id,
         chapter_count = #(chapters or {}),
@@ -266,16 +254,36 @@ function Methods:buildChapterMenuItems(manga, chapters, ledger, options, lookup,
 end
 
 
+-- Reusable prepared display state has no persistence or metadata work left to do.
+function Methods:buildChapterMenuItems(manga, prepared)
+    local items = {}
+    local queue = self:getDownloadQueue()
+    for _, display in ipairs(prepared or {}) do
+        local item = {}
+        for key, value in pairs(display.chapter) do item[key] = value end
+        local status = display.status
+        item.menu_text = item.name
+        item._suwayomi_download_status = copyDownloadStatus(status)
+        item.menu_status = queue:formatChapterMenuStatus(item, status)
+        if self.selection_mode and self:isChapterSelected(manga, item) then
+            item.menu_status = self:addChapterSelectionMarker(item.menu_status)
+        end
+        items[#items + 1] = item
+    end
+    return items
+end
+
+
 function Methods:buildChapterMenuOptions(manga, chapters, ledger, options)
     local visible_chapters = self:getVisibleChapters(chapters)
     local read_ledger = ledger or self:loadChapterLedger()
     local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga, read_ledger)
-    local items, err = self:buildChapterMenuItems(manga, visible_chapters, ledger, options, lookup, read_ledger)
-    if not items then return nil, err end
+    local prepared, err = self:prepareChapterMenuItems(manga, visible_chapters, ledger, options, lookup, read_ledger)
+    if not prepared then return nil, err end
 
     return copyTitleBarOptions({
         title = self.formatChapterListScreenTitle and self:formatChapterListScreenTitle(manga) or I18n.t("Chapters"),
-        chapters = items,
+        chapters = self:buildChapterMenuItems(manga, prepared),
     }, self:getChapterTitleBarMenuOptions(manga, lookup))
 end
 
@@ -296,12 +304,14 @@ function Methods:buildQuickChapterMenuItems(manga, chapters, lookup, read_ledger
     read_ledger = read_ledger or self:loadChapterLedger()
     lookup = lookup or (self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga, read_ledger))
     if manga.local_only then
-        return self:buildChapterMenuItems(manga, chapters, nil, { saved = true }, lookup, read_ledger)
+        local prepared = self:prepareChapterMenuItems(manga, chapters, nil, { saved = true }, lookup, read_ledger)
+        return self:buildChapterMenuItems(manga, prepared)
     end
-    if self.isLocalOnlyChapter then
+    if self.canMutateChapterArchive then
         for _, chapter in ipairs(chapters or {}) do
-            if self:isLocalOnlyChapter(manga, chapter, lookup) then
-                return self:buildChapterMenuItems(manga, chapters, nil, { saved = true }, lookup, read_ledger)
+            if not self:canMutateChapterArchive(manga, chapter, lookup) then
+                local prepared = self:prepareChapterMenuItems(manga, chapters, nil, { saved = true }, lookup, read_ledger)
+                return self:buildChapterMenuItems(manga, prepared)
             end
         end
     end
@@ -369,7 +379,7 @@ end
 
 function Methods:getChapterActions(manga, chapter)
     local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga)
-    if manga.local_only or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, chapter, lookup)) then
+    if manga.local_only or (self.canMutateChapterArchive and not self:canMutateChapterArchive(manga, chapter, lookup)) then
         if not self:isChapterDownloaded(manga, chapter, lookup) then return {} end
         return {
             { id = "open", text = I18n.c("chapter action", "Open") },
@@ -424,8 +434,8 @@ function Methods:getBulkChapterActions(lookup)
     local actions = {}
     local context = self.current_chapter_context
     local local_only = context and context.manga and context.manga.local_only
-    if context and self.isLocalOnlyChapterContext then
-        local_only = self:isLocalOnlyChapterContext(context.manga, context.chapters)
+    if context and self.hasCurrentChapterListing then
+        local_only = not self:hasCurrentChapterListing(context.manga, context.chapters)
     end
     local show_scanlator_filter = self.current_scanlator_filter ~= nil
         or #(self:getChapterScanlatorChoices((self.current_chapter_context and self.current_chapter_context.chapters) or {})) > 0

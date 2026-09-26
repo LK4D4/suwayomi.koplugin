@@ -251,6 +251,39 @@ describe("complete stored chapter loading", function()
         clearModules()
     end)
 
+    it("rebuilds prepared rows without repeating reconciliation effects", function()
+        archive_path = os.tmpname()
+        manga.endpoint_scope = "https://suwayomi.example"
+        assert(settings:saveChapterLedger({ ["17:201"] = {
+            manga_id = "17", chapter_id = "201", endpoint_scope = manga.endpoint_scope,
+            read = false, path = archive_path,
+        } }))
+        for name, method in pairs(require("suwayomi/reader_return").methods) do plugin[name] = method end
+        plugin.isChapterPathFinishedInKoreader = function() return true end
+        local chapters = { { id = "201", name = "Chapter 201", is_read = false } }
+        local prepared = assert(plugin:prepareChapterMenuItems(manga, chapters))
+        local store = settings:getStore()
+        local committed = store:serializeDocument(store:load())
+        local transaction = store:getTransactionId()
+        local prepared_before = json.encode(prepared)
+        assert.is_true(settings:loadChapterLedger()["17:201"].read)
+        assert.is_true(settings:loadChapterLedger()["17:201"].pending_read_sync)
+        assert.is_table(settings:loadReaderReturnContexts()[archive_path])
+        -- Metadata can change after preparation; rebuilding must use the prepared choice.
+        plugin.isChapterPathFinishedInKoreader = function() error("row construction inspected metadata") end
+        plugin.setKoreaderChapterReadState = function() error("row construction wrote metadata") end
+        local first = plugin:buildChapterMenuItems(manga, prepared)
+        local second = plugin:buildChapterMenuItems(manga, prepared)
+        assert.are.same(first, second)
+        assert.are.same({ "201" }, chapterIds(second))
+        assert.is_true(second[1].is_read)
+        assert.are.equal("Chapter 201", second[1].menu_text)
+        assert.are.equal("downloaded", second[1]._suwayomi_download_status.state)
+        assert.are.equal(transaction, store:getTransactionId())
+        assert.are.equal(committed, store:serializeDocument(store:load()))
+        assert.are.equal(prepared_before, json.encode(prepared))
+    end)
+
     for _, supplied in ipairs({ false, true }) do
         it("preserves menu ledger save ownership with a supplied ledger: " .. tostring(supplied), function()
             archive_path = os.tmpname()
