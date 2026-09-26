@@ -32,9 +32,9 @@ The report records Git candidate/dirty state, runtime versions, canonical deploy
 | Pending unread | Normal manual read and Refresh establish server/cache Read; offline manual unread followed by labeled absent-old-path/changed-destination preconditions stays Unread in rows/context and admits the correct first unread; original bytes preserved. |
 | Verification faults | Injected rename rejection and directory-sync uncertainty produce feedback, release inspection, retain fence and bytes/progress, and permit explicit recovery. These are not storage-exhaustion tests. |
 | Stale controls | A real background response invalidates an open ordinary action; rejection feedback appears without replay, then fresh Off succeeds. |
-| Publication stages | Separately injected checked-write faults retain server membership and files. Labeled empty/stale response controls exercise existing publication guards. |
+| Publication stages | Separately injected checked-write faults retain response membership, stage-specific cache/read-choice state, and files. A labeled three-to-two response subset distinguishes cache persistence from visible membership; background read sync is held during these cases to isolate publication acknowledgment. Directory-sync uncertainty records disk contents without claiming confirmed persistence. Labeled empty/stale response controls exercise existing publication guards. |
 | Deleted category | Delete synthetic selected category on real server; ordinary Refresh restores All manga. |
-| Browse layouts | Synthetic source discovery, List/Cover + text/Cover only switching, visible-item preservation, and pagination to final fixture. |
+| Browse layouts | Synthetic source discovery, List/Cover with text/Cover only switching, visible-item preservation, and pagination to final fixture. |
 
 Inspect framebuffer evidence for clipping and wrong destinations. Successful callbacks or matching titles alone are insufficient. Capture UI, saved state, events, and process state before restarting a stalled reader. A harness mistake is a retained failed attempt with a diagnosed cause, not a product pass.
 

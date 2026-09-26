@@ -103,6 +103,15 @@ end)
 userpatch.registerPatchPluginFunc("suwayomi", function(Plugin)
     if Plugin.upgrade_stages_observed then return end
     Plugin.upgrade_stages_observed = true
+    -- Isolate publication acknowledgments from the independently scheduled sync worker.
+    local start_sync = assert(Plugin.startPendingReadSyncWorker)
+    Plugin.startPendingReadSyncWorker = function(self, ...)
+        if mode():match("^cache%-") or mode():match("^merge%-") or mode():match("^visible%-") then
+            record("background-read-sync-held")
+            return false, 0
+        end
+        return start_sync(self, ...)
+    end
     local Settings = require("suwayomi/settings")
     local store = Settings:getStore()
     local function wrap(receiver, method, stage)

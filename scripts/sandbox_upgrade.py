@@ -179,7 +179,7 @@ class DesktopUpgrade:
         if sandbox.live_process(self.root, service):
             raise Blocked("Service already running; ownership unresolved")
         log = (self.evidence.directory / (service + "-launcher.log")).open("ab")
-        child = subprocess.Popen(["python3", str(self.source / "scripts/sandbox.py"), "--root", str(self.root), "run", service], stdout=log, stderr=log)
+        child = subprocess.Popen(["python3", str(Path(__file__).with_name("sandbox.py")), "--root", str(self.root), "run", service], stdout=log, stderr=log)
         log.close()
         self.children.append(child)
         deadline = time.monotonic() + 90
