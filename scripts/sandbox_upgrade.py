@@ -231,8 +231,11 @@ class DesktopUpgrade:
         subprocess.run(["xdotool", "windowactivate", "--sync", window], check=True)
         subprocess.run(["xdotool", "windowfocus", "--sync", window], check=True)
         time.sleep(.4)
-        subprocess.run(["xdotool", "key", "--clearmodifiers", "--delay", "100",
-                        "F1" if value == "menu" else value], check=True)
+        if value == "menu":
+            # Native top menu zone in the launcher's pinned 600x800 viewport.
+            subprocess.run(["xdotool", "mousemove", "--window", window, "300", "20", "click", "1"], check=True)
+        else:
+            subprocess.run(["xdotool", "key", "--clearmodifiers", "--delay", "100", value], check=True)
 
     def native_entry(self):
         self.native_key("menu")
@@ -342,7 +345,11 @@ class DesktopUpgrade:
         saved = self.settings()
         cached = saved["chapter_cache"]["mangas"][self.manga_id]["chapters"]
         first_id = str(next(c["id"] for c in cached if c["name"] == "Chapter 001"))
-        self.archive = Path(saved["chapter_ledger"][self.manga_id + ":" + first_id]["path"])
+        key = self.manga_id + ":" + first_id
+        self.ui._wait(lambda state: bool((self.settings().get("chapter_ledger") or {}).get(key, {}).get("path")),
+                      "durable downloaded archive association", 30)
+        saved = self.settings()
+        self.archive = Path(saved["chapter_ledger"][key]["path"])
         if not self.archive.is_file() or not self.archive.is_relative_to(self.root / "downloads"):
             raise AcceptanceFailure("Expected downloaded synthetic archive inside owned root")
         before = sandbox.digest(self.archive)
