@@ -1,6 +1,6 @@
 -- Boundary: ReaderReturn.
 --
--- Responsibility: Persist chapter return context and hand reader return to the live FileManager chapter flow.
+-- Responsibility: Persist return context, resolve legacy listing metadata, and hand return to the live FileManager.
 -- Owned state: Settings-backed return contexts keyed by local chapter path and a cancellable deferred handoff.
 -- Dependencies: KOReader reader/filemanager UI modules, Suwayomi settings, plugin i18n facade, and chapter menu methods.
 -- External data: Document paths and persisted contexts are optional; scope and freshness gate reader teardown/publication.
@@ -192,7 +192,57 @@ local function inferSiblingContext(path, contexts, ledger)
     }
 end
 
+local function matchesListingManga(context, manga, scope)
+    return type(manga) == "table" and not manga.local_only
+        and (not manga.endpoint_scope or manga.endpoint_scope == scope)
+        and present(manga.id) == present(context.manga_id)
+        and present(manga.title) == present(context.manga_title)
+        and type(manga.source) == "table"
+        and present(manga.source.id) == present(context.source.id)
+end
+
+local function resolveLegacyListing(context)
+    if present(context.endpoint_scope) or not present(context.manga_id)
+        or not present(context.chapter_id) or not present(context.manga_title)
+        or type(context.source) ~= "table" or not present(context.source.id) then return nil end
+    local credentials = SuwayomiSettings:load()
+    local scope = SuwayomiSettings:normalizeEndpointScope(credentials.server_url)
+    if not scope then return nil end
+    for _, records in ipairs({ SuwayomiSettings:loadReaderReturnContexts(), SuwayomiSettings:loadChapterLedger() }) do
+        for _, record in pairs(type(records) == "table" and records or {}) do
+            if type(record) == "table" and record.path == context.path
+                and present(record.endpoint_scope) and record.endpoint_scope ~= scope then return nil end
+        end
+    end
+    local listing = SuwayomiSettings.loadChapterCache
+        and SuwayomiSettings:loadChapterCache(credentials, { id = context.manga_id })
+    local library = SuwayomiSettings.loadLibraryCache and SuwayomiSettings:loadLibraryCache(credentials)
+    local manga = listing and listing.manga
+    if manga and not matchesListingManga(context, manga, scope) then return nil end
+    for _, candidate in ipairs(library and library.manga or {}) do
+        if present(candidate.id) == present(context.manga_id) then
+            if not matchesListingManga(context, candidate, scope) then return nil end
+            manga = candidate
+        end
+    end
+    if not manga then return nil end
+    for _, chapter in ipairs(listing and listing.chapters or {}) do
+        if present(chapter.id) == present(context.chapter_id) then
+            for _, pair in ipairs({ { "name", "chapter_name" }, { "source_order", "source_order" },
+                { "chapter_number", "chapter_number" }, { "scanlator", "scanlator" } }) do
+                if context[pair[2]] ~= nil and chapter[pair[1]] ~= context[pair[2]] then return nil end
+            end
+        end
+    end
+    -- This selects a server listing; it never associates the legacy archive or its reads.
+    manga = copyTable(manga)
+    manga.endpoint_scope = scope
+    return manga
+end
+
 local function buildReturnedManga(context)
+    local listing_manga = resolveLegacyListing(context)
+    if listing_manga then return listing_manga end
     return {
         id = context.manga_id,
         title = context.manga_title or context.manga_id,
@@ -359,13 +409,6 @@ function Methods:returnToSuwayomiChapters(context)
     if self.cancelMangaNetworkRequests then self:cancelMangaNetworkRequests() end
     local request_token = {}
     self.active_reader_return_request = request_token
-    local manga = buildReturnedManga(context)
-    local options = {
-        return_context = context,
-        reader_return_close_target = self.buildReaderReturnCloseTarget
-            and self:buildReaderReturnCloseTarget(context, manga)
-            or nil,
-    }
     if self.scheduleFinishedChapterCleanup then
         self:scheduleFinishedChapterCleanup(0)
     end
@@ -374,7 +417,13 @@ function Methods:returnToSuwayomiChapters(context)
         if ReaderUI.instance or not contextMatches(self:getReaderReturnContextForPath(context.path), context) then
             return
         end
-        destination:showChaptersForManga(manga, options)
+        local manga = buildReturnedManga(context)
+        destination:showChaptersForManga(manga, {
+            return_context = context,
+            reader_return_close_target = self.buildReaderReturnCloseTarget
+                and self:buildReaderReturnCloseTarget(context, manga)
+                or nil,
+        })
     end, function()
         if self.suwayomi_host_retired or self.active_reader_return_request ~= request_token then
             return false

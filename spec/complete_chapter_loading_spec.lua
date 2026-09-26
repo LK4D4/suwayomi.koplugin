@@ -1970,6 +1970,301 @@ describe("complete stored chapter loading", function()
         assert.are.same({}, json.decode(saved_ledger))
     end)
 
+    local function returnLegacyReader(options)
+        options = options or {}
+        archive_path = os.tmpname()
+        local file = assert(io.open(archive_path, "wb"))
+        file:write("preserved archive bytes")
+        file:close()
+        manga.endpoint_scope = "https://suwayomi.example"
+        manga.source = { id = "fixture-source", name = "Fixture source" }
+        local context = {
+            path = archive_path, manga_id = manga.id, manga_title = manga.title,
+            chapter_id = "201", chapter_name = "Chapter 201", source_order = 201,
+            source = { id = manga.source.id, name = manga.source.name }, in_library = true,
+            endpoint_scope = options.scope,
+        }
+        if options.change_context then options.change_context(context) end
+        assert(settings:saveReaderReturnContexts({ [archive_path] = context }))
+        assert(settings:saveChapterLedger({ ["17:201"] = {
+            path = archive_path, manga_id = "17", chapter_id = "201", read = false,
+            pending_read_sync = true, pending_read_state = false, endpoint_scope = options.scope,
+        } }))
+        if not options.no_cache then
+            assert(settings:saveChapterCache(settings:load(), manga, {
+                { id = "201", name = "Chapter 201", source_order = 201, is_read = false },
+                { id = "202", name = "Chapter 202", source_order = 202, is_read = false },
+                { id = "203", name = "Chapter 203", source_order = 203, is_read = false },
+            }))
+        end
+        if options.library_cache then
+            assert(settings:saveLibraryCache(settings:load(), { manga = { manga }, categories = {} }))
+        end
+        if options.prepare then options.prepare(context) end
+        for name, method in pairs(require("suwayomi/reader_return").methods) do plugin[name] = method end
+        local destination = { max_batch_queue_chapters = 50 }
+        for name, method in pairs(plugin) do if type(method) == "function" then destination[name] = method end end
+        local filemanager = { suwayomi = destination, reinit = function() end }
+        destination.ui = filemanager
+        local reader = { document = { file = archive_path }, onClose = function()
+            if options.on_close then options.on_close() end
+            plugin:retireChapterHost()
+            require("apps/reader/readerui").instance = nil
+        end }
+        plugin.ui = reader
+        package.preload["apps/reader/readerui"] = function() return { instance = reader } end
+        package.preload["apps/filemanager/filemanager"] = function() return { instance = filemanager } end
+        local accepted = plugin:returnToSuwayomiChapters()
+        if accepted then table.remove(scheduled, 1)() end
+        return destination, context, accepted
+    end
+
+    it("issue60 returns a legacy archive to its full saved server listing and fetches normally", function()
+        respond = function() return page(nodes(201, 203), 3, false) end
+        local destination, context = returnLegacyReader()
+        assert.are.same({ "201", "202", "203" }, chapterIds(destination.current_chapter_menu.chapters))
+        assert.is_nil(destination.current_chapter_context.manga.local_only)
+        assert.are.equal("https://suwayomi.example", destination.current_chapter_context.manga.endpoint_scope)
+        finishRequest(destination.active_manga_network_requests.chapter_menu)
+        assert.are.same({ "201", "202", "203" }, chapterIds(destination.current_chapter_menu.chapters))
+        assert.are.same(context, settings:loadReaderReturnContexts()[archive_path])
+        assert.is_nil(settings:loadChapterLedger()["17:201"].endpoint_scope)
+        local refresh
+        for _, action in ipairs(destination:getBulkChapterActions()) do
+            if action.id == "refresh_chapters" then refresh = action end
+        end
+        assert.is_table(refresh)
+        assert.are.equal(1, #requests)
+        local before = settings:loadChapterLedger()
+        respond = function()
+            return { data = { fetchManga = { manga = { id = 17, title = "Example manga" } },
+                fetchChapters = { chapters = nodes(201, 204) } } }
+        end
+        assert.is_true(destination:performBulkChapterAction(refresh.id))
+        finishRequest(destination.active_manga_network_requests.chapter_menu)
+        assert.are.same({ "201", "202", "203", "204" }, chapterIds(destination.current_chapter_menu.chapters))
+        assert.are.same(before, settings:loadChapterLedger())
+        assert.are.same(context, settings:loadReaderReturnContexts()[archive_path])
+    end)
+
+    for _, control in ipairs({
+        { "different manga title", function(context) context.manga_title = "Another manga" end },
+        { "different source with reused IDs and title", function(context) context.source.id = "other-source" end },
+        { "reused chapter ID with another name", function(context) context.chapter_name = "Another chapter" end },
+        { "reused chapter ID with another order", function(context) context.source_order = 17 end },
+        { "missing manga ID", function(context) context.manga_id = nil end },
+        { "missing chapter ID", function(context) context.chapter_id = nil end },
+        { "missing source ID", function(context) context.source.id = nil end },
+    }) do
+        it("issue60 keeps local fallback for " .. control[1], function()
+            local destination, context = returnLegacyReader({ change_context = control[2] })
+            assert.is_true(destination.current_chapter_context.manga.local_only)
+            assert.are.equal(1, #destination.current_chapter_menu.chapters)
+            assert.is_nil(destination.active_manga_network_requests)
+            assert.are.same(context, settings:loadReaderReturnContexts()[archive_path])
+        end)
+    end
+
+    it("issue60 rejects a known foreign context despite matching cached identities", function()
+        local destination, _, accepted = returnLegacyReader({ scope = "https://foreign.example" })
+        assert.is_false(accepted)
+        assert.is_table(require("apps/reader/readerui").instance)
+        assert.is_nil(destination.current_chapter_menu)
+        assert.are.same({}, requests)
+    end)
+
+    it("issue60 does not resolve a foreign path hidden by an unscoped return record", function()
+        local destination = returnLegacyReader({ prepare = function()
+            local ledger = settings:loadChapterLedger()
+            ledger["17:201"].endpoint_scope = "https://foreign.example"
+            assert(settings:saveChapterLedger(ledger))
+        end })
+        assert.is_true(destination.current_chapter_context.manga.local_only)
+        assert.is_nil(destination.active_manga_network_requests)
+    end)
+
+    it("issue60 uses ordinary current context without needing legacy identity matching", function()
+        respond = function() return page(nodes(201, 203), 3, false) end
+        local destination = returnLegacyReader({ scope = "https://suwayomi.example" })
+        assert.are.same({ "201", "202", "203" }, chapterIds(destination.current_chapter_menu.chapters))
+        finishRequest(destination.active_manga_network_requests.chapter_menu)
+        assert.are.same({ "201", "202", "203" }, chapterIds(destination.current_chapter_menu.chapters))
+    end)
+
+    it("issue60 can resolve from the current Library cache before loading its chapters", function()
+        respond = function() return page(nodes(201, 203), 3, false) end
+        local destination = returnLegacyReader({ no_cache = true, library_cache = true })
+        assert.is_nil(destination.current_chapter_context.manga.local_only)
+        assert.are.same({ "201" }, chapterIds(destination.current_chapter_menu.chapters))
+        finishRequest(destination.active_manga_network_requests.chapter_menu)
+        assert.are.same({ "201", "202", "203" }, chapterIds(destination.current_chapter_menu.chapters))
+        assert.is_nil(settings:loadReaderReturnContexts()[archive_path].endpoint_scope)
+        assert.is_nil(settings:loadChapterLedger()["17:201"].endpoint_scope)
+    end)
+
+    it("issue60 uses recorded downloads immediately when no scoped listing is available", function()
+        local destination = returnLegacyReader({ no_cache = true })
+        assert.is_true(destination.current_chapter_context.manga.local_only)
+        assert.are.same({ "201" }, chapterIds(destination.current_chapter_menu.chapters))
+        assert.is_nil(destination.active_manga_network_requests)
+    end)
+
+    for _, failure in ipairs({ "offline", "incomplete" }) do
+        it("issue60 retains the saved list on " .. failure .. " and reports explicit Refresh failure", function()
+            respond = function()
+                if failure == "offline" then return {}, 503 end
+                return page(nodes(201, 201), 3, false)
+            end
+            local destination, context = returnLegacyReader()
+            local before = settings:loadChapterLedger()
+            assert.are.same({ "201", "202", "203" }, chapterIds(destination.current_chapter_menu.chapters))
+            finishRequest(destination.active_manga_network_requests.chapter_menu)
+            assert.are.same({ "201", "202", "203" }, chapterIds(destination.current_chapter_menu.chapters))
+            assert.are.same({}, messages)
+            respond = function() return {}, 503 end
+            assert.is_true(destination:performBulkChapterAction("refresh_chapters"))
+            finishRequest(destination.active_manga_network_requests.chapter_menu)
+            assert.is_true(#messages > 0)
+            assert.are.same(before, settings:loadChapterLedger())
+            assert.are.same(context, settings:loadReaderReturnContexts()[archive_path])
+        end)
+    end
+
+    it("issue60 preserves authoritative empty membership on the next offline reader return", function()
+        respond = function(request)
+            if request.query:find("GET_CHAPTERS_MANGA", 1, true) then return page({}, 0, false) end
+            if request.query:find("GET_MANGA_CHAPTERS_FETCH", 1, true) then
+                return { data = { fetchChapters = { chapters = {} } } }
+            end
+            return { data = { mangas = { totalCount = 1, nodes = { { id = 17 } } } } }
+        end
+        local destination, context = returnLegacyReader()
+        local before = settings:loadChapterLedger()
+        finishRequest(destination.active_manga_network_requests.chapter_menu)
+        assert.are.same({}, destination.current_chapter_menu.chapters)
+        assert.are.same({}, settings:loadChapterCache(settings:load(), manga).chapters)
+        assert.are.same(context, settings:loadReaderReturnContexts()[archive_path])
+        assert.are.same(before, settings:loadChapterLedger())
+        local file = assert(io.open(archive_path, "rb"))
+        assert.are.equal("preserved archive bytes", file:read("*a"))
+        file:close()
+        -- A fresh native reader host returns again using the now-empty authoritative cache.
+        plugin.suwayomi_host_retired = nil
+        require("apps/reader/readerui").instance = plugin.ui
+        destination.current_chapter_menu, destination.current_chapter_context = nil, nil
+        assert.is_true(plugin:returnToSuwayomiChapters())
+        table.remove(scheduled, 1)()
+        assert.are.same({}, destination.current_chapter_menu.chapters)
+        respond = function() return {}, 503 end
+        finishRequest(destination.active_manga_network_requests.chapter_menu)
+        assert.are.same({}, destination.current_chapter_menu.chapters)
+    end)
+
+    for _, change in ipairs({ "cancel", "navigate", "endpoint", "supersede", "retire" }) do
+        it("issue60 discards a delayed legacy listing after " .. change, function()
+            respond = function() return page(nodes(204, 205), 2, false) end
+            local destination = returnLegacyReader()
+            local request = destination.active_manga_network_requests.chapter_menu
+            local original = destination.current_chapter_menu
+            if change == "cancel" then destination:cancelMangaNetworkRequests()
+            elseif change == "navigate" then original.close_callback()
+            elseif change == "endpoint" then settings.load = function() return { server_url = "https://other.example" } end
+            elseif change == "supersede" then destination:showChaptersForManga(destination.current_chapter_context.manga)
+            else destination:retireChapterHost() end
+            finishRequest(request)
+            assert.are.same({ "201", "202", "203" }, chapterIds(original.chapters))
+            destination:cancelMangaNetworkRequests()
+        end)
+    end
+
+    for _, conflict in ipairs({ "source", "scope" }) do
+        it("issue60 rejects contradictory current Library metadata: " .. conflict, function()
+            local destination = returnLegacyReader({ prepare = function()
+                local candidate = { id = manga.id, title = manga.title, source = manga.source }
+                if conflict == "source" then candidate.source = { id = "another-source" }
+                else candidate.endpoint_scope = "https://foreign.example" end
+                assert(settings:saveLibraryCache(settings:load(), { manga = { candidate }, categories = {} }))
+            end })
+            assert.is_true(destination.current_chapter_context.manga.local_only)
+            assert.is_nil(destination.active_manga_network_requests)
+        end)
+    end
+
+    it("issue60 ignores a chapter cache stored for another endpoint", function()
+        local destination = returnLegacyReader({ prepare = function()
+            assert(settings:saveChapterCache({ server_url = "https://foreign.example" }, {
+                id = manga.id, title = manga.title, source = manga.source,
+            }, {}))
+        end })
+        assert.is_true(destination.current_chapter_context.manga.local_only)
+        assert.are.same({ "201" }, chapterIds(destination.current_chapter_menu.chapters))
+        assert.is_nil(destination.active_manga_network_requests)
+    end)
+
+    it("issue60 resolves from current cache after native close rather than a stale pre-close copy", function()
+        local destination = returnLegacyReader({ on_close = function()
+            assert(settings:saveLibraryCache(settings:load(), { categories = {}, manga = {
+                { id = manga.id, title = manga.title, source = { id = "another-source" } },
+            } }))
+        end })
+        assert.is_true(destination.current_chapter_context.manga.local_only)
+        assert.is_nil(destination.active_manga_network_requests)
+    end)
+
+    it("issue60 does not grant a legacy refill request an origin while resolving listing metadata", function()
+        respond = function() return page(nodes(201, 203), 3, false) end
+        local destination = returnLegacyReader({ prepare = function()
+            assert(settings:getStore():saveKey("manga_keep_next_unread_downloads", { ["17"] = 5 }))
+            assert(queue.refill:request({ id = "17", title = manga.title }))
+        end })
+        local before = settings:getStore():readKey("download_refill")
+        assert.is_nil(before.requests["17"].endpoint_scope)
+        assert.are.equal("origin_unknown", before.requests["17"].reason)
+        finishRequest(destination.active_manga_network_requests.chapter_menu)
+        local after = settings:getStore():readKey("download_refill")
+        assert.are.same(before.associations, after.associations)
+        assert.is_nil(after.requests["17"].endpoint_scope)
+        assert.are.equal("origin_unknown", after.requests["17"].reason)
+        assert.are.same({}, admittedIds())
+    end)
+
+    it("issue60 keeps a genuinely changed known refill association blocked", function()
+        respond = function() return page(nodes(201, 203), 3, false) end
+        local destination = returnLegacyReader({ prepare = function()
+            assert(settings:getStore():saveDocument(function(doc)
+                doc.manga_keep_next_unread_downloads = { ["17"] = 5 }
+                doc.download_refill = { version = 1, next_revision = 1, requests = {}, associations = {
+                    ["17"] = { version = 1, manga = { id = "17", title = manga.title },
+                        endpoint_scope = "https://foreign.example" },
+                } }
+            end))
+        end })
+        finishRequest(destination.active_manga_network_requests.chapter_menu)
+        local state = settings:getStore():readKey("download_refill")
+        assert.are.equal("https://foreign.example", state.associations["17"].endpoint_scope)
+        assert.are.equal("endpoint_changed", state.requests["17"].reason)
+        assert.are.equal("blocked", state.requests["17"].state)
+        assert.are.same({}, admittedIds())
+    end)
+
+    it("issue60 allows an explicit current-server refill policy after listing-only recovery", function()
+        respond = function() return page(nodes(201, 203), 3, false) end
+        local destination = returnLegacyReader({ prepare = function()
+            assert(settings:getStore():saveKey("manga_keep_next_unread_downloads", { ["17"] = 5 }))
+            assert(queue.refill:request({ id = "17", title = manga.title }))
+        end })
+        finishRequest(destination.active_manga_network_requests.chapter_menu)
+        assert.are.equal("origin_unknown", settings:getStore():readKey("download_refill").requests["17"].reason)
+        assert.are.equal(5, queue.refill:setPolicy(destination.current_chapter_context.manga, 5))
+        local state = settings:getStore():readKey("download_refill")
+        assert.are.equal("https://suwayomi.example", state.associations["17"].endpoint_scope)
+        assert.are.equal("https://suwayomi.example", state.requests["17"].endpoint_scope)
+        assert.are.equal("pending", state.requests["17"].state)
+        assert.is_nil(state.requests["17"].reason)
+        assert.is_nil(settings:loadChapterLedger()["17:201"].endpoint_scope)
+        assert.is_nil(settings:loadReaderReturnContexts()[archive_path].endpoint_scope)
+    end)
+
     for _, total in ipairs({ 0, 205 }) do
         it("hands complete reader return of " .. total .. " chapters to the live FileManager host", function()
             local reader_context = { path = "example.cbz", manga_id = "17", chapter_id = "201",
