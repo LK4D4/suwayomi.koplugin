@@ -543,12 +543,25 @@ class DesktopUpgrade:
         chapters = configured["chapter_cache"]["mangas"][self.manga_id]["chapters"]
         if len(chapters) != 3:
             raise AcceptanceFailure("Unexpected stale-control fixture membership")
+        keys = {self.manga_id + ":" + str(chapter["id"]) for chapter in chapters}
         def refill_finished(state):
-            ledger = self.settings().get("chapter_ledger") or {}
-            entries = [ledger.get(self.manga_id + ":" + str(chapter["id"]), {}) for chapter in chapters]
-            return all(entry.get("endpoint_scope") == configured["credentials"]["server_url"]
-                       and entry.get("path") and Path(entry["path"]).is_file() for entry in entries)
+            saved = self.settings()
+            ledger = saved.get("chapter_ledger") or {}
+            jobs = saved.get("download_queue") or []
+            if isinstance(jobs, dict):
+                jobs = jobs.values()
+            return (not any(job.get("key") in keys for job in jobs)
+                    and all((entry := ledger.get(self.manga_id + ":" + str(chapter["id"]), {})).get("manga_id") == self.manga_id
+                            and str(entry.get("chapter_id")) == str(chapter["id"])
+                            and entry.get("endpoint_scope") == configured["credentials"]["server_url"]
+                            and entry.get("path") and Path(entry["path"]).is_file() for chapter in chapters))
         self.ui._wait(refill_finished, "initial automatic downloads persisted", 90)
+        from sandbox_ui import _pages
+        ledger = self.settings()["chapter_ledger"]
+        for chapter in chapters:
+            archive = Path(ledger[self.manga_id + ":" + str(chapter["id"])]["path"])
+            if _pages(archive) != _pages(self.root / "server-data/local/Sandbox Alpha" / (chapter["name"] + ".cbz")):
+                raise AcceptanceFailure("Automatic download fixture pages mismatch")
         self.ui.tap("appbar.menu")
         self.ui.tap("Library")
         self.ui._wait(lambda s: any(c.get("label") == "Sandbox Alpha" for c in s["controls"]), "Library")
