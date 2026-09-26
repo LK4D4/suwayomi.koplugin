@@ -538,6 +538,17 @@ class DesktopUpgrade:
         configured = copy.deepcopy(self.baseline)
         configured["manga_keep_next_unread_downloads"] = {self.manga_id: 5}
         self.reset(configured)
+        # Enabling refill legitimately downloads the remaining synthetic chapters.
+        # Finish those writes before attributing a ledger change to the stale action.
+        chapters = configured["chapter_cache"]["mangas"][self.manga_id]["chapters"]
+        if len(chapters) != 3:
+            raise AcceptanceFailure("Unexpected stale-control fixture membership")
+        def refill_finished(state):
+            ledger = self.settings().get("chapter_ledger") or {}
+            entries = [ledger.get(self.manga_id + ":" + str(chapter["id"]), {}) for chapter in chapters]
+            return all(entry.get("endpoint_scope") == configured["credentials"]["server_url"]
+                       and entry.get("path") and Path(entry["path"]).is_file() for entry in entries)
+        self.ui._wait(refill_finished, "initial automatic downloads persisted", 90)
         self.ui.tap("appbar.menu")
         self.ui.tap("Library")
         self.ui._wait(lambda s: any(c.get("label") == "Sandbox Alpha" for c in s["controls"]), "Library")
@@ -561,6 +572,8 @@ class DesktopUpgrade:
         self.check("feedback", self.count("stale-guard") > 0)
         after = self.settings()
         self.check("policy", after.get("manga_keep_next_unread_downloads") == before.get("manga_keep_next_unread_downloads"))
+        (self.evidence.directory / "stale-action-state.json").write_text(
+            json.dumps({"before": before, "after": after}, indent=2), encoding="utf-8")
         self.check("ledger", after.get("chapter_ledger") == before.get("chapter_ledger"))
         time.sleep(3.2)
         # Expired bulk controls reopen the current action menu.
