@@ -232,7 +232,10 @@ class DesktopUpgrade:
         subprocess.run(["xdotool", "windowfocus", "--sync", window], check=True)
         time.sleep(.4)
         if value == "menu":
-            # Native top menu zone in the launcher's pinned 600x800 viewport.
+            # WSLg may consume the first pointer event while activating a fresh window.
+            # The owned fixture directory has no rows in this lower blank area.
+            subprocess.run(["xdotool", "mousemove", "--window", window, "300", "700", "click", "1"], check=True)
+            time.sleep(.3)
             subprocess.run(["xdotool", "mousemove", "--window", window, "300", "20", "click", "1"], check=True)
         else:
             subprocess.run(["xdotool", "key", "--clearmodifiers", "--delay", "100", value], check=True)
