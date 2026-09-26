@@ -1,6 +1,6 @@
 # Issues #59–#62 acceptance evidence — 2026-09-26
 
-Status: **implemented; physical Palma verification pending**. Desktop observations below establish only their recorded controls. GitHub issues [#59](https://github.com/LK4D4/suwayomi.koplugin/issues/59), [#60](https://github.com/LK4D4/suwayomi.koplugin/issues/60), [#61](https://github.com/LK4D4/suwayomi.koplugin/issues/61), and [#62](https://github.com/LK4D4/suwayomi.koplugin/issues/62), including comments, remain the specifications.
+Initial desktop handoff: **implemented; physical Palma verification pending at that time**. Subsequent physical results and restoration are recorded in [Palma follow-up](issues-59-62-palma-2026-09-26.md). Desktop observations below establish only their recorded controls. GitHub issues [#59](https://github.com/LK4D4/suwayomi.koplugin/issues/59), [#60](https://github.com/LK4D4/suwayomi.koplugin/issues/60), [#61](https://github.com/LK4D4/suwayomi.koplugin/issues/61), and [#62](https://github.com/LK4D4/suwayomi.koplugin/issues/62), including comments, remain the specifications.
 
 Base: `9500b0d2ba0b340ea6cbcf48162117d965485d1c`. Frozen runtime candidate: `aaa6d64865dc18e39ad9da831b18ffdffc4de738`, with no dirty runtime changes. This evidence and its index are a subsequent documentation-only commit. Integration branch: `codex/issues-59-62-integration`.
 
@@ -45,9 +45,9 @@ Synthetic fixtures Alpha and Beta each had three chapters with three generated P
 | **#62 — deleted selection/Back** | **Demonstrated.** Deleting the selected disposable category through the server API, then ordinary Refresh, immediately showed All manga with independently matching membership. Back opened the fresh picker without the deleted category. |
 | **#62 — retained selections/failure/empty Library** | **Demonstrated.** Rename retained the category by ID and refreshed its name; an existing empty category remained empty. Default and All stayed usable. A failed refresh preserved the selected category and saved manga. Removing all server Library membership produced a genuine empty Library despite three local archives; archives remained, and server membership was restored afterward. |
 
-## Remaining acceptance and retained resources
+## Initial desktop handoff and retained resources
 
-**Palma: unverified for all four issues.** A connected device had KOReader open with no test inspector or forwarding routes. Other relevant Codex chats were idle, but ownership of the active reading session was unresolved. The coordinator requested clearance to interrupt it; no answer arrived during this run. No device deployment, profile change, process interruption, or ADB mapping change was performed. USB detection alone establishes no repaired behavior.
+**At this initial handoff, Palma was unverified for all four issues.** A connected device had KOReader open with no test inspector or forwarding routes. Other relevant Codex chats were idle, but ownership of the active reading session was unresolved. The coordinator requested clearance to interrupt it; no answer arrived during this run. No device deployment, profile change, process interruption, or ADB mapping change was performed. USB detection alone establishes no repaired behavior.
 
 After session clearance, back up device plugin/profile/progress, deploy and hash the same candidate's canonical payload, then repeat the relevant mixed bulk/auto/read-refusal, native return/Refresh/offline/identity/progress, pending-unread, and deleted-category/Back flows against disposable fixtures. Restore the device state and mappings afterward. Android behavior, physical network changes, sleep/wake, and e-ink usability are not established here. Storage-failure cases retain controlled-spec evidence; no real storage exhaustion or power-loss test was performed.
 
