@@ -32,10 +32,18 @@ function Fixture.new()
         menus[#menus + 1] = { options = options, callback = callback }
     end
     local plugin = { max_batch_queue_chapters = 50 }
-    for _, name in ipairs({ "suwayomi/chapters/context", "suwayomi/chapters/menu", "suwayomi/chapters/actions",
-        "suwayomi/readsync/ledger", "suwayomi/downloads/controller", "suwayomi/manga/controller" }) do
+    for _, name in ipairs({ "suwayomi/chapters/context", "suwayomi/chapters/local_downloads",
+        "suwayomi/chapters/menu", "suwayomi/chapters/actions", "suwayomi/readsync/ledger",
+        "suwayomi/downloads/controller", "suwayomi/manga/controller" }) do
         for key, method in pairs(require(name).methods) do plugin[key] = method end
     end
+    local required = {
+        buildChapterDownloadLookup = require("suwayomi/chapters/local_downloads").methods.buildChapterDownloadLookup,
+        isLocalOnlyChapter = require("suwayomi/chapters/local_downloads").methods.isLocalOnlyChapter,
+        getChapterReadEntry = require("suwayomi/chapters/local_downloads").methods.getChapterReadEntry,
+        buildChapterMenuOptions = require("suwayomi/chapters/menu").methods.buildChapterMenuOptions,
+        getNextUnreadChaptersForDownload = require("suwayomi/chapters/context").methods.getNextUnreadChaptersForDownload,
+    }
     plugin.getDownloadQueue = function() return service.queue end
     plugin.getChapterDownloadKey = function(_, manga, chapter) return service.queue:getKey(manga, chapter) end
     plugin.getChapterDownloadStatus = function(_, manga, chapter) return service.queue:getStatus(manga, chapter) end
@@ -52,12 +60,24 @@ function Fixture.new()
     plugin:setCurrentMangaChapterContext(manga, chapters)
     local fixture = { settings = settings, plugin = plugin, queue = service.queue, manga = manga, chapters = chapters,
         scope = scope, existing = existing, finished = finished, writes = writes, menus = menus, messages = messages }
+    function fixture:assertComposed()
+        for name, method in pairs(required) do
+            assert(self.plugin[name] == method, "missing or replaced chapter collaborator: " .. name)
+        end
+    end
+    function fixture:render(options)
+        self:assertComposed()
+        self.plugin:setCurrentMangaChapterContext(self.manga, self.chapters)
+        local rows = assert(self.plugin:buildChapterMenuOptions(self.manga, self.chapters, nil, options)).chapters
+        return rows
+    end
     function fixture:legacy(path, origin)
         assert(settings:saveChapterLedger({ ["1:1"] = { manga_id = "1", chapter_id = "1", manga_title = "Fixture", chapter_name = "Chapter 1", path = path,
             endpoint_scope = origin, read = false, pending_read_sync = true, pending_read_state = false } }))
         if path then existing[path] = true end
     end
     function fixture:choose(id)
+        self:assertComposed()
         local menu = assert(menus[#menus])
         for _, action in ipairs(menu.options.actions) do
             if action.id == id then return menu.callback(action) end

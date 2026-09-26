@@ -4,6 +4,55 @@ describe("issue 59 mixed legacy chapter actions", function()
     local f
     before_each(function() f = Fixture.new() end)
     after_each(Fixture.clear)
+    it("fails explicitly if classification or lookup is removed or replaced", function()
+        local classifier = f.plugin.isLocalOnlyChapter
+        f.plugin.isLocalOnlyChapter = nil
+        assert.has_error(function() f:render({ saved = true }) end, "missing or replaced chapter collaborator: isLocalOnlyChapter")
+        f.plugin.isLocalOnlyChapter = function() return false end
+        assert.has_error(function() f:render({ saved = true }) end, "missing or replaced chapter collaborator: isLocalOnlyChapter")
+        f.plugin.isLocalOnlyChapter = classifier
+        local lookup = f.plugin.buildChapterDownloadLookup
+        f.plugin.buildChapterDownloadLookup = nil
+        assert.has_error(function() f:render({ saved = true }) end, "missing or replaced chapter collaborator: buildChapterDownloadLookup")
+        f.plugin.buildChapterDownloadLookup = lookup
+    end)
+    for _, case in ipairs({
+        { name = "current pending unread with missing recorded archive", scope = "current", old = "/downloads/old.cbz", unread = true, admitted = true },
+        { name = "current pending unread with changed unassociated archive", scope = "current", old = "/downloads/old.cbz", generated = true, unread = true },
+        { name = "current pending unread with associated archive", scope = "current", old = "/downloads/1.cbz", keep_old = true, unread = true },
+        { name = "current pathless pending unread", scope = "current", unread = true, admitted = true },
+        { name = "unknown pending unread with missing recorded archive", old = "/downloads/old.cbz" },
+        { name = "foreign pending unread with an archive", scope = "foreign", old = "/downloads/1.cbz", keep_old = true },
+    }) do
+        it("composes rows, current context, and Download for " .. case.name, function()
+            local origin = case.scope == "current" and f.scope
+                or case.scope == "foreign" and "https://other.example" or nil
+            f:legacy(case.old, origin)
+            if case.old and not case.keep_old then f.existing[case.old] = nil end
+            if case.generated then f.existing["/downloads/1.cbz"] = true end
+            f.chapters[1].is_read = true -- remote Read must not override an applicable pending unread
+            local before = f.settings:loadChapterLedger()
+            local rows = f:render({ saved = true })
+            assert.equals(case.unread ~= true, rows[1].is_read == true)
+            assert.equals(rows[1].is_read, f.plugin.current_chapter_context.chapters[1].is_read)
+            local candidates = f.plugin:getNextUnreadChaptersForDownload(f.manga, 1)
+            assert.equals(case.admitted == true, candidates[1] == f.chapters[1])
+            local shown = f.plugin:showChapterActions(f.manga, f.chapters[1])
+            if case.scope ~= "current" then
+                assert.is_not_true(shown)
+            else
+                assert.equals(case.admitted == true, f:action("download") ~= nil)
+            end
+            if case.admitted then
+                f:choose("download")
+                assert.is_table(f.queue:findPersistentJob("1:1"))
+            else
+                assert.is_nil(f.queue:findPersistentJob("1:1"))
+            end
+            assert.same(before, f.settings:loadChapterLedger())
+            assert.equals(case.keep_old == true, f.existing[case.old] == true)
+        end)
+    end
     for _, archive in ipairs({ false, true }) do
         it("offers and executes safe bulk work with " .. (archive and "recorded bytes" or "a pathless legacy choice"), function()
             f:legacy(archive and "/downloads/1.cbz" or nil)
@@ -52,7 +101,11 @@ describe("issue 59 mixed legacy chapter actions", function()
         f:legacy("/downloads/1.cbz")
         f.existing["/downloads/2.cbz"] = true
         assert(f.settings:saveMangaScanlatorFilter(f.manga, "A"))
-        f.plugin:setCurrentMangaChapterContext(f.manga, f.chapters)
+        local rows = f:render({ saved = true })
+        assert.equals(3, #rows)
+        assert.equals("1", rows[1].id)
+        assert.equals("3", rows[3].id)
+        assert.equals(rows[1].is_read, f.plugin.current_chapter_context.chapters[1].is_read)
         f.plugin:selectAllChapters()
         assert.equals(3, f.plugin:getSelectedChapterCount())
         f.plugin:showBulkChapterActions()
@@ -67,6 +120,28 @@ describe("issue 59 mixed legacy chapter actions", function()
         assert.is_table(f:action("verify_download"))
         assert.is_nil(f:action("mark_read"))
         assert.is_nil(f:action("delete"))
+    end)
+    it("caps a mixed selected batch at fifty without backfilling hidden or legacy rows", function()
+        f:legacy(nil)
+        for id = 5, 55 do
+            f.chapters[id] = { id = tostring(id), name = "Chapter " .. id, source_order = id,
+                scanlator = id == 55 and "B" or "A", is_read = false }
+        end
+        assert(f.settings:saveMangaScanlatorFilter(f.manga, "A"))
+        local before = f.settings:loadChapterLedger()
+        local rows = f:render({ saved = true })
+        assert.equals(53, #rows)
+        f.plugin:selectAllChapters()
+        assert.equals(53, f.plugin:getSelectedChapterCount())
+        f.plugin:showBulkChapterActions()
+        f:choose("download_selected")
+        assert.equals(50, #f.settings:loadDownloadQueue())
+        assert.is_nil(f.queue:findPersistentJob("1:1"))
+        assert.is_table(f.queue:findPersistentJob("1:2"))
+        assert.is_table(f.queue:findPersistentJob("1:52"))
+        assert.is_nil(f.queue:findPersistentJob("1:53"))
+        assert.is_nil(f.queue:findPersistentJob("1:55"))
+        assert.same(before, f.settings:loadChapterLedger())
     end)
     it("persists a filter for a complete scoped context with a legacy row", function()
         f:legacy(nil)
