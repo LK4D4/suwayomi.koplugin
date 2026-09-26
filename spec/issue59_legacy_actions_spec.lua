@@ -47,10 +47,12 @@ describe("issue 59 mixed legacy chapter actions", function()
                 f:choose("download")
                 assert.is_table(f.queue:findPersistentJob("1:1"))
             else
+                assert.is_not_true(f.plugin:performChapterAction(f.manga, f.chapters[1], "download"))
                 assert.is_nil(f.queue:findPersistentJob("1:1"))
             end
             assert.same(before, f.settings:loadChapterLedger())
             assert.equals(case.keep_old == true, f.existing[case.old] == true)
+            if case.generated then assert.is_true(f.existing["/downloads/1.cbz"]) end
         end)
     end
     for _, archive in ipairs({ false, true }) do
