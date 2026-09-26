@@ -288,8 +288,18 @@ msgstr "无法取消下载：存储状态不明确"
 msgid "Cannot cancel downloads: storage is ambiguous"
 msgstr "无法取消下载：存储状态不明确"
 
+msgid ""
+"Cannot change read state: a chapter lacks a verified association with the "
+"current server. No read state was changed and no deletion was started."
+msgstr ""
+
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr "无法删除章节：存储状态不明确"
+
+#, fuzzy
+msgid ""
+"Cannot delete these downloads: a chapter lacks a verified server association."
+msgstr "无法删除 %1 个下载。请重新打开章节列表并重试。"
 
 msgid "Cannot enqueue download: storage is ambiguous"
 msgstr "无法将下载加入队列：存储状态不明确"
@@ -992,6 +1002,9 @@ msgstr "无可用描述。"
 msgid "No downloads queued."
 msgstr "没有排队中的下载。"
 
+msgid "No downloads queued: these chapters lack a verified server association."
+msgstr ""
+
 msgid "No eligible chapters match the saved scanlator filter."
 msgstr "没有符合下载条件的章节匹配已保存的汉化组筛选器。"
 
@@ -1010,9 +1023,10 @@ msgstr "没有漫画匹配此搜索。"
 msgid "No matching extensions"
 msgstr "没有匹配的扩展"
 
+#, fuzzy
 msgid ""
-"No new downloads available: chapters are already downloaded or in the "
-"download queue."
+"No new downloads available: chapters are already downloaded, queued, or lack "
+"a verified server association."
 msgstr "没有可新增的下载：章节已下载或已在下载队列中。"
 
 msgid "No new downloads queued."
@@ -1297,6 +1311,10 @@ msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
 msgstr[0] "已跳过 %1 个已下载或已排队的项目。"
 
+msgid "Skipped %1 chapter without a verified server association."
+msgid_plural "Skipped %1 chapters without a verified server association."
+msgstr[0] ""
+
 msgid "Source"
 msgstr "源"
 
@@ -1408,6 +1426,9 @@ msgid ""
 msgstr ""
 "此 KOReader 设置适用于所有文档，不会更改末尾操作或删除设置。您随时可以在该位"
 "置更改此设置。"
+
+msgid "This action requires a chapter list associated with the current server."
+msgstr ""
 
 msgid "This book is not linked to Suwayomi chapters."
 msgstr "此书未关联 Suwayomi 章节。"

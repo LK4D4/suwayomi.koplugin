@@ -337,8 +337,20 @@ msgstr "Неможливо скасувати завантаження: стан
 msgid "Cannot cancel downloads: storage is ambiguous"
 msgstr "Неможливо скасувати завантаження: стан сховища неоднозначний"
 
+msgid ""
+"Cannot change read state: a chapter lacks a verified association with the "
+"current server. No read state was changed and no deletion was started."
+msgstr ""
+
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr "Неможливо видалити розділ: стан сховища неоднозначний"
+
+#, fuzzy
+msgid ""
+"Cannot delete these downloads: a chapter lacks a verified server association."
+msgstr ""
+"Не вдалося видалити %1 завантаження. Знову відкрийте список розділів і "
+"повторіть спробу."
 
 msgid "Cannot enqueue download: storage is ambiguous"
 msgstr "Неможливо додати завантаження в чергу: стан сховища неоднозначний"
@@ -1096,6 +1108,9 @@ msgstr "Опис недоступний."
 msgid "No downloads queued."
 msgstr "У черзі немає завантажень."
 
+msgid "No downloads queued: these chapters lack a verified server association."
+msgstr ""
+
 msgid "No eligible chapters match the saved scanlator filter."
 msgstr ""
 "Жоден придатний до завантаження розділ не відповідає збереженому фільтру "
@@ -1116,9 +1131,10 @@ msgstr "Жодна манґа не відповідає цьому пошуку.
 msgid "No matching extensions"
 msgstr "Немає відповідних розширень"
 
+#, fuzzy
 msgid ""
-"No new downloads available: chapters are already downloaded or in the "
-"download queue."
+"No new downloads available: chapters are already downloaded, queued, or lack "
+"a verified server association."
 msgstr ""
 "Немає нових завантажень: розділи вже завантажено або додано в чергу "
 "завантажень."
@@ -1416,6 +1432,12 @@ msgstr[0] "Пропущено %1 вже завантажене або додан
 msgstr[1] "Пропущено %1 вже завантажені або додані в чергу."
 msgstr[2] "Пропущено %1 вже завантажених або доданих у чергу."
 
+msgid "Skipped %1 chapter without a verified server association."
+msgid_plural "Skipped %1 chapters without a verified server association."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
 msgid "Source"
 msgstr "Джерело"
 
@@ -1530,6 +1552,9 @@ msgid ""
 msgstr ""
 "Це налаштування KOReader діє для всіх документів. Дія в кінці документа й "
 "налаштування видалення не змінюються. Ви можете змінити його там будь-коли."
+
+msgid "This action requires a chapter list associated with the current server."
+msgstr ""
 
 msgid "This book is not linked to Suwayomi chapters."
 msgstr "Ця книга не пов'язана з розділами Suwayomi."

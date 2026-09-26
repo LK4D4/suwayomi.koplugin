@@ -279,7 +279,16 @@ msgstr ""
 msgid "Cannot cancel downloads: storage is ambiguous"
 msgstr ""
 
+msgid ""
+"Cannot change read state: a chapter lacks a verified association with the "
+"current server. No read state was changed and no deletion was started."
+msgstr ""
+
 msgid "Cannot delete chapter: storage is ambiguous"
+msgstr ""
+
+msgid ""
+"Cannot delete these downloads: a chapter lacks a verified server association."
 msgstr ""
 
 msgid "Cannot enqueue download: storage is ambiguous"
@@ -965,6 +974,9 @@ msgstr ""
 msgid "No downloads queued."
 msgstr ""
 
+msgid "No downloads queued: these chapters lack a verified server association."
+msgstr ""
+
 msgid "No eligible chapters match the saved scanlator filter."
 msgstr ""
 
@@ -984,8 +996,8 @@ msgid "No matching extensions"
 msgstr ""
 
 msgid ""
-"No new downloads available: chapters are already downloaded or in the "
-"download queue."
+"No new downloads available: chapters are already downloaded, queued, or lack "
+"a verified server association."
 msgstr ""
 
 msgid "No new downloads queued."
@@ -1265,6 +1277,10 @@ msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
 msgstr[0] ""
 
+msgid "Skipped %1 chapter without a verified server association."
+msgid_plural "Skipped %1 chapters without a verified server association."
+msgstr[0] ""
+
 msgid "Source"
 msgstr ""
 
@@ -1374,6 +1390,9 @@ msgid ""
 msgstr ""
 "이 KOReader 설정은 모든 문서에 적용됩니다. 문서 끝 동작과 삭제 설정은 바뀌지 "
 "않습니다. 같은 메뉴에서 언제든 이 설정을 바꿀 수 있습니다."
+
+msgid "This action requires a chapter list associated with the current server."
+msgstr ""
 
 msgid "This book is not linked to Suwayomi chapters."
 msgstr ""

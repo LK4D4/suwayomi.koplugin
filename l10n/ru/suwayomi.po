@@ -332,8 +332,20 @@ msgstr "Нельзя отменить загрузку: состояние хр�
 msgid "Cannot cancel downloads: storage is ambiguous"
 msgstr "Нельзя отменить загрузки: состояние хранилища не определено"
 
+msgid ""
+"Cannot change read state: a chapter lacks a verified association with the "
+"current server. No read state was changed and no deletion was started."
+msgstr ""
+
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr "Нельзя удалить главу: состояние хранилища не определено"
+
+#, fuzzy
+msgid ""
+"Cannot delete these downloads: a chapter lacks a verified server association."
+msgstr ""
+"Не удалось удалить %1 загрузку. Снова откройте список глав и повторите "
+"попытку."
 
 msgid "Cannot enqueue download: storage is ambiguous"
 msgstr "Нельзя добавить загрузку в очередь: состояние хранилища не определено"
@@ -1083,6 +1095,9 @@ msgstr "Описание недоступно."
 msgid "No downloads queued."
 msgstr "Нет загрузок в очереди."
 
+msgid "No downloads queued: these chapters lack a verified server association."
+msgstr ""
+
 msgid "No eligible chapters match the saved scanlator filter."
 msgstr ""
 "Нет подходящих для загрузки глав, соответствующих сохранённому фильтру "
@@ -1103,9 +1118,10 @@ msgstr "Нет манги, соответствующей этому поиск�
 msgid "No matching extensions"
 msgstr "Нет подходящих расширений"
 
+#, fuzzy
 msgid ""
-"No new downloads available: chapters are already downloaded or in the "
-"download queue."
+"No new downloads available: chapters are already downloaded, queued, or lack "
+"a verified server association."
 msgstr ""
 "Новых загрузок нет: главы уже скачаны или находятся в очереди загрузок."
 
@@ -1404,6 +1420,12 @@ msgstr[0] "Пропущена %1 глава: уже скачана или в о�
 msgstr[1] "Пропущены %1 главы: уже скачаны или в очереди."
 msgstr[2] "Пропущено %1 глав: уже скачаны или в очереди."
 
+msgid "Skipped %1 chapter without a verified server association."
+msgid_plural "Skipped %1 chapters without a verified server association."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
 msgid "Source"
 msgstr "Источник"
 
@@ -1519,6 +1541,9 @@ msgstr ""
 "Эта настройка KOReader действует для всех документов. Действие в конце "
 "документа и настройки удаления не меняются. Вы можете изменить её там в "
 "любое время."
+
+msgid "This action requires a chapter list associated with the current server."
+msgstr ""
 
 msgid "This book is not linked to Suwayomi chapters."
 msgstr "Эта книга не связана с главами Suwayomi."
