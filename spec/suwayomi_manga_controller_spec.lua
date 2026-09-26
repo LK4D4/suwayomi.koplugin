@@ -15,6 +15,8 @@ local modules_to_clear = {
     "suwayomi/manga/controller",
     "suwayomi/chapters/context",
     "suwayomi/chapters/menu",
+    "suwayomi/chapters/actions",
+    "suwayomi/chapters/local_downloads",
     "suwayomi/downloads/controller",
     "suwayomi/downloads/downloader",
     "suwayomi/readsync/ledger",
@@ -92,6 +94,9 @@ local function installController(options)
             end,
             normalizeEndpointScope = function(_, url) return url end,
             loadChapterCache = function() return nil end,
+            loadChapterLedger = function() return {} end,
+            loadReaderReturnContexts = function() return {} end,
+            loadDownloadDirectory = function() return nil end,
             saveChapterCache = function() return {} end,
             loadMangaKeepNextUnreadDownloads = function(_, target_manga)
                 return (options.keep_next_limits or {})[tostring(target_manga and target_manga.id)]
@@ -208,6 +213,9 @@ local function installController(options)
     local actions = require("suwayomi/chapters/actions").methods
     plugin.captureChapterDownloadBatch = actions.captureChapterDownloadBatch
     plugin.confirmChapterDownloadBatch = actions.confirmChapterDownloadBatch
+    for name, method in pairs(require("suwayomi/chapters/local_downloads").methods) do
+        plugin[name] = method
+    end
     local queue = require("suwayomi/downloads/queue"):new{}
     function plugin:getDownloadQueue() return queue end
     function plugin:loadMangaScanlatorFilter() return nil end
