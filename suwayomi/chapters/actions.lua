@@ -66,9 +66,13 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
     local accepted, err = self:getDownloadQueue():verifyArchive(manga, chapter, chapter_path, function(result)
         if completed or not is_current() then return end
         completed = true
+        if result.stage == "persistence" then
+            self:showMessage(result.error or I18n.t("Could not verify download"))
+            return
+        end
         if self.refreshChapterMenu then self:refreshChapterMenu() end
         if result.state ~= "valid" then
-            if local_only or result.stage == "persistence" then
+            if local_only then
                 self:showMessage(result.error or I18n.t("Could not verify download"))
             else
                 self:showChapterDownloadError(manga, chapter)

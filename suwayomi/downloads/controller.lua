@@ -209,11 +209,13 @@ function Methods:verifyDownloadJob(job, is_current)
         current.progress and current.progress.path, function(result)
             if completed or not live() then return end
             completed = true
-            if self.refreshChapterMenu then self:refreshChapterMenu() end
-            self:refreshDownloadsMenu()
             if result.stage == "persistence" then
                 self:showMessage(result.error)
-            elseif result.state ~= "valid" then
+                return
+            end
+            if self.refreshChapterMenu then self:refreshChapterMenu() end
+            self:refreshDownloadsMenu()
+            if result.state ~= "valid" then
                 self:showDownloadJobError(current, is_current)
             end
         end, { is_current = live })

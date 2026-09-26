@@ -230,6 +230,7 @@ local function installController(options)
         return callback()
     end
     function plugin:refreshChapterMenu(refresh_options)
+        state.chapter_refresh_count = (state.chapter_refresh_count or 0) + 1
         state.refresh_options = refresh_options
     end
     return plugin, state
@@ -519,6 +520,7 @@ describe("suwayomi/downloads/controller", function()
         complete({ state = "unverified", stage = "persistence", error = "Saving verification failed; retry." })
         complete({ state = "unverified", stage = "persistence", error = "Saving verification failed; retry." })
         assert.are.same({ "Saving verification failed; retry." }, state.messages)
+        assert.is_nil(state.chapter_refresh_count)
     end)
     it("discards replaced archive damage in details and rejects retained recovery callbacks", function()
         local plugin, state = installController()
