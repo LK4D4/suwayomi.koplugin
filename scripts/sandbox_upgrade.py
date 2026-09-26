@@ -579,10 +579,12 @@ class DesktopUpgrade:
                     raise AcceptanceFailure("Publication pending-unread precondition lost before chapter request")
                 self.ui.tap("Sandbox Alpha")
                 self.ui.tap("Open chapters")
-                state = self.ui._wait(lambda state: self.count("stage-fault") > count
-                    and any(c.get("label") == "Chapter 001" for c in state["controls"]), "injected stage fault")
-                time.sleep(3.2)
-                state = self.ui._observe()
+                state = self.ui._wait(lambda state: self.count("stage-fault") > count, "injected stage fault")
+                if state.get("message"):
+                    (self.evidence.directory / (stage + "-" + outcome + "-feedback.json")).write_text(json.dumps(state))
+                    self.ui.tap("Dismiss message")
+                state = self.ui._wait(lambda state: any(c.get("label") == "Chapter 001" for c in state["controls"]),
+                                      "chapter membership after stage feedback")
                 labels = {c.get("label") for c in state["controls"]}
                 disk = self.settings()
                 persisted = disk["chapter_cache"]["mangas"][self.manga_id]["chapters"]
