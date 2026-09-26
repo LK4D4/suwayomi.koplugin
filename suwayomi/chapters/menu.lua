@@ -55,13 +55,46 @@ end
 
 local Methods = {}
 
+local function reportExpiredChapterAction(owner)
+    if owner.suwayomi_host_retired then return false end
+    owner:showMessage(I18n.t("Chapter controls expired. Reopen the current chapter actions and try again."),
+        { toast = true, timeout = 3 })
+    return false
+end
+
+local function reopenCurrentBulkChapterActions(owner, menu, manga, manga_id, endpoint_scope)
+    local current = owner.current_chapter_context
+    local current_manga = current and current.manga
+    if menu and owner.current_chapter_menu == menu and manga and current_manga
+        and tostring(current_manga.id or current_manga.title) == manga_id
+        and tostring(manga.id or manga.title) == manga_id
+        and current_manga.endpoint_scope == manga.endpoint_scope
+        and endpoint_scope == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
+        and (not owner.isSuwayomiScreenActive or owner:isSuwayomiScreenActive(menu))
+        and (not owner.suwayomi_navigation or owner.suwayomi_navigation:isCurrent(menu)) then
+        owner:showBulkChapterActions()
+    end
+end
+
 local function guardChapterCallback(owner, callback)
     local menu = owner.current_chapter_menu
+    local context = owner.current_chapter_context
+    local manga = context and context.manga
+    local manga_id = manga and tostring(manga.id or manga.title)
+    local endpoint_scope = SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
     local is_current = owner.captureChapterActionGuard and owner:captureChapterActionGuard()
     return function(...)
-        if owner.suwayomi_host_retired or (is_current and not is_current()) then return false end
-        if menu and owner.isSuwayomiScreenActive and not owner:isSuwayomiScreenActive(menu) then return false end
-        if menu and owner.suwayomi_navigation and not owner.suwayomi_navigation:isCurrent(menu) then return false end
+        if owner.suwayomi_host_retired then return false end
+        if is_current and not is_current() then
+            reopenCurrentBulkChapterActions(owner, menu, manga, manga_id, endpoint_scope)
+            return reportExpiredChapterAction(owner)
+        end
+        if menu and owner.isSuwayomiScreenActive and not owner:isSuwayomiScreenActive(menu) then
+            return reportExpiredChapterAction(owner)
+        end
+        if menu and owner.suwayomi_navigation and not owner.suwayomi_navigation:isCurrent(menu) then
+            return reportExpiredChapterAction(owner)
+        end
         return callback(...)
     end
 end
@@ -81,13 +114,19 @@ function Methods:getChapterTitleBarMenuOptions(manga, lookup)
         captureActionGuard = function()
             local is_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
             local menu = self.current_chapter_menu
+            local endpoint_scope = SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
             return function()
-                return not self.suwayomi_host_retired and self.current_chapter_context == context
+                local current = not self.suwayomi_host_retired and self.current_chapter_context == context
                     and self.current_chapter_menu == menu
                     and (not self.suwayomi_navigation or self.suwayomi_navigation:isCurrent(menu))
                     and (not context or context.manga == manga)
                     and (not manga or tostring(manga.id or manga.title) == manga_id)
                     and (not is_current or is_current())
+                if not current and not self.suwayomi_host_retired then
+                    reopenCurrentBulkChapterActions(self, menu, manga, manga_id, endpoint_scope)
+                    reportExpiredChapterAction(self)
+                end
+                return current
             end
         end,
         onSelect = function(action, _, menu_context)
@@ -459,12 +498,11 @@ function Methods:getBulkDownloadActions()
 end
 
 
-function Methods:showBulkActionConfirmation(text, ok_text, callback, on_stale)
+function Methods:showBulkActionConfirmation(text, ok_text, callback)
     local is_current = self.captureChapterActionGuard and self:captureChapterActionGuard()
     local function accept()
         if is_current and not is_current() then
-            if on_stale and not self.suwayomi_host_retired then return on_stale() end
-            return false
+            return reportExpiredChapterAction(self)
         end
         return callback()
     end
@@ -582,7 +620,7 @@ function Methods:showChapterActions(manga, chapter)
     }
 
     SuwayomiUI.showChapterActionsMenu(options, function(action)
-        if is_current and not is_current() then return false end
+        if is_current and not is_current() then return reportExpiredChapterAction(self) end
         return self:performChapterAction(manga, chapter, action.id)
     end)
 end

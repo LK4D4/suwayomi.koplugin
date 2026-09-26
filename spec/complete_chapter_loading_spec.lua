@@ -1686,7 +1686,12 @@ describe("complete stored chapter loading", function()
                     assert.are.same(json.decode(ledger), json.decode(saved_ledger))
                     assert.are.equal("{}", return_contexts)
                     assert.are.equal(0, return_writes)
-                    assert.are.equal(message_count, #messages)
+                    local expired_chapter_control = (origin == "chapter bulk" or origin == "chapter title")
+                        and invalidation ~= "retired host"
+                    assert.are.equal(message_count + (expired_chapter_control and 1 or 0), #messages)
+                    if expired_chapter_control then
+                        assert.matches("expired", messages[#messages], 1, true)
+                    end
                 end
                 assert.are.same(json.decode(jobs), json.decode(saved_jobs))
                 assert.are.same({}, queue:getSnapshot().queued)
