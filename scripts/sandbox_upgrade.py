@@ -227,13 +227,14 @@ class DesktopUpgrade:
         if len(windows) != 1:
             raise Blocked("Expected one visible window owned by this sandbox")
         window = windows.pop()
+        subprocess.run(["xdotool", "windowactivate", "--sync", window], check=True)
         subprocess.run(["xdotool", "windowfocus", "--sync", window], check=True)
         time.sleep(.4)
         subprocess.run(["xdotool", "key", "--clearmodifiers", "--delay", "100",
                         "F1" if value == "menu" else value], check=True)
 
     def native_entry(self):
-        self.ui._request("/koreader/ui/menu/onShowMenu/")
+        self.native_key("menu")
         self.ui._wait(lambda s: any(c.get("label") == "appbar.search" for c in s["controls"]), "native Search tab")
         if not any(c.get("label") == "appbar.search" and c.get("selected") for c in self.ui._observe()["controls"]):
             self.ui.tap("appbar.search")

@@ -4,7 +4,7 @@ Run this after the candidate passes ordinary offline checks. This is opt-in desk
 
 ## Disposable desktop run
 
-Follow [sandbox setup](sandbox.md) with Linux x86_64/WSLg, Python 3, LuaJIT, and `xdotool`. Use the pinned releases, a graphical session, an English profile, and a fresh private root. The allowed native KOReader menu handler opens the menu, then observed Search > Suwayomi widgets establish entry. Desktop paging input targets only the window whose process owns this sandbox profile. Keep other reading sessions untouched.
+Follow [sandbox setup](sandbox.md) with Linux x86_64/WSLg, Python 3, LuaJIT, and `xdotool`. Use the pinned releases, a graphical session, an English profile, and a fresh private root. Native entry and paging input activate and target only the window whose process owns this sandbox profile. Keep other reading sessions untouched.
 
 From the candidate checkout, with sandbox services stopped:
 
