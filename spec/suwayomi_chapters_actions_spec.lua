@@ -566,6 +566,32 @@ describe("suwayomi/chapters/actions", function()
         package.loaded["apps/reader/readerui"] = nil
     end)
 
+    it("explains an uncertain storage fence when the user retries verification", function()
+        local plugin = build_plugin({
+            existing = { ["/downloads/Manga/Chapter 1.cbz"] = true },
+            queue = { verifyArchive = function() return false, "store_blocked" end },
+        })
+        assert.is_false(plugin:openChapter(manga, chapter))
+        assert.are.same({ "Verification is blocked by uncertain storage. Wait for storage recovery, then try again." }, plugin.messages)
+        assert.are.same({}, plugin.reader_return_contexts)
+    end)
+    it("reports completion persistence failure without opening or changing reading metadata", function()
+        local complete
+        local plugin = build_plugin({
+            ledger = { ["m1:c1"] = { manga_id = "m1", chapter_id = "c1", path = "/downloads/Manga/Chapter 1.cbz", read = true, last_page = 7 } },
+            existing = { ["/downloads/Manga/Chapter 1.cbz"] = true },
+            queue = { verifyArchive = function(_, _, _, _, callback) complete = callback; return true end },
+        })
+        local before = settings:loadChapterLedger()
+        plugin.showChapterDownloadError = function() error("Persistence failure is not archive damage") end
+        assert.is_true(plugin:openChapter(manga, chapter))
+        complete({ state = "unverified", stage = "persistence", error = "Verification result could not be saved; retry." })
+        assert.are.same({ "Verification result could not be saved; retry." }, plugin.messages)
+        complete({ state = "valid" })
+        assert.are.same({}, plugin.reader_return_contexts)
+        assert.are.same({}, plugin.metadata_updates)
+        assert.are.same(before, settings:loadChapterLedger())
+    end)
     it("never opens or writes reader metadata for an inconclusive or damaged inspection", function()
         local complete
         local plugin = build_plugin({

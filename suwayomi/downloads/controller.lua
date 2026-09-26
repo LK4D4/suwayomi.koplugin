@@ -7,6 +7,7 @@
 
 local SuwayomiSettings = require("suwayomi/settings")
 local SuwayomiUI = require("suwayomi/ui")
+local StatusFormatter = require("suwayomi/downloads/status_formatter")
 local I18n = require("suwayomi/i18n")
 
 local DownloadsController = {}
@@ -190,6 +191,7 @@ function Methods:redownloadDownloadJob(job)
 end
 
 function Methods:verifyDownloadJob(job, is_current)
+    local completed = false
     if self.suwayomi_host_retired or (is_current and not is_current()) then return false end
     local request = {}
     self.chapter_archive_request = request
@@ -205,16 +207,18 @@ function Methods:verifyDownloadJob(job, is_current)
     end
     local accepted, err = queue:verifyArchive(current.manga, current.chapter,
         current.progress and current.progress.path, function(result)
-            if not live() then return end
+            if completed or not live() then return end
+            completed = true
             if self.refreshChapterMenu then self:refreshChapterMenu() end
             self:refreshDownloadsMenu()
-            if result.state ~= "valid" then
+            if result.stage == "persistence" then
+                self:showMessage(result.error)
+            elseif result.state ~= "valid" then
                 self:showDownloadJobError(current, is_current)
             end
         end, { is_current = live })
     if not accepted then
-        self:showMessage(err == "verification_busy" and I18n.t("Another download is being verified.")
-            or I18n.t("Could not verify download"))
+        self:showMessage(StatusFormatter.formatVerificationStartError(err))
     end
     return accepted, err
 end

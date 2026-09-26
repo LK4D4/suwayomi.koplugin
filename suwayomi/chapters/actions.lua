@@ -11,6 +11,7 @@ local ChapterReadActions = require("suwayomi/chapters/read_actions")
 local MangaActionMenu = require("suwayomi/manga/action_menu")
 local SuwayomiDebug = require("suwayomi/debug")
 local SuwayomiSettings = require("suwayomi/settings")
+local StatusFormatter = require("suwayomi/downloads/status_formatter")
 local I18n = require("suwayomi/i18n")
 
 local ChapterActions = {}
@@ -67,7 +68,7 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         completed = true
         if self.refreshChapterMenu then self:refreshChapterMenu() end
         if result.state ~= "valid" then
-            if local_only then
+            if local_only or result.stage == "persistence" then
                 self:showMessage(result.error or I18n.t("Could not verify download"))
             else
                 self:showChapterDownloadError(manga, chapter)
@@ -111,8 +112,7 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid)
         end
     end, { is_current = is_current, read_only = local_only })
     if not accepted then
-        self:showMessage(err == "verification_busy" and I18n.t("Another download is being verified.")
-            or I18n.t("Could not verify download"))
+        self:showMessage(StatusFormatter.formatVerificationStartError(err))
     end
     return accepted, err
 end

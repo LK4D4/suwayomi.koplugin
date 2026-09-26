@@ -502,6 +502,24 @@ describe("suwayomi/downloads/controller", function()
         assert.is_nil(plugin.current_chapter_context)
     end)
 
+    it("shows verification persistence feedback once without substituting an archive error", function()
+        local job = {
+            key = "m1:c1", state = "failed", download_directory = "/original",
+            manga = { id = "m1", title = "Manga" }, chapter = { id = "c1", name = "Chapter" },
+            progress = { archive_state = "unverified", path = "/original/chapter.cbz" },
+        }
+        local complete
+        local queue = {
+            snapshot = { active = {}, queued = {}, failed = { job } },
+            verifyArchive = function(_, _, _, _, callback) complete = callback; return true end,
+        }
+        local plugin, state = installController({ queue = queue })
+        assert.is_true(plugin:verifyDownloadJob(job))
+        plugin.showDownloadJobError = function() error("Persistence failure is not archive damage") end
+        complete({ state = "unverified", stage = "persistence", error = "Saving verification failed; retry." })
+        complete({ state = "unverified", stage = "persistence", error = "Saving verification failed; retry." })
+        assert.are.same({ "Saving verification failed; retry." }, state.messages)
+    end)
     it("discards replaced archive damage in details and rejects retained recovery callbacks", function()
         local plugin, state = installController()
         local Archive = require("suwayomi/downloads/archive")
