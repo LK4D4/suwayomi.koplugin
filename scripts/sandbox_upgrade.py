@@ -571,6 +571,9 @@ class DesktopUpgrade:
                 count = self.count("stage-fault")
                 self.start("reader")
                 self.native_entry()
+                pending = self.settings()["chapter_ledger"].get(second_key, {})
+                if pending.get("pending_read_sync") is not True or pending.get("pending_read_state") is not False:
+                    raise AcceptanceFailure("Publication pending-unread precondition lost before chapter request")
                 self.ui.tap("Sandbox Alpha")
                 self.ui.tap("Open chapters")
                 state = self.ui._wait(lambda state: self.count("stage-fault") > count
@@ -780,6 +783,7 @@ def run(root, source, only=None):
         evidence.metadata["instrumentation_sha256"] = sandbox.digest(root / "profile/patches/2-upgrade-acceptance.lua")
         evidence.save()
         driver = DesktopUpgrade(root, source, evidence)
+        driver.fault("none")
         driver.start("server")
         driver.start("reader")
         for name in REQUIRED:
