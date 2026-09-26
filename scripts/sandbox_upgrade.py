@@ -726,9 +726,12 @@ class DesktopUpgrade:
         self.ui._wait(lambda s: any("Local source" in c.get("label", "") for c in s["controls"]), "Local source")
         label = next(c["label"] for c in self.ui._observe()["controls"] if "Local source" in c.get("label", ""))
         self.ui.tap(label)
-        self.ui.tap("Popular")
-        self.ui.wait("Popular")
-        self.check("discovered", any(c.get("label", "").startswith("Upgrade Manga") for c in self.ui._observe()["controls"]))
+        if any(c.get("label") == "Popular" for c in self.ui._observe()["controls"]):
+            self.ui.tap("Popular")
+        state = self.ui._wait(lambda current: current.get("title") == "Popular"
+            and any(c.get("label", "").startswith("Upgrade Manga") for c in current["controls"]),
+            "populated Popular fixture listing", 45)
+        self.check("discovered", any(c.get("label", "").startswith("Upgrade Manga") for c in state["controls"]))
         for name, label in (("list", "List"), ("cover_text", "Cover with text"), ("cover_only", "Cover only")):
             state = self.ui._observe()
             self.check(name, state.get("pages", 0) > 1)
