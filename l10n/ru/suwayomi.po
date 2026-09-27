@@ -293,6 +293,9 @@ msgstr "Назад"
 msgid "Basic Auth"
 msgstr "Базовая (Basic Auth)"
 
+msgid "Book status"
+msgstr ""
+
 msgid "Browse"
 msgstr "Обзор"
 
@@ -332,8 +335,20 @@ msgstr "Нельзя отменить загрузку: состояние хр�
 msgid "Cannot cancel downloads: storage is ambiguous"
 msgstr "Нельзя отменить загрузки: состояние хранилища не определено"
 
+msgid ""
+"Cannot change read state: a chapter lacks a verified association with the "
+"current server. No read state was changed and no deletion was started."
+msgstr ""
+
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr "Нельзя удалить главу: состояние хранилища не определено"
+
+#, fuzzy
+msgid ""
+"Cannot delete these downloads: a chapter lacks a verified server association."
+msgstr ""
+"Не удалось удалить %1 загрузку. Снова откройте список глав и повторите "
+"попытку."
 
 #, fuzzy
 msgid "Cannot determine the next chapter from the saved list."
@@ -357,6 +372,13 @@ msgstr "Выбор категории: %1"
 
 msgid "Chapter actions"
 msgstr "Действия с главами"
+
+#, fuzzy
+msgid ""
+"Chapter controls expired. Reopen the current chapter actions and try again."
+msgstr ""
+"Не удалось добавить загрузки в очередь. Снова откройте список глав и "
+"повторите попытку."
 
 msgid "Chapter download failed."
 msgstr "Не удалось скачать главу."
@@ -458,6 +480,10 @@ msgstr "Не удалось отменить загрузку: %1"
 msgid "Could not clear failed downloads: %1"
 msgstr "Не удалось очистить загрузки с ошибками: %1"
 
+#, fuzzy
+msgid "Could not close settings."
+msgstr "Не удалось загрузить мангу."
+
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] "Не удалось подтвердить %1 загрузку главы."
@@ -521,6 +547,10 @@ msgstr "Не удалось удалить эту главу с устройст
 msgid "Could not download \"%1\"%2: %3"
 msgstr "Не удалось скачать «%1»%2: %3"
 
+#, fuzzy
+msgid "Could not flush settings."
+msgstr "Не удалось сохранить настройки."
+
 msgid "Could not load Suwayomi extensions."
 msgstr "Не удалось загрузить расширения Suwayomi."
 
@@ -540,9 +570,20 @@ msgstr "Не удалось загрузить сохранённые фильт
 msgid "Could not load source filters."
 msgstr "Не удалось загрузить фильтры источника."
 
+msgid "Could not open next file. Sort by date does not support this feature."
+msgstr ""
+
+#, fuzzy
+msgid "Could not open settings for writing."
+msgstr "Не удалось начать загрузку манги."
+
 #, fuzzy
 msgid "Could not open the next chapter."
 msgstr "Не удалось загрузить главы."
+
+#, fuzzy
+msgid "Could not prepare settings."
+msgstr "Не удалось сохранить настройки."
 
 msgid "Could not queue download: %1"
 msgstr "Не удалось добавить загрузку в очередь: %1"
@@ -557,6 +598,10 @@ msgstr "Не удалось скачать главу заново."
 
 msgid "Could not refresh Library. Showing saved information."
 msgstr ""
+
+#, fuzzy
+msgid "Could not replace settings."
+msgstr "Не удалось сохранить настройки."
 
 msgid "Could not retry download."
 msgstr "Не удалось повторить загрузку."
@@ -601,6 +646,10 @@ msgstr "Не удалось начать загрузку источников: 
 msgid "Could not start source loading: unknown error"
 msgstr "Не удалось начать загрузку источников: неизвестная ошибка"
 
+#, fuzzy
+msgid "Could not sync settings."
+msgstr "Не удалось сохранить настройки."
+
 msgid "Could not update auto-download: %1"
 msgstr "Не удалось изменить автозагрузку: %1"
 
@@ -609,6 +658,17 @@ msgstr "Не удалось обновить библиотеку."
 
 msgid "Could not verify download"
 msgstr "Не удалось проверить загрузку"
+
+#, fuzzy
+msgid "Could not write settings."
+msgstr "Не удалось начать поиск."
+
+msgid "Cover only"
+msgstr ""
+
+#, fuzzy
+msgid "Cover with text"
+msgstr "Текст поиска"
 
 msgid "Delete"
 msgstr "Удалить"
@@ -639,6 +699,10 @@ msgstr "Удалить скачанный файл для %1 с этого ус�
 
 msgid "Delete downloads"
 msgstr "Удалить загрузки"
+
+#, fuzzy
+msgid "Delete file"
+msgstr "Удалить сохранённый фильтр"
 
 msgid "Delete from device"
 msgstr "Удалить с устройства"
@@ -866,6 +930,9 @@ msgstr "Не удалось сохранить фильтр сканлейтор
 msgid "Failed to save settings."
 msgstr "Не удалось сохранить настройки."
 
+msgid "File browser"
+msgstr ""
+
 msgid "Filter"
 msgstr "Фильтр"
 
@@ -895,6 +962,9 @@ msgstr "Глобальный поиск"
 
 msgid "Go to Suwayomi"
 msgstr "Перейти к Suwayomi"
+
+msgid "Go to beginning"
+msgstr ""
 
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
@@ -971,6 +1041,10 @@ msgid "Library category picker settings are unavailable."
 msgstr "Настройки выбора категории библиотеки недоступны."
 
 msgid "Library loaded, but could not be saved for next time."
+msgstr ""
+
+msgctxt "manga view"
+msgid "List"
 msgstr ""
 
 msgid "Loading canceled."
@@ -1088,6 +1162,9 @@ msgstr "Описание недоступно."
 msgid "No downloads queued."
 msgstr "Нет загрузок в очереди."
 
+msgid "No downloads queued: these chapters lack a verified server association."
+msgstr ""
+
 msgid "No eligible chapters match the saved scanlator filter."
 msgstr ""
 "Нет подходящих для загрузки глав, соответствующих сохранённому фильтру "
@@ -1108,9 +1185,10 @@ msgstr "Нет манги, соответствующей этому поиск�
 msgid "No matching extensions"
 msgstr "Нет подходящих расширений"
 
+#, fuzzy
 msgid ""
-"No new downloads available: chapters are already downloaded or in the "
-"download queue."
+"No new downloads available: chapters are already downloaded, queued, or lack "
+"a verified server association."
 msgstr ""
 "Новых загрузок нет: главы уже скачаны или находятся в очереди загрузок."
 
@@ -1185,6 +1263,10 @@ msgstr "Открыть главы"
 
 msgid "Open first unread"
 msgstr "Открыть первую непрочитанную"
+
+#, fuzzy
+msgid "Open next file"
+msgstr "Открыть следующую непрочитанную"
 
 msgid "Open next unread"
 msgstr "Открыть следующую непрочитанную"
@@ -1398,6 +1480,14 @@ msgstr "Настройки"
 msgid "Settings are unavailable."
 msgstr "Настройки недоступны."
 
+#, fuzzy
+msgid "Settings directory unavailable."
+msgstr "Настройки недоступны."
+
+#, fuzzy
+msgid "Settings save failed."
+msgstr "Настройки недоступны."
+
 msgid "Setup wizard"
 msgstr "Мастер настройки"
 
@@ -1412,6 +1502,12 @@ msgid_plural "Skipped %1 already downloaded or queued."
 msgstr[0] "Пропущена %1 глава: уже скачана или в очереди."
 msgstr[1] "Пропущены %1 главы: уже скачаны или в очереди."
 msgstr[2] "Пропущено %1 глав: уже скачаны или в очереди."
+
+msgid "Skipped %1 chapter without a verified server association."
+msgid_plural "Skipped %1 chapters without a verified server association."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Source"
 msgstr "Источник"
@@ -1437,8 +1533,8 @@ msgstr "Suwayomi"
 msgid "Suwayomi Chapters"
 msgstr "Главы Suwayomi"
 
-msgid "Suwayomi Client v1.2.0"
-msgstr "Клиент Suwayomi v1.2.0"
+msgid "Suwayomi Client v1.2.1"
+msgstr "Клиент Suwayomi v1.2.1"
 
 msgid "Suwayomi Downloads"
 msgstr "Загрузки Suwayomi"
@@ -1543,6 +1639,9 @@ msgstr ""
 "документа и настройки удаления не меняются. Вы можете изменить её там в "
 "любое время."
 
+msgid "This action requires a chapter list associated with the current server."
+msgstr ""
+
 msgid ""
 "This book belongs to another server. Go to Suwayomi opens the configured "
 "Library."
@@ -1632,6 +1731,21 @@ msgstr "Использовать эту папку"
 msgid "Username"
 msgstr "Имя пользователя"
 
+msgid ""
+"Verification finished, but its result could not be saved. %1 Try Open or "
+"Verify download again."
+msgstr ""
+
+msgid ""
+"Verification finished, but saving its result is blocked by uncertain "
+"storage. Wait for storage recovery, then try Open or Verify download again."
+msgstr ""
+
+msgid ""
+"Verification is blocked by uncertain storage. Wait for storage recovery, "
+"then try again."
+msgstr ""
+
 msgid "Verify download"
 msgstr "Проверить загрузку"
 
@@ -1639,6 +1753,9 @@ msgid "Verifying download"
 msgstr "Проверка загрузки"
 
 msgid "Verifying next chapter…"
+msgstr ""
+
+msgid "View"
 msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."

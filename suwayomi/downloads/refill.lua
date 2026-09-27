@@ -135,7 +135,7 @@ function Refill:enroll(doc, manga, options)
     local reason = not known and "origin_unknown" or endpoint ~= self:_endpoint() and "endpoint_changed" or nil
     if manga.require_origin and manga.endpoint_scope == nil then
         endpoint, reason = nil, "origin_unknown"
-    elseif manga.endpoint_scope and manga.endpoint_scope ~= endpoint then
+    elseif known and manga.endpoint_scope and manga.endpoint_scope ~= endpoint then
         endpoint, reason = self.settings:normalizeEndpointScope(manga.endpoint_scope), "endpoint_changed"
     end
     state.requests[id] = { version = 1, manga_id = id, revision = allocate(state),

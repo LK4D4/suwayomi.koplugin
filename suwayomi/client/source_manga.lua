@@ -1238,6 +1238,17 @@ function SuwayomiClient:renderMangaForSourceResult(credentials, source, browse_o
     })
     local menu_options = self:buildBrowseResultMenuOptions(source, browse_options)
     menu_options.thumbnail_credentials = credentials
+    menu_options.view_mode = self.settings.loadBrowseViewMode and self.settings:loadBrowseViewMode() or "list"
+    menu_options.on_view_mode_changed = function(mode)
+        if session.closed or session.token ~= self._source_manga_load_token then return false end
+        local saved, err = self.settings:saveBrowseViewMode(mode)
+        if not saved then
+            self.plugin:showMessage(err or I18n.t("Failed to save settings."))
+            return false
+        end
+        menu_options.view_mode = saved
+        return true
+    end
     if existing_menu and menu_options.close_callback == nil then
         menu_options.close_callback = function() end
     end

@@ -4,6 +4,9 @@ These dated records describe the named candidate, environment, method, observed 
 
 | Record | Scope |
 | --- | --- |
+| [Release review, 2026-09-27](release-review-2026-09-27.md) | Master review, 1,789 specs, all eight fresh desktop scenarios, focused fresh Palma controls, verified restoration, and release recommendation |
+| [Issues #67–#70, 2026-09-26](issues-67-70-acceptance-2026-09-26.md) | Authority/preparation boundaries, composed historical controls, repeatable upgrade acceptance; all eight desktop and Palma scenarios with verified restoration |
+| [Issues #63–#66, 2026-09-26](issues-63-66-acceptance-2026-09-26.md) | Pending unread path changes, verification persistence recovery, stale controls, fail-closed localization discovery; desktop and Palma with verified restoration |
 | [Issue #51 chapter cache, 2026-09-18](issue-51-chapter-cache-2026-09-18.md) | Desktop offline chapters, recovery, and injected empty response |
 | [Authentication, 2026-09-09](authentication-2026-09-09.md) | Earlier authentication investigation and bounded evidence |
 | [Read sync, 2026-09-23](read-sync-2026-09-23.md) | Desktop endpoint scope and recovered archive controls |
@@ -14,3 +17,5 @@ These dated records describe the named candidate, environment, method, observed 
 | [Issue #56, 2026-09-25](issue-56-chapter-lookup-2026-09-25.md) | Chapter-lookup refactor, scope and save-ownership checks, desktop Open/read state |
 | [Issue #58, 2026-09-25](issue-58-next-chapter-2026-09-25.md) | Reader Next selection, desktop offline/completion controls, and Palma saved-position and blocked-navigation acceptance |
 | [Release readiness, 2026-09-24](release-readiness-2026-09-24.md) | Review of exact candidate, CI, desktop, Palma, and remaining gaps |
+| [Issues #59–#62, 2026-09-26](issues-59-62-acceptance-2026-09-26.md) | Combined candidate and desktop legacy actions/return/unread/category checks |
+| [Issues #59–#62 Palma, 2026-09-26](issues-59-62-palma-2026-09-26.md) | Physical issue controls, initial Open anomaly, and verified original-profile restoration |

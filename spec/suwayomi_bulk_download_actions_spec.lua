@@ -259,8 +259,10 @@ describe("bounded bulk download actions", function()
             dialog.ok_callback()
             if stale_change == "retired host" then
                 assert.are.same({}, messages)
+            elseif stale_change == "retired menu" then
+                assert.are.equal("Chapter view changed. Run this download action again.", messages[#messages])
             else
-                assert.is_truthy(messages[#messages]:find("Chapter view changed. Run this download action again.", 1, true))
+                assert.are.equal("Chapter controls expired. Reopen the current chapter actions and try again.", messages[#messages])
             end
             assert.are.same({}, storedJobs())
             assert.are.equal(selected, plugin:getSelectedChapterCount())
@@ -336,7 +338,7 @@ describe("bounded bulk download actions", function()
                 if size == 0 then
                     assert.are.same({}, stack)
                     assert.are.same({}, storedJobs())
-                    assert.are.equal("No new downloads available: chapters are already downloaded or in the download queue.", messages[#messages])
+                    assert.are.equal("No new downloads available: chapters are already downloaded, queued, or lack a verified server association.", messages[#messages])
                     return
                 end
                 local expected_count = math.min(size, 50)

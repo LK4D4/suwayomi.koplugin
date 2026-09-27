@@ -393,7 +393,7 @@ class ServerClient:
             # Refresh returns accessToken only; its refresh token never rotates.
             self.access_token = tokens["accessToken"]
 
-    def request(self, path, authorized=True):
+    def request(self, path, authorized=True, timeout=5):
         if not path.startswith("/api/") or "\\" in path or "#" in path:
             raise RuntimeError("Invalid sandbox API path")
         headers = {}
@@ -411,7 +411,7 @@ class ServerClient:
         request = urllib.request.Request(self.url + path, headers=headers)
         client = self.http if authorized and self.mode == "simple_login" else self.plain_http
         try:
-            with client.open(request, timeout=5) as response:
+            with client.open(request, timeout=timeout) as response:
                 body = response.read()
         except urllib.error.HTTPError as error:
             if not (authorized and self.mode == "ui_login" and error.code == 401):
@@ -421,7 +421,7 @@ class ServerClient:
             request.add_header("Authorization", "Bearer " + self.access_token)
             # REST 401 rejects before execution. Never replay network failures,
             # redirects, other HTTP errors, or a second rejection.
-            with client.open(request, timeout=5) as response:
+            with client.open(request, timeout=timeout) as response:
                 body = response.read()
         return json.loads(body) if body else None
 
@@ -431,14 +431,14 @@ def seed_library(client):
     local = [source for source in sources if source["name"] == "Local source"]
     if len(local) != 1:
         raise RuntimeError("Expected one Local source")
-    page = client.request(f"/api/v1/source/{local[0]['id']}/popular/1")
+    page = client.request(f"/api/v1/source/{local[0]['id']}/popular/1", timeout=30)
     manga = [manga for manga in page["mangaList"] if manga["title"] == "Sandbox Alpha"]
     if len(manga) != 1:
         raise RuntimeError("Generated fixture was not discovered")
     manga_id = manga[0]["id"]
-    client.request(f"/api/v1/manga/{manga_id}?onlineFetch=true")
+    client.request(f"/api/v1/manga/{manga_id}?onlineFetch=true", timeout=30)
     client.request(f"/api/v1/manga/{manga_id}/library")
-    chapters = client.request(f"/api/v1/manga/{manga_id}/chapters?onlineFetch=true")
+    chapters = client.request(f"/api/v1/manga/{manga_id}/chapters?onlineFetch=true", timeout=30)
     if len(chapters) != 3:
         raise RuntimeError("Fixture chapter discovery did not return three chapters")
     try:
@@ -597,6 +597,10 @@ def main():
     commands.add_parser("status")
     commands.add_parser("smoke", help="Download and open one unused fixture chapter through the real UI")
     commands.add_parser("auth-smoke", help="Fill and test the real setup connection dialog, then download a fixture")
+    upgrade = commands.add_parser("upgrade-acceptance", help="Opt-in synthetic upgrade workflow acceptance")
+    upgrade.add_argument("--prepare", action="store_true", help="Prepare fixtures with services stopped")
+    upgrade.add_argument("--source", type=Path, default=HERE.parent)
+    upgrade.add_argument("--only", help="One diagnostic scenario; remaining scenarios stay unverified")
     ui = commands.add_parser("ui").add_subparsers(dest="action", required=True)
     for name in ("observe", "home"):
         ui.add_parser(name)
@@ -629,6 +633,12 @@ def main():
         return
     elif args.command == "stop":
         result = stop(root, args.service)
+    elif args.command == "upgrade-acceptance":
+        import sandbox_upgrade
+        if args.prepare:
+            result = sandbox_upgrade.prepare(root)
+        else:
+            sys.exit(sandbox_upgrade.run(root, args.source.resolve(), args.only))
     elif args.command == "status":
         config = configuration(root)
         services = ("server", "tls", "reader") if config.get("https_port") else ("server", "reader")

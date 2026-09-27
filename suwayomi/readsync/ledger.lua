@@ -2,6 +2,7 @@
 -- Read actions and reader lifecycle own metadata, completion publication, and sync ordering.
 -- Manual deletion and refill contribute policy to one staged document; archive bookkeeping
 -- remains with its existing owners. Failed or uncertain saves expose no committed targets.
+-- Read merging consumes applicable read choices; command admission separately requires mutation eligibility.
 -- Pending choices retain their recorded endpoint; current credentials never associate legacy entries.
 
 local SuwayomiSettings = require("suwayomi/settings")
@@ -142,7 +143,7 @@ function Methods:getChapterReadScope(manga, chapters, ledger)
         local key = self:getChapterLedgerKey(manga, chapter)
         local entry, saved = ledger[key], committed[key]
         if chapter.local_only or not manga.id or not chapter.id
-            or (self.isLocalOnlyChapter and self:isLocalOnlyChapter(manga, chapter, lookup))
+            or (self.canMutateChapterArchive and not self:canMutateChapterArchive(manga, chapter, lookup))
             or (entry and entry.endpoint_scope ~= scope)
             or (saved and saved.endpoint_scope ~= scope) then return nil, "origin_unknown_or_mismatched" end
     end
@@ -168,6 +169,7 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters, options)
     local ledger = self:loadChapterLedger()
     local changed = false
     local merged = {}
+    local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga, ledger)
 
     for _, chapter in ipairs(chapters or {}) do
         local item = {}
@@ -177,9 +179,10 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters, options)
 
         local key = self:getChapterLedgerKey(manga, item)
         local entry = ledger[key]
-        local foreign_entry = entry and entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope
+        local unrelated_entry = entry and ((entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope)
+            or (lookup and self.getApplicableChapterReadChoice and self:getApplicableChapterReadChoice(manga, item, lookup) ~= entry))
         local unassociated_entry = entry and not entry.endpoint_scope
-        if foreign_entry then entry = nil end
+        if unrelated_entry then entry = nil end
         local suwayomi_is_read = item.is_read == true
         local pending_read_state
         if entry and entry.pending_read_sync == true then
@@ -203,7 +206,7 @@ function Methods:mergeChaptersWithReadLedger(manga, chapters, options)
         item._suwayomi_is_read = suwayomi_is_read
         item.is_read = is_read
 
-        if foreign_entry or unassociated_entry or (options and options.saved) then
+        if unrelated_entry or unassociated_entry or (options and options.saved) then
             item.pending_read_sync = entry and entry.pending_read_sync
         elseif remote_matches_pending then
             if is_read or (entry and entry.path) or hasUnrelatedFields(entry) then

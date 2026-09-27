@@ -75,6 +75,7 @@ userpatch.registerPatchPluginFunc("httpinspector", function(Inspector)
                 or (widget.title_bar and text(widget.title_bar.title))
             result.message = text(widget.text)
             result.page, result.pages = widget.page, widget.page_num
+            result.view_mode = widget.view_mode
             result.selected = widget.selected and {
                 x = widget.selected.x, y = widget.selected.y,
             } or nil

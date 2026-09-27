@@ -31,6 +31,66 @@ describe("suwayomi/client source manga flows", function()
     local buildSourceMangaSubprocessFake = helper.buildSourceMangaSubprocessFake
     local buildChapterCountSubprocessFake = helper.buildChapterCountSubprocessFake
 
+    it("remembers the browse view through result refreshes and reopening", function()
+        local shown_options, selected_callback
+        local client, observed = newClient({
+            chapter_count_worker = "disabled",
+            ui = {
+                showMangaMenu = function(_, select, options)
+                    shown_options, selected_callback = options, select
+                    return {}
+                end,
+                updateMangaMenu = function(_, _, _, options) shown_options = options end,
+            },
+        })
+        local preference, saves = "list", 0
+        client.settings.loadBrowseViewMode = function() return preference end
+        client.settings.saveBrowseViewMode = function(_, mode)
+            preference, saves = mode, saves + 1
+            return mode
+        end
+        local source = { id = "s1", name = "Source" }
+        local result = { ok = true, manga = { { id = "m1", title = "One" } } }
+        client:renderMangaForSourceResult({}, source, { type = "POPULAR" }, result)
+        assert.are.equal("list", shown_options.view_mode)
+        assert.is_true(shown_options.on_view_mode_changed("cover_text"))
+        selected_callback(result.manga[1])
+        observed.shown_manga_action_options().onMangaUpdated()
+        assert.are.equal("cover_text", shown_options.view_mode)
+        shown_options.close_callback()
+        assert.is_false(shown_options.on_view_mode_changed("list"))
+        assert.are.equal(1, saves)
+        client:renderMangaForSourceResult({}, source, { type = "POPULAR" }, result)
+        assert.are.equal("cover_text", shown_options.view_mode)
+    end)
+
+    it("reports a failed view save and rejects changes from superseded results", function()
+        local shown_options
+        local client, observed = newClient({
+            chapter_count_worker = "disabled",
+            ui = {
+                showMangaMenu = function(_, _, options)
+                    shown_options = options
+                    return {}
+                end,
+            },
+        })
+        local saves = 0
+        client.settings.saveBrowseViewMode = function()
+            saves = saves + 1
+            return nil, "write_failed"
+        end
+        client:renderMangaForSourceResult({}, { id = "s1" }, { type = "POPULAR" }, {
+            ok = true, manga = { { id = "m1", title = "One" } },
+        })
+        assert.is_false(shown_options.on_view_mode_changed("list"))
+        assert.are.equal("list", shown_options.view_mode)
+        assert.are.same({ "write_failed" }, observed.shown_messages)
+        client._source_manga_load_token = 2
+        assert.is_false(shown_options.on_view_mode_changed("cover_text"))
+        assert.are.equal(1, saves)
+    end)
+
     local function installLocalizedI18n(translations)
         previous_i18n_preload = package.preload["suwayomi/i18n"]
         previous_i18n_loaded = package.loaded["suwayomi/i18n"]
@@ -1961,6 +2021,60 @@ describe("suwayomi/client source manga flows", function()
         assert.are.equal("Page 2", updates[#updates].manga[2].title)
         assert.are.equal(shown_menu, updates[#updates].menu)
     end)
+
+    for _, view_change in ipairs({ false, true }) do
+        it("continues pagination after " .. (view_change and "a layout change" or "normal paging"), function()
+            local subprocess_job, started = buildSourceMangaSubprocessFake()
+            local menu, options, visible
+            local client = newClient({
+                subprocess_job = subprocess_job,
+                source_manga_worker = {},
+                chapter_count_worker = "disabled",
+                ffi_util = {},
+                ui_manager = {},
+                ui = {
+                    showMangaMenu = function()
+                        menu = { page = 1, page_num = 2, perpage = 12 }
+                        return menu
+                    end,
+                    updateMangaMenu = function(_, manga, _, menu_options)
+                        visible, options = manga, menu_options
+                    end,
+                },
+            })
+            local rows = {}
+            for index = 1, 20 do rows[index] = { id = tostring(index), title = tostring(index) } end
+            client:showMangaForSource({ id = "s1" }, { skip_mode_menu = true })
+            started[1].on_finish(started[1], { ok = true, manga = rows, has_next_page = true })
+            assert.are.equal(1, #started)
+
+            -- A wider grid fits the loaded batch on one page; native Next is disabled.
+            if view_change then
+                menu.perpage, menu.page_num = 24, 1
+                menu._suwayomi_view_mode_update = true
+            else
+                menu.page = 2
+            end
+            options.on_page_changed(menu, menu.page)
+            assert.are.equal(2, #started)
+            assert.are.equal(2, started[2].browse_options.page)
+            assert.are.equal(rows, visible)
+            options.on_page_changed(menu, menu.page)
+            assert.are.equal(2, #started)
+            menu._suwayomi_view_mode_update = nil
+
+            started[2].on_finish(started[2], {
+                ok = true,
+                manga = { rows[20], { id = "21", title = "21" } },
+                has_next_page = false,
+            })
+            assert.are.equal(21, #visible)
+            for index = 1, 20 do assert.are.equal(rows[index], visible[index]) end
+            assert.are.equal(view_change and 1 or 2, menu.page)
+            options.on_page_changed(menu, menu.page)
+            assert.are.equal(2, #started)
+        end)
+    end
 
     it("keeps appending while the refreshed menu remains on the last local page", function()
         local subprocess_job, started = buildSourceMangaSubprocessFake()

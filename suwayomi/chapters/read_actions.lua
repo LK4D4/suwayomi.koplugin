@@ -89,7 +89,9 @@ local function showReadSummary(self, result, options)
     if result.committed and result.busy == 0 and result.blocked == 0 then return end
     local parts = {}
     if not result.committed then
-        parts[1] = I18n.t("Could not confirm the read state was saved. No deletion was started. Reopen the chapter list and try again.")
+        parts[1] = result.identity_blocked
+            and I18n.t("Cannot change read state: a chapter lacks a verified association with the current server. No read state was changed and no deletion was started.")
+            or I18n.t("Could not confirm the read state was saved. No deletion was started. Reopen the chapter list and try again.")
     else
         if result.busy > 0 then
             parts[#parts + 1] = I18n.count(result.busy,
@@ -133,7 +135,7 @@ local function markRead(self, manga, chapters, options, batch, clear_selection)
     local ledger = copyLedger(options.ledger or self:loadChapterLedger())
     local scope, scope_err = self:getChapterReadScope(manga, chapters, ledger)
     if not scope then
-        local result = { committed = false, error = scope_err, marked_read = 0 }
+        local result = { committed = false, error = scope_err, identity_blocked = true, marked_read = 0 }
         showReadSummary(self, result, options)
         return 0, result
     end
@@ -231,10 +233,10 @@ local function markUnread(self, manga, chapters, options, batch, clear_selection
     local ledger = copyLedger(options.ledger or self:loadChapterLedger())
     local scope, scope_err = self:getChapterReadScope(manga, chapters, ledger)
     if not scope then
-        if not options.quiet then
-            self:showMessage(I18n.t("Could not confirm the unread state was saved. Pending deletion may still run. Reopen the chapter list and try again."))
-        end
-        return 0, { committed = false, marked_unread = 0, error = scope_err, summary_shown = not options.quiet }
+        local message = I18n.t("Cannot change read state: a chapter lacks a verified association with the current server. No read state was changed and no deletion was started.")
+        if not options.quiet then self:showMessage(message) end
+        return 0, { committed = false, marked_unread = 0, error = scope_err, identity_blocked = true,
+            message = message, summary_shown = not options.quiet }
     end
     local previous = captureContext(self)
     local keys = {}

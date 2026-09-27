@@ -1,6 +1,6 @@
 -- Boundary: ChapterActions.
 --
--- Responsibility: Public chapter actions, captured bulk download confirmations, and checked admission results, composed with focused read/delete modules.
+-- Responsibility: Public chapter actions using separate listing, archive-presence, and mutation-admission decisions, composed with focused read/delete modules.
 -- Owned state: State stays on the plugin instance so KOReader callbacks keep stable method names and return values.
 -- Dependencies: Focused chapter action modules, KOReader UI helpers, settings, debug timing, and i18n.
 -- External data: API responses, settings values, queue status, worker files, and filesystem paths remain untrusted at module boundaries.
@@ -11,6 +11,7 @@ local ChapterReadActions = require("suwayomi/chapters/read_actions")
 local MangaActionMenu = require("suwayomi/manga/action_menu")
 local SuwayomiDebug = require("suwayomi/debug")
 local SuwayomiSettings = require("suwayomi/settings")
+local StatusFormatter = require("suwayomi/downloads/status_formatter")
 local I18n = require("suwayomi/i18n")
 
 local ChapterActions = {}
@@ -60,7 +61,7 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid, options)
     if reader and queue:ownsChapter(queue:getKey(manga, chapter)) then
         return blocked(I18n.t("The next chapter has unfinished download work."))
     end
-    local local_only = self:isLocalOnlyChapter(manga, chapter)
+    local mutation_allowed = self:canMutateChapterArchive(manga, chapter)
     local request = {}
     local completed = false
     self.chapter_archive_request = request
@@ -77,7 +78,7 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid, options)
         return not self.suwayomi_host_retired
             and self.chapter_archive_request == request
             and (not context_current or context_current())
-            and self:isLocalOnlyChapter(manga, chapter) == local_only
+            and self:canMutateChapterArchive(manga, chapter) == mutation_allowed
             and (reader or not self.isChapterInCurrentContext or self:isChapterInCurrentContext(manga, chapter))
             and self:getChapterPath(manga, chapter) == chapter_path
             and (not reader or (require("apps/reader/readerui").instance == reader
@@ -94,12 +95,16 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid, options)
         if completed or not is_current() then return end
         completed = true
         if reader then self.next_chapter_pending = nil end
+        if result.stage == "persistence" then
+            blocked(result.error or I18n.t("Could not verify download"))
+            return
+        end
         if not reader and self.refreshChapterMenu then self:refreshChapterMenu() end
         if result.state ~= "valid" then
             if reader then
                 blocked(result.state == "damaged" and I18n.t("The next chapter archive is damaged.")
                     or I18n.t("The next chapter could not be verified. This does not mean it is damaged."))
-            elseif local_only then
+            elseif not mutation_allowed then
                 self:showMessage(result.error or I18n.t("Could not verify download"))
             else
                 self:showChapterDownloadError(manga, chapter)
@@ -118,21 +123,21 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid, options)
         end
         if not is_current() then return end
         if reader and result.identity ~= identity then return end
-        if not reader and not local_only then
+        if not reader and mutation_allowed then
             local associated, association_err = self:getDownloadQueue().refill:associate(manga)
             if not associated then
                 self:showMessage(association_err or I18n.t("Failed to save settings."))
                 return
             end
         end
-        if not local_only and self.saveReaderReturnContext then
+        if mutation_allowed and self.saveReaderReturnContext then
             local saved, save_err = self:saveReaderReturnContext(manga, chapter, chapter_path)
             if reader and not saved then
                 blocked(save_err or I18n.t("Failed to save settings."))
                 return
             end
         end
-        if not local_only and self.upsertChapterLedgerEntry then
+        if mutation_allowed and self.upsertChapterLedgerEntry then
             local saved, save_err = self:upsertChapterLedgerEntry(manga, chapter, {
                 path = chapter_path, endpoint_scope = manga.endpoint_scope,
             })
@@ -148,10 +153,9 @@ function Methods:verifyChapterDownload(manga, chapter, open_when_valid, options)
         else
             ReaderUI:showReader(chapter_path)
         end
-    end, { is_current = is_current, read_only = reader ~= nil or local_only })
+    end, { is_current = is_current, read_only = reader ~= nil or not mutation_allowed })
     if not accepted then
-        blocked(err == "verification_busy" and I18n.t("Another download is being verified.")
-            or I18n.t("Could not verify download"))
+        blocked(StatusFormatter.formatVerificationStartError(err))
     end
     return accepted, err
 end
@@ -163,7 +167,7 @@ end
 
 function Methods:performChapterAction(manga, chapter, action_id)
     if self.isChapterInCurrentContext and not self:isChapterInCurrentContext(manga, chapter) then return false end
-    if self:isLocalOnlyChapter(manga, chapter) and action_id ~= "open" and action_id ~= "verify_download" then
+    if not self:canMutateChapterArchive(manga, chapter) and action_id ~= "open" and action_id ~= "verify_download" then
         return false
     end
     self.chapter_archive_request = nil
@@ -249,7 +253,7 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
     local batch = {
         manga = queue:copyMangaMetadata(manga), chapters = {},
         download_directory = download_directory,
-        skipped = options.skipped or 0, capped = 0, scope = options.scope,
+        skipped = options.skipped or 0, blocked = 0, capped = 0, scope = options.scope,
         limit = self.max_batch_queue_chapters,
         context = self.current_chapter_context, unread = options.unread,
         menu = self.current_chapter_menu, filter = self.current_scanlator_filter,
@@ -268,6 +272,7 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
     end
     local seen = {}
     local scanlator_filter = batch.saved_filter or batch.filter
+    local lookup = self:buildChapterDownloadLookup(manga)
     for _index, chapter in ipairs(chapters or {}) do
         local key = queue:getKey(manga, chapter)
         if not seen[key] and (not scanlator_filter or self:getChapterScanlator(chapter) == scanlator_filter)
@@ -276,6 +281,8 @@ function Methods:captureChapterDownloadBatch(manga, chapters, download_directory
             if not context_allowed or (current_ids and not current_ids[tostring(chapter.id)])
                 or not queue:canEnqueue(manga, chapter, download_directory) then
                 batch.skipped = batch.skipped + 1
+            elseif not self:canMutateChapterArchive(manga, chapter, lookup) then
+                batch.blocked = batch.blocked + 1
             elseif #batch.chapters >= batch.limit then
                 batch.capped = batch.capped + 1
             else
@@ -288,8 +295,11 @@ end
 
 
 local function noDownloadCandidatesMessage(batch)
+    if (batch.blocked or 0) > 0 then
+        return I18n.t("No downloads queued: these chapters lack a verified server association.")
+    end
     if batch.skipped > 0 then
-        return I18n.t("No new downloads available: chapters are already downloaded or in the download queue.")
+        return I18n.t("No new downloads available: chapters are already downloaded, queued, or lack a verified server association.")
     end
     if batch.saved_filter then
         return I18n.t("No eligible chapters match the saved scanlator filter.")
@@ -319,8 +329,7 @@ function Methods:confirmChapterDownloadBatch(manga, chapters, download_directory
     local function accept()
         return self:enqueueSelectedChapterDownloads(batch.manga, batch.chapters, batch.download_directory, batch)
     end
-    -- Stale batch admission reports zero without persisting or changing selection.
-    return self:showBulkActionConfirmation(table.concat(parts, "\n"), I18n.t("Queue"), accept, accept)
+    return self:showBulkActionConfirmation(table.concat(parts, "\n"), I18n.t("Queue"), accept)
 end
 
 function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_directory, batch)
@@ -348,10 +357,14 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
         current_chapters[queue:getKey(batch.context.manga, chapter)] = chapter
     end
     local candidates = {}
+    local lookup = not stale and self:buildChapterDownloadLookup(batch.manga)
     for _, chapter in ipairs(batch.chapters) do
         local current = current_chapters[queue:getKey(batch.manga, chapter)]
         local scanlator_filter = batch.saved_filter or batch.filter
-        if not stale and (not batch.context or current) and not (batch.unread and current and current.is_read == true)
+        if not stale and queue:canEnqueue(batch.manga, current or chapter, batch.download_directory)
+            and not self:canMutateChapterArchive(batch.manga, current or chapter, lookup) then
+            batch.blocked = (batch.blocked or 0) + 1
+        elseif not stale and (not batch.context or current) and not (batch.unread and current and current.is_read == true)
             and (not scanlator_filter or self:getChapterScanlator(current or chapter) == scanlator_filter) then
             table.insert(candidates, chapter)
         end
@@ -382,6 +395,11 @@ function Methods:enqueueSelectedChapterDownloads(manga, chapters, download_direc
         status = stale and "stale" or (enqueue_err and "failed" or "accepted"),
         code = enqueue_err and tostring(enqueue_err):match("^([%w_]+)"),
     })
+    if (batch.blocked or 0) > 0 then
+        self:showMessage(I18n.count(batch.blocked,
+            "Skipped %1 chapter without a verified server association.",
+            "Skipped %1 chapters without a verified server association."))
+    end
     if not enqueue_err and not stale and outcome.failed == 0 and outcome.unconfirmed == 0 then
         return queued, enqueue_err
     end
@@ -703,12 +721,24 @@ function Methods:performBulkChapterAction(action_id, menu_context)
     local context = self.current_chapter_context
     local manga = context and context.manga
     if manga and action_id ~= "select_all" and action_id ~= "clear_selection" and action_id ~= "scanlator_filter" then
-        if manga.local_only then return false end
-        local recovered_refresh = action_id == "refresh_chapters" and manga.id and manga.endpoint_scope
-            and manga.endpoint_scope == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)
-        local lookup = self:buildChapterDownloadLookup(manga)
-        for _, chapter in ipairs(context.chapters or {}) do
-            if self:isLocalOnlyChapter(manga, chapter, lookup) and not recovered_refresh then return false end
+        local recovered_refresh = action_id == "refresh_chapters" and not manga.local_only and manga.id
+            and ((context.missing and not manga.endpoint_scope)
+                or (manga.endpoint_scope and manga.endpoint_scope
+                    == SuwayomiSettings:normalizeEndpointScope(SuwayomiSettings:load().server_url)))
+        if not self:hasCurrentChapterListing(manga, context.chapters) and not recovered_refresh then
+            self:showMessage(I18n.t("This action requires a chapter list associated with the current server."))
+            return false
+        end
+        if action_id == "delete_selected" or action_id == "delete_read_downloaded" then
+            local lookup = self:buildChapterDownloadLookup(manga)
+            local targets = action_id == "delete_selected" and self:getSelectedChapters(manga, context.chapters)
+                or self:getReadDownloadedChaptersFromCurrentContext()
+            for _, chapter in ipairs(targets) do
+                if not self:canMutateChapterArchive(manga, chapter, lookup) then
+                    self:showMessage(I18n.t("Cannot delete these downloads: a chapter lacks a verified server association."))
+                    return false
+                end
+            end
         end
     end
     if action_id == "bulk_downloads" then

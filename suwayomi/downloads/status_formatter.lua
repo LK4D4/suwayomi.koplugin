@@ -85,6 +85,37 @@ function StatusFormatter.formatChapterStatusSymbols(chapter, symbols, max_title_
     return title .. "  " .. suffix
 end
 
+function StatusFormatter.formatVerificationStartError(err)
+    if err == "store_blocked" then
+        return I18n.t("Verification is blocked by uncertain storage. Wait for storage recovery, then try again.")
+    end
+    return err == "verification_busy" and I18n.t("Another download is being verified.")
+        or I18n.t("Could not verify download")
+end
+
+function StatusFormatter.formatVerificationPersistenceError(err, blocked)
+    -- Never expose backend error details: they may contain private paths or credentials.
+    local code = tostring(err or ""):match("^([a-z_]+)")
+    local reasons = {
+        destination_directory_unavailable = I18n.t("Settings directory unavailable."),
+        open_failed = I18n.t("Could not open settings for writing."),
+        write_failed = I18n.t("Could not write settings."),
+        flush_failed = I18n.t("Could not flush settings."),
+        sync_failed = I18n.t("Could not sync settings."),
+        close_failed = I18n.t("Could not close settings."),
+        replacement_failed = I18n.t("Could not replace settings."),
+        serialization_failed = I18n.t("Could not prepare settings."),
+    }
+    if blocked or code == "store_blocked" or code == "store_blocked_ambiguous_transaction"
+        or code == "ambiguous_post_replacement" then
+        return I18n.t("Verification finished, but saving its result is blocked by uncertain storage. Wait for storage recovery, then try Open or Verify download again."),
+            "store_blocked"
+    end
+    local reason = reasons[code]
+    return I18n.f("Verification finished, but its result could not be saved. %1 Try Open or Verify download again.",
+        reason or I18n.t("Settings save failed.")), reason and code or "save_failed"
+end
+
 function StatusFormatter.formatArchiveStatus(status)
     if status and status.archive_state == "damaged" then
         return I18n.t("Download damaged; redownload")

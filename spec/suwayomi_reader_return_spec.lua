@@ -364,6 +364,7 @@ describe("suwayomi/reader_return", function()
         assert.is_true(context.in_library)
         assert.is_nil(context.chapter_id)
         assert.are.same({ id = "local", name = "Local source" }, context.source)
+        assert.is_nil(plugin:getReaderReturnContextForPath(context.path, true))
     end)
 
     it("does not infer sibling context from ambiguous manga folders", function()

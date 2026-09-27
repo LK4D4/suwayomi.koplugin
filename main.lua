@@ -20,6 +20,7 @@ local HomeController = require("suwayomi/plugin/home")
 local TitleMenuController = require("suwayomi/plugin/title_menu")
 local SettingsController = require("suwayomi/plugin/settings_controller")
 local ReaderReturn = require("suwayomi/reader_return")
+local ReaderFinish = require("suwayomi/reader_finish")
 local BrowseController = require("suwayomi/browse/controller")
 local DownloadsDirectory = require("suwayomi/downloads/directory")
 local MangaController = require("suwayomi/manga/controller")
@@ -169,6 +170,7 @@ function SuwayomiPlugin:closeSuwayomiPlugin()
 end
 
 function SuwayomiPlugin:onCloseWidget()
+    self:removeReaderFinishAdapter()
     self:retireChapterHost()
     self:cancelSourceFetchWorker()
     self.download_host_closed = true
@@ -234,6 +236,7 @@ function SuwayomiPlugin:init()
     if self.ui and self.ui.menu then
         self.ui.menu:registerToMainMenu(self)
     end
+    self:installReaderFinishAdapter()
     SuwayomiDebug.log({ operation = "plugin_init", event = "end" })
 end
 
@@ -243,6 +246,7 @@ local CONTROLLER_MODULES = {
     TitleMenuController,
     SettingsController,
     ReaderReturn,
+    ReaderFinish,
     BrowseController,
     DownloadsDirectory,
     MangaController,

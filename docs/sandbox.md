@@ -177,3 +177,7 @@ For a final-page test:
 4. For the positive control, reopen and use the native **Mark as finished** action. Check archive protection while open and the configured outcome after close. A completed document can remain downloaded when retention is Off.
 
 Read synchronization is asynchronous. A pending local read entry immediately after close is not a failed server update; wait for the server result and cleared pending state within a bounded deadline.
+
+## Upgrade workflows
+
+Use [upgrade acceptance](upgrade-acceptance.md) for repeatable synthetic upgrade states, fail-closed assertions, and the separate Palma release-readiness gate. Ordinary smoke and unit checks do not replace those controls.

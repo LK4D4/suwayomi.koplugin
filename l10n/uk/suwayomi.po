@@ -298,6 +298,9 @@ msgstr "Назад"
 msgid "Basic Auth"
 msgstr "Базова (Basic Auth)"
 
+msgid "Book status"
+msgstr ""
+
 msgid "Browse"
 msgstr "Огляд"
 
@@ -337,8 +340,20 @@ msgstr "Неможливо скасувати завантаження: стан
 msgid "Cannot cancel downloads: storage is ambiguous"
 msgstr "Неможливо скасувати завантаження: стан сховища неоднозначний"
 
+msgid ""
+"Cannot change read state: a chapter lacks a verified association with the "
+"current server. No read state was changed and no deletion was started."
+msgstr ""
+
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr "Неможливо видалити розділ: стан сховища неоднозначний"
+
+#, fuzzy
+msgid ""
+"Cannot delete these downloads: a chapter lacks a verified server association."
+msgstr ""
+"Не вдалося видалити %1 завантаження. Знову відкрийте список розділів і "
+"повторіть спробу."
 
 #, fuzzy
 msgid "Cannot determine the next chapter from the saved list."
@@ -362,6 +377,13 @@ msgstr "Вибір категорії: %1"
 
 msgid "Chapter actions"
 msgstr "Дії з розділом"
+
+#, fuzzy
+msgid ""
+"Chapter controls expired. Reopen the current chapter actions and try again."
+msgstr ""
+"Не вдалося додати завантаження в чергу. Знову відкрийте список розділів і "
+"повторіть спробу."
 
 msgid "Chapter download failed."
 msgstr "Не вдалося завантажити розділ."
@@ -464,6 +486,10 @@ msgstr "Не вдалося скасувати завантаження: %1"
 msgid "Could not clear failed downloads: %1"
 msgstr "Не вдалося очистити невдалі завантаження: %1"
 
+#, fuzzy
+msgid "Could not close settings."
+msgstr "Не вдалося завантажити манґу."
+
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] "Не вдалося підтвердити %1 завантаження розділу."
@@ -530,6 +556,10 @@ msgstr "Не вдалося видалити цей розділ із прист
 msgid "Could not download \"%1\"%2: %3"
 msgstr "Не вдалося завантажити \"%1\"%2: %3"
 
+#, fuzzy
+msgid "Could not flush settings."
+msgstr "Не вдалося зберегти налаштування."
+
 msgid "Could not load Suwayomi extensions."
 msgstr "Не вдалося завантажити розширення Suwayomi."
 
@@ -550,9 +580,20 @@ msgstr "Не вдалося завантажити збережені фільт
 msgid "Could not load source filters."
 msgstr "Не вдалося завантажити фільтри джерела."
 
+msgid "Could not open next file. Sort by date does not support this feature."
+msgstr ""
+
+#, fuzzy
+msgid "Could not open settings for writing."
+msgstr "Не вдалося почати завантаження манґи."
+
 #, fuzzy
 msgid "Could not open the next chapter."
 msgstr "Не вдалося завантажити розділи."
+
+#, fuzzy
+msgid "Could not prepare settings."
+msgstr "Не вдалося зберегти налаштування."
 
 msgid "Could not queue download: %1"
 msgstr "Не вдалося додати завантаження в чергу: %1"
@@ -567,6 +608,10 @@ msgstr "Не вдалося завантажити розділ заново."
 
 msgid "Could not refresh Library. Showing saved information."
 msgstr ""
+
+#, fuzzy
+msgid "Could not replace settings."
+msgstr "Не вдалося зберегти налаштування."
 
 msgid "Could not retry download."
 msgstr "Не вдалося повторити завантаження."
@@ -611,6 +656,10 @@ msgstr "Не вдалося почати завантаження джерела
 msgid "Could not start source loading: unknown error"
 msgstr "Не вдалося почати завантаження джерела: невідома помилка"
 
+#, fuzzy
+msgid "Could not sync settings."
+msgstr "Не вдалося зберегти налаштування."
+
 msgid "Could not update auto-download: %1"
 msgstr "Не вдалося оновити автозавантаження: %1"
 
@@ -619,6 +668,17 @@ msgstr "Не вдалося оновити бібліотеку."
 
 msgid "Could not verify download"
 msgstr "Не вдалося перевірити завантаження"
+
+#, fuzzy
+msgid "Could not write settings."
+msgstr "Не вдалося почати пошук."
+
+msgid "Cover only"
+msgstr ""
+
+#, fuzzy
+msgid "Cover with text"
+msgstr "Текст пошуку"
 
 msgid "Delete"
 msgstr "Видалити"
@@ -649,6 +709,10 @@ msgstr "Видалити завантажений файл для %1 з цьог
 
 msgid "Delete downloads"
 msgstr "Видалити завантаження"
+
+#, fuzzy
+msgid "Delete file"
+msgstr "Видалити збережений фільтр"
 
 msgid "Delete from device"
 msgstr "Видалити з пристрою"
@@ -877,6 +941,9 @@ msgstr "Не вдалося зберегти фільтр сканлейтора
 msgid "Failed to save settings."
 msgstr "Не вдалося зберегти налаштування."
 
+msgid "File browser"
+msgstr ""
+
 msgid "Filter"
 msgstr "Фільтр"
 
@@ -906,6 +973,9 @@ msgstr "Глобальний пошук"
 
 msgid "Go to Suwayomi"
 msgstr "Перейти до Suwayomi"
+
+msgid "Go to beginning"
+msgstr ""
 
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
@@ -983,6 +1053,10 @@ msgid "Library category picker settings are unavailable."
 msgstr "Налаштування вибору категорії бібліотеки недоступні."
 
 msgid "Library loaded, but could not be saved for next time."
+msgstr ""
+
+msgctxt "manga view"
+msgid "List"
 msgstr ""
 
 msgid "Loading canceled."
@@ -1101,6 +1175,9 @@ msgstr "Опис недоступний."
 msgid "No downloads queued."
 msgstr "У черзі немає завантажень."
 
+msgid "No downloads queued: these chapters lack a verified server association."
+msgstr ""
+
 msgid "No eligible chapters match the saved scanlator filter."
 msgstr ""
 "Жоден придатний до завантаження розділ не відповідає збереженому фільтру "
@@ -1121,9 +1198,10 @@ msgstr "Жодна манґа не відповідає цьому пошуку.
 msgid "No matching extensions"
 msgstr "Немає відповідних розширень"
 
+#, fuzzy
 msgid ""
-"No new downloads available: chapters are already downloaded or in the "
-"download queue."
+"No new downloads available: chapters are already downloaded, queued, or lack "
+"a verified server association."
 msgstr ""
 "Немає нових завантажень: розділи вже завантажено або додано в чергу "
 "завантажень."
@@ -1199,6 +1277,10 @@ msgstr "Відкрити розділи"
 
 msgid "Open first unread"
 msgstr "Відкрити перший непрочитаний"
+
+#, fuzzy
+msgid "Open next file"
+msgstr "Відкрити наступний непрочитаний"
 
 msgid "Open next unread"
 msgstr "Відкрити наступний непрочитаний"
@@ -1410,6 +1492,14 @@ msgstr "Налаштування"
 msgid "Settings are unavailable."
 msgstr "Налаштування недоступні."
 
+#, fuzzy
+msgid "Settings directory unavailable."
+msgstr "Налаштування недоступні."
+
+#, fuzzy
+msgid "Settings save failed."
+msgstr "Налаштування недоступні."
+
 msgid "Setup wizard"
 msgstr "Майстер налаштування"
 
@@ -1424,6 +1514,12 @@ msgid_plural "Skipped %1 already downloaded or queued."
 msgstr[0] "Пропущено %1 вже завантажене або додане в чергу."
 msgstr[1] "Пропущено %1 вже завантажені або додані в чергу."
 msgstr[2] "Пропущено %1 вже завантажених або доданих у чергу."
+
+msgid "Skipped %1 chapter without a verified server association."
+msgid_plural "Skipped %1 chapters without a verified server association."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Source"
 msgstr "Джерело"
@@ -1449,8 +1545,8 @@ msgstr "Suwayomi"
 msgid "Suwayomi Chapters"
 msgstr "Розділи Suwayomi"
 
-msgid "Suwayomi Client v1.2.0"
-msgstr "Клієнт Suwayomi v1.2.0"
+msgid "Suwayomi Client v1.2.1"
+msgstr "Клієнт Suwayomi v1.2.1"
 
 msgid "Suwayomi Downloads"
 msgstr "Завантаження Suwayomi"
@@ -1554,6 +1650,9 @@ msgstr ""
 "Це налаштування KOReader діє для всіх документів. Дія в кінці документа й "
 "налаштування видалення не змінюються. Ви можете змінити його там будь-коли."
 
+msgid "This action requires a chapter list associated with the current server."
+msgstr ""
+
 msgid ""
 "This book belongs to another server. Go to Suwayomi opens the configured "
 "Library."
@@ -1644,6 +1743,21 @@ msgstr "Використати цю теку"
 msgid "Username"
 msgstr "Ім'я користувача"
 
+msgid ""
+"Verification finished, but its result could not be saved. %1 Try Open or "
+"Verify download again."
+msgstr ""
+
+msgid ""
+"Verification finished, but saving its result is blocked by uncertain "
+"storage. Wait for storage recovery, then try Open or Verify download again."
+msgstr ""
+
+msgid ""
+"Verification is blocked by uncertain storage. Wait for storage recovery, "
+"then try again."
+msgstr ""
+
 msgid "Verify download"
 msgstr "Перевірити завантаження"
 
@@ -1651,6 +1765,9 @@ msgid "Verifying download"
 msgstr "Перевірка завантаження"
 
 msgid "Verifying next chapter…"
+msgstr ""
+
+msgid "View"
 msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."

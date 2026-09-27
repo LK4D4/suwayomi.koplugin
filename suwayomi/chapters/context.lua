@@ -1,6 +1,6 @@
 -- Boundary: ChapterContext.
 --
--- Responsibility: Owns chapter context, selection, filtering, status formatting, and ledger merge helpers.
+-- Responsibility: Owns chapter context, selection, filtering, and status formatting; listing identity gates persisted filters.
 -- Owned state: State lives on the plugin instance so KOReader callbacks keep the same behavior during the extraction.
 -- Dependencies: KOReader UI helpers, Suwayomi runtime modules, and the plugin i18n facade are required at module load to match the original plugin runtime.
 -- External data: callers must continue to treat API responses, settings values, worker files, and filesystem paths as untrusted until checked locally.
@@ -541,8 +541,8 @@ function Methods:formatBulkDownloadMessage(queued, skipped)
 end
 
 
-function Methods:canQueueChapterDownload(manga, chapter, download_directory)
-    if chapter.is_read == true then
+function Methods:canQueueChapterDownload(manga, chapter, download_directory, lookup)
+    if chapter.is_read == true or (self.canMutateChapterArchive and not self:canMutateChapterArchive(manga, chapter, lookup)) then
         return false
     end
 
@@ -573,11 +573,12 @@ function Methods:getNextUnreadChaptersForDownload(manga, limit, download_directo
     local seen = {}
     local queue = self:getDownloadQueue()
     local saved_filter = self:loadMangaScanlatorFilter(manga)
+    local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(manga)
     for _index, chapter in ipairs(self:getVisibleChapters((self.current_chapter_context and self.current_chapter_context.chapters) or {})) do
         local key = queue:getKey(manga, chapter)
         if not seen[key] and (not saved_filter or self:getChapterScanlator(chapter) == saved_filter) then
             seen[key] = true
-            if self:canQueueChapterDownload(manga, chapter, download_directory) then
+            if self:canQueueChapterDownload(manga, chapter, download_directory, lookup) then
                 table.insert(chapters, chapter)
                 if #chapters >= limit then
                     break
@@ -621,14 +622,11 @@ end
 function Methods:setScanlatorFilter(scanlator)
     if self.suwayomi_host_retired or not self.current_chapter_context then return false end
     local context = self.current_chapter_context
-    local local_only = context.manga.local_only
-    if self.isLocalOnlyChapter then
-        local lookup = self.buildChapterDownloadLookup and self:buildChapterDownloadLookup(context.manga)
-        for _, chapter in ipairs(context.chapters or {}) do
-            if self:isLocalOnlyChapter(context.manga, chapter, lookup) then local_only = true; break end
-        end
+    local current_listing = not context.manga.local_only
+    if self.hasCurrentChapterListing then
+        current_listing = self:hasCurrentChapterListing(context.manga, context.chapters)
     end
-    if local_only then
+    if not current_listing then
         -- Recovered IDs may collide with another server's saved filter or refill policy.
         self.current_scanlator_filter = SuwayomiSettings:normalizeMangaScanlatorFilter(scanlator)
         self:clearChapterSelection(true)

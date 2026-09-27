@@ -1,6 +1,6 @@
 -- Boundary: ChapterLocalDownloads.
 --
--- Responsibility: Recover recorded chapters, decide record association/read authority, resolve scope-safe paths, and remove sidecars before archives.
+-- Responsibility: Recover recorded chapters, separate listing identity, applicable read choices, archive association, and mutation admission, and remove sidecars before archives.
 -- Owned state: Synchronous lookup indexes borrow the caller's working ledger; settings and downloader remain the source of truth.
 -- Dependencies: Suwayomi settings and downloader path helpers.
 -- External data: Download directory, manga/chapter metadata, and filesystem paths are treated as untrusted boundary inputs.
@@ -141,38 +141,70 @@ local function hasScopedPathRecord(manga, chapter, path, lookup)
     return false
 end
 
-function Methods:hasChapterReadAuthority(manga, chapter, path, lookup)
+-- Recorded association permits sidecar/read reconciliation, not an archive-generation mutation.
+function Methods:hasChapterArchiveReadAssociation(manga, chapter, path, lookup)
     if not manga.endpoint_scope or not lookup or lookup.foreign_paths[path] then return false end
     local stored = lookup.ledger[tostring(manga.id) .. ":" .. tostring(chapter.id)]
     if stored and stored.endpoint_scope ~= manga.endpoint_scope then return false end
     return hasScopedPathRecord(manga, chapter, path, lookup)
 end
 
-function Methods:getChapterReadEntry(manga, chapter, lookup)
+function Methods:getApplicableChapterReadChoice(manga, chapter, lookup)
+    if not currentScope(manga) then return nil end
     local entry = lookup.ledger[self:getChapterLedgerKey(manga, chapter)]
-    -- Unknown scope remains applicable here; archive authority requires known scope.
-    if entry and entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope then return nil end
+    if type(entry) ~= "table" or (entry.endpoint_scope and entry.endpoint_scope ~= manga.endpoint_scope)
+        or (entry.manga_id ~= nil and tostring(entry.manga_id) ~= tostring(manga.id))
+        or (entry.chapter_id ~= nil and tostring(entry.chapter_id) ~= tostring(chapter.id)) then return nil end
+    -- A scoped pending choice follows chapter identity when its archive moves.
+    -- Other entries still describe their recorded file, never another archive.
+    -- Display precedence does not grant archive association or mutation admission.
+    if entry.path then
+        local path, reason = self:getChapterPath(manga, chapter, lookup)
+        if lookup.foreign_paths[entry.path] or reason == "foreign_path" then return nil end
+        local scoped_pending = entry.endpoint_scope and entry.pending_read_sync == true
+        if not scoped_pending and path ~= entry.path then return nil end
+    elseif not entry.endpoint_scope then
+        local path, reason = self:getChapterPath(manga, chapter, lookup)
+        if reason == "foreign_path" then return nil end
+        if path and self:chapterArchiveExists(path) and not hasScopedPathRecord(manga, chapter, path, lookup) then return nil end
+    end
     return entry
 end
 
-function Methods:isLocalOnlyChapter(manga, chapter, lookup)
+-- Listing identity is independent of legacy read/archive records.
+function Methods:hasCurrentChapterListing(manga, chapters)
+    if not manga or manga.local_only or not manga.id or not manga.endpoint_scope or not currentScope(manga) then
+        return false
+    end
+    -- Reconstructed rows carry explicit local-only identity; a legacy ledger
+    -- entry alone cannot remove authority from a complete server listing.
+    for _, chapter in ipairs(chapters or {}) do
+        if chapter.local_only then return false end
+    end
+    return true
+end
+
+-- Admission only: mutation owners still capture/revalidate paths, generations, and checked saves.
+-- Unknown origin blocks mutations just like foreign origin, but may remain readable.
+function Methods:canMutateChapterArchive(manga, chapter, lookup)
     if not manga or manga.local_only or not manga.id or not chapter or chapter.local_only or not chapter.id
-        or not currentScope(manga) then return true end
+        or not currentScope(manga) then return false end
     lookup = lookup or self:buildChapterDownloadLookup(manga)
     local ledger = lookup.ledger
     local entry = ledger[tostring(manga.id) .. ":" .. tostring(chapter.id)]
-    if type(entry) == "table" and entry.endpoint_scope ~= manga.endpoint_scope then return true end
+    if type(entry) == "table" and entry.endpoint_scope ~= manga.endpoint_scope then return false end
     local path = self:getChapterPath(manga, chapter, lookup)
     if path and self:chapterArchiveExists(path) then
         -- A scoped pathless choice does not associate bytes found at a guessed path.
-        return not hasScopedPathRecord(manga, chapter, path, lookup)
+        return hasScopedPathRecord(manga, chapter, path, lookup)
     end
-    return false
+    return true
 end
 
 function Methods:getChapterPath(manga, chapter, lookup)
     if type(manga) ~= "table" or type(chapter) ~= "table" or not currentScope(manga) then return nil end
     lookup = lookup or self:buildChapterDownloadLookup(manga)
+    if chapter.local_path and lookup.foreign_paths[chapter.local_path] then return nil, "foreign_path" end
     local entries
     if chapter.id ~= nil then entries = lookup.by_id[tostring(chapter.id)]
     else entries = lookup.by_path[chapter.local_path] end
@@ -194,10 +226,11 @@ function Methods:getChapterPath(manga, chapter, lookup)
     local chapter_path = SuwayomiDownloader.findExistingChapterPath
         and SuwayomiDownloader:findExistingChapterPath(download_directory, manga, chapter)
         or select(2, SuwayomiDownloader:getTargetPath(download_directory, manga, chapter))
-    if lookup.foreign_paths[chapter_path] then return nil end
+    if lookup.foreign_paths[chapter_path] then return nil, "foreign_path" end
     return chapter_path
 end
 
+-- Scope-safe presence/path only; Open must still validate archive integrity.
 function Methods:isChapterDownloaded(manga, chapter, lookup)
     local chapter_path = self:getChapterPath(manga, chapter, lookup)
     if not chapter_path then

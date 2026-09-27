@@ -822,6 +822,9 @@ function DownloadQueue:pollVerification()
     if not active.worker_done then
         local ok, done = pcall(self.ffi_util.isSubProcessDone, active.pid)
         active.worker_done = ok and done == true
+        if active.worker_done then
+            self:logDebug({ operation = "downloadQueue.verification", event = "worker_exited" })
+        end
     end
     if not self:verificationIsCurrent(active) then active.canceled = true end
     if active.canceled and not active.worker_done and not active.terminating then
@@ -844,42 +847,52 @@ function DownloadQueue:pollVerification()
             pcall(self.ffi_util.terminateSubProcess, active.pid)
         end
     end
-    if active.result and not active.delivered and not active.canceled then
+    if active.worker_done and active.result and not active.delivered and not active.canceled then
         if not self:verificationIsCurrent(active) then
             active.canceled = true
-        elseif self:checkStoreFence() then
+        else
             local result = active.result
             result.path = active.path
-            local ok
-            if active.read_only then
-                ok = true
-            elseif result.state == "valid" then
-                ok = self:commitChapterCompletion(active, active.path)
-            else
-                local failed = self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
-                    repair = active.repair,
-                    archive_generation = active.archive_generation,
-                    provenance = active.provenance,
-                    progress = { state = "failed", archive_state = result.state, identity = result.identity,
-                        path = active.path, error = result.error },
-                })
-                ok = self:upsertPersistentJob(failed)
+            local ok, err = self:checkStoreFence()
+            if ok then
+                if active.read_only then
+                    ok = true
+                elseif result.state == "valid" then
+                    ok, err = self:commitChapterCompletion(active, active.path)
+                else
+                    local failed = self:buildPersistentJob(active.manga, active.chapter, active.download_directory, "failed", {
+                        repair = active.repair,
+                        archive_generation = active.archive_generation,
+                        provenance = active.provenance,
+                        progress = { state = "failed", archive_state = result.state, identity = result.identity,
+                            path = active.path, error = result.error },
+                    })
+                    ok, err = self:upsertPersistentJob(failed)
+                end
             end
             if ok then
-                active.delivered = true
                 if not active.read_only then
                     self.statuses[active.key] = result.state == "valid"
                         and { state = "downloaded", path = active.path }
                         or { state = "failed", archive_state = result.state, identity = result.identity,
                             path = active.path, error = result.error }
-                    self.onStatusChanged()
                 end
-                local current = self:verificationIsCurrent(active)
-                if active.worker_done then
-                    if not active.retain_files then SubprocessJob.cleanup(active) end
-                    self.verification = nil
-                end
-                if current and active.callback then pcall(active.callback, result) end
+            else
+                local message, code = StatusFormatter.formatVerificationPersistenceError(err, self:isBlocked())
+                result = { state = "unverified", stage = "persistence", code = code, error = message }
+                self:logDebug({ operation = "downloadQueue.verification", event = "persistence_failed", code = code })
+            end
+            -- This request ends on a save failure. An explicit ordinary retry must
+            -- pass the store fence and inspect the current archive again.
+            active.delivered = true
+            if not active.read_only then self.onStatusChanged() end
+            local current = self:verificationIsCurrent(active)
+            if not active.retain_files then SubprocessJob.cleanup(active) end
+            self.verification = nil
+            if current and active.callback then
+                local delivered = pcall(active.callback, result)
+                self:logDebug({ operation = "downloadQueue.verification",
+                    event = delivered and "delivered" or "callback_error", status = result.stage or result.state })
             end
         end
     end
@@ -917,6 +930,7 @@ function DownloadQueue:verifyArchive(manga, chapter, path, callback, options)
         result_path = SubprocessJob.buildResultPath("verify_" .. attempt_id),
     }
     self.verification = active
+    self:logDebug({ operation = "downloadQueue.verification", event = "inspection_started" })
     local ok, pid, launch_error = pcall(self.ffi_util.runInSubProcess, function()
         local valid, result = pcall(Archive.validate, path)
         if not valid then result = { state = "unverified", identity = active.identity, error = tostring(result) } end

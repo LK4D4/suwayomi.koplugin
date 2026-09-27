@@ -249,6 +249,9 @@ msgstr "返回"
 msgid "Basic Auth"
 msgstr "基本验证（Basic Auth）"
 
+msgid "Book status"
+msgstr ""
+
 msgid "Browse"
 msgstr "浏览"
 
@@ -288,8 +291,18 @@ msgstr "无法取消下载：存储状态不明确"
 msgid "Cannot cancel downloads: storage is ambiguous"
 msgstr "无法取消下载：存储状态不明确"
 
+msgid ""
+"Cannot change read state: a chapter lacks a verified association with the "
+"current server. No read state was changed and no deletion was started."
+msgstr ""
+
 msgid "Cannot delete chapter: storage is ambiguous"
 msgstr "无法删除章节：存储状态不明确"
+
+#, fuzzy
+msgid ""
+"Cannot delete these downloads: a chapter lacks a verified server association."
+msgstr "无法删除 %1 个下载。请重新打开章节列表并重试。"
 
 #, fuzzy
 msgid "Cannot determine the next chapter from the saved list."
@@ -313,6 +326,11 @@ msgstr "分类选择：%1"
 
 msgid "Chapter actions"
 msgstr "章节操作"
+
+#, fuzzy
+msgid ""
+"Chapter controls expired. Reopen the current chapter actions and try again."
+msgstr "无法将下载加入队列。请重新打开章节列表并重试。"
 
 msgid "Chapter download failed."
 msgstr "章节下载失败。"
@@ -410,6 +428,10 @@ msgstr "无法取消下载：%1"
 msgid "Could not clear failed downloads: %1"
 msgstr "无法清除失败的下载：%1"
 
+#, fuzzy
+msgid "Could not close settings."
+msgstr "无法加载漫画。"
+
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] "无法确认 %1 个章节下载。"
@@ -454,6 +476,10 @@ msgstr "无法从设备删除此章节。"
 msgid "Could not download \"%1\"%2: %3"
 msgstr "无法下载“%1”%2：%3"
 
+#, fuzzy
+msgid "Could not flush settings."
+msgstr "无法保存设置。"
+
 msgid "Could not load Suwayomi extensions."
 msgstr "无法加载 Suwayomi 扩展。"
 
@@ -472,9 +498,20 @@ msgstr "无法加载已保存的筛选器。"
 msgid "Could not load source filters."
 msgstr "无法加载源筛选器。"
 
+msgid "Could not open next file. Sort by date does not support this feature."
+msgstr ""
+
+#, fuzzy
+msgid "Could not open settings for writing."
+msgstr "无法开始加载漫画。"
+
 #, fuzzy
 msgid "Could not open the next chapter."
 msgstr "无法加载章节。"
+
+#, fuzzy
+msgid "Could not prepare settings."
+msgstr "无法保存设置。"
 
 msgid "Could not queue download: %1"
 msgstr "无法将下载加入队列：%1"
@@ -487,6 +524,10 @@ msgstr "无法重新下载章节。"
 
 msgid "Could not refresh Library. Showing saved information."
 msgstr ""
+
+#, fuzzy
+msgid "Could not replace settings."
+msgstr "无法保存设置。"
 
 msgid "Could not retry download."
 msgstr "无法重试下载。"
@@ -531,6 +572,10 @@ msgstr "无法开始加载源：%1"
 msgid "Could not start source loading: unknown error"
 msgstr "无法开始加载源：未知错误"
 
+#, fuzzy
+msgid "Could not sync settings."
+msgstr "无法保存设置。"
+
 msgid "Could not update auto-download: %1"
 msgstr "无法更新自动下载：%1"
 
@@ -539,6 +584,17 @@ msgstr "无法更新书架。"
 
 msgid "Could not verify download"
 msgstr "无法校验下载"
+
+#, fuzzy
+msgid "Could not write settings."
+msgstr "无法开始搜索。"
+
+msgid "Cover only"
+msgstr ""
+
+#, fuzzy
+msgid "Cover with text"
+msgstr "搜索文本"
 
 msgid "Delete"
 msgstr "删除"
@@ -565,6 +621,10 @@ msgstr "从此设备删除 %1 的已下载文件？"
 
 msgid "Delete downloads"
 msgstr "删除下载"
+
+#, fuzzy
+msgid "Delete file"
+msgstr "删除已保存的筛选器"
 
 msgid "Delete from device"
 msgstr "从设备删除"
@@ -786,6 +846,9 @@ msgstr "无法保存汉化组筛选器。"
 msgid "Failed to save settings."
 msgstr "无法保存设置。"
 
+msgid "File browser"
+msgstr ""
+
 msgid "Filter"
 msgstr "筛选"
 
@@ -815,6 +878,9 @@ msgstr "全局搜索"
 
 msgid "Go to Suwayomi"
 msgstr "前往 Suwayomi"
+
+msgid "Go to beginning"
+msgstr ""
 
 msgid ""
 "Helps Auto-download refill after chapters close. Manual marking still works."
@@ -886,6 +952,10 @@ msgid "Library category picker settings are unavailable."
 msgstr "书架分类选择器设置不可用。"
 
 msgid "Library loaded, but could not be saved for next time."
+msgstr ""
+
+msgctxt "manga view"
+msgid "List"
 msgstr ""
 
 msgid "Loading canceled."
@@ -997,6 +1067,9 @@ msgstr "无可用描述。"
 msgid "No downloads queued."
 msgstr "没有排队中的下载。"
 
+msgid "No downloads queued: these chapters lack a verified server association."
+msgstr ""
+
 msgid "No eligible chapters match the saved scanlator filter."
 msgstr "没有符合下载条件的章节匹配已保存的汉化组筛选器。"
 
@@ -1015,9 +1088,10 @@ msgstr "没有漫画匹配此搜索。"
 msgid "No matching extensions"
 msgstr "没有匹配的扩展"
 
+#, fuzzy
 msgid ""
-"No new downloads available: chapters are already downloaded or in the "
-"download queue."
+"No new downloads available: chapters are already downloaded, queued, or lack "
+"a verified server association."
 msgstr "没有可新增的下载：章节已下载或已在下载队列中。"
 
 msgid "No new downloads queued."
@@ -1091,6 +1165,10 @@ msgstr "打开章节"
 
 msgid "Open first unread"
 msgstr "打开第一个未读章节"
+
+#, fuzzy
+msgid "Open next file"
+msgstr "打开下一个未读章节"
 
 msgid "Open next unread"
 msgstr "打开下一个未读章节"
@@ -1293,6 +1371,14 @@ msgstr "设置"
 msgid "Settings are unavailable."
 msgstr "设置不可用。"
 
+#, fuzzy
+msgid "Settings directory unavailable."
+msgstr "设置不可用。"
+
+#, fuzzy
+msgid "Settings save failed."
+msgstr "设置不可用。"
+
 msgid "Setup wizard"
 msgstr "设置向导"
 
@@ -1305,6 +1391,10 @@ msgstr "简单登录（Simple Login）"
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
 msgstr[0] "已跳过 %1 个已下载或已排队的项目。"
+
+msgid "Skipped %1 chapter without a verified server association."
+msgid_plural "Skipped %1 chapters without a verified server association."
+msgstr[0] ""
 
 msgid "Source"
 msgstr "源"
@@ -1330,8 +1420,8 @@ msgstr "Suwayomi"
 msgid "Suwayomi Chapters"
 msgstr "Suwayomi 章节"
 
-msgid "Suwayomi Client v1.2.0"
-msgstr "Suwayomi 客户端 v1.2.0"
+msgid "Suwayomi Client v1.2.1"
+msgstr "Suwayomi 客户端 v1.2.1"
 
 msgid "Suwayomi Downloads"
 msgstr "Suwayomi 下载"
@@ -1432,6 +1522,9 @@ msgstr ""
 "此 KOReader 设置适用于所有文档，不会更改末尾操作或删除设置。您随时可以在该位"
 "置更改此设置。"
 
+msgid "This action requires a chapter list associated with the current server."
+msgstr ""
+
 msgid ""
 "This book belongs to another server. Go to Suwayomi opens the configured "
 "Library."
@@ -1520,6 +1613,21 @@ msgstr "使用此文件夹"
 msgid "Username"
 msgstr "用户名"
 
+msgid ""
+"Verification finished, but its result could not be saved. %1 Try Open or "
+"Verify download again."
+msgstr ""
+
+msgid ""
+"Verification finished, but saving its result is blocked by uncertain "
+"storage. Wait for storage recovery, then try Open or Verify download again."
+msgstr ""
+
+msgid ""
+"Verification is blocked by uncertain storage. Wait for storage recovery, "
+"then try again."
+msgstr ""
+
 msgid "Verify download"
 msgstr "校验下载"
 
@@ -1527,6 +1635,9 @@ msgid "Verifying download"
 msgstr "正在校验下载"
 
 msgid "Verifying next chapter…"
+msgstr ""
+
+msgid "View"
 msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."

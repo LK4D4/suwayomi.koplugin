@@ -16,6 +16,7 @@ describe("suwayomi/chapters/menu", function()
 
     it("exports chapter menu construction methods", function()
         helper.assertControllerModule("suwayomi/chapters/menu", {
+            "prepareChapterMenuItems",
             "buildChapterMenuItems",
             "buildChapterMenuOptions",
             "buildQuickChapterMenuItems",
@@ -42,6 +43,9 @@ describe("suwayomi/chapters/menu", function()
         end
         function plugin:buildChapterMenuItems()
             return { { name = "Chapter 1" } }
+        end
+        function plugin:prepareChapterMenuItems()
+            return {}
         end
         function plugin:isChapterDownloaded()
             return true
@@ -567,7 +571,7 @@ describe("suwayomi/chapters/menu", function()
         local ChapterMenu = require("suwayomi/chapters/menu")
         local message
         local plugin = {
-            isLocalOnlyChapter = function() return true end,
+            canMutateChapterArchive = function() return false end,
             isChapterDownloaded = function() return false end,
             showMessage = function(_, text) message = text end,
             performChapterAction = function() error("no chapter action is available") end,

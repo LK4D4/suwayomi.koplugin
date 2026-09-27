@@ -250,6 +250,9 @@ msgstr ""
 msgid "Basic Auth"
 msgstr ""
 
+msgid "Book status"
+msgstr ""
+
 msgid "Browse"
 msgstr ""
 
@@ -289,7 +292,16 @@ msgstr ""
 msgid "Cannot cancel downloads: storage is ambiguous"
 msgstr ""
 
+msgid ""
+"Cannot change read state: a chapter lacks a verified association with the "
+"current server. No read state was changed and no deletion was started."
+msgstr ""
+
 msgid "Cannot delete chapter: storage is ambiguous"
+msgstr ""
+
+msgid ""
+"Cannot delete these downloads: a chapter lacks a verified server association."
 msgstr ""
 
 msgid "Cannot determine the next chapter from the saved list."
@@ -311,6 +323,10 @@ msgid "Category picker: %1"
 msgstr ""
 
 msgid "Chapter actions"
+msgstr ""
+
+msgid ""
+"Chapter controls expired. Reopen the current chapter actions and try again."
 msgstr ""
 
 msgid "Chapter download failed."
@@ -403,6 +419,9 @@ msgstr ""
 msgid "Could not clear failed downloads: %1"
 msgstr ""
 
+msgid "Could not close settings."
+msgstr ""
+
 msgid "Could not confirm %1 chapter download."
 msgid_plural "Could not confirm %1 chapter downloads."
 msgstr[0] ""
@@ -448,6 +467,9 @@ msgstr ""
 msgid "Could not download \"%1\"%2: %3"
 msgstr ""
 
+msgid "Could not flush settings."
+msgstr ""
+
 msgid "Could not load Suwayomi extensions."
 msgstr ""
 
@@ -466,7 +488,16 @@ msgstr ""
 msgid "Could not load source filters."
 msgstr ""
 
+msgid "Could not open next file. Sort by date does not support this feature."
+msgstr ""
+
+msgid "Could not open settings for writing."
+msgstr ""
+
 msgid "Could not open the next chapter."
+msgstr ""
+
+msgid "Could not prepare settings."
 msgstr ""
 
 msgid "Could not queue download: %1"
@@ -479,6 +510,9 @@ msgid "Could not redownload chapter."
 msgstr ""
 
 msgid "Could not refresh Library. Showing saved information."
+msgstr ""
+
+msgid "Could not replace settings."
 msgstr ""
 
 msgid "Could not retry download."
@@ -524,6 +558,9 @@ msgstr ""
 msgid "Could not start source loading: unknown error"
 msgstr ""
 
+msgid "Could not sync settings."
+msgstr ""
+
 msgid "Could not update auto-download: %1"
 msgstr ""
 
@@ -531,6 +568,15 @@ msgid "Could not update library."
 msgstr ""
 
 msgid "Could not verify download"
+msgstr ""
+
+msgid "Could not write settings."
+msgstr ""
+
+msgid "Cover only"
+msgstr ""
+
+msgid "Cover with text"
 msgstr ""
 
 msgid "Delete"
@@ -559,6 +605,9 @@ msgid "Delete downloaded file for %1 from this device?"
 msgstr ""
 
 msgid "Delete downloads"
+msgstr ""
+
+msgid "Delete file"
 msgstr ""
 
 msgid "Delete from device"
@@ -779,6 +828,9 @@ msgstr ""
 msgid "Failed to save settings."
 msgstr ""
 
+msgid "File browser"
+msgstr ""
+
 msgid "Filter"
 msgstr ""
 
@@ -807,6 +859,9 @@ msgid "Global search"
 msgstr ""
 
 msgid "Go to Suwayomi"
+msgstr ""
+
+msgid "Go to beginning"
 msgstr ""
 
 msgid ""
@@ -879,6 +934,10 @@ msgid "Library category picker settings are unavailable."
 msgstr ""
 
 msgid "Library loaded, but could not be saved for next time."
+msgstr ""
+
+msgctxt "manga view"
+msgid "List"
 msgstr ""
 
 msgid "Loading canceled."
@@ -985,6 +1044,9 @@ msgstr ""
 msgid "No downloads queued."
 msgstr ""
 
+msgid "No downloads queued: these chapters lack a verified server association."
+msgstr ""
+
 msgid "No eligible chapters match the saved scanlator filter."
 msgstr ""
 
@@ -1004,8 +1066,8 @@ msgid "No matching extensions"
 msgstr ""
 
 msgid ""
-"No new downloads available: chapters are already downloaded or in the "
-"download queue."
+"No new downloads available: chapters are already downloaded, queued, or lack "
+"a verified server association."
 msgstr ""
 
 msgid "No new downloads queued."
@@ -1075,6 +1137,9 @@ msgid "Open chapters"
 msgstr ""
 
 msgid "Open first unread"
+msgstr ""
+
+msgid "Open next file"
 msgstr ""
 
 msgid "Open next unread"
@@ -1277,6 +1342,12 @@ msgstr ""
 msgid "Settings are unavailable."
 msgstr ""
 
+msgid "Settings directory unavailable."
+msgstr ""
+
+msgid "Settings save failed."
+msgstr ""
+
 msgid "Setup wizard"
 msgstr ""
 
@@ -1288,6 +1359,11 @@ msgstr ""
 
 msgid "Skipped %1 already downloaded or queued."
 msgid_plural "Skipped %1 already downloaded or queued."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Skipped %1 chapter without a verified server association."
+msgid_plural "Skipped %1 chapters without a verified server association."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -1315,7 +1391,7 @@ msgstr ""
 msgid "Suwayomi Chapters"
 msgstr ""
 
-msgid "Suwayomi Client v1.2.0"
+msgid "Suwayomi Client v1.2.1"
 msgstr ""
 
 msgid "Suwayomi Downloads"
@@ -1415,6 +1491,9 @@ msgstr ""
 "Dokumentende und Löschregeln bleiben unverändert. Die Einstellung lässt sich "
 "dort jederzeit ändern."
 
+msgid "This action requires a chapter list associated with the current server."
+msgstr ""
+
 msgid ""
 "This book belongs to another server. Go to Suwayomi opens the configured "
 "Library."
@@ -1502,6 +1581,21 @@ msgstr ""
 msgid "Username"
 msgstr ""
 
+msgid ""
+"Verification finished, but its result could not be saved. %1 Try Open or "
+"Verify download again."
+msgstr ""
+
+msgid ""
+"Verification finished, but saving its result is blocked by uncertain "
+"storage. Wait for storage recovery, then try Open or Verify download again."
+msgstr ""
+
+msgid ""
+"Verification is blocked by uncertain storage. Wait for storage recovery, "
+"then try again."
+msgstr ""
+
 msgid "Verify download"
 msgstr ""
 
@@ -1509,6 +1603,9 @@ msgid "Verifying download"
 msgstr ""
 
 msgid "Verifying next chapter…"
+msgstr ""
+
+msgid "View"
 msgstr ""
 
 msgid "Waiting to check which unread chapters need downloading."

@@ -70,12 +70,23 @@ local function refreshLibrary(self, session, background)
         on_finish = function(result)
             if not live(self, session) or session.request ~= token then return end
             session.request, session.active = nil, nil
-            if not result or not result.ok then
+            if not result or not result.ok or type(result.categories) ~= "table"
+                or type(result.manga) ~= "table" then
                 if not quiet then notify(self, I18n.t("Could not refresh Library. Showing saved information.")) end
                 return
             end
             session.listing = result
             session.saved = true
+            if session.category and session.category.id ~= nil then
+                local selected_id = tostring(session.category.id)
+                session.category = nil
+                for _, category in ipairs(result.categories) do
+                    if tostring(category.id) == selected_id then
+                        session.category = category
+                        break
+                    end
+                end
+            end
             local saved = self.settings:saveLibraryCache(session.credentials, result)
             renderLibrary(self, session)
             if not saved then
