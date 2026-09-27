@@ -1339,7 +1339,7 @@ msgstr ""
 msgid "Suwayomi Chapters"
 msgstr ""
 
-msgid "Suwayomi Client v1.2.0"
+msgid "Suwayomi Client v1.2.1"
 msgstr ""
 
 msgid "Suwayomi Downloads"

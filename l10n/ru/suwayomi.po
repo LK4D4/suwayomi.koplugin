@@ -1490,8 +1490,8 @@ msgstr "Suwayomi"
 msgid "Suwayomi Chapters"
 msgstr "Главы Suwayomi"
 
-msgid "Suwayomi Client v1.2.0"
-msgstr "Клиент Suwayomi v1.2.0"
+msgid "Suwayomi Client v1.2.1"
+msgstr "Клиент Suwayomi v1.2.1"
 
 msgid "Suwayomi Downloads"
 msgstr "Загрузки Suwayomi"
