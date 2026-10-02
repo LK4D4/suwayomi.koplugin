@@ -551,6 +551,20 @@ describe("saved-first Library browsing", function()
         assert.are.equal(8, views[1].rows[1].id)
     end)
 
+    it("keeps newer Library discovery and aggregate metadata when an older nested action completes", function()
+        local client, requests, views, _, _, actions = fixture({ categories = {}, manga = {
+            { id = 7, title = "Saved", in_library = true, latest_fetched_at = 1700000000, unread_count = 3 },
+        } })
+        client:showLibrary()
+        views[1].select(views[1].rows[1])
+        requests[1].on_finish({ ok = true, categories = {}, manga = {
+            { id = 7, title = "Refreshed", in_library = true, latest_fetched_at = 1800000000, unread_count = 8 },
+        } })
+        actions().options.onMangaUpdated(actions().manga)
+        assert.are.equal(1800000000, views[1].rows[1].latest_fetched_at)
+        assert.are.equal(8, views[1].rows[1].unread_count)
+    end)
+
     for _, preference in ipairs({ "always", "never" }) do
         it("honors the " .. preference .. " category picker preference offline", function()
             local client, _, views = fixture({ categories = { { id = 1, name = "Single" } }, manga = {} })

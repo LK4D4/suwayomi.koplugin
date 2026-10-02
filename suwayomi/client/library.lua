@@ -241,10 +241,9 @@ local function renderManga(self, session)
                         table.remove(session.listing.manga, index)
                     else
                         local previous = session.listing.manga[index]
-                        if updated_manga.latest_fetched_at == nil then
-                            updated_manga.latest_fetched_at = previous.latest_fetched_at
-                        end
-                        if updated_manga.unread_count == nil then updated_manga.unread_count = previous.unread_count end
+                        -- Nested actions do not reload the Library snapshot's discovery/aggregate metadata.
+                        updated_manga.latest_fetched_at = previous.latest_fetched_at
+                        updated_manga.unread_count = previous.unread_count
                         session.listing.manga[index] = updated_manga
                     end
                 end

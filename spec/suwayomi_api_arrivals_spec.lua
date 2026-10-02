@@ -70,6 +70,21 @@ describe("Library arrivals API", function()
         assert.is_nil(result.manga[1].latest_fetched_at)
     end)
 
+    it("keeps unavailable server unread counts unknown and preserves valid zero", function()
+        for _, count in ipairs({ json.null, "bad", false, {}, -1, 1.5, "inf" }) do
+            local body = json.decode(library())
+            body.data.mangas.nodes[1].unreadCount = count
+            local parsed = assert(api.parseLibraryMangaResponse(json.encode(body), true))
+            assert.is_nil(parsed.manga[1].unread_count)
+        end
+        for _, count in ipairs({ 0, "0", 12, "12" }) do
+            local body = json.decode(library())
+            body.data.mangas.nodes[1].unreadCount = count
+            local parsed = assert(api.parseLibraryMangaResponse(json.encode(body), true))
+            assert.are.equal(tonumber(count), parsed.manga[1].unread_count)
+        end
+    end)
+
     it("leaves timestamps unknown when the platform cannot render them", function()
         local date = os.date
         os.date = function() error("out of range") end

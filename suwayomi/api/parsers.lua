@@ -179,7 +179,11 @@ local function parseMangaNode(entry)
         manga.in_library = entry.inLibrary == true
     end
     if entry.unreadCount ~= nil then
-        manga.unread_count = tonumber(entry.unreadCount) or 0
+        local count = (type(entry.unreadCount) == "number" or type(entry.unreadCount) == "string")
+            and tonumber(entry.unreadCount)
+        if count and count >= 0 and count <= 9007199254740991 and count == math.floor(count) then
+            manga.unread_count = count
+        end
     end
     if entry.downloadCount ~= nil then
         manga.download_count = tonumber(entry.downloadCount) or 0
