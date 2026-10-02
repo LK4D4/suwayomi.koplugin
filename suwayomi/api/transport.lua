@@ -466,6 +466,7 @@ end
 local COMPATIBILITY_FIELDS = {
     "iconUrl", "isNsfw", "supportsLatest", "apkName", "repo",
     "author", "artist", "description", "genre", "status", "filters", "meta", "setSourceMetas",
+    "latestFetchedChapter", "fetchedAt",
 }
 local TRANSIENT_SOURCE_ERRORS = {
     "timed out", "timeout", "could not reach", "could not download chapter page",
@@ -578,6 +579,10 @@ local function performGraphQLRequest(credentials, request_body, operation_name, 
         if failure then
             return failure
         end
+    end
+    if ok and code == 400 then
+        local compatibility = graphQLFailure(response_body, false)
+        if compatibility and compatibility.ok then return compatibility end
     end
     if ok and code == 200 then
         return {

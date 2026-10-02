@@ -426,6 +426,53 @@ describe("suwayomi/api facade", function()
         assert.are.same({}, result.manga)
     end)
 
+    it("passes sanitized discovery validation errors through transport to Library fallback", function()
+        local json = require("dkjson")
+        for _, code in ipairs({ 200, 400 }) do
+        for _, field in ipairs({ "latestFetchedChapter", "fetchedAt" }) do
+            local request = install_graphql_sequence_stub({
+                { code = code, body = json.encode({ errors = {
+                    { message = 'Cannot query field "' .. field .. '" on type "Fixture". Private diagnostic.' },
+                } }) },
+                { body = [[{"data":{"mangas":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}]] },
+            })
+            local result = api.fetchLibraryManga(valid_credentials(), { require_complete = true })
+            assert.is_true(result.ok)
+            assert.is_false(result.arrivals_supported)
+            assert.are.equal(2, request.count)
+            assert.truthy(json.decode(request.bodies[1]).query:find("latestFetchedChapter", 1, true))
+            assert.is_nil(json.decode(request.bodies[2]).query:find("latestFetchedChapter", 1, true))
+        end
+        end
+    end)
+
+    it("does not let mixed discovery validation and auth errors reach fallback", function()
+        for _, code in ipairs({ 200, 400, 401, 403 }) do
+        local request = install_graphql_sequence_stub({ { code = code, body = [[{"errors":[
+            {"message":"Cannot query field \"latestFetchedChapter\" on type \"Manga\""},
+            {"message":"Unauthorized"}
+        ]}]] } })
+        local result = api.fetchLibraryManga(valid_credentials(), { require_complete = true })
+        assert.is_false(result.ok)
+        assert.is_nil(result.arrivals_supported)
+        assert.are.equal(1, request.count)
+        end
+    end)
+
+    it("preserves HTTP 400 errors for unrelated validation and executed partial data", function()
+        for _, body in ipairs({
+            [[{"errors":[{"message":"Cannot query field \"unrelated\" on type \"Manga\""}]}]],
+            [[{"data":{"mangas":{"nodes":[]}},"errors":[{"message":"Cannot query field \"latestFetchedChapter\" on type \"Manga\""}]}]],
+        }) do
+            local request = install_graphql_sequence_stub({ { code = 400, body = body } })
+            local result = api.fetchLibraryManga(valid_credentials(), { require_complete = true })
+            assert.is_false(result.ok)
+            assert.is_nil(result.arrivals_supported)
+            assert.are.equal(400, result.status_code)
+            assert.are.equal(1, request.count)
+        end
+    end)
+
     it("retains legacy metadata compatibility during complete Library loading", function()
         install_graphql_sequence_stub({
             { body = [[{"errors":[{"message":"FieldUndefined: description"}]}]] },
