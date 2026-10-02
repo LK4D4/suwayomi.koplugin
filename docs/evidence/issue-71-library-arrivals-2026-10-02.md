@@ -1,6 +1,6 @@
 # Issue #71 Library arrivals acceptance, 2026-10-02
 
-Implementation is committed. Automated and desktop acceptance below is demonstrated. Physical Palma acceptance remains **unverified**: its existing KOReader session was running, and the session-availability question remains unanswered. No device profile, plugin, package state, or ADB mapping was changed.
+Implementation is committed. Automated, desktop, and focused physical Palma acceptance below is demonstrated. Palma used an isolated synthetic profile; its original profile and recorded package state were restored with all 1,224 file hashes matching. Human e-ink usability and unrelated hardware fault cases remain unverified.
 
 ## Candidate and controls
 
@@ -45,6 +45,22 @@ One code-review workflow ran its Standards and Spec axes independently. Standard
 | Offline cold reopen | Restarted real KOReader while the owned server stayed stopped. Saved dates/counts appeared, categories remained usable, and the saved chapter flow remained available. |
 | KOReader March compatibility | Focused native entry, dates/counts/rows, both sort controls, offline Open/return, paging, and footer jump-search demonstrated on `v2026.03`. July carried the complete changed-Library workflow. |
 
+## Physical Palma evidence
+
+The device pass ran on 2026-10-02 against the same frozen runtime candidate and installed Android KOReader **v2026.03**. All **99 runtime payload hashes** matched before testing and remained unchanged before the offline control. One coordinator owned the device. Its original reader was stopped at takeover; the recorded package state was disabled. The test temporarily enabled it and used a separate profile and download directory. An authenticated, loopback-only inspector used USB ADB forwarding; a task-owned Windows loopback relay and ADB reverse routed requests to the isolated WSL Suwayomi **v2.3.2243** server. This route establishes USB acceptance, not Wi-Fi behavior.
+
+| Control | Result and scope |
+| --- | --- |
+| Native entry and touch | Demonstrated actual Search > Suwayomi entry, native touch on the Library title menu and Title choice, and touch selection of a manga into its ordinary actions dialog. |
+| Ordering and rows | Nine synthetic manga matched independently captured server discovery order. Title matched displayed-title ordering. Screenshots showed Found dates, source labels, qualified unread counts including zero, the all-scanlator explanation, and a wrapped long Unicode title with its date/count column intact. |
+| Same-session navigation | Native Back returned to the category picker; selecting Reading, Refresh, and returning to All manga preserved Title order. Closing the manga dialog through its visible X also preserved Title. A new Library shortcut entry and cross-reader return correctly created a new session with Latest arrivals. |
+| Download and saved position | Normal chapter actions downloaded a synthetic CBZ; every PNG matched the source fixture. The native three-page reader went to page two, returned through Go to Suwayomi, and a fresh Open resumed page two. The resumed framebuffer was inspected. |
+| Failed Refresh | Stopped only the owned server. Explicit Refresh retained all nine usable rows and displayed retained-information status. The settings-directory hash comparison stayed unchanged across this projection action. |
+| Offline cold restart | A normal quit stopped the Android process. With the server still stopped, cold startup and native entry restored saved categories and all nine dated/count-qualified rows in Latest arrivals order. Cached chapter actions reopened the downloaded chapter at page two; Go to Suwayomi returned successfully and the CBZ hash stayed unchanged. |
+| Restoration | Before isolation, a host tar backup matched every original profile hash. The preserved original remained unchanged during testing; after restoration all **1,224/1,224 hashes** matched. Installed/stopped/enabled package flags matched the recorded takeover state; the reader was stopped, ADB mappings were empty, and both sandbox roots and the task loopback relay were stopped. Synthetic test data and private evidence were retained separately. Restoration verified at **17:55 UTC**. |
+
+Device fixture/setup failures are retained separately from product results: the disabled package initially prevented launch; a desktop color setting prompted a native warning; Windows CRLF broke the private inspector token; direct Windows-to-WSL loopback routing failed before the relay was added; and an attempted server title patch was unsupported. A Local-source fixture supplied the long title instead. One assertion expected the wrong synthetic display label. Two navigation assertions incorrectly expected sort retention across a new Library session/cross-reader return, which the issue explicitly excludes; the corrected same-session controls passed. Android Back did not dismiss the existing manga information dialog, so its visible X was used. Normal quit made the forwarded inspector connection reset; independent process checks confirmed shutdown without replaying the quit action. These attempts did not alter the frozen runtime payload.
+
 ## First attempts and limits
 
 - The first desktop deployment accidentally used the primary checkout because a shell-expanded source path was wrong. A source/deployment hash comparison identified it. Those screens were **not** counted as candidate acceptance; the explicit task-worktree deployment and subsequent candidate checks above replaced them.
@@ -52,6 +68,6 @@ One code-review workflow ran its Standards and Spec axes independently. Standard
 - One rapid reopen after reader return stayed on the chapter list during online background loading. A freshly selected Open subsequently resumed page two. The original attempt and diagnostics are retained; the exact cause is **unverified**. This is separate from the successful saved-position control and is not represented as a repaired reading defect.
 - Footer search is disabled natively for a one-page menu. The two-page control exercised it successfully. An additional zero-count assertion initially used a stale synthetic display-name alias; the independent manga-ID/cache check resolved that harness mismatch.
 - Unsupported older schemas, persistence faults, pending/foreign/relocated read choices, and unchanged download/retention/finish edge cases were covered by focused/composed automated checks; this task did not repeat their historical physical-device matrices.
-- Palma touch/layout, saved-position reopening, and offline browsing remain unverified pending availability of its active session. Human e-ink scanning, ghosting, physical sleep/wake, Wi-Fi changes, and power/storage faults were not tested.
+- Focused Palma touch/layout, saved-position reopening, and offline browsing are demonstrated above. Human e-ink scanning/refresh/ghosting, physical sleep/wake, Wi-Fi changes, and power/storage faults were not tested.
 
-Both task-owned desktop server roots and the reader were stopped after acceptance. Disposable profiles, synthetic archives, private evidence, the task worktree, and API worker worktree are retained for the pending device pass. No push, merge, issue publication, or production-device deployment was performed.
+Both task-owned server roots, readers, and the loopback relay were stopped after acceptance. Disposable profiles, synthetic archives, original-profile backup, private evidence, the task worktree, and API worker worktree are retained. Palma's original profile and package state were restored; no production plugin replacement remains. No push, merge, or issue publication was performed.
