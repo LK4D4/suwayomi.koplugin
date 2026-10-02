@@ -4,6 +4,7 @@ These dated records describe the named candidate, environment, method, observed 
 
 | Record | Scope |
 | --- | --- |
+| [Issue #71 Library arrivals, 2026-10-02](issue-71-library-arrivals-2026-10-02.md) | Library sorting/counts/status, both server queries, both desktop KOReader versions, retained first attempts; Palma acceptance pending active-session availability |
 | [Issue #58 native finish flow, 2026-09-27](issue-58-native-flow-acceptance-2026-09-27.md) | Native popup/automatic navigation, both-version 24-case desktop matrix, native completion comparison, isolated Palma controls and verified restoration |
 | [Release review, 2026-09-27](release-review-2026-09-27.md) | Master review, 1,789 specs, all eight fresh desktop scenarios, focused fresh Palma controls, verified restoration, and release recommendation |
 | [Issues #67–#70, 2026-09-26](issues-67-70-acceptance-2026-09-26.md) | Authority/preparation boundaries, composed historical controls, repeatable upgrade acceptance; all eight desktop and Palma scenarios with verified restoration |
