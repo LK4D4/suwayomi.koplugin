@@ -112,6 +112,8 @@ Server downloaded state never proves device-local availability. New archives use
 
 The release payload and Android destination are defined in [AGENTS.md](../AGENTS.md#packaging). Release notes live outside the payload; the tag workflow checks the tag against plugin metadata.
 
+Library projects complete membership into session-only Latest arrivals or Title order. Optional `latestFetchedChapter.fetchedAt` is requested only by Library and normalized at the API parser; narrow schema fallback retains separate discovery capability. The checked Library cache retains dates/counts and capability without a migration. Library rendering observes endpoint-scoped pending read choices without reconciling chapters, modifying aggregates, or enrolling refill. Transient loading/retained/unsaved status belongs to the existing Library session; successful live membership remains authoritative even when its cache write fails.
+
 ## Test strategy
 
 [AGENTS.md](../AGENTS.md#tests-and-commands) gives required local checks. [Testing guidance](agents/testing.md) routes integration, UI, and device work; [sandbox](sandbox.md) and [recipes](testing-recipes.md) hold setup and scenario steps. The [evidence index](evidence/README.md) separates dated observations from requirements.

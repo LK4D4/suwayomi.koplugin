@@ -524,6 +524,7 @@ function SuwayomiSettings:saveLibraryCache(credentials, listing)
         endpoint_scope = scope,
         manga = listing and listing.manga,
         categories = listing and listing.categories,
+        arrivals_supported = listing and listing.arrivals_supported,
     }
     if not scope or not usableLibraryCache(cache) then return nil, "invalid_library_cache" end
     local ok, err = self:getStore():saveKey("library_cache", copyLibraryValue(cache))

@@ -93,6 +93,25 @@ describe("suwayomi/network/request_worker", function()
         assert.are.same(result, written["/settings/snapshot.json"])
     end)
 
+    it("retains supported discovery metadata and capability in a complete Library snapshot", function()
+        local api = require("suwayomi/api")
+        api.fetchLibraryManga = function()
+            return { ok = true, total_count = 1, has_next_page = false, arrivals_supported = true,
+                manga = { { id = 7, latest_fetched_at = 1700000000, unread_count = 0 } } }
+        end
+        local result = require("suwayomi/network/request_worker"):run({},
+            { action = "fetch_library_snapshot" }, "/settings/snapshot.json")
+        assert.is_true(result.arrivals_supported)
+        assert.are.equal(1700000000, result.manga[1].latest_fetched_at)
+        assert.are.equal(0, result.manga[1].unread_count)
+        api.fetchLibraryManga = function()
+            return { ok = true, total_count = 0, has_next_page = false, manga = {}, arrivals_supported = false }
+        end
+        result = require("suwayomi/network/request_worker"):run({},
+            { action = "fetch_library_snapshot" }, "/settings/snapshot.json")
+        assert.is_false(result.arrivals_supported)
+    end)
+
     local function snapshotWithPages(pages, categories)
         local api = require("suwayomi/api")
         local index = 0

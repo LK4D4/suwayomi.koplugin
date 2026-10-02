@@ -1153,12 +1153,23 @@ local function buildLibraryCategoryRows(categories, onSelectCallback)
     return rows
 end
 
+local function withLibraryStatus(rows, options)
+    if options.library_status then
+        table.insert(rows, 1, {
+            text = I18n.t("Arrival dates and server counts: all scanlators."),
+            subtitle = options.library_status,
+            select_enabled = false,
+        })
+    end
+    return rows
+end
+
 function BrowseUI.showLibraryCategoryMenu(categories, onSelectCallback, options)
     options = options or {}
     return getListMenu().show{
         title = I18n.t("Suwayomi Library"),
         title_bar_left_icon = options.title_bar_left_icon,
-        item_table = buildLibraryCategoryRows(categories, onSelectCallback),
+        item_table = withLibraryStatus(buildLibraryCategoryRows(categories, onSelectCallback), options),
         close_callback = options.close_callback,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
         on_title_bar_left_hold = options.on_title_bar_left_hold,
@@ -1168,7 +1179,7 @@ end
 function BrowseUI.updateLibraryCategoryMenu(menu, categories, onSelectCallback, options)
     options = options or {}
     return getListMenu().update(menu, {
-        item_table = buildLibraryCategoryRows(categories, onSelectCallback),
+        item_table = withLibraryStatus(buildLibraryCategoryRows(categories, onSelectCallback), options),
         title_bar_left_icon = options.title_bar_left_icon,
         on_title_bar_left_tap = options.on_title_bar_left_tap,
         on_title_bar_left_hold = options.on_title_bar_left_hold,
@@ -1178,13 +1189,15 @@ end
 local function buildLibraryMangaMenuTable(manga_list, onSelectCallback, options)
     local rows = ListRows.buildMangaMenuTable(manga_list, {
         show_in_library = false,
+        library = true,
+        library_pending = options.library_pending,
         on_select = onSelectCallback,
     })
     for _, row in ipairs(rows) do row.keep_menu_open = true end
     if #rows == 0 and options.empty_text then
         rows[1] = { text = options.empty_text, select_enabled = false }
     end
-    return rows
+    return withLibraryStatus(rows, options)
 end
 
 function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)

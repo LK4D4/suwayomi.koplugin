@@ -24,6 +24,8 @@ describe("suwayomi/ui/list_rows", function()
         package.loaded["suwayomi/ui/list_rows"] = nil
         package.loaded["suwayomi/i18n"] = nil
         package.loaded["suwayomi/source_languages"] = nil
+        package.preload.datetime = nil
+        package.loaded.datetime = nil
     end)
 
     it("uses manga title, id, then an empty title fallback", function()
@@ -32,6 +34,29 @@ describe("suwayomi/ui/list_rows", function()
         assert.are.equal("Frieren", rows.getMangaTitle({ title = "Frieren", id = "m1" }))
         assert.are.equal("m2", rows.getMangaTitle({ id = "m2" }))
         assert.are.equal("", rows.getMangaTitle(nil))
+    end)
+
+    it("qualifies Library metadata without changing Browse rows or external source labels", function()
+        package.preload.datetime = function()
+            return { secondsToDate = function(seconds, locale)
+                assert.are.equal(1700000000, seconds)
+                assert.is_false(locale)
+                return "2023-11-14"
+            end }
+        end
+        local rows = require("suwayomi/ui/list_rows")
+        local manga = { id = 7, title = "長いタイトル", source = { name = "Source α" },
+            unread_count = 0, latest_fetched_at = 1700000000 }
+        local row = rows.buildMangaRow(manga, { library = true, library_pending = { [manga] = true } })
+        assert.are.equal("長いタイトル", row.text)
+        assert.matches("Source α", row.subtitle, 1, true)
+        assert.matches("Found 2023-11-14", row.mandatory, 1, true)
+        assert.matches("Server unread: 0", row.mandatory, 1, true)
+        assert.matches("Sync pending", row.mandatory, 1, true)
+        assert.is_nil(rows.buildMangaRow(manga, {}).mandatory)
+        local unknown = rows.buildMangaRow({ title = "Old cache" }, { library = true })
+        assert.are.equal("Arrival date unknown", unknown.mandatory)
+        assert.is_nil(unknown.mandatory:find("Server unread: 0", 1, true))
     end)
 
     it("shows manga in-library state only when requested and true", function()

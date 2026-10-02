@@ -174,6 +174,12 @@ msgid ""
 "preserved."
 msgstr ""
 
+msgid "Arrival date unknown"
+msgstr ""
+
+msgid "Arrival dates and server counts: all scanlators."
+msgstr ""
+
 msgid "Artist"
 msgstr ""
 
@@ -523,7 +529,10 @@ msgstr ""
 msgid "Could not redownload chapter."
 msgstr ""
 
-msgid "Could not refresh Library. Showing saved information."
+msgid "Could not refresh Library. No saved information is available."
+msgstr ""
+
+msgid "Could not refresh Library. Showing retained information."
 msgstr ""
 
 msgid "Could not replace settings."
@@ -870,6 +879,9 @@ msgstr ""
 msgid "First unread"
 msgstr ""
 
+msgid "Found %1"
+msgstr ""
+
 msgid "Genres"
 msgstr ""
 
@@ -940,6 +952,12 @@ msgctxt "source mode"
 msgid "Latest"
 msgstr ""
 
+msgid "Latest arrivals"
+msgstr ""
+
+msgid "Latest arrivals unavailable; using Title"
+msgstr ""
+
 msgid "Latest manga is not supported by this source."
 msgstr ""
 
@@ -957,6 +975,9 @@ msgstr ""
 
 msgctxt "manga view"
 msgid "List"
+msgstr ""
+
+msgid "Loaded information"
 msgstr ""
 
 msgid "Loading canceled."
@@ -1113,6 +1134,9 @@ msgstr ""
 msgid "No saved filters."
 msgstr ""
 
+msgid "No saved information"
+msgstr ""
+
 msgid "No unread chapters available to download."
 msgstr ""
 
@@ -1120,6 +1144,9 @@ msgid "Not in library"
 msgstr ""
 
 msgid "Not installed"
+msgstr ""
+
+msgid "Not saved for restart"
 msgstr ""
 
 msgid "Obsolete"
@@ -1218,6 +1245,9 @@ msgid ""
 "choices."
 msgstr ""
 
+msgid "Reconstructed information"
+msgstr ""
+
 msgid "Redownload"
 msgstr ""
 
@@ -1228,6 +1258,15 @@ msgid "Refresh chapters"
 msgstr ""
 
 msgid "Refresh extension list"
+msgstr ""
+
+msgid "Refresh failed; information retained"
+msgstr ""
+
+msgid "Refresh failed; information unavailable"
+msgstr ""
+
+msgid "Refreshing"
 msgstr ""
 
 msgid "Refreshing chapters..."
@@ -1293,6 +1332,9 @@ msgstr ""
 msgid "Saved filters metadata is not valid JSON."
 msgstr ""
 
+msgid "Saved information"
+msgstr ""
+
 msgid "Scanlator filter"
 msgstr ""
 
@@ -1349,6 +1391,9 @@ msgstr ""
 msgid ""
 "Server changed. Open this manga on the current server and choose Auto-"
 "download again."
+msgstr ""
+
+msgid "Server unread: %1"
 msgstr ""
 
 msgid "Set a download folder in Settings > Downloads."
@@ -1473,6 +1518,9 @@ msgstr ""
 msgid "Sync"
 msgstr ""
 
+msgid "Sync pending"
+msgstr ""
+
 msgid "Tap to retry"
 msgstr ""
 
@@ -1553,6 +1601,9 @@ msgid "This source has no manga."
 msgstr ""
 
 msgid "Timed out."
+msgstr ""
+
+msgid "Title"
 msgstr ""
 
 msgid "Turn off auto-download"

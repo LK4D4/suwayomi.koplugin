@@ -49,6 +49,11 @@ local function fetchLibraryMangaPages(credentials, categories)
         end
         total_count = total
         snapshot.total_count = total_count
+        if #all_manga == 0 then
+            snapshot.arrivals_supported = result.arrivals_supported
+        elseif snapshot.arrivals_supported ~= result.arrivals_supported then
+            return incompleteLibraryLoad()
+        end
         if not result_bytes then result_bytes = #json.encode(snapshot) end
         if #page_manga > page_size or #all_manga + #page_manga > total_count then
             return incompleteLibraryLoad()

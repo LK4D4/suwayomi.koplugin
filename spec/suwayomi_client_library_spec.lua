@@ -3,7 +3,12 @@ package.path = "?.lua;" .. package.path
 local helper = require("spec/support/suwayomi_client_spec_helper")
 
 describe("saved-first Library browsing", function()
-    after_each(function() helper.clearClientModules() end)
+    after_each(function()
+        helper.clearClientModules()
+        package.preload["suwayomi/ui"] = nil
+        package.loaded["suwayomi/ui"] = nil
+        package.loaded["suwayomi/plugin/title_menu"] = nil
+    end)
 
     local function fixture(saved)
         local requests, views, messages = {}, {}, {}
@@ -32,8 +37,8 @@ describe("saved-first Library browsing", function()
                     views[#views + 1] = menu
                     return menu
                 end,
-                updateLibraryCategoryMenu = function(menu, rows, select)
-                    menu.rows, menu.select = rows, select
+                updateLibraryCategoryMenu = function(menu, rows, select, options)
+                    menu.rows, menu.select, menu.options = rows, select, options
                 end,
             },
         })
@@ -60,6 +65,128 @@ describe("saved-first Library browsing", function()
         return client, requests, views, messages, credentials,
             function() return actions end, function() return title_options end
     end
+
+    it("orders saved discoveries deterministically without changing membership or cache order", function()
+        local listing = { categories = {}, manga = {
+            { id = 9, title = "Unknown" },
+            { id = 8, title = "Zulu", latest_fetched_at = 1700000000 },
+            { id = 7, title = "Alpha", latest_fetched_at = 1700000000 },
+            { id = 6, title = "Alpha", latest_fetched_at = 1700000000 },
+            { id = 5, title = "Newest", latest_fetched_at = 1800000000 },
+            { id = 4, title = "Absent", latest_fetched_at = 0 },
+        } }
+        local client, requests, views, _, _, _, title = fixture(listing)
+        client:showLibrary()
+        local function ids()
+            local result = {}
+            for _, manga in ipairs(views[1].rows) do result[#result + 1] = manga.id end
+            return result
+        end
+        assert.same({ 5, 6, 7, 8, 4, 9 }, ids())
+        assert.are.equal(9, listing.manga[1].id)
+        title().onSelect({ id = "sort_title" })
+        assert.same({ 4, 6, 7, 5, 9, 8 }, ids())
+        requests[1].on_finish({ ok = true, categories = {}, manga = listing.manga, arrivals_supported = true })
+        assert.same({ 4, 6, 7, 5, 9, 8 }, ids())
+        client:showLibrary()
+        assert.are.equal(5, views[2].rows[1].id)
+    end)
+
+    it("shows request, retained, loaded and unsaved status without losing authoritative emptiness", function()
+        local client, requests, views, messages, _, _, title = fixture({ categories = {}, manga = {} })
+        client:showLibrary()
+        assert.matches("Saved information", views[1].options.library_status, 1, true)
+        assert.matches("Refreshing", views[1].options.library_status, 1, true)
+        requests[1].on_finish({ ok = false })
+        assert.matches("Refresh failed", views[1].options.library_status, 1, true)
+        assert.same({}, messages)
+        title().onSelect({ id = "refresh" })
+        client.settings.saveLibraryCache = function() return nil, "uncertain" end
+        requests[2].on_finish({ ok = true, categories = {}, manga = {}, arrivals_supported = true })
+        assert.matches("Loaded information", views[1].options.library_status, 1, true)
+        assert.matches("Not saved for restart", views[1].options.library_status, 1, true)
+        assert.are.equal("Your Suwayomi library is empty.", views[1].options.empty_text)
+        assert.is_true(client.library_session.saved)
+    end)
+
+    it("qualifies server counts with only matching pending read choices, even after archive relocation", function()
+        local client, _, views = fixture({ categories = {}, manga = {
+            { id = 7, title = "Pending unread", unread_count = 12 },
+            { id = 8, title = "Foreign pending", unread_count = 0 },
+            { id = 9, title = "Legacy pending" },
+        } })
+        local ledger = {
+            one = { manga_id = 7, endpoint_scope = "http://library.test", pending_read_sync = true,
+                read = false, path = "/relocated/chapter.cbz" },
+            two = { manga_id = 8, endpoint_scope = "http://foreign.test", pending_read_sync = true },
+            three = { manga_id = 9, pending_read_sync = true },
+        }
+        client.settings.loadChapterLedger = function() return ledger end
+        client:showLibrary()
+        assert.is_true(views[1].options.library_pending[views[1].rows[3]])
+        assert.is_nil(views[1].options.library_pending[views[1].rows[1]])
+        assert.is_nil(views[1].options.library_pending[views[1].rows[2]])
+        assert.are.equal(12, views[1].rows[3].unread_count)
+        assert.is_true(ledger.one.pending_read_sync)
+        assert.is_false(ledger.one.read)
+        assert.are.equal("/relocated/chapter.cbz", ledger.one.path)
+        assert.is_nil(views[1].rows[3].sync_pending)
+    end)
+
+    it("falls back only for unsupported discovery and restores requested order on supported refresh", function()
+        local listing = { categories = {}, manga = {
+            { id = 7, title = "Zulu", latest_fetched_at = 1800000000 },
+            { id = 8, title = "Alpha", latest_fetched_at = 1700000000 },
+        }, arrivals_supported = false }
+        local client, requests, views, _, _, _, title = fixture(listing)
+        client:showLibrary()
+        assert.are.equal(8, views[1].rows[1].id)
+        assert.matches("Latest arrivals unavailable", views[1].options.library_status, 1, true)
+        requests[1].on_finish({ ok = false })
+        assert.are.equal(8, views[1].rows[1].id)
+        title().onSelect({ id = "refresh" })
+        requests[2].on_finish({ ok = true, categories = {}, manga = listing.manga, arrivals_supported = true })
+        assert.are.equal(7, views[1].rows[1].id)
+        assert.are.equal("latest_arrivals", client.library_session.sort_mode)
+    end)
+
+    it("retains the session sort across categories and metadata-only nested actions", function()
+        local category = { id = 1, name = "Reading" }
+        local client, requests, views, _, _, actions, title = fixture({ categories = { category }, manga = {
+            { id = 7, title = "Zulu", unread_count = 5, latest_fetched_at = 1800000000 },
+            { id = 8, title = "Alpha", latest_fetched_at = 1700000000, categories = { category } },
+        } })
+        client.settings.loadLibraryCategoryPickerBehavior = function() return "always" end
+        client:showLibrary()
+        title().onSelect({ id = "sort_title" })
+        views[1].select(views[1].rows[1])
+        assert.are.equal(8, views[2].rows[1].id)
+        views[1].select(views[1].rows[2])
+        assert.are.equal(8, views[2].rows[1].id)
+        views[1].select(views[1].rows[1])
+        views[2].select(views[2].rows[2])
+        actions().options.onMangaUpdated({ id = 7, title = "Zulu", in_library = true })
+        assert.are.equal(1800000000, views[2].rows[2].latest_fetched_at)
+        assert.are.equal(5, views[2].rows[2].unread_count)
+        assert.are.equal("title", client.library_session.sort_mode)
+        requests[1].on_finish({ ok = true, categories = { category }, manga = {}, arrivals_supported = true })
+        assert.are.equal("title", client.library_session.sort_mode)
+    end)
+
+    it("does not lend snapshot scope to unassociated, invalid-ID or empty-scope rows", function()
+        local unknown = { id = 7, title = "Unassociated", local_only = true }
+        local invalid = { id = -1, title = "Invalid" }
+        local foreign = { id = 7, title = "Foreign", endpoint_scope = "http://foreign.test" }
+        local client, _, views = fixture({ categories = {}, manga = { unknown, invalid, foreign } })
+        client.settings.loadChapterLedger = function() return {
+            { manga_id = 7, endpoint_scope = "http://library.test", pending_read_sync = true },
+            { manga_id = -1, endpoint_scope = "http://library.test", pending_read_sync = true },
+            { manga_id = 7, endpoint_scope = "", pending_read_sync = true },
+        } end
+        client:showLibrary()
+        assert.same({}, views[1].options.library_pending)
+        assert.is_nil(unknown.endpoint_scope)
+    end)
 
     it("allows saved row selection before the server completes without a loading modal", function()
         local client, requests, views, messages, _, actions = fixture({
@@ -374,6 +501,7 @@ describe("saved-first Library browsing", function()
     end)
 
     it("returns to Library through the title action without retaining the old navigation branch", function()
+        package.preload["suwayomi/ui"] = function() return {} end
         local client, _, views, _, _, actions = fixture({
             categories = { { id = 1, name = "First" }, { id = 2, name = "Second" } },
             manga = { { id = 7, title = "Saved" } },

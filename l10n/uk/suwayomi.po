@@ -199,6 +199,12 @@ msgstr ""
 "Належність архіву або завантаження не підтверджено. Наявні файли та завдання "
 "збережено."
 
+msgid "Arrival date unknown"
+msgstr ""
+
+msgid "Arrival dates and server counts: all scanlators."
+msgstr ""
+
 msgid "Artist"
 msgstr "Художник"
 
@@ -606,7 +612,11 @@ msgstr ""
 msgid "Could not redownload chapter."
 msgstr "Не вдалося завантажити розділ заново."
 
-msgid "Could not refresh Library. Showing saved information."
+#, fuzzy
+msgid "Could not refresh Library. No saved information is available."
+msgstr "Опис недоступний."
+
+msgid "Could not refresh Library. Showing retained information."
 msgstr ""
 
 #, fuzzy
@@ -965,6 +975,9 @@ msgstr "Перші 50 непрочитаних розділів"
 msgid "First unread"
 msgstr "Перший непрочитаний"
 
+msgid "Found %1"
+msgstr ""
+
 msgid "Genres"
 msgstr "Жанри"
 
@@ -1040,6 +1053,12 @@ msgctxt "source mode"
 msgid "Latest"
 msgstr "Новинки"
 
+msgid "Latest arrivals"
+msgstr ""
+
+msgid "Latest arrivals unavailable; using Title"
+msgstr ""
+
 msgid "Latest manga is not supported by this source."
 msgstr "Це джерело не підтримує режим «Новинки»."
 
@@ -1058,6 +1077,10 @@ msgstr ""
 msgctxt "manga view"
 msgid "List"
 msgstr ""
+
+#, fuzzy
+msgid "Loaded information"
+msgstr "Дані входу"
 
 msgid "Loading canceled."
 msgstr "Завантаження скасовано."
@@ -1233,6 +1256,10 @@ msgstr "Опис недоступний."
 msgid "No saved filters."
 msgstr "Немає збережених фільтрів."
 
+#, fuzzy
+msgid "No saved information"
+msgstr "Дані входу"
+
 msgid "No unread chapters available to download."
 msgstr "Немає непрочитаних розділів для завантаження."
 
@@ -1241,6 +1268,10 @@ msgstr "Не в бібліотеці"
 
 msgid "Not installed"
 msgstr "Не встановлено"
+
+#, fuzzy
+msgid "Not saved for restart"
+msgstr "Немає збережених фільтрів."
 
 msgid "Obsolete"
 msgstr "Застаріле"
@@ -1341,6 +1372,10 @@ msgstr ""
 "Параметри читання або завантаження змінилися. Автозавантаження використає "
 "поточні параметри."
 
+#, fuzzy
+msgid "Reconstructed information"
+msgstr "Дані входу"
+
 msgid "Redownload"
 msgstr "Завантажити заново"
 
@@ -1353,6 +1388,17 @@ msgstr "Оновити розділи"
 
 msgid "Refresh extension list"
 msgstr "Оновити список розширень"
+
+msgid "Refresh failed; information retained"
+msgstr ""
+
+#, fuzzy
+msgid "Refresh failed; information unavailable"
+msgstr "Опис недоступний."
+
+#, fuzzy
+msgid "Refreshing"
+msgstr "Оновити розділи"
 
 msgid "Refreshing chapters..."
 msgstr "Оновлення розділів..."
@@ -1418,6 +1464,10 @@ msgstr "Сервер не підтримує збережені фільтри."
 msgid "Saved filters metadata is not valid JSON."
 msgstr "Метадані збережених фільтрів не є коректним JSON."
 
+#, fuzzy
+msgid "Saved information"
+msgstr "Інформація про манґу"
+
 msgid "Scanlator filter"
 msgstr "Фільтр сканлейтора"
 
@@ -1479,6 +1529,9 @@ msgid ""
 msgstr ""
 "Сервер змінився. Відкрийте цю манґу на поточному сервері та знову виберіть "
 "«Автозавантаження»."
+
+msgid "Server unread: %1"
+msgstr ""
 
 msgid "Set a download folder in Settings > Downloads."
 msgstr "Задайте теку завантажень у Налаштування > Завантаження."
@@ -1607,6 +1660,10 @@ msgstr "Мови джерел Suwayomi"
 msgid "Sync"
 msgstr "Синхронізувати"
 
+#, fuzzy
+msgid "Sync pending"
+msgstr "За зростанням"
+
 msgid "Tap to retry"
 msgstr "Натисніть, щоб повторити"
 
@@ -1691,6 +1748,9 @@ msgstr "Це джерело не має манґи."
 
 msgid "Timed out."
 msgstr "Час очікування минув."
+
+msgid "Title"
+msgstr ""
 
 msgid "Turn off auto-download"
 msgstr "Вимкнути автозавантаження"

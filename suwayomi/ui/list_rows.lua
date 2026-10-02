@@ -40,6 +40,24 @@ end
 
 function ListRows.getMangaMandatory(manga, options)
     options = options or {}
+    if options.library == true then
+        local labels = {}
+        local count = manga.unread_count
+        if type(count) == "number" and count >= 0 and count < math.huge and count == math.floor(count) then
+            labels[#labels + 1] = I18n.f("Server unread: %1", count)
+        end
+        local time = manga.latest_fetched_at
+        local date
+        if type(time) == "number" and time > 0 and time < math.huge and time == math.floor(time) then
+            local ok, value = pcall(require("datetime").secondsToDate, time, false)
+            if ok and type(value) == "string" and value ~= "" then date = value end
+        end
+        labels[#labels + 1] = date and I18n.f("Found %1", date) or I18n.t("Arrival date unknown")
+        if options.library_pending and options.library_pending[manga] then
+            labels[#labels + 1] = I18n.t("Sync pending")
+        end
+        return I18n.join(labels, "\n")
+    end
     local labels = {}
     if options.show_in_library == true and type(manga) == "table" and manga.in_library == true then
         table.insert(labels, I18n.t("In Library"))

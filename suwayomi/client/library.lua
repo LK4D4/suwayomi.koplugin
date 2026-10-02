@@ -1,12 +1,41 @@
 -- Boundary: library flow.
 --
--- Responsibility: render saved Library information and replace it after a complete server load.
+-- Responsibility: project saved/loaded Library membership with session sorting and observational status.
 -- Owned state: one Library session and its cancellable request on the client.
 -- Dependencies: checked settings, normal Library widgets, and the request worker.
 -- External data: only complete scoped snapshots are persisted; unassociated reconstruction permits local reading only.
 
 local M = {}
 local I18n = require("suwayomi/i18n")
+local ListRows = require("suwayomi/ui/list_rows")
+
+local function discoveryTime(manga)
+    local value = manga.latest_fetched_at
+    if type(value) ~= "number" or value <= 0 or value == math.huge or value ~= math.floor(value) then return nil end
+    local ok, date = pcall(os.date, "%Y-%m-%d", value)
+    if ok and type(date) == "string" and date ~= "" then return value end
+end
+
+local function mangaIdentity(manga)
+    return tostring(manga.id or manga.local_manga_path or "")
+        .. "\n" .. tostring(manga.endpoint_scope or "")
+end
+
+local function sortLibraryRows(rows, mode)
+    table.sort(rows, function(a, b)
+        if mode == "latest_arrivals" then
+            local a_time, b_time = discoveryTime(a), discoveryTime(b)
+            if a_time ~= b_time then
+                if not a_time then return false end
+                if not b_time then return true end
+                return a_time > b_time
+            end
+        end
+        local a_title, b_title = ListRows.getMangaTitle(a), ListRows.getMangaTitle(b)
+        if a_title ~= b_title then return a_title < b_title end
+        return mangaIdentity(a) < mangaIdentity(b)
+    end)
+end
 
 function M.install(SuwayomiClient)
 function SuwayomiClient:mangaBelongsToCategory(manga, category)
@@ -46,7 +75,7 @@ end
 function SuwayomiClient:cancelLibraryNetworkRequests()
     local session = self.library_session
     if not session then return end
-    session.request = nil
+    session.request, session.refreshing = nil, false
     if session.active then self:getNetworkRequestJob().cancel(session.active) end
     session.active = nil
 end
@@ -58,6 +87,19 @@ local function refreshLibrary(self, session, background)
     local quiet = background and (session.saved or #session.listing.manga > 0)
     local token = {}
     session.request = token
+    session.refreshing, session.refresh_failed = true, false
+    renderLibrary(self, session)
+    local function failed()
+        session.request, session.active, session.refreshing = nil, nil, false
+        session.refresh_failed = true
+        renderLibrary(self, session)
+        if not quiet then
+            local message = (session.saved or #session.listing.manga > 0)
+                and I18n.t("Could not refresh Library. Showing retained information.")
+                or I18n.t("Could not refresh Library. No saved information is available.")
+            notify(self, message)
+        end
+    end
     local ok, active = pcall(self:getNetworkRequestJob().start, {
         owner = self.plugin,
         credentials = session.credentials,
@@ -65,18 +107,22 @@ local function refreshLibrary(self, session, background)
         result_prefix = "library_request",
         timeout_seconds = self:getNetworkRequestTimeoutSeconds(),
         on_cancel = function()
-            if session.request == token then session.request = nil end
+            if session.request == token then
+                session.request, session.active, session.refreshing = nil, nil, false
+                if live(self, session) then renderLibrary(self, session) end
+            end
         end,
         on_finish = function(result)
             if not live(self, session) or session.request ~= token then return end
-            session.request, session.active = nil, nil
+            session.request, session.active, session.refreshing = nil, nil, false
             if not result or not result.ok or type(result.categories) ~= "table"
                 or type(result.manga) ~= "table" then
-                if not quiet then notify(self, I18n.t("Could not refresh Library. Showing saved information.")) end
+                failed()
                 return
             end
             session.listing = result
             session.saved = true
+            session.information = "loaded"
             if session.category and session.category.id ~= nil then
                 local selected_id = tostring(session.category.id)
                 session.category = nil
@@ -88,6 +134,7 @@ local function refreshLibrary(self, session, background)
                 end
             end
             local saved = self.settings:saveLibraryCache(session.credentials, result)
+            session.saved_for_restart = saved ~= nil and saved ~= false
             renderLibrary(self, session)
             if not saved then
                 notify(self, I18n.t("Library loaded, but could not be saved for next time."))
@@ -96,8 +143,7 @@ local function refreshLibrary(self, session, background)
     })
     if not ok or not active then
         if session.request == token then
-            session.request = nil
-            if not quiet then notify(self, I18n.t("Could not refresh Library. Showing saved information.")) end
+            failed()
         end
         return false
     end
@@ -108,19 +154,69 @@ end
 local function menuOptions(self, session)
     local options = self:getTitleBarMenuOptions({
         title = I18n.t("Suwayomi Library"),
-        actions = { { id = "refresh", text = I18n.t("Refresh") } },
+        actions = {
+            { id = "refresh", text = I18n.t("Refresh") },
+            { id = "sort_latest_arrivals", text = I18n.t("Latest arrivals") },
+            { id = "sort_title", text = I18n.t("Title") },
+        },
         captureActionGuard = function() return function() return live(self, session) end end,
         onSelect = function(action)
             if action.id == "refresh" then return refreshLibrary(self, session) end
+            if action.id == "sort_latest_arrivals" or action.id == "sort_title" then
+                session.sort_mode = action.id == "sort_title" and "title" or "latest_arrivals"
+                renderLibrary(self, session)
+            end
         end,
     }) or {}
     options.thumbnail_credentials = session.credentials
+    local status = { session.information == "loaded" and I18n.t("Loaded information")
+        or (session.saved and I18n.t("Saved information") or I18n.t("Reconstructed information")) }
+    if not session.saved and #session.listing.manga == 0 then status[1] = I18n.t("No saved information") end
+    if session.information == "loaded" and not session.saved_for_restart then
+        status[#status + 1] = I18n.t("Not saved for restart")
+    end
+    if session.refreshing then status[#status + 1] = I18n.t("Refreshing") end
+    if session.refresh_failed then
+        status[#status + 1] = (session.saved or #session.listing.manga > 0)
+            and I18n.t("Refresh failed; information retained") or I18n.t("Refresh failed; information unavailable")
+    end
+    if session.listing.arrivals_supported == false then
+        status[#status + 1] = I18n.t("Latest arrivals unavailable; using Title")
+    else
+        status[#status + 1] = session.sort_mode == "title" and I18n.t("Title") or I18n.t("Latest arrivals")
+    end
+    options.library_status = I18n.join(status, " · ")
     return options
+end
+
+local function pendingLibraryChoices(self, session, rows)
+    local pending, by_id = {}, {}
+    if not session.scope or session.scope == "" then return pending end
+    local function validID(value)
+        local id = (type(value) == "number" or type(value) == "string") and tonumber(value)
+        return id and id > 0 and id <= 9007199254740991 and id == math.floor(id) and tostring(id) or nil
+    end
+    for _, entry in pairs(self.settings:loadChapterLedger() or {}) do
+        if type(entry) == "table" and entry.pending_read_sync == true then
+            local id = validID(entry.manga_id)
+            local scope = self.settings:normalizeEndpointScope(entry.endpoint_scope)
+            if id and scope and scope ~= "" and scope == session.scope then by_id[id] = true end
+        end
+    end
+    for _, manga in ipairs(rows) do
+        local id = validID(manga.id)
+        local scope = self.settings:normalizeEndpointScope(manga.endpoint_scope)
+        if not scope and session.saved and not manga.local_only then scope = session.scope end
+        if id and scope == session.scope and by_id[id] then pending[manga] = true end
+    end
+    return pending
 end
 
 local function renderManga(self, session)
     local rows = self:filterLibraryMangaByCategory(session.listing.manga, session.category)
+    sortLibraryRows(rows, session.listing.arrivals_supported == false and "title" or session.sort_mode)
     local options = menuOptions(self, session)
+    options.library_pending = pendingLibraryChoices(self, session, rows)
     if not session.saved and #rows == 0 then
         options.empty_text = I18n.t("No saved Library information is available.")
     elseif session.category and session.category.id then
@@ -144,6 +240,11 @@ local function renderManga(self, session)
                     if updated_manga.in_library == false then
                         table.remove(session.listing.manga, index)
                     else
+                        local previous = session.listing.manga[index]
+                        if updated_manga.latest_fetched_at == nil then
+                            updated_manga.latest_fetched_at = previous.latest_fetched_at
+                        end
+                        if updated_manga.unread_count == nil then updated_manga.unread_count = previous.unread_count end
                         session.listing.manga[index] = updated_manga
                     end
                 end
@@ -157,6 +258,7 @@ local function renderManga(self, session)
         end
     end
     if session.manga_menu then
+        options.close_callback = session.manga_menu.close_callback
         self.ui.updateLibraryMangaMenu(session.manga_menu, rows, select, options)
     else
         options.close_callback = function()
@@ -184,6 +286,7 @@ renderLibrary = function(self, session)
         end
         local choices = self:buildLibraryCategoryChoices(categories)
         if session.category_menu then
+            options.close_callback = session.category_menu.close_callback
             self.ui.updateLibraryCategoryMenu(session.category_menu, choices, select, options)
         else
             if session.manga_menu then
@@ -272,6 +375,8 @@ function SuwayomiClient:showLibrary()
         scope = scope,
         listing = listing or reconstructLibrary(self, scope),
         saved = listing ~= nil,
+        saved_for_restart = listing ~= nil,
+        sort_mode = "latest_arrivals",
     }
     self.library_session = session
     renderLibrary(self, session)

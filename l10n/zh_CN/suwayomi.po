@@ -161,6 +161,12 @@ msgid ""
 "preserved."
 msgstr "无法确认压缩包或下载任务的归属。现有文件和任务已保留。"
 
+msgid "Arrival date unknown"
+msgstr ""
+
+msgid "Arrival dates and server counts: all scanlators."
+msgstr ""
+
 msgid "Artist"
 msgstr "画师"
 
@@ -522,7 +528,11 @@ msgstr "无法将下载加入队列。请重新打开章节列表并重试。"
 msgid "Could not redownload chapter."
 msgstr "无法重新下载章节。"
 
-msgid "Could not refresh Library. Showing saved information."
+#, fuzzy
+msgid "Could not refresh Library. No saved information is available."
+msgstr "无可用描述。"
+
+msgid "Could not refresh Library. Showing retained information."
 msgstr ""
 
 #, fuzzy
@@ -870,6 +880,9 @@ msgstr "前 50 个未读章节"
 msgid "First unread"
 msgstr "第一个未读章节"
 
+msgid "Found %1"
+msgstr ""
+
 msgid "Genres"
 msgstr "题材"
 
@@ -939,6 +952,12 @@ msgctxt "source mode"
 msgid "Latest"
 msgstr "最新"
 
+msgid "Latest arrivals"
+msgstr ""
+
+msgid "Latest arrivals unavailable; using Title"
+msgstr ""
+
 msgid "Latest manga is not supported by this source."
 msgstr "此源不支持最新漫画。"
 
@@ -957,6 +976,10 @@ msgstr ""
 msgctxt "manga view"
 msgid "List"
 msgstr ""
+
+#, fuzzy
+msgid "Loaded information"
+msgstr "登录信息"
 
 msgid "Loading canceled."
 msgstr "加载已取消。"
@@ -1121,6 +1144,10 @@ msgstr "无可用描述。"
 msgid "No saved filters."
 msgstr "没有已保存的筛选器。"
 
+#, fuzzy
+msgid "No saved information"
+msgstr "登录信息"
+
 msgid "No unread chapters available to download."
 msgstr "没有可下载的未读章节。"
 
@@ -1129,6 +1156,10 @@ msgstr "不在书架中"
 
 msgid "Not installed"
 msgstr "未安装"
+
+#, fuzzy
+msgid "Not saved for restart"
+msgstr "没有已保存的筛选器。"
 
 msgid "Obsolete"
 msgstr "过时"
@@ -1223,6 +1254,10 @@ msgid ""
 "choices."
 msgstr "阅读或下载选项已更改。自动下载会使用当前选项。"
 
+#, fuzzy
+msgid "Reconstructed information"
+msgstr "登录信息"
+
 msgid "Redownload"
 msgstr "重新下载"
 
@@ -1235,6 +1270,17 @@ msgstr "刷新章节"
 
 msgid "Refresh extension list"
 msgstr "刷新扩展列表"
+
+msgid "Refresh failed; information retained"
+msgstr ""
+
+#, fuzzy
+msgid "Refresh failed; information unavailable"
+msgstr "无可用描述。"
+
+#, fuzzy
+msgid "Refreshing"
+msgstr "刷新章节"
 
 msgid "Refreshing chapters..."
 msgstr "正在刷新章节..."
@@ -1299,6 +1345,10 @@ msgstr "此服务器不支持已保存的筛选器。"
 msgid "Saved filters metadata is not valid JSON."
 msgstr "已保存筛选器的元数据不是有效的 JSON。"
 
+#, fuzzy
+msgid "Saved information"
+msgstr "漫画信息"
+
 msgid "Scanlator filter"
 msgstr "汉化组筛选器"
 
@@ -1358,6 +1408,9 @@ msgid ""
 "Server changed. Open this manga on the current server and choose Auto-"
 "download again."
 msgstr "服务器已更改。请在当前服务器上打开此漫画，然后再次选择“自动下载”。"
+
+msgid "Server unread: %1"
+msgstr ""
 
 msgid "Set a download folder in Settings > Downloads."
 msgstr "请在“设置 > 下载”中设置下载文件夹。"
@@ -1481,6 +1534,10 @@ msgstr "Suwayomi 源语言"
 msgid "Sync"
 msgstr "同步"
 
+#, fuzzy
+msgid "Sync pending"
+msgstr "升序"
+
 msgid "Tap to retry"
 msgstr "点按重试"
 
@@ -1562,6 +1619,9 @@ msgstr "此源没有漫画。"
 
 msgid "Timed out."
 msgstr "已超时。"
+
+msgid "Title"
+msgstr ""
 
 msgid "Turn off auto-download"
 msgstr "关闭自动下载"
