@@ -331,16 +331,26 @@ function SuwayomiAPI.fetchMangaForSource(credentials, options)
 end
 
 function SuwayomiAPI.fetchLibraryManga(credentials, options)
-    local result = performGraphQLRequest(credentials, SuwayomiAPI._buildLibraryMangaQuery(options), "fetchLibraryManga")
-    if not result.ok then
-        return result
-    end
-    if parsers.isOptionalMangaMetadataFieldError(result.response_body) then
-        logDebugEvent({ operation = "fetchLibraryManga", event = "legacy_manga_query_retry" })
-        result = performGraphQLRequest(credentials, SuwayomiAPI._buildLegacyLibraryMangaQuery(options), "fetchLibraryManga")
-        if not result.ok then
-            return result
+    local query_options = {}
+    for key, value in pairs(options or {}) do query_options[key] = value end
+    local arrivals_supported, legacy_metadata = query_options.arrivals_supported ~= false, false
+    local result
+    for _ = 1, 3 do
+        query_options.arrivals_supported = arrivals_supported
+        local builder = legacy_metadata and SuwayomiAPI._buildLegacyLibraryMangaQuery or SuwayomiAPI._buildLibraryMangaQuery
+        result = performGraphQLRequest(credentials, builder(query_options), "fetchLibraryManga")
+        if not result.ok then return result end
+        local rejected = parsers.libraryOptionalFieldErrors(result.response_body)
+        local retry = false
+        if rejected and rejected.arrivals and arrivals_supported then
+            arrivals_supported, retry = false, true
+            logDebugEvent({ operation = "fetchLibraryManga", event = "legacy_library_arrivals_query_retry" })
         end
+        if rejected and rejected.metadata and not legacy_metadata then
+            legacy_metadata, retry = true, true
+            logDebugEvent({ operation = "fetchLibraryManga", event = "legacy_manga_query_retry" })
+        end
+        if not retry then break end
     end
 
     local parsed, parse_error = SuwayomiAPI.parseLibraryMangaResponse(result.response_body, options and options.require_complete)
@@ -357,6 +367,7 @@ function SuwayomiAPI.fetchLibraryManga(credentials, options)
         manga = parsed.manga,
         total_count = parsed.total_count,
         has_next_page = parsed.has_next_page,
+        arrivals_supported = arrivals_supported,
     }
 end
 

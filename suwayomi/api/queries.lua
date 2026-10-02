@@ -194,6 +194,7 @@ local function buildLibraryMangaQuery(options, fields)
         query = "query GET_LIBRARY_MANGAS($filter: MangaFilterInput, $first: Int, $offset: Int, $order: [MangaOrderInput!]) { mangas(filter: $filter, first: $first, offset: $offset, order: $order) { totalCount "
             .. (options.require_complete and "pageInfo { hasNextPage } " or "") .. "nodes { "
             .. fields
+            .. (options.arrivals_supported ~= false and " latestFetchedChapter { fetchedAt }" or "")
             .. " unreadCount downloadCount source { id displayName name lang } categories { nodes { id name order } } firstUnreadChapter { id name chapterNumber sourceOrder scanlator isRead } } } }",
         variables = variables,
     })

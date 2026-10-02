@@ -335,6 +335,31 @@ function Parsers.isOptionalMangaMetadataFieldError(response_body)
     return false
 end
 
+-- A Library retry is safe only when every error rejects one of its optional fields.
+function Parsers.libraryOptionalFieldErrors(response_body)
+    local payload = json.decode(response_body, 1, nil)
+    if type(payload) ~= "table" or type(payload.errors) ~= "table" or #payload.errors == 0 then
+        return nil
+    end
+    local rejected = {}
+    for _, graph_error in ipairs(payload.errors) do
+        local message = type(graph_error) == "table" and graph_error.message
+        if type(message) ~= "string" then return nil end
+        local field = message:match('Cannot query field "([%w_]+)"')
+            or message:match('Unknown field "([%w_]+)"')
+            or message:match("FieldUndefined.-Field '([%w_]+)'")
+        if field == "latestFetchedChapter" or field == "fetchedAt" then
+            rejected.arrivals = true
+        elseif field == "author" or field == "artist" or field == "description"
+            or field == "genre" or field == "status" then
+            rejected.metadata = true
+        else
+            return nil
+        end
+    end
+    return rejected
+end
+
 function Parsers.parseSourceFiltersResponse(response_body)
     local payload, _, err = json.decode(response_body, 1, nil)
     if err then
@@ -585,6 +610,17 @@ local function completeLibraryConnection(payload, field)
     return connection
 end
 
+local function normalizeFetchedAt(chapter)
+    if type(chapter) ~= "table" then return nil end
+    local value = chapter.fetchedAt
+    if type(value) ~= "number" and type(value) ~= "string" then return nil end
+    local timestamp = tonumber(value)
+    if not timestamp or timestamp <= 0 or timestamp > 9007199254740991
+        or timestamp ~= math.floor(timestamp) then return nil end
+    local ok, rendered = pcall(os.date, "%Y-%m-%d", timestamp)
+    if ok and type(rendered) == "string" and rendered ~= "" then return timestamp end
+end
+
 function Parsers.parseLibraryMangaResponse(response_body, require_complete)
     local payload, _, err = json.decode(response_body, 1, json.null)
     if err or type(payload) ~= "table" then
@@ -592,6 +628,11 @@ function Parsers.parseLibraryMangaResponse(response_body, require_complete)
     end
 
     local mangas = type(payload.data) == "table" and payload.data.mangas
+    if type(payload.errors) == "table" and next(payload.errors) ~= nil then
+        local first = payload.errors[1]
+        return nil, type(first) == "table" and type(first.message) == "string" and first.message
+            or "Suwayomi server returned GraphQL errors."
+    end
     if require_complete and not completeLibraryConnection(payload, "mangas") then
         return nil, "Suwayomi server returned incomplete library metadata."
     end
@@ -612,6 +653,7 @@ function Parsers.parseLibraryMangaResponse(response_body, require_complete)
         if not manga then
             return nil, "Suwayomi server returned invalid manga data."
         end
+        manga.latest_fetched_at = normalizeFetchedAt(entry.latestFetchedChapter)
         table.insert(parsed, manga)
     end
     local has_next_page
