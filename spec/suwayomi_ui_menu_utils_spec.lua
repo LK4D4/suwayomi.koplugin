@@ -31,4 +31,20 @@ describe("suwayomi/ui/menu_utils", function()
             { type = "hold", menu = menu, value = "hold-value" },
         }, calls)
     end)
+
+    it("keeps an unchanged native title intact while still applying a changed title", function()
+        local menu_utils = require("suwayomi/ui/menu_utils")
+        local calls = {}
+        local menu = { title = "Library", title_bar = {
+            setTitle = function(_, text, no_refresh)
+                assert.is_true(no_refresh)
+                calls[#calls + 1] = text
+            end,
+        } }
+        menu_utils.applyTitleBarOptions(menu, { title = "Library" })
+        assert.same({}, calls)
+        menu_utils.applyTitleBarOptions(menu, { title = "Chapters" })
+        assert.same({ "Chapters" }, calls)
+        assert.are.equal("Chapters", menu.title)
+    end)
 end)

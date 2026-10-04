@@ -1248,7 +1248,6 @@ function ListMenu.update(menu, options)
     ListMenu.install(menu, options)
     cancelThumbnailJobs(menu)
     menu.item_table = options.item_table or {}
-    menu.title = options.title or menu.title
     if options.subtitle ~= nil then
         menu.subtitle = options.subtitle
         if menu.title_bar and menu.title_bar.setSubTitle then

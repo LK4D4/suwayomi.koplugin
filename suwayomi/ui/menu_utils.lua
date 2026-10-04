@@ -23,8 +23,9 @@ end
 function MenuUtils.applyTitleBarOptions(menu, options)
     options = options or {}
     if options.title then
+        local changed = menu.title ~= options.title
         menu.title = options.title
-        if menu.title_bar and menu.title_bar.setTitle then
+        if changed and menu.title_bar and menu.title_bar.setTitle then
             menu.title_bar:setTitle(options.title, true)
         end
     end
