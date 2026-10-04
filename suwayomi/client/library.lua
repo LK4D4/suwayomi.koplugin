@@ -158,10 +158,15 @@ local function menuOptions(self, session)
             { id = "refresh", text = I18n.t("Refresh") },
             { id = "sort_latest_arrivals", text = I18n.t("Latest arrivals") },
             { id = "sort_title", text = I18n.t("Title") },
+            { id = "about_library", text = I18n.t("About Library") },
         },
         captureActionGuard = function() return function() return live(self, session) end end,
         onSelect = function(action)
             if action.id == "refresh" then return refreshLibrary(self, session) end
+            if action.id == "about_library" then
+                self.plugin:showMessage(I18n.t("Latest arrivals orders manga by their newest server-discovered chapter.\n\nServer unread is the loaded or saved server aggregate, not total chapters, downloads, or new chapters since your last visit.\n\nLatest found is chapter discovery time. Imported old chapters may look recent. Counts and dates cover all scanlators; reading uses your saved scanlator filter.\n\nSync pending means local read choices await synchronization.\n\nLibrary Refresh reloads known server data. It does not discover chapters from sources."))
+                return
+            end
             if action.id == "sort_latest_arrivals" or action.id == "sort_title" then
                 session.sort_mode = action.id == "sort_title" and "title" or "latest_arrivals"
                 renderLibrary(self, session)
@@ -169,17 +174,25 @@ local function menuOptions(self, session)
         end,
     }) or {}
     options.thumbnail_credentials = session.credentials
-    local status = { session.information == "loaded" and I18n.t("Loaded information")
-        or (session.saved and I18n.t("Saved information") or I18n.t("Reconstructed information")) }
-    if not session.saved and #session.listing.manga == 0 then status[1] = I18n.t("No saved information") end
-    if session.information == "loaded" and not session.saved_for_restart then
-        status[#status + 1] = I18n.t("Not saved for restart")
-    end
-    if session.refreshing then status[#status + 1] = I18n.t("Refreshing") end
+    local information = session.information == "loaded" and I18n.t("Loaded information")
+        or (session.saved and I18n.t("Saved information") or I18n.t("Reconstructed information"))
+    if not session.saved and #session.listing.manga == 0 then information = I18n.t("No saved information") end
+    local unsaved = session.information == "loaded" and not session.saved_for_restart
+    local status = {}
     if session.refresh_failed then
-        status[#status + 1] = (session.saved or #session.listing.manga > 0)
-            and I18n.t("Refresh failed; information retained") or I18n.t("Refresh failed; information unavailable")
+        if unsaved then information = I18n.t("Loaded, not saved for restart")
+        elseif session.information == "loaded" then information = I18n.t("Loaded information retained")
+        elseif session.saved then information = I18n.t("Saved information retained")
+        elseif #session.listing.manga > 0 then information = I18n.t("Reconstructed information retained")
+        else information = I18n.t("Information unavailable") end
+        status[#status + 1] = I18n.t("Refresh failed")
+    elseif unsaved then
+        information = I18n.t("Loaded, not saved for restart")
     end
+    -- Native subtitles truncate on the right: actionable outcomes come first.
+    if unsaved then status[#status + 1] = information end
+    if session.refreshing then status[#status + 1] = I18n.t("Refreshing") end
+    if not unsaved then status[#status + 1] = information end
     if session.listing.arrivals_supported == false then
         status[#status + 1] = I18n.t("Latest arrivals unavailable; using Title")
     else

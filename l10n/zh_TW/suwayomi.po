@@ -99,6 +99,9 @@ msgid ""
 "later is not deleted for that earlier finish."
 msgstr ""
 
+msgid "About Library"
+msgstr ""
+
 msgid "Actions"
 msgstr ""
 
@@ -162,9 +165,6 @@ msgid ""
 msgstr ""
 
 msgid "Arrival date unknown"
-msgstr ""
-
-msgid "Arrival dates and server counts: all scanlators."
 msgstr ""
 
 msgid "Artist"
@@ -850,9 +850,6 @@ msgstr ""
 msgid "First unread"
 msgstr ""
 
-msgid "Found %1"
-msgstr ""
-
 msgid "Genres"
 msgstr ""
 
@@ -880,6 +877,9 @@ msgstr ""
 
 msgctxt "source filter tri-state"
 msgid "Include"
+msgstr ""
+
+msgid "Information unavailable"
 msgstr ""
 
 msgctxt "extension action"
@@ -922,7 +922,26 @@ msgstr ""
 msgid "Latest arrivals"
 msgstr ""
 
+msgid ""
+"Latest arrivals orders manga by their newest server-discovered chapter.\n"
+"\n"
+"Server unread is the loaded or saved server aggregate, not total chapters, "
+"downloads, or new chapters since your last visit.\n"
+"\n"
+"Latest found is chapter discovery time. Imported old chapters may look "
+"recent. Counts and dates cover all scanlators; reading uses your saved "
+"scanlator filter.\n"
+"\n"
+"Sync pending means local read choices await synchronization.\n"
+"\n"
+"Library Refresh reloads known server data. It does not discover chapters "
+"from sources."
+msgstr ""
+
 msgid "Latest arrivals unavailable; using Title"
+msgstr ""
+
+msgid "Latest found %1"
 msgstr ""
 
 msgid "Latest manga is not supported by this source."
@@ -945,6 +964,12 @@ msgid "List"
 msgstr ""
 
 msgid "Loaded information"
+msgstr ""
+
+msgid "Loaded information retained"
+msgstr ""
+
+msgid "Loaded, not saved for restart"
 msgstr ""
 
 msgid "Loading canceled."
@@ -1113,9 +1138,6 @@ msgstr ""
 msgid "Not installed"
 msgstr ""
 
-msgid "Not saved for restart"
-msgstr ""
-
 msgid "Obsolete"
 msgstr ""
 
@@ -1212,6 +1234,9 @@ msgstr ""
 msgid "Reconstructed information"
 msgstr ""
 
+msgid "Reconstructed information retained"
+msgstr ""
+
 msgid "Redownload"
 msgstr ""
 
@@ -1224,10 +1249,7 @@ msgstr ""
 msgid "Refresh extension list"
 msgstr ""
 
-msgid "Refresh failed; information retained"
-msgstr ""
-
-msgid "Refresh failed; information unavailable"
+msgid "Refresh failed"
 msgstr ""
 
 msgid "Refreshing"
@@ -1297,6 +1319,9 @@ msgid "Saved filters metadata is not valid JSON."
 msgstr ""
 
 msgid "Saved information"
+msgstr ""
+
+msgid "Saved information retained"
 msgstr ""
 
 msgid "Scanlator filter"

@@ -1249,6 +1249,12 @@ function ListMenu.update(menu, options)
     cancelThumbnailJobs(menu)
     menu.item_table = options.item_table or {}
     menu.title = options.title or menu.title
+    if options.subtitle ~= nil then
+        menu.subtitle = options.subtitle
+        if menu.title_bar and menu.title_bar.setSubTitle then
+            menu.title_bar:setSubTitle(options.subtitle, true)
+        end
+    end
     menu._suwayomi_pending_itemnumber = options.itemnumber
     applyOptions(menu, options)
     if menu.updateItems then

@@ -1355,18 +1355,31 @@ describe("suwayomi/ui/browse", function()
         assert.are.same({ id = "m1", title = "Sousou no Frieren", unread_count = 12 }, selected_manga)
     end)
 
-    it("shows Library scope and transient status once, preserving manga callbacks and native list chrome", function()
+    it("puts Library status in the native subtitle without consuming category or manga rows", function()
         local browse = require("suwayomi/ui/browse")
         local selected
         local options = { library_status = "Saved information · Refreshing" }
         browse.showLibraryMangaMenu({ { id = 7, title = "Saved" } }, function(manga) selected = manga end, options)
-        assert.matches("all scanlators", shown_dialog.item_table[1].text, 1, true)
-        assert.are.equal(options.library_status, shown_dialog.item_table[1].subtitle)
-        assert.is_false(shown_dialog.item_table[1].select_enabled)
-        assert.are.equal("Saved", shown_dialog.item_table[2].text)
-        assert.is_true(shown_dialog.item_table[2].keep_menu_open)
-        shown_dialog.item_table[2].callback()
+        assert.are.equal(options.library_status, shown_dialog.subtitle)
+        assert.are.equal(1, #shown_dialog.item_table)
+        assert.are.equal("Saved", shown_dialog.item_table[1].text)
+        assert.is_true(shown_dialog.item_table[1].keep_menu_open)
+        shown_dialog.item_table[1].callback()
         assert.are.equal(7, selected.id)
         assert.are.equal("list_menu", shown_dialog.renderer)
+        local menu = shown_dialog
+        browse.updateLibraryMangaMenu(menu, {}, nil, {
+            library_status = "Refresh failed · Saved information retained",
+            empty_text = "Empty",
+        })
+        assert.are.equal("Refresh failed · Saved information retained", menu.updated_options.subtitle)
+        assert.are.equal(1, #menu.item_table)
+        browse.showLibraryCategoryMenu({ { id = 1, name = "Reading" } }, nil, options)
+        assert.are.equal(options.library_status, shown_dialog.subtitle)
+        assert.are.equal(1, #shown_dialog.item_table)
+        browse.updateLibraryCategoryMenu(shown_dialog, { { name = "All manga" } }, nil, {
+            library_status = "Loaded information",
+        })
+        assert.are.equal("Loaded information", shown_dialog.updated_options.subtitle)
     end)
 end)

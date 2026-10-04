@@ -99,14 +99,55 @@ describe("saved-first Library browsing", function()
         assert.matches("Refreshing", views[1].options.library_status, 1, true)
         requests[1].on_finish({ ok = false })
         assert.matches("Refresh failed", views[1].options.library_status, 1, true)
+        assert.matches("^Refresh failed · Saved information retained", views[1].options.library_status)
         assert.same({}, messages)
         title().onSelect({ id = "refresh" })
         client.settings.saveLibraryCache = function() return nil, "uncertain" end
         requests[2].on_finish({ ok = true, categories = {}, manga = {}, arrivals_supported = true })
-        assert.matches("Loaded information", views[1].options.library_status, 1, true)
-        assert.matches("Not saved for restart", views[1].options.library_status, 1, true)
+        assert.matches("Loaded, not saved for restart", views[1].options.library_status, 1, true)
         assert.are.equal("Your Suwayomi library is empty.", views[1].options.empty_text)
         assert.is_true(client.library_session.saved)
+        title().onSelect({ id = "refresh" })
+        assert.matches("^Loaded, not saved for restart · Refreshing", views[1].options.library_status)
+        requests[3].on_finish({ ok = false })
+        assert.matches("^Refresh failed · Loaded, not saved for restart", views[1].options.library_status)
+        client.settings.saveLibraryCache = function(_, _, listing) return listing end
+        title().onSelect({ id = "refresh" })
+        requests[4].on_finish({ ok = true, categories = {}, manga = {} })
+        assert.matches("^Loaded information", views[1].options.library_status)
+        title().onSelect({ id = "refresh" })
+        requests[5].on_finish({ ok = false })
+        assert.matches("^Refresh failed · Loaded information retained", views[1].options.library_status)
+    end)
+
+    it("opens dismissible About from either title menu without changing the Library session", function()
+        local category = { id = 1, name = "Reading" }
+        local client, requests, views, messages, _, _, title = fixture({ categories = { category }, manga = {
+            { id = 7, title = "Saved", categories = { category } },
+        } })
+        client.settings.loadLibraryCategoryPickerBehavior = function() return "always" end
+        client:showLibrary()
+        title().onSelect({ id = "sort_title" })
+        for index = 1, 2 do
+            local menu = views[index]
+            menu.page = 3
+            local session, rows = client.library_session, menu.rows
+            title().onSelect({ id = "about_library" })
+            assert.are.equal(session, client.library_session)
+            assert.are.equal(rows, menu.rows)
+            assert.are.equal(3, menu.page)
+            assert.are.equal("title", session.sort_mode)
+            assert.are.equal(index == 2 and category or nil, session.category)
+            assert.are.equal(1, #requests)
+            assert.is_nil(messages[index].options)
+            for _, text in ipairs({ "newest server-discovered chapter", "loaded or saved server aggregate",
+                "total chapters, downloads", "discovery time", "Imported old chapters", "all scanlators",
+                "saved scanlator filter", "local read choices", "does not discover chapters" }) do
+                assert.matches(text, messages[index].text, 1, true)
+            end
+            -- Ordinary help dismissal has no Library callback or reconstruction.
+            if index == 1 then menu.select(menu.rows[2]) end
+        end
     end)
 
     it("qualifies server counts with only matching pending read choices, even after archive relocation", function()
@@ -217,11 +258,13 @@ describe("saved-first Library browsing", function()
         client:showLibrary()
         assert.are.equal(1, #views[1].rows)
         assert.are.equal("Recovered", views[1].rows[1].title)
+        assert.matches("Reconstructed information", views[1].options.library_status, 1, true)
         assert.is_nil(views[1].rows[1].endpoint_scope)
         views[1].select(views[1].rows[1])
         assert.is_true(actions().chapters)
         assert.is_true(actions().manga.local_only)
         requests[1].on_finish({ ok = false })
+        assert.matches("^Refresh failed · Reconstructed information retained", views[1].options.library_status)
         assert.same({}, messages)
         assert.is_true(ledger.one.read)
         assert.is_true(ledger.one.pending_read_sync)

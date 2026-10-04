@@ -97,6 +97,10 @@ msgstr ""
 "旧的已读状态不会触发删除。没有下载文件的读完章节仍计入保留数量，但之后下载的"
 "文件不会因之前的读完记录而被删除。"
 
+#, fuzzy
+msgid "About Library"
+msgstr "书架"
+
 msgid "Actions"
 msgstr "操作"
 
@@ -162,9 +166,6 @@ msgid ""
 msgstr "无法确认压缩包或下载任务的归属。现有文件和任务已保留。"
 
 msgid "Arrival date unknown"
-msgstr ""
-
-msgid "Arrival dates and server counts: all scanlators."
 msgstr ""
 
 msgid "Artist"
@@ -880,9 +881,6 @@ msgstr "前 50 个未读章节"
 msgid "First unread"
 msgstr "第一个未读章节"
 
-msgid "Found %1"
-msgstr ""
-
 msgid "Genres"
 msgstr "题材"
 
@@ -911,6 +909,10 @@ msgstr "在书架中"
 msgctxt "source filter tri-state"
 msgid "Include"
 msgstr "包含"
+
+#, fuzzy
+msgid "Information unavailable"
+msgstr "没有可用操作"
 
 msgctxt "extension action"
 msgid "Install"
@@ -955,7 +957,26 @@ msgstr "最新"
 msgid "Latest arrivals"
 msgstr ""
 
+msgid ""
+"Latest arrivals orders manga by their newest server-discovered chapter.\n"
+"\n"
+"Server unread is the loaded or saved server aggregate, not total chapters, "
+"downloads, or new chapters since your last visit.\n"
+"\n"
+"Latest found is chapter discovery time. Imported old chapters may look "
+"recent. Counts and dates cover all scanlators; reading uses your saved "
+"scanlator filter.\n"
+"\n"
+"Sync pending means local read choices await synchronization.\n"
+"\n"
+"Library Refresh reloads known server data. It does not discover chapters "
+"from sources."
+msgstr ""
+
 msgid "Latest arrivals unavailable; using Title"
+msgstr ""
+
+msgid "Latest found %1"
 msgstr ""
 
 msgid "Latest manga is not supported by this source."
@@ -980,6 +1001,14 @@ msgstr ""
 #, fuzzy
 msgid "Loaded information"
 msgstr "登录信息"
+
+#, fuzzy
+msgid "Loaded information retained"
+msgstr "登录信息"
+
+#, fuzzy
+msgid "Loaded, not saved for restart"
+msgstr "没有已保存的筛选器。"
 
 msgid "Loading canceled."
 msgstr "加载已取消。"
@@ -1157,10 +1186,6 @@ msgstr "不在书架中"
 msgid "Not installed"
 msgstr "未安装"
 
-#, fuzzy
-msgid "Not saved for restart"
-msgstr "没有已保存的筛选器。"
-
 msgid "Obsolete"
 msgstr "过时"
 
@@ -1258,6 +1283,10 @@ msgstr "阅读或下载选项已更改。自动下载会使用当前选项。"
 msgid "Reconstructed information"
 msgstr "登录信息"
 
+#, fuzzy
+msgid "Reconstructed information retained"
+msgstr "登录信息"
+
 msgid "Redownload"
 msgstr "重新下载"
 
@@ -1271,12 +1300,9 @@ msgstr "刷新章节"
 msgid "Refresh extension list"
 msgstr "刷新扩展列表"
 
-msgid "Refresh failed; information retained"
-msgstr ""
-
 #, fuzzy
-msgid "Refresh failed; information unavailable"
-msgstr "无可用描述。"
+msgid "Refresh failed"
+msgstr "清除失败项"
 
 #, fuzzy
 msgid "Refreshing"
@@ -1347,6 +1373,10 @@ msgstr "已保存筛选器的元数据不是有效的 JSON。"
 
 #, fuzzy
 msgid "Saved information"
+msgstr "漫画信息"
+
+#, fuzzy
+msgid "Saved information retained"
 msgstr "漫画信息"
 
 msgid "Scanlator filter"

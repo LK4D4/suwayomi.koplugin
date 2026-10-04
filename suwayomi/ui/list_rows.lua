@@ -52,7 +52,7 @@ function ListRows.getMangaMandatory(manga, options)
             local ok, value = pcall(require("datetime").secondsToDate, time, false)
             if ok and type(value) == "string" and value ~= "" then date = value end
         end
-        labels[#labels + 1] = date and I18n.f("Found %1", date) or I18n.t("Arrival date unknown")
+        labels[#labels + 1] = date and I18n.f("Latest found %1", date) or I18n.t("Arrival date unknown")
         if options.library_pending and options.library_pending[manga] then
             labels[#labels + 1] = I18n.t("Sync pending")
         end

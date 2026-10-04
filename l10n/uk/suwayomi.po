@@ -127,6 +127,10 @@ msgstr ""
 "ліміті зберігання, але файл, завантажений пізніше, не видаляється через те "
 "попереднє завершення."
 
+#, fuzzy
+msgid "About Library"
+msgstr "Бібліотека"
+
 msgid "Actions"
 msgstr "Дії"
 
@@ -200,9 +204,6 @@ msgstr ""
 "збережено."
 
 msgid "Arrival date unknown"
-msgstr ""
-
-msgid "Arrival dates and server counts: all scanlators."
 msgstr ""
 
 msgid "Artist"
@@ -975,9 +976,6 @@ msgstr "Перші 50 непрочитаних розділів"
 msgid "First unread"
 msgstr "Перший непрочитаний"
 
-msgid "Found %1"
-msgstr ""
-
 msgid "Genres"
 msgstr "Жанри"
 
@@ -1008,6 +1006,10 @@ msgstr "У бібліотеці"
 msgctxt "source filter tri-state"
 msgid "Include"
 msgstr "Включити"
+
+#, fuzzy
+msgid "Information unavailable"
+msgstr "Немає доступних дій"
 
 msgctxt "extension action"
 msgid "Install"
@@ -1056,7 +1058,26 @@ msgstr "Новинки"
 msgid "Latest arrivals"
 msgstr ""
 
+msgid ""
+"Latest arrivals orders manga by their newest server-discovered chapter.\n"
+"\n"
+"Server unread is the loaded or saved server aggregate, not total chapters, "
+"downloads, or new chapters since your last visit.\n"
+"\n"
+"Latest found is chapter discovery time. Imported old chapters may look "
+"recent. Counts and dates cover all scanlators; reading uses your saved "
+"scanlator filter.\n"
+"\n"
+"Sync pending means local read choices await synchronization.\n"
+"\n"
+"Library Refresh reloads known server data. It does not discover chapters "
+"from sources."
+msgstr ""
+
 msgid "Latest arrivals unavailable; using Title"
+msgstr ""
+
+msgid "Latest found %1"
 msgstr ""
 
 msgid "Latest manga is not supported by this source."
@@ -1081,6 +1102,14 @@ msgstr ""
 #, fuzzy
 msgid "Loaded information"
 msgstr "Дані входу"
+
+#, fuzzy
+msgid "Loaded information retained"
+msgstr "Дані входу"
+
+#, fuzzy
+msgid "Loaded, not saved for restart"
+msgstr "Немає збережених фільтрів."
 
 msgid "Loading canceled."
 msgstr "Завантаження скасовано."
@@ -1269,10 +1298,6 @@ msgstr "Не в бібліотеці"
 msgid "Not installed"
 msgstr "Не встановлено"
 
-#, fuzzy
-msgid "Not saved for restart"
-msgstr "Немає збережених фільтрів."
-
 msgid "Obsolete"
 msgstr "Застаріле"
 
@@ -1376,6 +1401,10 @@ msgstr ""
 msgid "Reconstructed information"
 msgstr "Дані входу"
 
+#, fuzzy
+msgid "Reconstructed information retained"
+msgstr "Дані входу"
+
 msgid "Redownload"
 msgstr "Завантажити заново"
 
@@ -1389,12 +1418,9 @@ msgstr "Оновити розділи"
 msgid "Refresh extension list"
 msgstr "Оновити список розширень"
 
-msgid "Refresh failed; information retained"
-msgstr ""
-
 #, fuzzy
-msgid "Refresh failed; information unavailable"
-msgstr "Опис недоступний."
+msgid "Refresh failed"
+msgstr "Очистити невдалі"
 
 #, fuzzy
 msgid "Refreshing"
@@ -1466,6 +1492,10 @@ msgstr "Метадані збережених фільтрів не є коре�
 
 #, fuzzy
 msgid "Saved information"
+msgstr "Інформація про манґу"
+
+#, fuzzy
+msgid "Saved information retained"
 msgstr "Інформація про манґу"
 
 msgid "Scanlator filter"

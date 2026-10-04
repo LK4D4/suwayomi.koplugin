@@ -218,6 +218,28 @@ describe("suwayomi/ui/list_menu", function()
         assert.is_nil(menu.items_mandatory_font_size)
     end)
 
+    it("updates the visible native subtitle before recalculating pagination, preserving the page", function()
+        local ListMenu = require("suwayomi/ui/list_menu")
+        local visible_subtitle, updated = nil, false
+        local menu = {
+            page = 3,
+            subtitle = "Saved information",
+            title_bar = { setSubTitle = function(_, text, no_refresh)
+                visible_subtitle = text
+                assert.is_true(no_refresh)
+            end },
+            _suwayomi_list_menu_installed = true,
+            updateItems = function(self)
+                assert.are.equal("Loaded, not saved for restart", visible_subtitle)
+                assert.are.equal(3, self.page)
+                updated = true
+            end,
+        }
+        ListMenu.update(menu, { subtitle = "Loaded, not saved for restart", item_table = {} })
+        assert.is_true(updated)
+        assert.are.equal(visible_subtitle, menu.subtitle)
+    end)
+
     it("lets callers override list layout defaults", function()
         local ListMenu = require("suwayomi/ui/list_menu")
 
