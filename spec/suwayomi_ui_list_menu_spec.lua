@@ -224,7 +224,7 @@ describe("suwayomi/ui/list_menu", function()
         local menu = {
             page = 3,
             subtitle = "Saved information",
-            title_bar = { setSubTitle = function(_, text, no_refresh)
+            title_bar = { subtitle = "Saved information", setSubTitle = function(_, text, no_refresh)
                 visible_subtitle = text
                 assert.is_true(no_refresh)
             end },
@@ -235,7 +235,13 @@ describe("suwayomi/ui/list_menu", function()
                 updated = true
             end,
         }
-        ListMenu.update(menu, { subtitle = "Loaded, not saved for restart", item_table = {} })
+        require("suwayomi/ui/menu_utils").applyTitleBarOptions = function(current)
+            -- Native shrink-to-fit setTitle rebuilds its subtitle from stored text.
+            visible_subtitle = current.title_bar.subtitle
+            return current
+        end
+        ListMenu.update(menu, { title = "Suwayomi Library",
+            subtitle = "Loaded, not saved for restart", item_table = {} })
         assert.is_true(updated)
         assert.are.equal(visible_subtitle, menu.subtitle)
     end)

@@ -1252,6 +1252,8 @@ function ListMenu.update(menu, options)
     if options.subtitle ~= nil then
         menu.subtitle = options.subtitle
         if menu.title_bar and menu.title_bar.setSubTitle then
+            -- Native setTitle may rebuild the subtitle from this stored value.
+            menu.title_bar.subtitle = options.subtitle
             menu.title_bar:setSubTitle(options.subtitle, true)
         end
     end
