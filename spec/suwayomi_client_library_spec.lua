@@ -30,6 +30,7 @@ describe("saved-first Library browsing", function()
                 end,
                 updateLibraryMangaMenu = function(menu, rows, select, options)
                     menu.rows, menu.select, menu.options = rows, select, options
+                    if options.itemnumber then menu.page = 1 end
                 end,
                 showLibraryCategoryMenu = function(rows, select, options)
                     local menu = { rows = rows, select = select, options = options, categories = true,
@@ -92,6 +93,87 @@ describe("saved-first Library browsing", function()
         assert.are.equal(5, views[2].rows[1].id)
     end)
 
+    local function sortChoices(options)
+        local result = {}
+        for _, action in ipairs(options.actions) do
+            if action.id:match("^sort_") then result[#result + 1] = { action.id, action.text, action.checked } end
+        end
+        return result
+    end
+
+    it("checks the effective sort and resets only explicit sort selections to the first page", function()
+        local listing = { categories = {}, arrivals_supported = true, manga = {
+            { id = 7, title = "Zulu", latest_fetched_at = 1800000000 },
+            { id = 8, title = "Alpha", latest_fetched_at = 1700000000 },
+        } }
+        local client, requests, views, _, _, _, title = fixture(listing)
+        local saves = 0
+        client.settings.saveLibraryCache = function() saves = saves + 1; return listing end
+        client:showLibrary()
+        local menu = views[1]
+        assert.same({ { "sort_latest_arrivals", "Sort by latest arrivals", true },
+            { "sort_title", "Sort by title", false } }, sortChoices(title()))
+        for _, id in ipairs({ "sort_latest_arrivals", "sort_title", "sort_title", "sort_latest_arrivals" }) do
+            menu.page = 3
+            title().onSelect({ id = id })
+            assert.are.equal(1, menu.page)
+            assert.are.equal(1, menu.options.itemnumber)
+            assert.are.equal(id == "sort_title" and 8 or 7, menu.rows[1].id)
+            local choices = sortChoices(title())
+            assert.are.equal(id == "sort_latest_arrivals", choices[1][3])
+            assert.are.equal(id == "sort_title", choices[2][3])
+            assert.are.equal(1, #requests)
+            assert.are.equal(0, saves)
+            assert.are.equal(7, listing.manga[1].id)
+        end
+        menu.page = 3
+        title().onSelect({ id = "refresh" })
+        assert.are.equal(3, menu.page)
+        assert.is_nil(menu.options.itemnumber)
+        requests[2].on_finish({ ok = true, categories = {}, manga = listing.manga, arrivals_supported = true })
+        assert.are.equal(3, menu.page)
+        assert.is_nil(menu.options.itemnumber)
+    end)
+
+    it("omits sort controls from categories and keeps supported unknown dates selectable", function()
+        local client, _, views, _, _, _, title = fixture({ categories = { { id = 1, name = "Reading" } },
+            manga = { { id = 7, title = "Unknown" } }, arrivals_supported = true })
+        client.settings.loadLibraryCategoryPickerBehavior = function() return "always" end
+        client:showLibrary()
+        assert.same({}, sortChoices(title()))
+        assert.are.equal("refresh", title().actions[1].id)
+        assert.are.equal("about_library", title().actions[2].id)
+        views[1].select(views[1].rows[1])
+        assert.same({ { "sort_latest_arrivals", "Sort by latest arrivals", true },
+            { "sort_title", "Sort by title", false } }, sortChoices(title()))
+        title().onSelect({ id = "sort_title" })
+        assert.are.equal("title", client.library_session.sort_mode)
+        views[1].select(views[1].rows[2])
+        assert.are.equal("title", client.library_session.sort_mode)
+    end)
+
+    for _, invalidation in ipairs({ "server", "retired", "closed", "newer", "navigation" }) do
+        it("rejects stale sort controls after " .. invalidation, function()
+            local client, requests, views, _, credentials, _, title = fixture({ categories = {}, manga = {
+                { id = 7, title = "Saved" },
+            } })
+            client:showLibrary()
+            local options, session = title(), client.library_session
+            local guard = options.captureActionGuard()
+            views[1].page = 3
+            if invalidation == "server" then credentials.server_url = "http://other.test"
+            elseif invalidation == "retired" then client.plugin.suwayomi_host_retired = true
+            elseif invalidation == "closed" then views[1].options.close_callback()
+            elseif invalidation == "navigation" then client.plugin.isSuwayomiScreenActive = function() return false end
+            else client:showLibrary() end
+            assert.is_false(guard())
+            options.onSelect({ id = "sort_title" })
+            assert.are.equal("latest_arrivals", session.sort_mode)
+            assert.are.equal(3, views[1].page)
+            assert.are.equal(invalidation == "newer" and 2 or 1, #requests)
+        end)
+    end
+
     it("shows request, retained, loaded and unsaved status without losing authoritative emptiness", function()
         local client, requests, views, messages, _, _, title = fixture({ categories = {}, manga = {} })
         client:showLibrary()
@@ -127,16 +209,16 @@ describe("saved-first Library browsing", function()
         } })
         client.settings.loadLibraryCategoryPickerBehavior = function() return "always" end
         client:showLibrary()
-        title().onSelect({ id = "sort_title" })
         for index = 1, 2 do
             local menu = views[index]
+            if index == 2 then title().onSelect({ id = "sort_title" }) end
             menu.page = 3
             local session, rows = client.library_session, menu.rows
             title().onSelect({ id = "about_library" })
             assert.are.equal(session, client.library_session)
             assert.are.equal(rows, menu.rows)
             assert.are.equal(3, menu.page)
-            assert.are.equal("title", session.sort_mode)
+            assert.are.equal(index == 2 and "title" or "latest_arrivals", session.sort_mode)
             assert.are.equal(index == 2 and category or nil, session.category)
             assert.are.equal(1, #requests)
             assert.is_nil(messages[index].options)
@@ -183,12 +265,16 @@ describe("saved-first Library browsing", function()
         client:showLibrary()
         assert.are.equal(8, views[1].rows[1].id)
         assert.matches("Latest arrivals unavailable", views[1].options.library_status, 1, true)
+        assert.same({ { "sort_title", "Sort by title", true } }, sortChoices(title()))
+        assert.are.equal("latest_arrivals", client.library_session.sort_mode)
         requests[1].on_finish({ ok = false })
         assert.are.equal(8, views[1].rows[1].id)
         title().onSelect({ id = "refresh" })
         requests[2].on_finish({ ok = true, categories = {}, manga = listing.manga, arrivals_supported = true })
         assert.are.equal(7, views[1].rows[1].id)
         assert.are.equal("latest_arrivals", client.library_session.sort_mode)
+        assert.same({ { "sort_latest_arrivals", "Sort by latest arrivals", true },
+            { "sort_title", "Sort by title", false } }, sortChoices(title()))
     end)
 
     it("retains the session sort across categories and metadata-only nested actions", function()
@@ -199,8 +285,8 @@ describe("saved-first Library browsing", function()
         } })
         client.settings.loadLibraryCategoryPickerBehavior = function() return "always" end
         client:showLibrary()
-        title().onSelect({ id = "sort_title" })
         views[1].select(views[1].rows[1])
+        title().onSelect({ id = "sort_title" })
         assert.are.equal(8, views[2].rows[1].id)
         views[1].select(views[1].rows[2])
         assert.are.equal(8, views[2].rows[1].id)

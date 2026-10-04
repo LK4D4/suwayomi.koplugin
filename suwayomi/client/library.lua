@@ -151,15 +151,21 @@ local function refreshLibrary(self, session, background)
     return true
 end
 
-local function menuOptions(self, session)
+local function menuOptions(self, session, manga_list)
+    local actions = { { id = "refresh", text = I18n.t("Refresh") } }
+    if manga_list then
+        local arrivals_supported = session.listing.arrivals_supported ~= false
+        if arrivals_supported then
+            actions[#actions + 1] = { id = "sort_latest_arrivals", text = I18n.t("Sort by latest arrivals"),
+                checked = session.sort_mode ~= "title" }
+        end
+        actions[#actions + 1] = { id = "sort_title", text = I18n.t("Sort by title"),
+            checked = not arrivals_supported or session.sort_mode == "title" }
+    end
+    actions[#actions + 1] = { id = "about_library", text = I18n.t("About Library") }
     local options = self:getTitleBarMenuOptions({
         title = I18n.t("Suwayomi Library"),
-        actions = {
-            { id = "refresh", text = I18n.t("Refresh") },
-            { id = "sort_latest_arrivals", text = I18n.t("Latest arrivals") },
-            { id = "sort_title", text = I18n.t("Title") },
-            { id = "about_library", text = I18n.t("About Library") },
-        },
+        actions = actions,
         captureActionGuard = function() return function() return live(self, session) end end,
         onSelect = function(action)
             if action.id == "refresh" then return refreshLibrary(self, session) end
@@ -167,9 +173,11 @@ local function menuOptions(self, session)
                 self.plugin:showMessage(I18n.t("Latest arrivals orders manga by their newest server-discovered chapter.\n\nServer unread is the loaded or saved server aggregate, not total chapters, downloads, or new chapters since your last visit.\n\nLatest found is chapter discovery time. Imported old chapters may look recent. Counts and dates cover all scanlators; reading uses your saved scanlator filter.\n\nSync pending means local read choices await synchronization.\n\nLibrary Refresh reloads known server data. It does not discover chapters from sources."))
                 return
             end
-            if action.id == "sort_latest_arrivals" or action.id == "sort_title" then
+            if manga_list and live(self, session)
+                and (action.id == "sort_title" or (action.id == "sort_latest_arrivals"
+                    and session.listing.arrivals_supported ~= false)) then
                 session.sort_mode = action.id == "sort_title" and "title" or "latest_arrivals"
-                renderLibrary(self, session)
+                renderLibrary(self, session, true)
             end
         end,
     }) or {}
@@ -225,10 +233,11 @@ local function pendingLibraryChoices(self, session, rows)
     return pending
 end
 
-local function renderManga(self, session)
+local function renderManga(self, session, reset_page)
     local rows = self:filterLibraryMangaByCategory(session.listing.manga, session.category)
     sortLibraryRows(rows, session.listing.arrivals_supported == false and "title" or session.sort_mode)
-    local options = menuOptions(self, session)
+    local options = menuOptions(self, session, true)
+    options.itemnumber = reset_page and 1 or nil
     options.library_pending = pendingLibraryChoices(self, session, rows)
     if not session.saved and #rows == 0 then
         options.empty_text = I18n.t("No saved Library information is available.")
@@ -285,7 +294,7 @@ local function renderManga(self, session)
     end
 end
 
-renderLibrary = function(self, session)
+renderLibrary = function(self, session, reset_page)
     local categories = session.listing.categories
     local behavior = self.settings:loadLibraryCategoryPickerBehavior()
     local picker = #categories > 0 and (behavior == "always" or (behavior == "automatic" and #categories > 1))
@@ -315,9 +324,9 @@ renderLibrary = function(self, session)
             session.category_menu = self.ui.showLibraryCategoryMenu(choices, select, options)
             self:trackScreen("library-categories", session.category_menu)
         end
-        if session.manga_menu then renderManga(self, session) end
+        if session.manga_menu then renderManga(self, session, reset_page) end
     else
-        renderManga(self, session)
+        renderManga(self, session, reset_page)
     end
 end
 

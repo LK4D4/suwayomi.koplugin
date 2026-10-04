@@ -1355,6 +1355,17 @@ describe("suwayomi/ui/browse", function()
         assert.are.same({ id = "m1", title = "Sousou no Frieren", unread_count = 12 }, selected_manga)
     end)
 
+    it("passes explicit Library sort position to the list widget and leaves refresh position unchanged", function()
+        local browse = require("suwayomi/ui/browse")
+        browse.showLibraryMangaMenu({ { id = 7, title = "Saved" } }, nil, { itemnumber = 1 })
+        assert.are.equal(1, shown_dialog.itemnumber)
+        local menu = shown_dialog
+        browse.updateLibraryMangaMenu(menu, { { id = 7, title = "Saved" } }, nil, { itemnumber = 1 })
+        assert.are.equal(1, menu.updated_options.itemnumber)
+        browse.updateLibraryMangaMenu(menu, { { id = 7, title = "Saved" } }, nil, {})
+        assert.is_nil(menu.updated_options.itemnumber)
+    end)
+
     it("puts Library status in the native subtitle without consuming category or manga rows", function()
         local browse = require("suwayomi/ui/browse")
         local selected

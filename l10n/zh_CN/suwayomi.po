@@ -1479,6 +1479,12 @@ msgid "Skipped %1 chapter without a verified server association."
 msgid_plural "Skipped %1 chapters without a verified server association."
 msgstr[0] ""
 
+msgid "Sort by latest arrivals"
+msgstr ""
+
+msgid "Sort by title"
+msgstr ""
+
 msgid "Source"
 msgstr "源"
 

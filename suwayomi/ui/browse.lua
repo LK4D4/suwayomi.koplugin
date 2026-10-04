@@ -1202,6 +1202,7 @@ function BrowseUI.showLibraryMangaMenu(manga_list, onSelectCallback, options)
         on_title_bar_left_tap = options.on_title_bar_left_tap,
         on_title_bar_left_hold = options.on_title_bar_left_hold,
         thumbnail_credentials = options.thumbnail_credentials,
+        itemnumber = options.itemnumber,
     }
 end
 
@@ -1220,6 +1221,7 @@ function BrowseUI.updateLibraryMangaMenu(menu, manga_list, onSelectCallback, opt
         on_title_bar_left_tap = options.on_title_bar_left_tap,
         on_title_bar_left_hold = options.on_title_bar_left_hold,
         thumbnail_credentials = options.thumbnail_credentials,
+        itemnumber = options.itemnumber,
     })
 end
 

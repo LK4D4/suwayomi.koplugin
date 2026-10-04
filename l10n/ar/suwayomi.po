@@ -1482,6 +1482,12 @@ msgstr[3] ""
 msgstr[4] ""
 msgstr[5] ""
 
+msgid "Sort by latest arrivals"
+msgstr ""
+
+msgid "Sort by title"
+msgstr ""
+
 msgid "Source"
 msgstr ""
 

@@ -1604,6 +1604,12 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
+msgid "Sort by latest arrivals"
+msgstr ""
+
+msgid "Sort by title"
+msgstr ""
+
 msgid "Source"
 msgstr "Джерело"
 
