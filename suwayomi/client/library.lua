@@ -1,6 +1,6 @@
 -- Boundary: library flow.
 --
--- Responsibility: project saved/loaded Library membership with session sorting and observational status.
+-- Responsibility: project saved/loaded Library membership with remembered sorting and observational status.
 -- Owned state: one Library session and its cancellable request on the client.
 -- Dependencies: checked settings, normal Library widgets, and the request worker.
 -- External data: only complete scoped snapshots are persisted; unassociated reconstruction permits local reading only.
@@ -178,6 +178,9 @@ local function menuOptions(self, session, manga_list)
                     and session.listing.arrivals_supported ~= false)) then
                 session.sort_mode = action.id == "sort_title" and "title" or "latest_arrivals"
                 renderLibrary(self, session, true)
+                if not self.settings:saveLibrarySortMode(session.sort_mode) then
+                    notify(self, I18n.t("Library order changed, but could not confirm it was saved for next time."))
+                end
             end
         end,
     }) or {}
@@ -397,7 +400,7 @@ function SuwayomiClient:showLibrary()
         listing = listing or reconstructLibrary(self, scope),
         saved = listing ~= nil,
         saved_for_restart = listing ~= nil,
-        sort_mode = "latest_arrivals",
+        sort_mode = self.settings:loadLibrarySortMode(),
     }
     self.library_session = session
     renderLibrary(self, session)

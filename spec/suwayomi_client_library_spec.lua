@@ -90,8 +90,53 @@ describe("saved-first Library browsing", function()
         requests[1].on_finish({ ok = true, categories = {}, manga = listing.manga, arrivals_supported = true })
         assert.same({ 4, 6, 7, 5, 9, 8 }, ids())
         client:showLibrary()
-        assert.are.equal(5, views[2].rows[1].id)
+        assert.are.equal(4, views[2].rows[1].id)
+        assert.are.equal("title", client.library_session.sort_mode)
     end)
+
+    for _, mode in ipairs({ "title", "latest_arrivals" }) do
+        it("loads confirmed " .. mode .. " order on offline reopening without saving it", function()
+            local client, requests, views, _, _, _, title = fixture({ categories = {}, manga = {
+                { id = 7, title = "Zulu", latest_fetched_at = 1800000000 },
+                { id = 8, title = "Alpha", latest_fetched_at = 1700000000 },
+            } })
+            local writes = 0
+            local save = client.settings.saveLibrarySortMode
+            client.settings.saveLibrarySortMode = function(settings, value)
+                writes = writes + 1
+                return save(settings, value)
+            end
+            client:showLibrary()
+            assert.are.equal(0, writes)
+            title().onSelect({ id = "sort_" .. mode })
+            assert.are.equal(1, writes)
+            views[1].close_callback()
+            client:showLibrary()
+            requests[2].on_finish({ ok = false })
+            assert.are.equal(mode, client.library_session.sort_mode)
+            assert.are.equal(mode == "title" and 8 or 7, views[2].rows[1].id)
+            assert.are.equal(1, writes)
+        end)
+    end
+
+    for _, error_code in ipairs({ "replacement_failed", "ambiguous_post_replacement" }) do
+        it("keeps requested order usable after " .. error_code .. " without claiming persistence", function()
+            local client, _, views, messages, _, _, title = fixture({ categories = {}, manga = {
+                { id = 7, title = "Zulu", latest_fetched_at = 1800000000 },
+                { id = 8, title = "Alpha", latest_fetched_at = 1700000000 },
+            } })
+            client.settings.saveLibrarySortMode = function() return nil, error_code end
+            client:showLibrary()
+            title().onSelect({ id = "sort_title" })
+            assert.are.equal("title", client.library_session.sort_mode)
+            assert.are.equal(8, views[1].rows[1].id)
+            assert.matches("could not confirm it was saved", messages[1].text, 1, true)
+            assert.is_true(messages[1].options.toast)
+            client:showLibrary()
+            assert.are.equal("latest_arrivals", client.library_session.sort_mode)
+            assert.are.equal(7, views[2].rows[1].id)
+        end)
+    end
 
     local function sortChoices(options)
         local result = {}
@@ -262,6 +307,8 @@ describe("saved-first Library browsing", function()
             { id = 8, title = "Alpha", latest_fetched_at = 1700000000 },
         }, arrivals_supported = false }
         local client, requests, views, _, _, _, title = fixture(listing)
+        local writes = 0
+        client.settings.saveLibrarySortMode = function() writes = writes + 1; return "title" end
         client:showLibrary()
         assert.are.equal(8, views[1].rows[1].id)
         assert.matches("Latest arrivals unavailable", views[1].options.library_status, 1, true)
@@ -275,6 +322,10 @@ describe("saved-first Library browsing", function()
         assert.are.equal("latest_arrivals", client.library_session.sort_mode)
         assert.same({ { "sort_latest_arrivals", "Sort by latest arrivals", true },
             { "sort_title", "Sort by title", false } }, sortChoices(title()))
+        assert.are.equal(0, writes)
+        client:showLibrary()
+        assert.are.equal("latest_arrivals", client.library_session.sort_mode)
+        assert.are.equal(0, writes)
     end)
 
     it("retains the session sort across categories and metadata-only nested actions", function()
@@ -284,6 +335,12 @@ describe("saved-first Library browsing", function()
             { id = 8, title = "Alpha", latest_fetched_at = 1700000000, categories = { category } },
         } })
         client.settings.loadLibraryCategoryPickerBehavior = function() return "always" end
+        local writes = 0
+        local save = client.settings.saveLibrarySortMode
+        client.settings.saveLibrarySortMode = function(settings, value)
+            writes = writes + 1
+            return save(settings, value)
+        end
         client:showLibrary()
         views[1].select(views[1].rows[1])
         title().onSelect({ id = "sort_title" })
@@ -298,6 +355,7 @@ describe("saved-first Library browsing", function()
         assert.are.equal("title", client.library_session.sort_mode)
         requests[1].on_finish({ ok = true, categories = { category }, manga = {}, arrivals_supported = true })
         assert.are.equal("title", client.library_session.sort_mode)
+        assert.are.equal(1, writes)
     end)
 
     it("does not lend snapshot scope to unassociated, invalid-ID or empty-scope rows", function()

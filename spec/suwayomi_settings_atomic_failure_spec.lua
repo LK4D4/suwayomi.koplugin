@@ -176,6 +176,53 @@ describe("suwayomi settings atomic failure handling", function()
         require("ffi/util").joinPath = saved_join_path
     end)
 
+    it("preserves confirmed Library sorting and unrelated settings after a rejected save", function()
+        assert.are.equal("title", SuwayomiSettings:saveLibrarySortMode("title"))
+        local before = io_adapter.files[settings_path]
+        io_adapter.fail_rename = true
+        local saved, err = SuwayomiSettings:saveLibrarySortMode("latest_arrivals")
+        assert.is_nil(saved)
+        assert.matches("replacement_failed", err, 1, true)
+        assert.are.equal("title", SuwayomiSettings:loadLibrarySortMode())
+        assert.are.equal(before, io_adapter.files[settings_path])
+        assert.are.equal("http://suwayomi.test", SuwayomiSettings:load().server_url)
+        assert.is_false(SuwayomiSettings:getStore():isBlocked())
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        assert.are.equal("title", SuwayomiSettings:loadLibrarySortMode())
+    end)
+
+    it("keeps confirmed sort and fences ambiguous saves until checked reconciliation", function()
+        assert.are.equal("latest_arrivals", SuwayomiSettings:saveLibrarySortMode("latest_arrivals"))
+        io_adapter.fail_sync_dir = true
+        local saved, err = SuwayomiSettings:saveLibrarySortMode("title")
+        assert.is_nil(saved)
+        assert.matches("ambiguous_post_replacement", err, 1, true)
+        assert.are.equal("latest_arrivals", SuwayomiSettings:loadLibrarySortMode())
+        assert.are.equal("latest_arrivals", stored_data.library_sort_mode)
+        assert.is_true(SuwayomiSettings:getStore():isBlocked())
+        assert.is_nil(SuwayomiSettings:saveLibrarySortMode("latest_arrivals"))
+        assert.is_nil(SuwayomiSettings:saveMaxParallelChapterDownloads(4))
+        assert.are.equal(2, SuwayomiSettings:loadMaxParallelChapterDownloads())
+        -- A cold store follows disk; the still-fenced owner retains confirmed data.
+        local restarted = SettingsStore:new({ path = settings_path, io = io_adapter })
+        assert.are.equal("title", restarted:readKey("library_sort_mode"))
+        assert.are.equal("latest_arrivals", SuwayomiSettings:loadLibrarySortMode())
+        assert.is_true(SuwayomiSettings:getStore():reconcile())
+        assert.is_false(SuwayomiSettings:getStore():isBlocked())
+        assert.are.equal("title", SuwayomiSettings:loadLibrarySortMode())
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        assert.are.equal("title", SuwayomiSettings:loadLibrarySortMode())
+        assert.are.equal(2, SuwayomiSettings:loadMaxParallelChapterDownloads())
+    end)
+
+    it("loads both confirmed sort modes from disk alone after restart", function()
+        for _, mode in ipairs({ "title", "latest_arrivals" }) do
+            assert.are.equal(mode, SuwayomiSettings:saveLibrarySortMode(mode))
+            SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+            assert.are.equal(mode, SuwayomiSettings:loadLibrarySortMode())
+        end
+    end)
+
     it("keeps the committed Library after rejected replacement and distinguishes empty after restart", function()
         local credentials = SuwayomiSettings:load()
         assert.is_nil(SuwayomiSettings:loadLibraryCache(credentials))

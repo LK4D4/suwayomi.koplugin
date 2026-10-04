@@ -967,6 +967,10 @@ msgstr ""
 msgid "Library loaded, but could not be saved for next time."
 msgstr ""
 
+msgid ""
+"Library order changed, but could not confirm it was saved for next time."
+msgstr ""
+
 msgctxt "manga view"
 msgid "List"
 msgstr ""

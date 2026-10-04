@@ -74,6 +74,13 @@ local function newClient(options)
             loadLibraryCategoryPickerBehavior = function()
                 return options.picker_behavior or "automatic"
             end,
+            loadLibrarySortMode = function()
+                return options.library_sort_mode or "latest_arrivals"
+            end,
+            saveLibrarySortMode = function(_, mode)
+                options.library_sort_mode = mode
+                return mode
+            end,
             loadBrowseSettings = function()
                 return options.browse_settings or {
                     show_nsfw_sources = false,

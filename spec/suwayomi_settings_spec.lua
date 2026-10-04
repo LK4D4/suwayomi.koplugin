@@ -4,6 +4,22 @@ describe("suwayomi/settings", function()
     local flushed
     local stored_data
 
+    it("normalizes Library sort values without writing defaults", function()
+        local settings = require("suwayomi/settings")
+        assert.are.equal("latest_arrivals", settings:loadLibrarySortMode())
+        assert.is_nil(stored_data.library_sort_mode)
+        for _, value in ipairs({ false, 0, {}, "TITLE", "unknown" }) do
+            stored_data.library_sort_mode = value
+            assert.are.equal("latest_arrivals", settings:loadLibrarySortMode())
+            assert.are.equal(value, stored_data.library_sort_mode)
+        end
+        for _, mode in ipairs({ "title", "latest_arrivals" }) do
+            assert.are.equal(mode, settings:saveLibrarySortMode(mode))
+            assert.are.equal(mode, stored_data.library_sort_mode)
+            assert.are.equal(mode, settings:loadLibrarySortMode())
+        end
+    end)
+
     before_each(function()
         flushed = false
         stored_data = {}

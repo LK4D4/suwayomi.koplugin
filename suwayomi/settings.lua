@@ -460,6 +460,22 @@ function SuwayomiSettings:saveLibraryCategoryPickerBehavior(behavior)
     return normalized
 end
 
+function SuwayomiSettings:normalizeLibrarySortMode(mode)
+    if mode == "title" or mode == "latest_arrivals" then return mode end
+    return "latest_arrivals"
+end
+
+function SuwayomiSettings:loadLibrarySortMode()
+    return self:normalizeLibrarySortMode(self:getStore():readKey("library_sort_mode"))
+end
+
+function SuwayomiSettings:saveLibrarySortMode(mode)
+    local normalized = self:normalizeLibrarySortMode(mode)
+    local ok, err = self:getStore():saveKey("library_sort_mode", normalized)
+    if not ok then return nil, err end
+    return normalized
+end
+
 function SuwayomiSettings:normalizeBrowseViewMode(mode)
     if mode == "list" or mode == "cover_only" or mode == "cover_text" then
         return mode
