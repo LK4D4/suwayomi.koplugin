@@ -140,6 +140,16 @@ local function textWidth(text, face, bold)
     return width
 end
 
+local function mandatoryWidth(text, face, inner_width)
+    text = tostring(text)
+    local width = 0
+    for line in (text .. "\n"):gmatch("(.-)\n") do
+        width = math.max(width, textWidth(line, face))
+    end
+    local fraction = text:find("\n", 1, true) and 0.4 or 0.28
+    return math.max(1, math.min(width, math.floor(inner_width * fraction)))
+end
+
 local function textBoxLineHeight(face)
     local widget = TextBoxWidget:new{
         text = "A",
@@ -421,17 +431,17 @@ function ListMenuItem:buildRowWidget(width, height)
     local mandatory_width = 0
 
     if self.mandatory then
-        mandatory_widget = TextBoxWidget:new{
+        local status_width = mandatoryWidth(self.mandatory,
+            fontFace("cfont", fontSizeForRow(14, 18, font_height)), inner_width)
+        mandatory_widget = fittingTextBox{
             text = tostring(self.mandatory),
-            face = fontFace("cfont", fontSizeForRow(14, 18, font_height)),
-            width = math.floor(inner_width * 0.28),
+            font_size = fontSizeForRow(14, 18, font_height),
+            width = status_width,
             alignment = "right",
             height = height,
-            height_adjust = true,
-            height_overflow_show_ellipsis = true,
             fgcolor = Blitbuffer.COLOR_DARK_GRAY,
         }
-        mandatory_width = math.min(mandatory_widget:getSize().w, math.floor(inner_width * 0.28))
+        mandatory_width = math.min(mandatory_widget:getSize().w, status_width)
     end
 
     local title_width = math.max(
@@ -603,10 +613,7 @@ function ListMenu.estimateItemTitleWidth(menu, item, base_height)
     local mandatory_width = 0
     if item.mandatory then
         local mandatory_face = fontFace("cfont", fontSizeForRow(14, 18, base_height))
-        mandatory_width = math.min(
-            textWidth(item.mandatory, mandatory_face),
-            math.floor(inner_width * 0.28)
-        )
+        mandatory_width = mandatoryWidth(item.mandatory, mandatory_face, inner_width)
     end
     return math.max(
         1,

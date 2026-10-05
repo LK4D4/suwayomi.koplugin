@@ -455,6 +455,81 @@ describe("suwayomi/ui/list_menu", function()
         assert.are.equal(3, calls[2].page)
     end)
 
+    it("keeps count, arrival date, and pending status visible at Palma row geometry", function()
+        local scale = 824 / 600
+        package.preload.device = function()
+            return { screen = {
+                scaleBySize = function(_, value) return math.ceil(value * scale) end,
+                getWidth = function() return 824 end,
+                getHeight = function() return 1648 end,
+            } }
+        end
+        package.preload["ui/font"] = function()
+            return { getFace = function(_, name, size)
+                return { name = name, size = size and math.ceil(size * scale) or 16 }
+            end }
+        end
+        local function measuredText()
+            return { new = function(_, options)
+                table.insert(created_textboxes, options)
+                local size = options.face.size
+                local line_height = math.ceil(size * 1.34)
+                local glyph_width = math.floor(size / 2)
+                local lines, natural_width = 0, 0
+                for paragraph in (options.text .. "\n"):gmatch("(.-)\n") do
+                    local width = #paragraph * glyph_width
+                    natural_width = math.max(natural_width, width)
+                    lines = lines + math.max(1, math.ceil(width / (options.width or math.max(1, width))))
+                end
+                local visible = options.height and math.max(1, math.floor(options.height / line_height)) or lines
+                options.line_with_ellipsis = lines > visible and visible or nil
+                function options:getSize()
+                    return { w = math.min(natural_width, self.width or natural_width),
+                        h = math.min(lines, visible) * line_height }
+                end
+                function options:free() end
+                return options
+            end }
+        end
+        package.preload["ui/widget/textboxwidget"] = measuredText
+        package.preload["ui/widget/textwidget"] = measuredText
+        local ListMenu = require("suwayomi/ui/list_menu")
+        for _, count in ipairs({ 1221, 22, 741, 12345, 123456789 }) do
+            for _, pending in ipairs({ false, true }) do
+                local status = "Server unread: " .. count .. "\nLatest found 2026-10-04"
+                    .. (pending and "\nSync pending" or "")
+                local menu = {
+                    page = 1, itemnumber = 1,
+                    item_table = { { text = "Synthetic title", subtitle = "Synthetic source",
+                        mandatory = status, thumbnail_placeholder = true,
+                        thumbnail_width = 64, thumbnail_height = 96 } },
+                    item_group = { clear = function() end },
+                    page_info = { resetLayout = function() end },
+                    return_button = { resetLayout = function() end },
+                    content_group = { resetLayout = function() end },
+                    _recalculateDimen = function(self)
+                        self.perpage, self.page_num = 1, 1
+                        self.item_width, self.item_height = 824, 132
+                        self._suwayomi_base_item_height = 132
+                        self.item_dimen = { w = 824, h = 132, copy = function(value) return value end }
+                    end,
+                    updatePageInfo = function() end,
+                    mergeTitleBarIntoLayout = function() end,
+                    show_parent = "menu", line_color = "black",
+                }
+                ListMenu.install(menu, {})
+                menu:updateItems()
+                local rendered
+                for _, widget in ipairs(created_textboxes) do
+                    if widget.text == status and widget.alignment == "right" then rendered = widget end
+                end
+                assert.is_not_nil(rendered)
+                assert.is_nil(rendered.line_with_ellipsis, "Status clipped for unread count " .. count)
+                assert.is_true(rendered:getSize().h <= 131)
+            end
+        end
+    end)
+
     it("uses compact rows for section headers", function()
         local ListMenu = require("suwayomi/ui/list_menu")
         local menu = {
