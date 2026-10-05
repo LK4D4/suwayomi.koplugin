@@ -4,7 +4,7 @@ These dated records describe the named candidate, environment, method, observed 
 
 | Record | Scope |
 | --- | --- |
-| [Issues #72–#74 Library, 2026-10-04](issues-72-74-library-2026-10-04.md) | Compact native status/help, checked explicit sorts, saved order; combined review/checks, fresh desktop and focused Palma controls, verified restoration |
+| [Issues #72–#74 Library, 2026-10-04/05](issues-72-74-library-2026-10-04.md) | Compact native status/help, checked explicit sorts, saved order; combined review/checks, desktop and Palma controls, restoration, and four-digit row-layout repair |
 | [Release review, 2026-10-04](release-review-2026-10-04.md) | Review since v1.2.1, current automated/CI gates, all eight fresh desktop upgrade scenarios, focused Library/native Next controls, dated Palma evidence, and release-preparation verdict |
 | [Issue #71 Library arrivals, 2026-10-02](issue-71-library-arrivals-2026-10-02.md) | Library sorting/counts/status, both server queries, both desktop KOReader versions, focused Palma touch/reading/offline acceptance, retained first attempts and verified profile restoration |
 | [Issue #58 native finish flow, 2026-09-27](issue-58-native-flow-acceptance-2026-09-27.md) | Native popup/automatic navigation, both-version 24-case desktop matrix, native completion comparison, isolated Palma controls and verified restoration |
