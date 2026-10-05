@@ -3,7 +3,8 @@
 -- Responsibility: project saved/loaded Library membership with remembered sorting and observational status.
 -- Owned state: one Library session and its cancellable request on the client.
 -- Dependencies: checked settings, normal Library widgets, and the request worker.
--- External data: only complete scoped snapshots are persisted; unassociated reconstruction permits local reading only.
+-- External data: complete membership and exact endpoint/manga/filter metadata are cached separately;
+-- unassociated reconstruction permits local reading only.
 
 local M = {}
 local I18n = require("suwayomi/i18n")
@@ -81,11 +82,17 @@ function SuwayomiClient:cancelLibraryNetworkRequests()
 end
 
 local renderLibrary
+local function matchingMetadata(metadata, manga, scope, filter)
+    return type(metadata) == "table" and filter ~= nil and metadata.filter == filter
+        and metadata.endpoint_scope == scope and metadata.manga_id == tostring(manga.id)
+end
+
 local function refreshLibrary(self, session, background)
     if not live(self, session) then return false end
     self:cancelLibraryNetworkRequests()
     local quiet = background and (session.saved or #session.listing.manga > 0)
     local token = {}
+    local filters = self.settings:loadMangaScanlatorFilters()
     session.request = token
     session.refreshing, session.refresh_failed = true, false
     renderLibrary(self, session)
@@ -103,7 +110,7 @@ local function refreshLibrary(self, session, background)
     local ok, active = pcall(self:getNetworkRequestJob().start, {
         owner = self.plugin,
         credentials = session.credentials,
-        request = { action = "fetch_library_snapshot" },
+        request = { action = "fetch_library_snapshot", scanlator_filters = filters },
         result_prefix = "library_request",
         timeout_seconds = self:getNetworkRequestTimeoutSeconds(),
         on_cancel = function()
@@ -119,6 +126,28 @@ local function refreshLibrary(self, session, background)
                 or type(result.manga) ~= "table" then
                 failed()
                 return
+            end
+            local previous = {}
+            for _, manga in ipairs(session.listing.manga) do previous[tostring(manga.id)] = manga end
+            for _, manga in ipairs(result.manga) do
+                local filter = self.settings:loadMangaScanlatorFilter(manga)
+                local metadata = manga.scanlator_metadata
+                if filter and filters[tostring(manga.id)] == filter and type(metadata) == "table"
+                    and metadata.filter == filter and metadata.manga_id == tostring(manga.id) then
+                    metadata.endpoint_scope = session.scope
+                    metadata.retained = nil
+                else
+                    local old = previous[tostring(manga.id)]
+                    local cached = old and old.scanlator_metadata
+                    manga.scanlator_metadata = nil
+                    if matchingMetadata(cached, manga, session.scope, filter) then
+                        metadata = {}
+                        for key, value in pairs(cached) do metadata[key] = value end
+                        metadata.retained = true
+                        manga.scanlator_metadata = metadata
+                    end
+                end
+                manga.scanlator_metadata_failed = nil
             end
             session.listing = result
             session.saved = true
@@ -170,7 +199,7 @@ local function menuOptions(self, session, manga_list)
         onSelect = function(action)
             if action.id == "refresh" then return refreshLibrary(self, session) end
             if action.id == "about_library" then
-                self.plugin:showMessage(I18n.t("Latest arrivals orders manga by their newest server-discovered chapter.\n\nServer unread is the loaded or saved server aggregate, not total chapters, downloads, or new chapters since your last visit.\n\nLatest found is chapter discovery time. Imported old chapters may look recent. Counts and dates cover all scanlators; reading uses your saved scanlator filter.\n\nSync pending means local read choices await synchronization.\n\nLibrary Refresh reloads known server data. It does not discover chapters from sources."))
+                self.plugin:showMessage(I18n.t("Latest arrivals orders manga by their newest server-discovered chapter.\n\nServer unread is the loaded or saved server count, not total chapters, downloads, or new chapters since your last visit.\n\nCounts, Latest found, and Latest arrivals use each manga's saved scanlator filter, or All scanlators when unrestricted. Missing matching information stays unknown; retained information comes from the same saved filter.\n\nLatest found is chapter discovery time, including already-read chapters. Imported old chapters may look recent.\n\nSync pending means local read choices await synchronization.\n\nLibrary Refresh reloads known server data. It does not discover chapters from sources."))
                 return
             end
             if manga_list and live(self, session)
@@ -204,6 +233,9 @@ local function menuOptions(self, session, manga_list)
     if unsaved then status[#status + 1] = information end
     if session.refreshing then status[#status + 1] = I18n.t("Refreshing") end
     if not unsaved then status[#status + 1] = information end
+    if session.scoped_retained then status[#status + 1] = I18n.t("Scanlator information retained")
+    elseif session.scoped_missing then status[#status + 1] = I18n.t("Scanlator information unavailable")
+    elseif session.scoped then status[#status + 1] = I18n.t("Saved scanlator filters") end
     if session.listing.arrivals_supported == false then
         status[#status + 1] = I18n.t("Latest arrivals unavailable; using Title")
     else
@@ -237,7 +269,28 @@ local function pendingLibraryChoices(self, session, rows)
 end
 
 local function renderManga(self, session, reset_page)
-    local rows = self:filterLibraryMangaByCategory(session.listing.manga, session.category)
+    local rows = {}
+    session.scoped, session.scoped_retained, session.scoped_missing = false, false, false
+    for _, manga in ipairs(self:filterLibraryMangaByCategory(session.listing.manga, session.category)) do
+        local filter = self.settings:loadMangaScanlatorFilter(manga)
+        if filter then
+            session.scoped = true
+            local projected = {}
+            for key, value in pairs(manga) do projected[key] = value end
+            projected.unread_count, projected.latest_fetched_at = nil, nil
+            local metadata = manga.scanlator_metadata
+            if session.saved and not manga.local_only
+                and (manga.endpoint_scope == nil or manga.endpoint_scope == session.scope)
+                and matchingMetadata(metadata, manga, session.scope, filter) then
+                projected.unread_count, projected.latest_fetched_at = metadata.unread_count, metadata.latest_fetched_at
+                session.scoped_retained = session.scoped_retained or metadata.retained == true
+            else
+                session.scoped_missing = true
+            end
+            manga = projected
+        end
+        rows[#rows + 1] = manga
+    end
     sortLibraryRows(rows, session.listing.arrivals_supported == false and "title" or session.sort_mode)
     local options = menuOptions(self, session, true)
     options.itemnumber = reset_page and 1 or nil
@@ -269,6 +322,7 @@ local function renderManga(self, session, reset_page)
                         -- Nested actions do not reload the Library snapshot's discovery/aggregate metadata.
                         updated_manga.latest_fetched_at = previous.latest_fetched_at
                         updated_manga.unread_count = previous.unread_count
+                        updated_manga.scanlator_metadata = previous.scanlator_metadata
                         session.listing.manga[index] = updated_manga
                     end
                 end

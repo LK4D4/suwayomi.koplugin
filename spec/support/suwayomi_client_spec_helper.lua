@@ -74,6 +74,8 @@ local function newClient(options)
             loadLibraryCategoryPickerBehavior = function()
                 return options.picker_behavior or "automatic"
             end,
+            loadMangaScanlatorFilters = function() return {} end,
+            loadMangaScanlatorFilter = function() return nil end,
             loadLibrarySortMode = function()
                 return options.library_sort_mode or "latest_arrivals"
             end,

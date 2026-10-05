@@ -32,6 +32,7 @@ local query_exports = {
     "_buildLegacyMangaQuery",
     "_buildLibraryMangaQuery",
     "_buildLegacyLibraryMangaQuery",
+    "_buildLibraryScanlatorQuery",
     "_buildMangaByIdQuery",
     "_buildLegacyMangaByIdQuery",
     "_buildCategoryQuery",
@@ -65,6 +66,7 @@ local parser_exports = {
     "parseUpdateExtensionResponse",
     "parseMangaResponse",
     "parseLibraryMangaResponse",
+    "parseLibraryScanlatorResponse",
     "parseMangaByIdResponse",
     "parseCategoryResponse",
     "parseUpdateMangaLibraryResponse",
@@ -328,6 +330,24 @@ function SuwayomiAPI.fetchMangaForSource(credentials, options)
         manga = manga,
         has_next_page = parse_result == true,
     }
+end
+
+function SuwayomiAPI.fetchLibraryScanlatorMetadata(credentials, scopes)
+    if type(scopes) ~= "table" or #scopes == 0 or #scopes > 20 then
+        return { ok = false, error = "Invalid scanlator-scoped Library request." }
+    end
+    for _, scope in ipairs(scopes) do
+        local id = type(scope) == "table" and tonumber(scope.manga_id)
+        if not id or id <= 0 or id > 2147483647 or id ~= math.floor(id)
+            or type(scope.filter) ~= "string" or scope.filter == "" then
+            return { ok = false, error = "Invalid scanlator-scoped Library request." }
+        end
+    end
+    local result = performGraphQLRequest(credentials, queries._buildLibraryScanlatorQuery(scopes),
+        "fetchLibraryScanlatorMetadata")
+    if not result.ok then return result end
+    local metadata, err = parsers.parseLibraryScanlatorResponse(result.response_body, scopes)
+    return { ok = metadata ~= nil, metadata = metadata, error = err }
 end
 
 function SuwayomiAPI.fetchLibraryManga(credentials, options)

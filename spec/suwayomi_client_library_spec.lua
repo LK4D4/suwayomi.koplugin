@@ -267,14 +267,137 @@ describe("saved-first Library browsing", function()
             assert.are.equal(index == 2 and category or nil, session.category)
             assert.are.equal(1, #requests)
             assert.is_nil(messages[index].options)
-            for _, text in ipairs({ "newest server-discovered chapter", "loaded or saved server aggregate",
-                "total chapters, downloads", "discovery time", "Imported old chapters", "all scanlators",
+            for _, text in ipairs({ "newest server-discovered chapter", "loaded or saved server count",
+                "total chapters, downloads", "discovery time", "Imported old chapters", "All scanlators",
                 "saved scanlator filter", "local read choices", "does not discover chapters" }) do
                 assert.matches(text, messages[index].text, 1, true)
             end
             -- Ordinary help dismissal has no Library callback or reconstruction.
             if index == 1 then menu.select(menu.rows[2]) end
         end
+    end)
+
+    local function restrictedFixture(metadata)
+        local listing = { categories = {}, manga = {
+            { id = 7, title = "Filtered", unread_count = 9, latest_fetched_at = 1900000000,
+                scanlator_metadata = metadata },
+            { id = 8, title = "Other source", unread_count = 1, latest_fetched_at = 1800000000 },
+        } }
+        local client, requests, views, messages, credentials, actions, title = fixture(listing)
+        local filters = { ["7"] = "A" }
+        client.settings.loadMangaScanlatorFilters = function()
+            local captured = {}
+            for key, value in pairs(filters) do captured[key] = value end
+            return captured
+        end
+        client.settings.loadMangaScanlatorFilter = function(_, manga) return filters[tostring(manga.id)] end
+        return client, requests, views, messages, credentials, actions, title, filters, listing
+    end
+
+    local function scopedMetadata(count, date, filter, endpoint)
+        return { manga_id = "7", filter = filter or "A", endpoint_scope = endpoint or "http://library.test",
+            unread_count = count, latest_fetched_at = date }
+    end
+
+    it("projects matching metadata without changing aggregate cache or read/download state", function()
+        local client, requests, views, _, _, _, title, _, listing = restrictedFixture(scopedMetadata(2, 1700000000))
+        local ledger = { pending = { manga_id = 7, endpoint_scope = "http://library.test", pending_read_sync = true } }
+        client.settings.loadChapterLedger = function() return ledger end
+        client:showLibrary()
+        assert.same({ ["7"] = "A" }, requests[1].request.scanlator_filters)
+        assert.are.equal(8, views[1].rows[1].id)
+        assert.are.equal(2, views[1].rows[2].unread_count)
+        assert.is_true(views[1].options.library_pending[views[1].rows[2]])
+        title().onSelect({ id = "sort_title" })
+        assert.are.equal(7, views[1].rows[1].id)
+        assert.are.equal(9, listing.manga[1].unread_count)
+        assert.are.equal(1900000000, listing.manga[1].latest_fetched_at)
+        assert.is_true(ledger.pending.pending_read_sync)
+        assert.are.equal(1, #requests)
+    end)
+
+    for name, metadata in pairs({ old_aggregate = false, wrong_filter = scopedMetadata(3, 1800000000, "B"),
+        wrong_endpoint = scopedMetadata(3, 1800000000, "A", "http://other.test"),
+        wrong_manga = { manga_id = "8", filter = "A", endpoint_scope = "http://library.test", unread_count = 3 },
+    }) do
+        it("keeps " .. name .. " cache unknown under a saved restriction", function()
+            local client, requests, views = restrictedFixture(metadata or nil)
+            client:showLibrary()
+            requests[1].on_finish({ ok = false })
+            assert.are.equal(8, views[1].rows[1].id)
+            assert.is_nil(views[1].rows[2].unread_count)
+            assert.is_nil(views[1].rows[2].latest_fetched_at)
+            assert.matches("Scanlator information unavailable", views[1].options.library_status, 1, true)
+        end)
+    end
+
+    it("retains matching scoped facts through failed metadata reads and offline reopening", function()
+        local client, requests, views = restrictedFixture(scopedMetadata(0, nil))
+        client:showLibrary()
+        requests[1].on_finish({ ok = true, categories = {}, manga = {
+            { id = 7, title = "Filtered", unread_count = 12, latest_fetched_at = 1900000001,
+                scanlator_metadata_failed = true }, { id = 8, title = "Other source" },
+        } })
+        assert.are.equal(0, views[1].rows[1].unread_count)
+        assert.is_nil(views[1].rows[1].latest_fetched_at)
+        assert.matches("Scanlator information retained", views[1].options.library_status, 1, true)
+        views[1].close_callback()
+        client:showLibrary()
+        requests[2].on_finish({ ok = false })
+        assert.are.equal(0, views[2].rows[1].unread_count)
+        assert.is_nil(views[2].rows[1].latest_fetched_at)
+    end)
+
+    it("ignores excluded arrivals but ranks matching arrivals including already-read releases", function()
+        local client, requests, views, _, _, _, title = restrictedFixture(scopedMetadata(2, 1700000000))
+        client:showLibrary()
+        requests[1].on_finish({ ok = true, categories = {}, manga = {
+            { id = 7, title = "Filtered", unread_count = 10, latest_fetched_at = 1900000001,
+                scanlator_metadata = scopedMetadata(2, 1700000000) },
+            { id = 8, title = "Other source", latest_fetched_at = 1800000000 },
+        } })
+        assert.are.equal(8, views[1].rows[1].id)
+        assert.are.equal(2, views[1].rows[2].unread_count)
+        title().onSelect({ id = "refresh" })
+        requests[2].on_finish({ ok = true, categories = {}, manga = {
+            { id = 7, title = "Filtered", scanlator_metadata = scopedMetadata(2, 1900000002) },
+            { id = 8, title = "Other source", latest_fetched_at = 1800000000 },
+        } })
+        assert.are.equal(7, views[1].rows[1].id)
+        assert.are.equal(2, views[1].rows[1].unread_count)
+        assert.are.equal(1900000002, views[1].rows[1].latest_fetched_at)
+    end)
+
+    it("rejects stale filter results and removes the restriction without leaking filtered totals", function()
+        local client, requests, views, _, _, _, title, filters = restrictedFixture(scopedMetadata(2, 1700000000))
+        client:showLibrary()
+        title().onSelect({ id = "sort_title" })
+        filters["7"] = "B"
+        requests[1].on_finish({ ok = true, categories = {}, manga = {
+            { id = 7, title = "Filtered", unread_count = 9, latest_fetched_at = 1900000000,
+                scanlator_metadata = scopedMetadata(2, 1700000000) },
+        } })
+        assert.is_nil(views[1].rows[1].unread_count)
+        assert.is_nil(client.library_session.listing.manga[1].scanlator_metadata)
+        assert.are.equal("title", client.library_session.sort_mode)
+        filters["7"] = nil
+        title().onSelect({ id = "sort_title" })
+        assert.are.equal(9, views[1].rows[1].unread_count)
+        assert.are.equal(1900000000, views[1].rows[1].latest_fetched_at)
+        assert.are.equal(1, #requests)
+    end)
+
+    it("rejects scoped results when endpoint changes during the request", function()
+        local client, requests, views, _, credentials = restrictedFixture(scopedMetadata(2, 1700000000))
+        client:showLibrary()
+        local saves = 0
+        client.settings.saveLibraryCache = function() saves = saves + 1 end
+        credentials.server_url = "http://other.test"
+        requests[1].on_finish({ ok = true, categories = {}, manga = {
+            { id = 7, title = "Foreign", scanlator_metadata = scopedMetadata(0, 1900000000) },
+        } })
+        assert.are.equal(2, views[1].rows[2].unread_count)
+        assert.are.equal(0, saves)
     end)
 
     it("qualifies server counts with only matching pending read choices, even after archive relocation", function()

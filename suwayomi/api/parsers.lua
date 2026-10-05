@@ -625,6 +625,32 @@ local function normalizeFetchedAt(chapter)
     if ok and type(rendered) == "string" and rendered ~= "" then return timestamp end
 end
 
+function Parsers.parseLibraryScanlatorResponse(response_body, scopes)
+    local payload, _, err = json.decode(response_body, 1, json.null)
+    if err or type(payload) ~= "table" or type(payload.data) ~= "table"
+        or payload.data == json.null or (type(payload.errors) == "table" and next(payload.errors)) then
+        return nil, "Could not load scanlator-scoped Library information."
+    end
+    local function count(connection)
+        local value = type(connection) == "table" and connection.totalCount
+        if type(value) == "number" and value >= 0 and value <= 9007199254740991
+            and value == math.floor(value) then return value end
+    end
+    local metadata = {}
+    for index, scope in ipairs(scopes) do
+        local unread, latest = payload.data["unread" .. index], payload.data["latest" .. index]
+        local unread_count, total = count(unread), count(latest)
+        local nodes = type(latest) == "table" and latest.nodes
+        if not unread_count or not total or type(nodes) ~= "table" or nodes == json.null
+            or (total == 0 and next(nodes) ~= nil) or (total > 0 and (#nodes ~= 1 or next(nodes, 1) ~= nil)) then
+            return nil, "Suwayomi server returned incomplete scanlator-scoped Library information."
+        end
+        metadata[tostring(scope.manga_id)] = { manga_id = tostring(scope.manga_id), filter = scope.filter,
+            unread_count = unread_count, latest_fetched_at = normalizeFetchedAt(nodes[1]) }
+    end
+    return metadata
+end
+
 function Parsers.parseLibraryMangaResponse(response_body, require_complete)
     local payload, _, err = json.decode(response_body, 1, json.null)
     if err or type(payload) ~= "table" then

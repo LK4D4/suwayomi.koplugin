@@ -93,6 +93,38 @@ describe("suwayomi/network/request_worker", function()
         assert.are.same(result, written["/settings/snapshot.json"])
     end)
 
+    it("loads restricted metadata in bounded batches without changing membership or unrestricted rows", function()
+        local api = require("suwayomi/api")
+        local filters, batches = {}, {}
+        for id = 1, 41 do filters["m" .. id] = "A" end
+        api.fetchLibraryScanlatorMetadata = function(_, scopes)
+            batches[#batches + 1] = #scopes
+            local metadata = {}
+            for _, scope in ipairs(scopes) do
+                metadata[scope.manga_id] = { manga_id = scope.manga_id, filter = scope.filter, unread_count = 0 }
+            end
+            return { ok = true, metadata = metadata }
+        end
+        local result = require("suwayomi/network/request_worker"):run({},
+            { action = "fetch_library_snapshot", scanlator_filters = filters }, "/settings/snapshot.json")
+        assert.is_true(result.ok)
+        assert.are.equal(101, #result.manga)
+        assert.same({ 20, 20, 1 }, batches)
+        assert.are.equal(0, result.manga[41].scanlator_metadata.unread_count)
+        assert.is_nil(result.manga[42].scanlator_metadata)
+    end)
+
+    it("keeps complete membership when scoped metadata is unsupported or fails", function()
+        local api = require("suwayomi/api")
+        api.fetchLibraryScanlatorMetadata = function() return { ok = false } end
+        local result = require("suwayomi/network/request_worker"):run({},
+            { action = "fetch_library_snapshot", scanlator_filters = { m1 = "Absent group" } }, "/settings/snapshot.json")
+        assert.is_true(result.ok)
+        assert.are.equal(101, #result.manga)
+        assert.is_nil(result.manga[1].scanlator_metadata)
+        assert.is_true(result.manga[1].scanlator_metadata_failed)
+    end)
+
     it("retains supported discovery metadata and capability in a complete Library snapshot", function()
         local api = require("suwayomi/api")
         api.fetchLibraryManga = function()

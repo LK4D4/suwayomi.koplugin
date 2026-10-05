@@ -1061,12 +1061,15 @@ msgstr ""
 msgid ""
 "Latest arrivals orders manga by their newest server-discovered chapter.\n"
 "\n"
-"Server unread is the loaded or saved server aggregate, not total chapters, "
+"Server unread is the loaded or saved server count, not total chapters, "
 "downloads, or new chapters since your last visit.\n"
 "\n"
-"Latest found is chapter discovery time. Imported old chapters may look "
-"recent. Counts and dates cover all scanlators; reading uses your saved "
-"scanlator filter.\n"
+"Counts, Latest found, and Latest arrivals use each manga's saved scanlator "
+"filter, or All scanlators when unrestricted. Missing matching information "
+"stays unknown; retained information comes from the same saved filter.\n"
+"\n"
+"Latest found is chapter discovery time, including already-read chapters. "
+"Imported old chapters may look recent.\n"
 "\n"
 "Sync pending means local read choices await synchronization.\n"
 "\n"
@@ -1502,8 +1505,20 @@ msgstr "Інформація про манґу"
 msgid "Saved information retained"
 msgstr "Інформація про манґу"
 
+#, fuzzy
+msgid "Saved scanlator filters"
+msgstr "Фільтр сканлейтора"
+
 msgid "Scanlator filter"
 msgstr "Фільтр сканлейтора"
+
+#, fuzzy
+msgid "Scanlator information retained"
+msgstr "Інформація про манґу"
+
+#, fuzzy
+msgid "Scanlator information unavailable"
+msgstr "Немає доступних дій"
 
 msgid "Scanlator: %1"
 msgstr "Сканлейтор: %1"

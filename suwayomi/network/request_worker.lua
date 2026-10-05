@@ -81,12 +81,36 @@ local function fetchLibraryMangaPages(credentials, categories)
     end
 end
 
-local function fetchLibrarySnapshot(credentials)
+local function fetchLibrarySnapshot(credentials, filters)
     local result = SuwayomiAPI.fetchCategories(credentials, { require_complete = true })
     if type(result) ~= "table" or result.ok ~= true or type(result.categories) ~= "table" then
         return incompleteLibraryLoad(type(result) == "table" and result.error or nil)
     end
-    return fetchLibraryMangaPages(credentials, result.categories)
+    local snapshot = fetchLibraryMangaPages(credentials, result.categories)
+    if not snapshot.ok then return snapshot end
+    local batch = {}
+    local function loadBatch()
+        if #batch == 0 then return end
+        local scoped = SuwayomiAPI.fetchLibraryScanlatorMetadata(credentials, batch)
+        for _, scope in ipairs(batch) do
+            local manga = scope.manga
+            manga.scanlator_metadata = scoped.ok and scoped.metadata[tostring(manga.id)] or nil
+            manga.scanlator_metadata_failed = not scoped.ok or nil
+        end
+        batch = {}
+    end
+    for _, manga in ipairs(snapshot.manga) do
+        local filter = type(filters) == "table" and filters[tostring(manga.id)]
+        if type(filter) == "string" and filter ~= "" then
+            batch[#batch + 1] = { manga_id = manga.id, filter = filter, manga = manga }
+            if #batch == 20 then loadBatch() end
+        end
+    end
+    loadBatch()
+    if #json.encode(snapshot) > (tonumber(SubprocessJob.max_result_bytes) or 4 * 1024 * 1024) then
+        return { ok = false, error_kind = "too_large", error = LIBRARY_TOO_LARGE_ERROR }
+    end
+    return snapshot
 end
 
 
@@ -142,7 +166,7 @@ function RequestWorker:run(credentials, request, result_path)
             return SuwayomiAPI.updateMangaLibraryState(credentials, request.manga_id, request.in_library == true)
         end
         if request.action == "fetch_library_snapshot" then
-            return fetchLibrarySnapshot(credentials)
+            return fetchLibrarySnapshot(credentials, request.scanlator_filters)
         end
         return {
             ok = false,

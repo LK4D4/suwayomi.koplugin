@@ -208,6 +208,24 @@ function Queries._buildLegacyLibraryMangaQuery(options)
     return buildLibraryMangaQuery(options, LEGACY_MANGA_FIELDS)
 end
 
+function Queries._buildLibraryScanlatorQuery(scopes)
+    local declarations, fields, variables = {}, {}, {}
+    for index, scope in ipairs(scopes) do
+        local unread, latest = "unread" .. index, "latest" .. index
+        declarations[#declarations + 1] = "$" .. unread .. ": ChapterFilterInput!"
+        declarations[#declarations + 1] = "$" .. latest .. ": ChapterFilterInput!"
+        variables[unread] = { mangaId = { equalTo = tonumber(scope.manga_id) or scope.manga_id },
+            scanlator = { equalTo = scope.filter }, isRead = { equalTo = false } }
+        variables[latest] = { mangaId = variables[unread].mangaId, scanlator = variables[unread].scanlator,
+            fetchedAt = { greaterThan = "0", lessThanOrEqualTo = "9007199254740991" } }
+        fields[#fields + 1] = unread .. ": chapters(filter: $" .. unread .. ", first: 0) { totalCount }"
+        fields[#fields + 1] = latest .. ": chapters(filter: $" .. latest
+            .. ", first: 1, order: [{by: FETCHED_AT, byType: DESC}]) { totalCount nodes { fetchedAt } }"
+    end
+    return json.encode({ query = "query GET_LIBRARY_SCANLATORS(" .. table.concat(declarations, ", ")
+        .. ") { " .. table.concat(fields, " ") .. " }", variables = variables })
+end
+
 local function buildMangaByIdQuery(manga_id, fields)
     return json.encode({
         query = "query GET_MANGA_BY_ID($filter: MangaFilterInput, $first: Int) { mangas(filter: $filter, first: $first) { totalCount nodes { "

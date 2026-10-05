@@ -887,6 +887,15 @@ function SuwayomiSettings:saveMangaKeepNextUnreadDownloads(manga, limit)
     return normalized
 end
 
+function SuwayomiSettings:loadMangaScanlatorFilters()
+    local saved = self:getStore():readKey("manga_scanlator_filters", {})
+    local filters = {}
+    for key, value in pairs(type(saved) == "table" and saved or {}) do
+        filters[tostring(key)] = self:normalizeMangaScanlatorFilter(value)
+    end
+    return filters
+end
+
 function SuwayomiSettings:loadMangaScanlatorFilter(manga)
     local key = self:getMangaSettingsKey(manga)
     if not key then

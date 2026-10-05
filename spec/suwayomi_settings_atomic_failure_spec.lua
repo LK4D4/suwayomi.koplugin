@@ -261,6 +261,26 @@ describe("suwayomi settings atomic failure handling", function()
         assert.are.equal("Original", restarted.manga[1].source.name)
     end)
 
+    it("reloads independent aggregate and exact filtered Library facts from disk alone", function()
+        local credentials = SuwayomiSettings:load()
+        local scope = SuwayomiSettings:normalizeEndpointScope(credentials.server_url)
+        assert.are.equal("Team A", SuwayomiSettings:saveMangaScanlatorFilter({ id = 7 }, "Team A"))
+        assert(SuwayomiSettings:saveLibraryCache(credentials, { categories = {}, manga = {
+            { id = 7, title = "Saved", unread_count = 9, latest_fetched_at = 1800000000,
+                scanlator_metadata = { manga_id = "7", endpoint_scope = scope, filter = "Team A",
+                    unread_count = 0, latest_fetched_at = 1700000000 } },
+        } }))
+        SuwayomiSettings:setStore(SettingsStore:new({ path = settings_path, io = io_adapter }))
+        local row = SuwayomiSettings:loadLibraryCache(credentials).manga[1]
+        assert.are.equal(9, row.unread_count)
+        assert.are.equal(1800000000, row.latest_fetched_at)
+        assert.are.equal(0, row.scanlator_metadata.unread_count)
+        assert.are.equal(1700000000, row.scanlator_metadata.latest_fetched_at)
+        assert.are.equal(scope, row.scanlator_metadata.endpoint_scope)
+        assert.same({ ["7"] = "Team A" }, SuwayomiSettings:loadMangaScanlatorFilters())
+        assert.are.equal("Team A", SuwayomiSettings:loadMangaScanlatorFilter(row))
+    end)
+
     it("rejects unusable saved Library category metadata instead of exposing broken navigation", function()
         local credentials = SuwayomiSettings:load()
         local malformed = { categories = {}, manga = { { id = 7, title = "Broken", categories = "invalid" } } }
