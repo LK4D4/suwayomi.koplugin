@@ -48,12 +48,34 @@ describe("scanlator-scoped Library API", function()
 
     it("distinguishes confirmed no matches from matching unread chapters with unknown discovery", function()
         for _, count in ipairs({ 0, 2 }) do
-            response = payload(count, 0, {})
+            response = payload(count, 0, setmetatable({}, { __jsontype = "array" }))
             local result = api.fetchLibraryScanlatorMetadata({}, scopes)
             assert.is_true(result.ok)
             assert.are.equal(count, result.metadata["7"].unread_count)
             assert.is_nil(result.metadata["7"].latest_fetched_at)
         end
+    end)
+
+    it("keeps absent and invalid timestamps unknown within valid chapter objects", function()
+        for _, chapter in ipairs({ setmetatable({}, { __jsontype = "object" }),
+            { fetchedAt = json.null }, { fetchedAt = 0 }, { fetchedAt = -1 }, { fetchedAt = 1.5 },
+            { fetchedAt = "no date" }, { fetchedAt = true }, { fetchedAt = {} },
+            { fetchedAt = "nan" }, { fetchedAt = "inf" }, { fetchedAt = "1e300" } }) do
+            response = payload(2, 1, { chapter })
+            local result = api.fetchLibraryScanlatorMetadata({}, scopes)
+            assert.is_true(result.ok)
+            assert.are.equal(2, result.metadata["7"].unread_count)
+            assert.is_nil(result.metadata["7"].latest_fetched_at)
+        end
+    end)
+
+    it("rejects the whole batch when a later manga has a malformed chapter node", function()
+        response.data.unread2 = { totalCount = 3 }
+        response.data.latest2 = { totalCount = 1, nodes = { json.null } }
+        local result = api.fetchLibraryScanlatorMetadata({}, { scopes[1], { manga_id = 8, filter = "Team B" } })
+        assert.is_false(result.ok)
+        assert.is_nil(result.metadata)
+        assert.matches("incomplete", result.error, 1, true)
     end)
 
     it("keeps manga identities distinct within a bounded batch", function()
@@ -73,6 +95,15 @@ describe("scanlator-scoped Library API", function()
         negative = payload(-1, 0, {}),
         fractional = payload(1.5, 0, {}),
         absent_nodes = payload(0, 0, json.null),
+        null_chapter = payload(3, 1, { json.null }),
+        string_chapter = payload(3, 1, { "bad" }),
+        number_chapter = payload(3, 1, { 42 }),
+        true_chapter = payload(3, 1, { true }),
+        false_chapter = payload(3, 1, { false }),
+        array_chapter = payload(3, 1, { setmetatable({}, { __jsontype = "array" }) }),
+        nested_array_chapter = payload(3, 1, { { 1, 2 } }),
+        empty_object_nodes = payload(0, 0, setmetatable({}, { __jsontype = "object" })),
+        object_nodes = payload(3, 1, { fetchedAt = "1700000000" }),
         missing_latest = payload(0, 1, {}),
         unexpected_latest = payload(0, 0, { { fetchedAt = "1" } }),
         oversized_latest = payload(0, 2, { { fetchedAt = "1" }, { fetchedAt = "2" } }),

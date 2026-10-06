@@ -642,7 +642,11 @@ function Parsers.parseLibraryScanlatorResponse(response_body, scopes)
         local unread_count, total = count(unread), count(latest)
         local nodes = type(latest) == "table" and latest.nodes
         if not unread_count or not total or type(nodes) ~= "table" or nodes == json.null
-            or (total == 0 and next(nodes) ~= nil) or (total > 0 and (#nodes ~= 1 or next(nodes, 1) ~= nil)) then
+            or (getmetatable(nodes) or {}).__jsontype ~= "array"
+            or (total == 0 and next(nodes) ~= nil)
+            or (total > 0 and (#nodes ~= 1 or next(nodes, 1) ~= nil
+                or type(nodes[1]) ~= "table" or nodes[1] == json.null
+                or (getmetatable(nodes[1]) or {}).__jsontype ~= "object")) then
             return nil, "Suwayomi server returned incomplete scanlator-scoped Library information."
         end
         metadata[tostring(scope.manga_id)] = { manga_id = tostring(scope.manga_id), filter = scope.filter,

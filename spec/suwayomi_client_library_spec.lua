@@ -1,6 +1,7 @@
 package.path = "?.lua;" .. package.path
 
 local helper = require("spec/support/suwayomi_client_spec_helper")
+local json = require("dkjson")
 
 describe("saved-first Library browsing", function()
     after_each(function()
@@ -346,6 +347,95 @@ describe("saved-first Library browsing", function()
         requests[2].on_finish({ ok = false })
         assert.are.equal(0, views[2].rows[1].unread_count)
         assert.is_nil(views[2].rows[1].latest_fetched_at)
+    end)
+
+    describe("malformed scoped responses", function()
+        local modules = { "suwayomi/api", "suwayomi/api/transport", "suwayomi/network/request_worker",
+            "suwayomi/subprocess/job" }
+        local function clearModules()
+            for _, name in ipairs(modules) do
+                package.loaded[name], package.preload[name] = nil, nil
+            end
+        end
+        before_each(clearModules)
+        after_each(clearModules)
+
+        for name, latest in pairs({
+            null_chapter = '{"totalCount":1,"nodes":[null]}',
+            scalar_chapter = '{"totalCount":1,"nodes":["bad"]}',
+            object_nodes = '{"totalCount":0,"nodes":{}}',
+        }) do
+            it("retains confirmed count, date and arrival order after " .. name .. " and cache reopening", function()
+                package.preload["suwayomi/api/transport"] = function()
+                    return { performGraphQLRequest = function(_, _, operation)
+                        local body
+                        if operation == "fetchCategories" then
+                            body = '{"data":{"categories":{"totalCount":0,"nodes":[],"pageInfo":{"hasNextPage":false}}}}'
+                        elseif operation == "fetchLibraryManga" then
+                            body = json.encode({ data = { mangas = { totalCount = 3,
+                                pageInfo = { hasNextPage = false }, nodes = {
+                                    { id = 7, title = "Filtered", unreadCount = 12,
+                                        latestFetchedChapter = { fetchedAt = "1900000001" } },
+                                    { id = 8, title = "Other source", unreadCount = 1,
+                                        latestFetchedChapter = { fetchedAt = "1700000000" } },
+                                    { id = 9, title = "New member" },
+                                } } } })
+                        else
+                            assert.are.equal("fetchLibraryScanlatorMetadata", operation)
+                            body = '{"data":{"unread1":{"totalCount":3},"latest1":' .. latest .. '}}'
+                        end
+                        return { ok = true, response_body = body }
+                    end }
+                end
+                package.preload["suwayomi/subprocess/job"] = function()
+                    return { writeResult = function() return true end }
+                end
+                local client, requests, views, messages, credentials, actions, title, _, listing =
+                    restrictedFixture(scopedMetadata(2, 1800000000))
+                listing.manga[2].latest_fetched_at = 1700000000
+                listing.manga[3] = { id = 10, title = "Removed member" }
+                local cache, writes = json.encode(listing), 0
+                client.settings.loadLibraryCache = function() return json.decode(cache) end
+                client.settings.saveLibraryCache = function(_, _, value)
+                    writes, cache = writes + 1, json.encode(value)
+                    return json.decode(cache)
+                end
+                client:showLibrary()
+                title().onSelect({ id = "sort_latest_arrivals" })
+                local result = require("suwayomi/network/request_worker"):run(credentials,
+                    requests[1].request, "/settings/synthetic-library.json")
+                requests[1].on_finish(result)
+
+                local function assertRetained(menu)
+                    local ids = {}
+                    for _, manga in ipairs(menu.rows) do ids[#ids + 1] = manga.id end
+                    assert.same({ "7", "8", "9" }, ids)
+                    assert.are.equal(2, menu.rows[1].unread_count)
+                    assert.are.equal(1800000000, menu.rows[1].latest_fetched_at)
+                    assert.are.equal("latest_arrivals", client.library_session.sort_mode)
+                    assert.matches("Scanlator information retained", menu.options.library_status, 1, true)
+                    menu.select(menu.rows[1])
+                    assert.are.equal("7", actions().manga.id)
+                    assert.are.equal("http://library.test", actions().manga.endpoint_scope)
+                    assert.is_function(actions().options.onMangaUpdated)
+                end
+                assertRetained(views[1])
+                assert.is_true(result.ok)
+                assert.are.equal(1, writes)
+                local saved = json.decode(cache).manga[1]
+                assert.are.equal(12, saved.unread_count)
+                assert.are.equal(1900000001, saved.latest_fetched_at)
+                assert.are.equal(2, saved.scanlator_metadata.unread_count)
+                assert.are.equal(1800000000, saved.scanlator_metadata.latest_fetched_at)
+                assert.is_true(saved.scanlator_metadata.retained)
+                views[1].close_callback()
+                client:showLibrary()
+                requests[2].on_finish({ ok = false })
+                assertRetained(views[2])
+                assert.are.equal(1, writes)
+                assert.same({}, messages)
+            end)
+        end
     end)
 
     it("ignores excluded arrivals but ranks matching arrivals including already-read releases", function()
