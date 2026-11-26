@@ -755,6 +755,8 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
     local head_chunks = {}
     local head_bytes_count = 0
     local tail_bytes = ""
+    local tail_chunks = {}
+    local tail_chunks_bytes = 0
     local write_error
     local started_at = now()
     local max_bytes = request_options.max_bytes or MAX_CHAPTER_ARCHIVE_RESPONSE_BYTES
@@ -790,7 +792,14 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
                     table.insert(head_chunks, head_piece)
                     head_bytes_count = head_bytes_count + #head_piece
                 end
-                tail_bytes = (tail_bytes .. chunk):sub(-65557)
+                -- Keep the archive tail without allocating a 64 KB string per chunk.
+                tail_chunks[#tail_chunks + 1] = chunk
+                tail_chunks_bytes = tail_chunks_bytes + #chunk
+                if tail_chunks_bytes > 4 * 65557 then
+                    local tail = table.concat(tail_chunks):sub(-65557)
+                    tail_chunks = { tail }
+                    tail_chunks_bytes = #tail
+                end
                 response_bytes = response_bytes + #chunk
             end
             return 1
@@ -798,6 +807,7 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
         timeout = request_options.timeout_seconds or REQUEST_TIMEOUT_SECONDS,
     }
     handle:close()
+    tail_bytes = table.concat(tail_chunks):sub(-65557)
 
     response_headers = response_headers or {}
     local content_length = tonumber(response_headers["content-length"] or response_headers["Content-Length"])
