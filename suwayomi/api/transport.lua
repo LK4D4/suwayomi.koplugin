@@ -721,6 +721,9 @@ local function downloadBinary(credentials, page_url, log_debug_event, request_op
     }
 end
 
+-- Largest zip comment (65535) plus the 22-byte end-of-central-directory record.
+local ARCHIVE_TAIL_BYTES = 65557
+
 local function downloadChapterArchive(credentials, chapter_id, target_path, log_debug_event, request_options)
     request_options = request_options or {}
     local server_url = credentials and credentials.server_url
@@ -754,7 +757,11 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
     local header_bytes_count = 0
     local head_chunks = {}
     local head_bytes_count = 0
-    local tail_bytes = ""
+    -- Recent chunks covering the archive tail (end-of-central-directory search).
+    -- Joined once at the end: rebuilding a 64 KB string for every ~2 KB socket
+    -- chunk allocated hundreds of MB per chapter and got e-reader workers
+    -- OOM-killed.
+    local tail_chunks, tail_first, tail_last, tail_length = {}, 1, 0, 0
     local write_error
     local started_at = now()
     local max_bytes = request_options.max_bytes or MAX_CHAPTER_ARCHIVE_RESPONSE_BYTES
@@ -790,7 +797,14 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
                     table.insert(head_chunks, head_piece)
                     head_bytes_count = head_bytes_count + #head_piece
                 end
-                tail_bytes = (tail_bytes .. chunk):sub(-65557)
+                tail_last = tail_last + 1
+                tail_chunks[tail_last] = chunk
+                tail_length = tail_length + #chunk
+                while tail_first < tail_last and tail_length - #tail_chunks[tail_first] >= ARCHIVE_TAIL_BYTES do
+                    tail_length = tail_length - #tail_chunks[tail_first]
+                    tail_chunks[tail_first] = nil
+                    tail_first = tail_first + 1
+                end
                 response_bytes = response_bytes + #chunk
             end
             return 1
@@ -830,7 +844,7 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
             content_length = content_length,
             header_bytes = table.concat(header_chunks),
             head_bytes = table.concat(head_chunks),
-            tail_bytes = tail_bytes,
+            tail_bytes = table.concat(tail_chunks, "", tail_first, tail_last):sub(-ARCHIVE_TAIL_BYTES),
         }
     end
 

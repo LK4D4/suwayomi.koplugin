@@ -1022,6 +1022,76 @@ describe("suwayomi/api/transport", function()
         end
     end)
 
+    -- Kindle and Kobo workers were OOM-killed while streaming large archives:
+    -- rebuilding a 64 KB tail string for every ~2 KB socket chunk allocated
+    -- hundreds of megabytes of garbage per chapter.
+    it("keeps archive download memory flat while capturing the exact tail", function()
+        local target_path = os.tmpname()
+        os.remove(target_path)
+        -- Unique chunks: LuaJIT interns strings, so repeating data would hide the churn.
+        local filler = string.rep("x", 2040)
+        local chunk_count = 2000
+        local stream_tail = {}
+
+        package.preload["ssl.https"] = function()
+            return {
+                request = function(options)
+                    for i = 1, chunk_count do
+                        local piece = ("%08d"):format(i) .. filler:sub(1, 2040 - (i % 7))
+                        assert(options.sink(piece))
+                        if i > chunk_count - 40 then table.insert(stream_tail, piece) end
+                    end
+                    return 1, 200, { ["content-type"] = "application/zip" }
+                end,
+            }
+        end
+
+        collectgarbage("collect")
+        collectgarbage("stop")
+        local before_kb = collectgarbage("count")
+        local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path, nil, {
+            total_timeout_seconds = 30,
+        })
+        local allocated_mb = (collectgarbage("count") - before_kb) / 1024
+        collectgarbage("restart")
+
+        assert.is_true(result.ok)
+        local expected_tail = table.concat(stream_tail):sub(-65557)
+        assert.are.equal(65557, #result.tail_bytes)
+        assert.is_true(result.tail_bytes == expected_tail)
+        -- Roughly 4 MB streamed; the old per-chunk concatenation allocated ~250 MB.
+        assert.is_true(allocated_mb < 16, ("allocated %.1f MB"):format(allocated_mb))
+        os.remove(target_path)
+        package.loaded["ssl.https"] = nil
+    end)
+
+    it("captures archive tails across uneven and oversized chunks", function()
+        local cases = {
+            { "short" },
+            { string.rep("a", 70000), "b" },
+            { "x", string.rep("y", 65556), "z" },
+            { string.rep("1", 30000), string.rep("2", 30000), string.rep("3", 30000) },
+        }
+        for _, chunks in ipairs(cases) do
+            local target_path = os.tmpname()
+            os.remove(target_path)
+            package.loaded["ssl.https"] = nil
+            package.preload["ssl.https"] = function()
+                return {
+                    request = function(options)
+                        for _, chunk in ipairs(chunks) do assert(options.sink(chunk)) end
+                        return 1, 200, {}
+                    end,
+                }
+            end
+            local result = transport.downloadChapterArchive(valid_credentials(), "398", target_path, nil, {})
+            assert.is_true(result.ok)
+            assert.is_true(result.tail_bytes == table.concat(chunks):sub(-65557))
+            os.remove(target_path)
+        end
+        package.loaded["ssl.https"] = nil
+    end)
+
     it("downloads chapter archives to disk and removes failed partial files", function()
         local target_path = os.tmpname()
         os.remove(target_path)
