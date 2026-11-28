@@ -26,6 +26,7 @@ local MAX_GRAPHQL_RESPONSE_BYTES = 8 * 1024 * 1024
 local MAX_BINARY_RESPONSE_BYTES = 32 * 1024 * 1024
 local MAX_CHAPTER_ARCHIVE_RESPONSE_BYTES = 512 * 1024 * 1024
 local CHAPTER_ARCHIVE_TOTAL_TIMEOUT_SECONDS = 10 * 60
+local ARCHIVE_TAIL_BYTES = 65557
 local RESPONSE_TIMEOUT_ERROR = "response timeout"
 local RESPONSE_TOO_LARGE_ERROR = "response too large"
 
@@ -754,7 +755,6 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
     local header_bytes_count = 0
     local head_chunks = {}
     local head_bytes_count = 0
-    local tail_bytes = ""
     local tail_chunks = {}
     local tail_chunks_bytes = 0
     local write_error
@@ -793,12 +793,14 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
                     head_bytes_count = head_bytes_count + #head_piece
                 end
                 -- Keep the archive tail without allocating a 64 KB string per chunk.
-                tail_chunks[#tail_chunks + 1] = chunk
-                tail_chunks_bytes = tail_chunks_bytes + #chunk
-                if tail_chunks_bytes > 4 * 65557 then
-                    local tail = table.concat(tail_chunks):sub(-65557)
-                    tail_chunks = { tail }
-                    tail_chunks_bytes = #tail
+                if #chunk > 0 then
+                    tail_chunks[#tail_chunks + 1] = chunk
+                    tail_chunks_bytes = tail_chunks_bytes + #chunk
+                    if tail_chunks_bytes > 4 * ARCHIVE_TAIL_BYTES then
+                        local tail = table.concat(tail_chunks):sub(-ARCHIVE_TAIL_BYTES)
+                        tail_chunks = { tail }
+                        tail_chunks_bytes = #tail
+                    end
                 end
                 response_bytes = response_bytes + #chunk
             end
@@ -807,7 +809,6 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
         timeout = request_options.timeout_seconds or REQUEST_TIMEOUT_SECONDS,
     }
     handle:close()
-    tail_bytes = table.concat(tail_chunks):sub(-65557)
 
     response_headers = response_headers or {}
     local content_length = tonumber(response_headers["content-length"] or response_headers["Content-Length"])
@@ -840,7 +841,7 @@ local function downloadChapterArchive(credentials, chapter_id, target_path, log_
             content_length = content_length,
             header_bytes = table.concat(header_chunks),
             head_bytes = table.concat(head_chunks),
-            tail_bytes = tail_bytes,
+            tail_bytes = table.concat(tail_chunks):sub(-ARCHIVE_TAIL_BYTES),
         }
     end
 
